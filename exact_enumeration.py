@@ -1,9 +1,13 @@
 import numpy as np
 
-from build_toric_code_examples import build_2d_toric_code
+from build_toric_code_examples import (
+    build_2d_toric_code,
+    build_2d_toric_zero_syndrome_move_data,
+)
 from linear_section import build_linear_section
 from main import (
     _build_kernel_basis_from_linear_section,
+    _build_q0_initial_chain_bits_per_start,
     _run_single_disorder_measurement,
 )
 from mcmc import draw_disorder_sample
@@ -124,6 +128,7 @@ def _run_validation_case(
         logical_observable_masks,
         checks_touching_each_qubit,
         kernel_basis,
+        zero_syndrome_move_data,
         syndrome_error_probability,
         data_error_probability,
         seed,
@@ -168,6 +173,7 @@ def _run_validation_case(
         num_measurements_per_disorder=num_measurements_per_disorder,
         num_sweeps_between_measurements=num_sweeps_between_measurements,
         rng=rng,
+        zero_syndrome_move_data=zero_syndrome_move_data,
         kernel_basis=kernel_basis,
     )
 
@@ -190,6 +196,113 @@ def _run_validation_case(
         f"{test_name} failed: max(|exact - mcmc|) = {max_abs_diff:.6f} "
         f">= {tolerance:.6f}"
     )
+
+
+def _run_zero_syndrome_move_structure_test(
+        parity_check_matrix,
+        zero_syndrome_move_data,
+        lattice_size):
+    all_moves = np.concatenate(
+        (
+            zero_syndrome_move_data["contractible_moves"],
+            zero_syndrome_move_data["winding_moves"],
+        ),
+        axis=0,
+    )
+    syndrome_bits = (
+        parity_check_matrix.astype(np.uint8) @ all_moves.T.astype(np.uint8)
+    ) % 2
+    assert not np.any(syndrome_bits), (
+        "q=0 move structure test failed: some moves are not in ker(H_Z)"
+    )
+    assert np.all(
+        zero_syndrome_move_data["contractible_moves"].sum(axis=1) == 4
+    ), "q=0 move structure test failed: local moves must have weight 4"
+    assert np.all(
+        zero_syndrome_move_data["winding_moves"].sum(axis=1) == lattice_size
+    ), "q=0 move structure test failed: winding moves must have weight L"
+
+
+def _run_q0_multi_start_validation_case(
+        test_name,
+        parity_check_matrix,
+        logical_observable_masks,
+        checks_touching_each_qubit,
+        linear_section_data,
+        zero_syndrome_move_data,
+        data_error_probability,
+        seed,
+        num_burn_in_sweeps,
+        num_measurements_per_disorder,
+        num_sweeps_between_measurements,
+        tolerance):
+    """
+    q=0 下对 4 个合法初态分别做 exact-vs-MCMC 回归。
+    """
+    num_checks, num_qubits = parity_check_matrix.shape
+    rng = np.random.default_rng(seed)
+
+    observed_syndrome_bits, disorder_data_error_bits = draw_disorder_sample(
+        num_checks=num_checks,
+        num_qubits=num_qubits,
+        syndrome_error_probability=0.0,
+        data_error_probability=data_error_probability,
+        rng=rng,
+    )
+    exact_m_u = compute_exact_logical_observable_means(
+        parity_check_matrix=parity_check_matrix,
+        observed_syndrome_bits=observed_syndrome_bits,
+        disorder_data_error_bits=disorder_data_error_bits,
+        syndrome_error_probability=0.0,
+        data_error_probability=data_error_probability,
+        logical_observable_masks=logical_observable_masks,
+    )
+    initial_chain_bits_per_start, start_sector_labels = (
+        _build_q0_initial_chain_bits_per_start(
+            observed_syndrome_bits=observed_syndrome_bits,
+            linear_section_data=linear_section_data,
+            zero_syndrome_move_data=zero_syndrome_move_data,
+            q0_num_start_chains=4,
+        )
+    )
+
+    for start_index, start_sector_label in enumerate(start_sector_labels):
+        start_rng = np.random.default_rng(seed + 100 + start_index)
+        mcmc_m_u, _ = _run_single_disorder_measurement(
+            parity_check_matrix=parity_check_matrix,
+            observed_syndrome_bits=observed_syndrome_bits,
+            disorder_data_error_bits=disorder_data_error_bits,
+            syndrome_error_probability=0.0,
+            data_error_probability=data_error_probability,
+            logical_observable_masks=logical_observable_masks,
+            checks_touching_each_qubit=checks_touching_each_qubit,
+            num_burn_in_sweeps=num_burn_in_sweeps,
+            num_measurements_per_disorder=num_measurements_per_disorder,
+            num_sweeps_between_measurements=num_sweeps_between_measurements,
+            rng=start_rng,
+            zero_syndrome_move_data=zero_syndrome_move_data,
+            initial_chain_bits=initial_chain_bits_per_start[start_index],
+        )
+
+        abs_diff = np.abs(exact_m_u - mcmc_m_u)
+        pass_flags = abs_diff < tolerance
+        for observable_index in range(logical_observable_masks.shape[0]):
+            print(
+                f"{test_name}:{start_sector_label:<2} "
+                f"{observable_index:>3d} "
+                f"{exact_m_u[observable_index]:+10.4f} "
+                f"{mcmc_m_u[observable_index]:+10.4f} "
+                f"{abs_diff[observable_index]:10.4f} "
+                f"{tolerance:10.4f} "
+                f"{'PASS' if pass_flags[observable_index] else 'FAIL':>6}"
+            )
+
+        max_abs_diff = float(np.max(abs_diff))
+        assert max_abs_diff < tolerance, (
+            f"{test_name}:{start_sector_label} failed: "
+            f"max(|exact - mcmc|) = {max_abs_diff:.6f} "
+            f">= {tolerance:.6f}"
+        )
 
 
 if __name__ == "__main__":
@@ -215,6 +328,15 @@ if __name__ == "__main__":
         parity_check_matrix=parity_check_matrix,
         linear_section_data=linear_section_data,
     )
+    zero_syndrome_move_data = build_2d_toric_zero_syndrome_move_data(
+        lattice_size=lattice_size
+    )
+    _run_zero_syndrome_move_structure_test(
+        parity_check_matrix=parity_check_matrix,
+        zero_syndrome_move_data=zero_syndrome_move_data,
+        lattice_size=lattice_size,
+    )
+    print("Test 0 passed: q=0 move structure")
 
     print(
         f"{'test_name':<10} "
@@ -232,6 +354,7 @@ if __name__ == "__main__":
         logical_observable_masks=logical_observable_masks,
         checks_touching_each_qubit=checks_touching_each_qubit,
         kernel_basis=kernel_basis,
+        zero_syndrome_move_data=None,
         syndrome_error_probability=0.05,
         data_error_probability=0.08,
         seed=20240701,
@@ -246,6 +369,7 @@ if __name__ == "__main__":
         logical_observable_masks=logical_observable_masks,
         checks_touching_each_qubit=checks_touching_each_qubit,
         kernel_basis=kernel_basis,
+        zero_syndrome_move_data=zero_syndrome_move_data,
         syndrome_error_probability=0.0,
         data_error_probability=0.08,
         seed=20240702,
@@ -260,9 +384,24 @@ if __name__ == "__main__":
         logical_observable_masks=logical_observable_masks,
         checks_touching_each_qubit=checks_touching_each_qubit,
         kernel_basis=kernel_basis,
+        zero_syndrome_move_data=None,
         syndrome_error_probability=0.02,
         data_error_probability=0.02,
         seed=20240703,
+        num_burn_in_sweeps=num_burn_in_sweeps,
+        num_measurements_per_disorder=num_measurements_per_disorder,
+        num_sweeps_between_measurements=num_sweeps_between_measurements,
+        tolerance=tolerance,
+    )
+    _run_q0_multi_start_validation_case(
+        test_name="Test 4",
+        parity_check_matrix=parity_check_matrix,
+        logical_observable_masks=logical_observable_masks,
+        checks_touching_each_qubit=checks_touching_each_qubit,
+        linear_section_data=linear_section_data,
+        zero_syndrome_move_data=zero_syndrome_move_data,
+        data_error_probability=0.08,
+        seed=20240704,
         num_burn_in_sweeps=num_burn_in_sweeps,
         num_measurements_per_disorder=num_measurements_per_disorder,
         num_sweeps_between_measurements=num_sweeps_between_measurements,

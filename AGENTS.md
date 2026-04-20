@@ -14,3 +14,7 @@
 - `build_toric_code_examples.py`：构造 toric code 输入, `toric_code_接口衔接`是这个程序的使用说明。
 - `架构设计.md`：程序设计与接口依据
 - `实验报告.md`：实验记录，后续按时间戳增量更新
+
+运行规则：
+- 运行完整实验之后要更新 `实验报告.md`
+- 版本大改并运行试验之后自动运行 `git add .` , `git commit -m "恰当的commit说明"` , `git push`, 要正确填写commit的说明
