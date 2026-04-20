@@ -15,89 +15,117 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
 
+PROJECT_ROOT = Path(__file__).resolve().parent
+DEFAULT_INPUT_PATH = (
+    PROJECT_ROOT / "data" / "scan_result_multi_L_q0_geometric_multistart.npz"
+)
+
+
 def _build_output_path(input_path, output_path):
     if output_path is not None:
         return Path(output_path)
     return Path(input_path).with_suffix(".png")
 
 
-def _plot_single_size_result(loaded_result, figure):
+def _load_q_top_std_curve(loaded_result):
+    if "q_top_std_curve" in loaded_result.files:
+        return loaded_result["q_top_std_curve"]
+    return loaded_result["q_top_std_error_curve"]
+
+
+def _load_q_top_std_curve_matrix(loaded_result):
+    if "q_top_std_curve_matrix" in loaded_result.files:
+        return loaded_result["q_top_std_curve_matrix"]
+    return loaded_result["q_top_std_error_curve_matrix"]
+
+
+def _has_q0_spread_diagnostics(loaded_result):
+    return (
+        "q0_mean_m_u_spread_linf_curve" in loaded_result.files
+        or "q0_mean_m_u_spread_linf_curve_matrix" in loaded_result.files
+    )
+
+
+def _plot_single_size_result(loaded_result, axes):
     data_error_probability_list = loaded_result["data_error_probability_list"]
     q_top_curve = loaded_result["q_top_curve"]
-    q_top_std_error_curve = loaded_result["q_top_std_error_curve"]
-    average_acceptance_rate_curve = loaded_result[
-        "average_acceptance_rate_curve"
-    ]
+    q_top_std_curve = _load_q_top_std_curve(loaded_result)
     lattice_size = int(loaded_result["lattice_size"])
 
-    axes = figure.subplots(2, 1, sharex=True)
-    axes[0].errorbar(
+    axis = axes[0]
+    axis.errorbar(
         data_error_probability_list,
         q_top_curve,
-        yerr=q_top_std_error_curve,
+        yerr=q_top_std_curve,
         marker="o",
         linewidth=1.5,
         capsize=3.0,
         label=f"L={lattice_size}",
     )
-    axes[0].set_ylabel("q_top")
-    axes[0].set_title("Toric code scan result")
-    axes[0].grid(True, alpha=0.3)
-    axes[0].legend()
-
-    axes[1].plot(
-        data_error_probability_list,
-        average_acceptance_rate_curve,
-        marker="o",
-        linewidth=1.5,
-        label=f"L={lattice_size}",
-    )
-    axes[1].set_xlabel("data error probability p")
-    axes[1].set_ylabel("acceptance rate")
-    axes[1].grid(True, alpha=0.3)
-    axes[1].legend()
+    axis.set_xlabel("data error probability p")
+    axis.set_ylabel("q_top")
+    axis.set_title("Toric code scan result")
+    axis.grid(True, alpha=0.3)
+    axis.legend(title="Error bar: disorder std dev")
+    if len(axes) > 1:
+        diagnostic_axis = axes[1]
+        diagnostic_axis.plot(
+            data_error_probability_list,
+            loaded_result["q0_mean_m_u_spread_linf_curve"],
+            marker="o",
+            linewidth=1.5,
+            label=f"L={lattice_size}",
+        )
+        diagnostic_axis.set_xlabel("data error probability p")
+        diagnostic_axis.set_ylabel("q=0 mean start spread")
+        diagnostic_axis.grid(True, alpha=0.3)
+        diagnostic_axis.legend()
     return axes
 
 
-def _plot_multi_size_result(loaded_result, figure):
+def _plot_multi_size_result(loaded_result, axes):
     data_error_probability_list = loaded_result["data_error_probability_list"]
     lattice_size_list = loaded_result["lattice_size_list"]
     q_top_curve_matrix = loaded_result["q_top_curve_matrix"]
-    q_top_std_error_curve_matrix = loaded_result["q_top_std_error_curve_matrix"]
-    average_acceptance_rate_curve_matrix = loaded_result[
-        "average_acceptance_rate_curve_matrix"
-    ]
+    q_top_std_curve_matrix = _load_q_top_std_curve_matrix(loaded_result)
 
-    axes = figure.subplots(2, 1, sharex=True)
+    axis = axes[0]
 
     for lattice_index, lattice_size in enumerate(lattice_size_list):
         label = f"L={int(lattice_size)}"
-        axes[0].errorbar(
+        axis.errorbar(
             data_error_probability_list,
             q_top_curve_matrix[lattice_index],
-            yerr=q_top_std_error_curve_matrix[lattice_index],
+            yerr=q_top_std_curve_matrix[lattice_index],
             marker="o",
             linewidth=1.5,
             capsize=3.0,
             label=label,
         )
-        axes[1].plot(
-            data_error_probability_list,
-            average_acceptance_rate_curve_matrix[lattice_index],
-            marker="o",
-            linewidth=1.5,
-            label=label,
-        )
 
-    axes[0].set_ylabel("q_top")
-    axes[0].set_title("Toric code multi-size scan result")
-    axes[0].grid(True, alpha=0.3)
-    axes[0].legend()
-
-    axes[1].set_xlabel("data error probability p")
-    axes[1].set_ylabel("acceptance rate")
-    axes[1].grid(True, alpha=0.3)
-    axes[1].legend()
+    axis.set_xlabel("data error probability p")
+    axis.set_ylabel("q_top")
+    axis.set_title("Toric code multi-size scan result")
+    axis.grid(True, alpha=0.3)
+    axis.legend(title="Error bar: disorder std dev")
+    if len(axes) > 1:
+        diagnostic_axis = axes[1]
+        q0_mean_m_u_spread_linf_curve_matrix = loaded_result[
+            "q0_mean_m_u_spread_linf_curve_matrix"
+        ]
+        for lattice_index, lattice_size in enumerate(lattice_size_list):
+            label = f"L={int(lattice_size)}"
+            diagnostic_axis.plot(
+                data_error_probability_list,
+                q0_mean_m_u_spread_linf_curve_matrix[lattice_index],
+                marker="o",
+                linewidth=1.5,
+                label=label,
+            )
+        diagnostic_axis.set_xlabel("data error probability p")
+        diagnostic_axis.set_ylabel("q=0 mean start spread")
+        diagnostic_axis.grid(True, alpha=0.3)
+        diagnostic_axis.legend()
     return axes
 
 
@@ -105,12 +133,28 @@ def plot_scan_result(input_path, output_path=None):
     output_path = _build_output_path(input_path, output_path)
 
     with np.load(input_path, allow_pickle=True) as loaded_result:
-        figure = plt.figure(figsize=(8.0, 8.0), constrained_layout=True)
+        has_q0_spread_diagnostics = _has_q0_spread_diagnostics(loaded_result)
+        if has_q0_spread_diagnostics:
+            figure, axes = plt.subplots(
+                2,
+                1,
+                figsize=(8.0, 8.0),
+                sharex=True,
+                constrained_layout=True,
+            )
+        else:
+            figure, axis = plt.subplots(
+                1,
+                1,
+                figsize=(8.0, 4.8),
+                constrained_layout=True,
+            )
+            axes = np.array([axis], dtype=object)
 
         if "q_top_curve_matrix" in loaded_result.files:
-            _plot_multi_size_result(loaded_result, figure)
+            _plot_multi_size_result(loaded_result, axes)
         elif "q_top_curve" in loaded_result.files:
-            _plot_single_size_result(loaded_result, figure)
+            _plot_single_size_result(loaded_result, axes)
         else:
             raise ValueError(
                 "Unsupported result format: missing q_top curve fields."
@@ -129,8 +173,8 @@ def main():
     parser.add_argument(
         "input_path",
         nargs="?",
-        default="scan_result_multi_L.npz",
-        help="Path to scan_result.npz or scan_result_multi_L.npz",
+        default=str(DEFAULT_INPUT_PATH),
+        help="Path to a scan_result*.npz file",
     )
     parser.add_argument(
         "-o",

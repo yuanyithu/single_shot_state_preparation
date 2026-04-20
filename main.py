@@ -1,10 +1,14 @@
 import multiprocessing
 from concurrent.futures import ProcessPoolExecutor, as_completed
+from pathlib import Path
 
 import numpy as np
 
-from build_toric_code_examples import build_2d_toric_code
-from linear_section import build_linear_section
+from build_toric_code_examples import (
+    build_2d_toric_code,
+    build_2d_toric_zero_syndrome_move_data,
+)
+from linear_section import apply_linear_section, build_linear_section
 from mcmc import (
     accumulate_logical_observables,
     draw_disorder_sample,
@@ -14,6 +18,15 @@ from preprocessing import (
     build_checks_touching_each_qubit,
     build_logical_observable_masks,
 )
+
+
+PROJECT_ROOT = Path(__file__).resolve().parent
+DATA_DIR = PROJECT_ROOT / "data"
+
+
+def _ensure_data_dir():
+    DATA_DIR.mkdir(exist_ok=True)
+    return DATA_DIR
 
 
 def _compute_log_odds(probability):
@@ -186,22 +199,22 @@ def _sample_random_kernel_move_bits(
     return generator_bits
 
 
-def _attempt_kernel_move_update(
+def _attempt_zero_syndrome_move_update(
         current_chain_bits,
         current_data_term_bits,
-        generator_bits,
+        move_bits,
         log_odds_data,
         rng):
     """
     在 q == 0 且 syndrome 固定时，沿 ker(H_Z) 方向做 Metropolis 更新。
     """
-    generator_support = generator_bits
-    support_size = int(np.count_nonzero(generator_support))
+    move_support = move_bits
+    support_size = int(np.count_nonzero(move_support))
     if support_size == 0:
         return False
 
     current_ones_on_support = int(
-        np.count_nonzero(current_data_term_bits[generator_support])
+        np.count_nonzero(current_data_term_bits[move_support])
     )
     delta_data_weight = support_size - 2 * current_ones_on_support
     log_acceptance = delta_data_weight * log_odds_data
@@ -214,8 +227,8 @@ def _attempt_kernel_move_update(
     if not accepted:
         return False
 
-    current_chain_bits[generator_support] ^= True
-    current_data_term_bits[generator_support] ^= True
+    current_chain_bits[move_support] ^= True
+    current_data_term_bits[move_support] ^= True
     return True
 
 
@@ -240,16 +253,153 @@ def _run_one_kernel_sweep_zero_syndrome(
             max_subset_size=3,
         )
         accepted_count += int(
-            _attempt_kernel_move_update(
+            _attempt_zero_syndrome_move_update(
                 current_chain_bits=current_chain_bits,
                 current_data_term_bits=current_data_term_bits,
-                generator_bits=generator_bits,
+                move_bits=generator_bits,
                 log_odds_data=log_odds_data,
                 rng=rng,
             )
         )
 
     return accepted_count
+
+
+def _run_one_geometric_sweep_zero_syndrome(
+        current_chain_bits,
+        current_data_term_bits,
+        zero_syndrome_move_data,
+        log_odds_data,
+        rng):
+    """
+    对预计算的局部闭环和 winding loop 各做一次随机顺序 sweep。
+    """
+    accepted_count = 0
+    contractible_moves = zero_syndrome_move_data["contractible_moves"]
+    winding_moves = zero_syndrome_move_data["winding_moves"]
+
+    for move_index in rng.permutation(contractible_moves.shape[0]):
+        accepted_count += int(
+            _attempt_zero_syndrome_move_update(
+                current_chain_bits=current_chain_bits,
+                current_data_term_bits=current_data_term_bits,
+                move_bits=contractible_moves[int(move_index)],
+                log_odds_data=log_odds_data,
+                rng=rng,
+            )
+        )
+
+    for move_index in rng.permutation(winding_moves.shape[0]):
+        accepted_count += int(
+            _attempt_zero_syndrome_move_update(
+                current_chain_bits=current_chain_bits,
+                current_data_term_bits=current_data_term_bits,
+                move_bits=winding_moves[int(move_index)],
+                log_odds_data=log_odds_data,
+                rng=rng,
+            )
+        )
+
+    return accepted_count
+
+
+def _count_zero_syndrome_proposals(
+        zero_syndrome_move_data=None,
+        kernel_basis=None):
+    if zero_syndrome_move_data is not None:
+        return (
+            zero_syndrome_move_data["contractible_moves"].shape[0]
+            + zero_syndrome_move_data["winding_moves"].shape[0]
+        )
+    if kernel_basis is None:
+        return 0
+    return kernel_basis.shape[0]
+
+
+def _run_one_zero_syndrome_sweep(
+        current_chain_bits,
+        current_data_term_bits,
+        log_odds_data,
+        rng,
+        zero_syndrome_move_data=None,
+        kernel_basis=None):
+    if zero_syndrome_move_data is not None:
+        return _run_one_geometric_sweep_zero_syndrome(
+            current_chain_bits=current_chain_bits,
+            current_data_term_bits=current_data_term_bits,
+            zero_syndrome_move_data=zero_syndrome_move_data,
+            log_odds_data=log_odds_data,
+            rng=rng,
+        )
+    return _run_one_kernel_sweep_zero_syndrome(
+        current_chain_bits=current_chain_bits,
+        current_data_term_bits=current_data_term_bits,
+        kernel_basis=kernel_basis,
+        log_odds_data=log_odds_data,
+        rng=rng,
+    )
+
+
+def _build_q0_start_sector_labels(q0_num_start_chains):
+    if q0_num_start_chains < 1 or q0_num_start_chains > 4:
+        raise ValueError("q0_num_start_chains must be in [1, 4]")
+    all_labels = np.array(["00", "10", "01", "11"])
+    return all_labels[:q0_num_start_chains]
+
+
+def _build_q0_initial_chain_bits_per_start(
+        observed_syndrome_bits,
+        linear_section_data,
+        zero_syndrome_move_data,
+        q0_num_start_chains):
+    """
+    用 section representative 加上两条独立 kernel winding loop 生成 q=0 初态。
+    """
+    if zero_syndrome_move_data is None:
+        raise ValueError(
+            "zero_syndrome_move_data is required for q=0 multi-start chains"
+        )
+
+    start_sector_labels = _build_q0_start_sector_labels(q0_num_start_chains)
+    start_sector_generators = zero_syndrome_move_data[
+        "start_sector_generators"
+    ]
+    section_representative = apply_linear_section(
+        observed_syndrome_bits,
+        linear_section_data,
+    )
+    initial_chain_bits_per_start = np.repeat(
+        section_representative[None, :],
+        q0_num_start_chains,
+        axis=0,
+    )
+
+    for start_index, label in enumerate(start_sector_labels):
+        if label[0] == "1":
+            initial_chain_bits_per_start[start_index] ^= (
+                start_sector_generators[0]
+            )
+        if label[1] == "1":
+            initial_chain_bits_per_start[start_index] ^= (
+                start_sector_generators[1]
+            )
+
+    return initial_chain_bits_per_start, start_sector_labels
+
+
+def _compute_q0_diagnostic_spreads(
+        q0_m_u_values_per_start,
+        q0_q_top_values_per_start):
+    pairwise_m_u_diff = np.abs(
+        q0_m_u_values_per_start[:, None, :]
+        - q0_m_u_values_per_start[None, :, :]
+    )
+    q0_m_u_spread_linf = float(np.max(pairwise_m_u_diff))
+    q0_q_top_spread = float(
+        np.max(q0_q_top_values_per_start)
+        - np.min(q0_q_top_values_per_start)
+    )
+    return q0_m_u_spread_linf, q0_q_top_spread
 
 
 def _run_single_disorder_measurement(
@@ -264,9 +414,11 @@ def _run_single_disorder_measurement(
         num_measurements_per_disorder,
         num_sweeps_between_measurements,
         rng,
+        zero_syndrome_move_data=None,
         kernel_basis=None,
         log_odds_data=None,
-        log_odds_syndrome=None):
+        log_odds_syndrome=None,
+        initial_chain_bits=None):
     """
     对固定的 (s, eta) 运行一次 MCMC，返回 (m_u_values, acceptance_rate)。
     """
@@ -276,12 +428,26 @@ def _run_single_disorder_measurement(
         log_odds_data = _compute_log_odds(data_error_probability)
     if log_odds_syndrome is None:
         log_odds_syndrome = _compute_log_odds(syndrome_error_probability)
-    if syndrome_error_probability == 0.0 and kernel_basis is None:
+    if (
+            syndrome_error_probability == 0.0
+            and zero_syndrome_move_data is None
+            and kernel_basis is None):
         linear_section_data = build_linear_section(parity_check_matrix)
         kernel_basis = _build_kernel_basis_from_linear_section(
             parity_check_matrix=parity_check_matrix,
             linear_section_data=linear_section_data,
         )
+    if syndrome_error_probability == 0.0 and initial_chain_bits is not None:
+        initial_syndrome_bits = (
+            parity_check_matrix.astype(np.uint8)
+            @ np.asarray(initial_chain_bits, dtype=np.uint8)
+        ) % 2
+        if not np.array_equal(
+                initial_syndrome_bits.astype(bool),
+                observed_syndrome_bits):
+            raise ValueError(
+                "q=0 initial_chain_bits must satisfy H_Z c = observed_syndrome_bits"
+            )
 
     (
         current_chain_bits,
@@ -293,16 +459,22 @@ def _run_single_disorder_measurement(
         disorder_data_error_bits=disorder_data_error_bits,
         parity_check_matrix=parity_check_matrix,
         rng=rng,
+        initial_chain_bits=initial_chain_bits,
+    )
+    num_zero_syndrome_proposals = _count_zero_syndrome_proposals(
+        zero_syndrome_move_data=zero_syndrome_move_data,
+        kernel_basis=kernel_basis,
     )
 
     for _ in range(num_burn_in_sweeps):
         if syndrome_error_probability == 0.0:
-            _run_one_kernel_sweep_zero_syndrome(
+            _run_one_zero_syndrome_sweep(
                 current_chain_bits=current_chain_bits,
                 current_data_term_bits=current_data_term_bits,
-                kernel_basis=kernel_basis,
                 log_odds_data=log_odds_data,
                 rng=rng,
+                zero_syndrome_move_data=zero_syndrome_move_data,
+                kernel_basis=kernel_basis,
             )
         else:
             _run_one_sweep_safe(
@@ -323,14 +495,15 @@ def _run_single_disorder_measurement(
     for _ in range(num_measurements_per_disorder):
         for _ in range(num_sweeps_between_measurements):
             if syndrome_error_probability == 0.0:
-                total_accepted_count += _run_one_kernel_sweep_zero_syndrome(
+                total_accepted_count += _run_one_zero_syndrome_sweep(
                     current_chain_bits=current_chain_bits,
                     current_data_term_bits=current_data_term_bits,
-                    kernel_basis=kernel_basis,
                     log_odds_data=log_odds_data,
                     rng=rng,
+                    zero_syndrome_move_data=zero_syndrome_move_data,
+                    kernel_basis=kernel_basis,
                 )
-                total_attempted_count += kernel_basis.shape[0]
+                total_attempted_count += num_zero_syndrome_proposals
             else:
                 total_accepted_count += _run_one_sweep_safe(
                     current_chain_bits=current_chain_bits,
@@ -365,7 +538,9 @@ def run_disorder_average_simulation(
         num_burn_in_sweeps,
         num_sweeps_between_measurements,
         num_measurements_per_disorder,
-        seed):
+        seed,
+        zero_syndrome_move_data=None,
+        q0_num_start_chains=4):
     rng = np.random.default_rng(seed)
 
     num_checks, num_qubits = parity_check_matrix.shape
@@ -380,7 +555,7 @@ def run_disorder_average_simulation(
         linear_section_data=linear_section_data,
     )
     kernel_basis = None
-    if syndrome_error_probability == 0.0:
+    if syndrome_error_probability == 0.0 and zero_syndrome_move_data is None:
         kernel_basis = _build_kernel_basis_from_linear_section(
             parity_check_matrix=parity_check_matrix,
             linear_section_data=linear_section_data,
@@ -399,6 +574,29 @@ def run_disorder_average_simulation(
         num_disorder_samples,
         dtype=np.float64,
     )
+    q0_start_sector_labels = None
+    if (
+            syndrome_error_probability == 0.0
+            and zero_syndrome_move_data is not None):
+        q0_start_sector_labels = _build_q0_start_sector_labels(
+            q0_num_start_chains
+        )
+        q0_logical_observable_mean_values_per_disorder_per_start = np.empty(
+            (num_disorder_samples, q0_num_start_chains, num_masks),
+            dtype=np.float64,
+        )
+        q0_q_top_values_per_disorder_per_start = np.empty(
+            (num_disorder_samples, q0_num_start_chains),
+            dtype=np.float64,
+        )
+        q0_m_u_spread_linf_per_disorder = np.empty(
+            num_disorder_samples,
+            dtype=np.float64,
+        )
+        q0_q_top_spread_per_disorder = np.empty(
+            num_disorder_samples,
+            dtype=np.float64,
+        )
 
     for disorder_index in range(num_disorder_samples):
         (
@@ -411,30 +609,135 @@ def run_disorder_average_simulation(
             data_error_probability=data_error_probability,
             rng=rng,
         )
+        if q0_start_sector_labels is not None:
+            (
+                initial_chain_bits_per_start,
+                _,
+            ) = _build_q0_initial_chain_bits_per_start(
+                observed_syndrome_bits=observed_syndrome_bits,
+                linear_section_data=linear_section_data,
+                zero_syndrome_move_data=zero_syndrome_move_data,
+                q0_num_start_chains=q0_num_start_chains,
+            )
+            q0_m_u_values_per_start = np.empty(
+                (q0_num_start_chains, num_masks),
+                dtype=np.float64,
+            )
+            q0_q_top_values_per_start = np.empty(
+                q0_num_start_chains,
+                dtype=np.float64,
+            )
+            q0_acceptance_rates_per_start = np.empty(
+                q0_num_start_chains,
+                dtype=np.float64,
+            )
 
-        m_u_values, acceptance_rate = _run_single_disorder_measurement(
-            parity_check_matrix=parity_check_matrix,
-            observed_syndrome_bits=observed_syndrome_bits,
-            disorder_data_error_bits=disorder_data_error_bits,
-            syndrome_error_probability=syndrome_error_probability,
-            data_error_probability=data_error_probability,
-            logical_observable_masks=logical_observable_masks,
-            checks_touching_each_qubit=checks_touching_each_qubit,
-            num_burn_in_sweeps=num_burn_in_sweeps,
-            num_measurements_per_disorder=num_measurements_per_disorder,
-            num_sweeps_between_measurements=num_sweeps_between_measurements,
-            rng=rng,
-            kernel_basis=kernel_basis,
-            log_odds_data=log_odds_data,
-            log_odds_syndrome=log_odds_syndrome,
-        )
-        q_top_value = float(np.mean(m_u_values ** 2))
+            for start_index in range(q0_num_start_chains):
+                start_seed = int(
+                    rng.integers(
+                        0,
+                        np.iinfo(np.uint64).max,
+                        dtype=np.uint64,
+                    )
+                )
+                start_rng = np.random.default_rng(start_seed)
+                (
+                    q0_m_u_values_per_start[start_index],
+                    q0_acceptance_rates_per_start[start_index],
+                ) = _run_single_disorder_measurement(
+                    parity_check_matrix=parity_check_matrix,
+                    observed_syndrome_bits=observed_syndrome_bits,
+                    disorder_data_error_bits=disorder_data_error_bits,
+                    syndrome_error_probability=syndrome_error_probability,
+                    data_error_probability=data_error_probability,
+                    logical_observable_masks=logical_observable_masks,
+                    checks_touching_each_qubit=checks_touching_each_qubit,
+                    num_burn_in_sweeps=num_burn_in_sweeps,
+                    num_measurements_per_disorder=(
+                        num_measurements_per_disorder
+                    ),
+                    num_sweeps_between_measurements=(
+                        num_sweeps_between_measurements
+                    ),
+                    rng=start_rng,
+                    zero_syndrome_move_data=zero_syndrome_move_data,
+                    kernel_basis=kernel_basis,
+                    log_odds_data=log_odds_data,
+                    log_odds_syndrome=log_odds_syndrome,
+                    initial_chain_bits=initial_chain_bits_per_start[
+                        start_index
+                    ],
+                )
+                q0_q_top_values_per_start[start_index] = float(
+                    np.mean(q0_m_u_values_per_start[start_index] ** 2)
+                )
+
+            m_u_values = np.mean(q0_m_u_values_per_start, axis=0)
+            acceptance_rate = float(np.mean(q0_acceptance_rates_per_start))
+            q_top_value = float(np.mean(m_u_values ** 2))
+            (
+                q0_m_u_spread_linf_per_disorder[disorder_index],
+                q0_q_top_spread_per_disorder[disorder_index],
+            ) = _compute_q0_diagnostic_spreads(
+                q0_m_u_values_per_start=q0_m_u_values_per_start,
+                q0_q_top_values_per_start=q0_q_top_values_per_start,
+            )
+            q0_logical_observable_mean_values_per_disorder_per_start[
+                disorder_index
+            ] = q0_m_u_values_per_start
+            q0_q_top_values_per_disorder_per_start[disorder_index] = (
+                q0_q_top_values_per_start
+            )
+        else:
+            m_u_values, acceptance_rate = _run_single_disorder_measurement(
+                parity_check_matrix=parity_check_matrix,
+                observed_syndrome_bits=observed_syndrome_bits,
+                disorder_data_error_bits=disorder_data_error_bits,
+                syndrome_error_probability=syndrome_error_probability,
+                data_error_probability=data_error_probability,
+                logical_observable_masks=logical_observable_masks,
+                checks_touching_each_qubit=checks_touching_each_qubit,
+                num_burn_in_sweeps=num_burn_in_sweeps,
+                num_measurements_per_disorder=num_measurements_per_disorder,
+                num_sweeps_between_measurements=(
+                    num_sweeps_between_measurements
+                ),
+                rng=rng,
+                zero_syndrome_move_data=zero_syndrome_move_data,
+                kernel_basis=kernel_basis,
+                log_odds_data=log_odds_data,
+                log_odds_syndrome=log_odds_syndrome,
+            )
+            q_top_value = float(np.mean(m_u_values ** 2))
 
         logical_observable_mean_values_per_disorder[disorder_index] = m_u_values
         disorder_q_top_values[disorder_index] = q_top_value
         average_acceptance_rate_per_disorder[disorder_index] = acceptance_rate
 
     disorder_average_q_top = float(np.mean(disorder_q_top_values))
+
+    if q0_start_sector_labels is not None:
+        return {
+            "disorder_q_top_values": disorder_q_top_values,
+            "disorder_average_q_top": disorder_average_q_top,
+            "logical_observable_mean_values_per_disorder": (
+                logical_observable_mean_values_per_disorder
+            ),
+            "average_acceptance_rate_per_disorder": (
+                average_acceptance_rate_per_disorder
+            ),
+            "q0_start_sector_labels": q0_start_sector_labels,
+            "q0_logical_observable_mean_values_per_disorder_per_start": (
+                q0_logical_observable_mean_values_per_disorder_per_start
+            ),
+            "q0_q_top_values_per_disorder_per_start": (
+                q0_q_top_values_per_disorder_per_start
+            ),
+            "q0_m_u_spread_linf_per_disorder": (
+                q0_m_u_spread_linf_per_disorder
+            ),
+            "q0_q_top_spread_per_disorder": q0_q_top_spread_per_disorder,
+        }
 
     return {
         "disorder_q_top_values": disorder_q_top_values,
@@ -457,7 +760,9 @@ def scan_data_error_probability(
         num_burn_in_sweeps,
         num_sweeps_between_measurements,
         num_measurements_per_disorder,
-        seed):
+        seed,
+        zero_syndrome_move_data=None,
+        q0_num_start_chains=4):
     data_error_probability_array = np.asarray(
         data_error_probability_list,
         dtype=np.float64,
@@ -465,8 +770,20 @@ def scan_data_error_probability(
     num_points = data_error_probability_array.shape[0]
 
     q_top_curve = np.empty(num_points, dtype=np.float64)
-    q_top_std_error_curve = np.empty(num_points, dtype=np.float64)
+    q_top_std_curve = np.empty(num_points, dtype=np.float64)
     average_acceptance_rate_curve = np.empty(num_points, dtype=np.float64)
+    q0_mean_m_u_spread_linf_curve = None
+    q0_mean_q_top_spread_curve = None
+
+    if syndrome_error_probability == 0.0 and zero_syndrome_move_data is not None:
+        q0_mean_m_u_spread_linf_curve = np.empty(
+            num_points,
+            dtype=np.float64,
+        )
+        q0_mean_q_top_spread_curve = np.empty(
+            num_points,
+            dtype=np.float64,
+        )
 
     for point_index, data_error_probability in enumerate(
             data_error_probability_array):
@@ -482,27 +799,47 @@ def scan_data_error_probability(
             ),
             num_measurements_per_disorder=num_measurements_per_disorder,
             seed=seed + point_index,
+            zero_syndrome_move_data=zero_syndrome_move_data,
+            q0_num_start_chains=q0_num_start_chains,
         )
 
         disorder_q_top_values = result["disorder_q_top_values"]
         q_top_curve[point_index] = result["disorder_average_q_top"]
         if num_disorder_samples == 1:
-            q_top_std_error_curve[point_index] = 0.0
+            q_top_std_curve[point_index] = 0.0
         else:
-            q_top_std_error_curve[point_index] = (
-                np.std(disorder_q_top_values, ddof=1)
-                / np.sqrt(num_disorder_samples)
+            q_top_std_curve[point_index] = np.std(
+                disorder_q_top_values,
+                ddof=1,
             )
         average_acceptance_rate_curve[point_index] = float(
             np.mean(result["average_acceptance_rate_per_disorder"])
         )
+        if q0_mean_m_u_spread_linf_curve is not None:
+            q0_mean_m_u_spread_linf_curve[point_index] = float(
+                np.mean(result["q0_m_u_spread_linf_per_disorder"])
+            )
+            q0_mean_q_top_spread_curve[point_index] = float(
+                np.mean(result["q0_q_top_spread_per_disorder"])
+            )
 
-    return {
+    scan_result = {
         "data_error_probability_list": data_error_probability_array,
         "q_top_curve": q_top_curve,
-        "q_top_std_error_curve": q_top_std_error_curve,
+        "q_top_std_curve": q_top_std_curve,
         "average_acceptance_rate_curve": average_acceptance_rate_curve,
     }
+    if q0_mean_m_u_spread_linf_curve is not None:
+        scan_result["q0_start_sector_labels"] = _build_q0_start_sector_labels(
+            q0_num_start_chains
+        )
+        scan_result["q0_mean_m_u_spread_linf_curve"] = (
+            q0_mean_m_u_spread_linf_curve
+        )
+        scan_result["q0_mean_q_top_spread_curve"] = (
+            q0_mean_q_top_spread_curve
+        )
+    return scan_result
 
 
 def _run_single_scan_point_task(task_data):
@@ -522,11 +859,17 @@ def _run_single_scan_point_task(task_data):
     num_measurements_per_disorder = (
         task_data["num_measurements_per_disorder"]
     )
+    q0_num_start_chains = task_data["q0_num_start_chains"]
     seed = task_data["seed"]
 
     parity_check_matrix, dual_logical_z_basis = build_2d_toric_code(
         lattice_size=lattice_size
     )
+    zero_syndrome_move_data = None
+    if syndrome_error_probability == 0.0:
+        zero_syndrome_move_data = build_2d_toric_zero_syndrome_move_data(
+            lattice_size=lattice_size
+        )
     simulation_result = run_disorder_average_simulation(
         parity_check_matrix=parity_check_matrix,
         dual_logical_z_basis=dual_logical_z_basis,
@@ -537,26 +880,49 @@ def _run_single_scan_point_task(task_data):
         num_sweeps_between_measurements=num_sweeps_between_measurements,
         num_measurements_per_disorder=num_measurements_per_disorder,
         seed=seed,
+        zero_syndrome_move_data=zero_syndrome_move_data,
+        q0_num_start_chains=q0_num_start_chains,
     )
 
     disorder_q_top_values = simulation_result["disorder_q_top_values"]
     if num_disorder_samples == 1:
-        q_top_std_error = 0.0
+        q_top_std = 0.0
     else:
-        q_top_std_error = float(
+        q_top_std = float(
             np.std(disorder_q_top_values, ddof=1)
-            / np.sqrt(num_disorder_samples)
         )
 
-    return {
+    task_result = {
         "lattice_index": lattice_index,
         "point_index": point_index,
         "q_top": simulation_result["disorder_average_q_top"],
-        "q_top_std_error": q_top_std_error,
+        "q_top_std": q_top_std,
         "average_acceptance_rate": float(
             np.mean(simulation_result["average_acceptance_rate_per_disorder"])
         ),
     }
+    if "q0_start_sector_labels" in simulation_result:
+        task_result["q0_mean_m_u_spread_linf"] = float(
+            np.mean(simulation_result["q0_m_u_spread_linf_per_disorder"])
+        )
+        task_result["q0_mean_q_top_spread"] = float(
+            np.mean(simulation_result["q0_q_top_spread_per_disorder"])
+        )
+        task_result["q0_logical_observable_mean_values_per_disorder_per_start"] = (
+            simulation_result[
+                "q0_logical_observable_mean_values_per_disorder_per_start"
+            ]
+        )
+        task_result["q0_q_top_values_per_disorder_per_start"] = (
+            simulation_result["q0_q_top_values_per_disorder_per_start"]
+        )
+        task_result["q0_m_u_spread_linf_per_disorder"] = simulation_result[
+            "q0_m_u_spread_linf_per_disorder"
+        ]
+        task_result["q0_q_top_spread_per_disorder"] = simulation_result[
+            "q0_q_top_spread_per_disorder"
+        ]
+    return task_result
 
 
 def _compute_parallel_worker_count(num_tasks):
@@ -576,19 +942,54 @@ def _build_multiprocessing_context():
 
 def _store_scan_point_result(
         q_top_curve_matrix,
-        q_top_std_error_curve_matrix,
+        q_top_std_curve_matrix,
         average_acceptance_rate_curve_matrix,
+        q0_mean_m_u_spread_linf_curve_matrix,
+        q0_mean_q_top_spread_curve_matrix,
+        q0_logical_observable_mean_values_per_disorder_per_start_tensor,
+        q0_q_top_values_per_disorder_per_start_tensor,
+        q0_m_u_spread_linf_per_disorder_tensor,
+        q0_q_top_spread_per_disorder_tensor,
         task_result):
     lattice_index = task_result["lattice_index"]
     point_index = task_result["point_index"]
     q_top_curve_matrix[lattice_index, point_index] = task_result["q_top"]
-    q_top_std_error_curve_matrix[lattice_index, point_index] = (
-        task_result["q_top_std_error"]
+    q_top_std_curve_matrix[lattice_index, point_index] = (
+        task_result["q_top_std"]
     )
     average_acceptance_rate_curve_matrix[
         lattice_index,
         point_index,
     ] = task_result["average_acceptance_rate"]
+    if (
+            q0_mean_m_u_spread_linf_curve_matrix is not None
+            and "q0_mean_m_u_spread_linf" in task_result):
+        q0_mean_m_u_spread_linf_curve_matrix[
+            lattice_index,
+            point_index,
+        ] = task_result["q0_mean_m_u_spread_linf"]
+        q0_mean_q_top_spread_curve_matrix[
+            lattice_index,
+            point_index,
+        ] = task_result["q0_mean_q_top_spread"]
+        q0_logical_observable_mean_values_per_disorder_per_start_tensor[
+            lattice_index,
+            point_index,
+        ] = task_result[
+            "q0_logical_observable_mean_values_per_disorder_per_start"
+        ]
+        q0_q_top_values_per_disorder_per_start_tensor[
+            lattice_index,
+            point_index,
+        ] = task_result["q0_q_top_values_per_disorder_per_start"]
+        q0_m_u_spread_linf_per_disorder_tensor[
+            lattice_index,
+            point_index,
+        ] = task_result["q0_m_u_spread_linf_per_disorder"]
+        q0_q_top_spread_per_disorder_tensor[
+            lattice_index,
+            point_index,
+        ] = task_result["q0_q_top_spread_per_disorder"]
 
 
 def scan_multiple_code_sizes(
@@ -599,7 +1000,8 @@ def scan_multiple_code_sizes(
         num_burn_in_sweeps,
         num_sweeps_between_measurements,
         num_measurements_per_disorder,
-        seed_base):
+        seed_base,
+        q0_num_start_chains=4):
     """
     扫描多个 2D toric code 尺寸，并在内部对 burn-in 做线性放大。
     """
@@ -617,7 +1019,7 @@ def scan_multiple_code_sizes(
     num_logical_qubits_list = np.empty(num_sizes, dtype=np.int64)
     effective_num_burn_in_sweeps_list = np.empty(num_sizes, dtype=np.int64)
     q_top_curve_matrix = np.empty((num_sizes, num_points), dtype=np.float64)
-    q_top_std_error_curve_matrix = np.empty(
+    q_top_std_curve_matrix = np.empty(
         (num_sizes, num_points),
         dtype=np.float64,
     )
@@ -625,6 +1027,7 @@ def scan_multiple_code_sizes(
         (num_sizes, num_points),
         dtype=np.float64,
     )
+    num_masks = None
     task_data_list = []
 
     for lattice_index, lattice_size in enumerate(lattice_size_array):
@@ -633,6 +1036,8 @@ def scan_multiple_code_sizes(
         )
         num_qubits = parity_check_matrix.shape[1]
         num_logical_qubits = dual_logical_z_basis.shape[0]
+        if num_masks is None:
+            num_masks = (1 << num_logical_qubits) - 1
         effective_num_burn_in_sweeps = int(np.ceil(
             num_burn_in_sweeps
             * (num_qubits / burn_in_scaling_reference_num_qubits)
@@ -661,10 +1066,60 @@ def scan_multiple_code_sizes(
                 "num_measurements_per_disorder": (
                     num_measurements_per_disorder
                 ),
+                "q0_num_start_chains": q0_num_start_chains,
                 "seed": (
                     seed_base + lattice_index * num_points + point_index
                 ),
             })
+
+    q0_start_sector_labels = None
+    q0_mean_m_u_spread_linf_curve_matrix = None
+    q0_mean_q_top_spread_curve_matrix = None
+    q0_logical_observable_mean_values_per_disorder_per_start_tensor = None
+    q0_q_top_values_per_disorder_per_start_tensor = None
+    q0_m_u_spread_linf_per_disorder_tensor = None
+    q0_q_top_spread_per_disorder_tensor = None
+    if syndrome_error_probability == 0.0:
+        q0_start_sector_labels = _build_q0_start_sector_labels(
+            q0_num_start_chains
+        )
+        q0_mean_m_u_spread_linf_curve_matrix = np.empty(
+            (num_sizes, num_points),
+            dtype=np.float64,
+        )
+        q0_mean_q_top_spread_curve_matrix = np.empty(
+            (num_sizes, num_points),
+            dtype=np.float64,
+        )
+        q0_logical_observable_mean_values_per_disorder_per_start_tensor = (
+            np.empty(
+                (
+                    num_sizes,
+                    num_points,
+                    num_disorder_samples,
+                    q0_num_start_chains,
+                    num_masks,
+                ),
+                dtype=np.float64,
+            )
+        )
+        q0_q_top_values_per_disorder_per_start_tensor = np.empty(
+            (
+                num_sizes,
+                num_points,
+                num_disorder_samples,
+                q0_num_start_chains,
+            ),
+            dtype=np.float64,
+        )
+        q0_m_u_spread_linf_per_disorder_tensor = np.empty(
+            (num_sizes, num_points, num_disorder_samples),
+            dtype=np.float64,
+        )
+        q0_q_top_spread_per_disorder_tensor = np.empty(
+            (num_sizes, num_points, num_disorder_samples),
+            dtype=np.float64,
+        )
 
     num_tasks = len(task_data_list)
     num_workers = _compute_parallel_worker_count(num_tasks)
@@ -675,9 +1130,27 @@ def scan_multiple_code_sizes(
         for task_result in task_results:
             _store_scan_point_result(
                 q_top_curve_matrix=q_top_curve_matrix,
-                q_top_std_error_curve_matrix=q_top_std_error_curve_matrix,
+                q_top_std_curve_matrix=q_top_std_curve_matrix,
                 average_acceptance_rate_curve_matrix=(
                     average_acceptance_rate_curve_matrix
+                ),
+                q0_mean_m_u_spread_linf_curve_matrix=(
+                    q0_mean_m_u_spread_linf_curve_matrix
+                ),
+                q0_mean_q_top_spread_curve_matrix=(
+                    q0_mean_q_top_spread_curve_matrix
+                ),
+                q0_logical_observable_mean_values_per_disorder_per_start_tensor=(
+                    q0_logical_observable_mean_values_per_disorder_per_start_tensor
+                ),
+                q0_q_top_values_per_disorder_per_start_tensor=(
+                    q0_q_top_values_per_disorder_per_start_tensor
+                ),
+                q0_m_u_spread_linf_per_disorder_tensor=(
+                    q0_m_u_spread_linf_per_disorder_tensor
+                ),
+                q0_q_top_spread_per_disorder_tensor=(
+                    q0_q_top_spread_per_disorder_tensor
                 ),
                 task_result=task_result,
             )
@@ -694,11 +1167,29 @@ def scan_multiple_code_sizes(
                     task_result = future.result()
                     _store_scan_point_result(
                         q_top_curve_matrix=q_top_curve_matrix,
-                        q_top_std_error_curve_matrix=(
-                            q_top_std_error_curve_matrix
+                        q_top_std_curve_matrix=(
+                            q_top_std_curve_matrix
                         ),
                         average_acceptance_rate_curve_matrix=(
                             average_acceptance_rate_curve_matrix
+                        ),
+                        q0_mean_m_u_spread_linf_curve_matrix=(
+                            q0_mean_m_u_spread_linf_curve_matrix
+                        ),
+                        q0_mean_q_top_spread_curve_matrix=(
+                            q0_mean_q_top_spread_curve_matrix
+                        ),
+                        q0_logical_observable_mean_values_per_disorder_per_start_tensor=(
+                            q0_logical_observable_mean_values_per_disorder_per_start_tensor
+                        ),
+                        q0_q_top_values_per_disorder_per_start_tensor=(
+                            q0_q_top_values_per_disorder_per_start_tensor
+                        ),
+                        q0_m_u_spread_linf_per_disorder_tensor=(
+                            q0_m_u_spread_linf_per_disorder_tensor
+                        ),
+                        q0_q_top_spread_per_disorder_tensor=(
+                            q0_q_top_spread_per_disorder_tensor
                         ),
                         task_result=task_result,
                     )
@@ -707,16 +1198,34 @@ def scan_multiple_code_sizes(
             for task_result in task_results:
                 _store_scan_point_result(
                     q_top_curve_matrix=q_top_curve_matrix,
-                    q_top_std_error_curve_matrix=(
-                        q_top_std_error_curve_matrix
+                    q_top_std_curve_matrix=(
+                        q_top_std_curve_matrix
                     ),
                     average_acceptance_rate_curve_matrix=(
                         average_acceptance_rate_curve_matrix
                     ),
+                    q0_mean_m_u_spread_linf_curve_matrix=(
+                        q0_mean_m_u_spread_linf_curve_matrix
+                    ),
+                    q0_mean_q_top_spread_curve_matrix=(
+                        q0_mean_q_top_spread_curve_matrix
+                    ),
+                    q0_logical_observable_mean_values_per_disorder_per_start_tensor=(
+                        q0_logical_observable_mean_values_per_disorder_per_start_tensor
+                    ),
+                    q0_q_top_values_per_disorder_per_start_tensor=(
+                        q0_q_top_values_per_disorder_per_start_tensor
+                    ),
+                    q0_m_u_spread_linf_per_disorder_tensor=(
+                        q0_m_u_spread_linf_per_disorder_tensor
+                    ),
+                    q0_q_top_spread_per_disorder_tensor=(
+                        q0_q_top_spread_per_disorder_tensor
+                    ),
                     task_result=task_result,
                 )
 
-    return {
+    scan_result = {
         "lattice_size_list": lattice_size_array,
         "num_qubits_list": num_qubits_list,
         "num_logical_qubits_list": num_logical_qubits_list,
@@ -725,11 +1234,32 @@ def scan_multiple_code_sizes(
         ),
         "data_error_probability_list": data_error_probability_array,
         "q_top_curve_matrix": q_top_curve_matrix,
-        "q_top_std_error_curve_matrix": q_top_std_error_curve_matrix,
+        "q_top_std_curve_matrix": q_top_std_curve_matrix,
         "average_acceptance_rate_curve_matrix": (
             average_acceptance_rate_curve_matrix
         ),
     }
+    if q0_start_sector_labels is not None:
+        scan_result["q0_start_sector_labels"] = q0_start_sector_labels
+        scan_result["q0_mean_m_u_spread_linf_curve_matrix"] = (
+            q0_mean_m_u_spread_linf_curve_matrix
+        )
+        scan_result["q0_mean_q_top_spread_curve_matrix"] = (
+            q0_mean_q_top_spread_curve_matrix
+        )
+        scan_result[
+            "q0_logical_observable_mean_values_per_disorder_per_start_tensor"
+        ] = q0_logical_observable_mean_values_per_disorder_per_start_tensor
+        scan_result["q0_q_top_values_per_disorder_per_start_tensor"] = (
+            q0_q_top_values_per_disorder_per_start_tensor
+        )
+        scan_result["q0_m_u_spread_linf_per_disorder_tensor"] = (
+            q0_m_u_spread_linf_per_disorder_tensor
+        )
+        scan_result["q0_q_top_spread_per_disorder_tensor"] = (
+            q0_q_top_spread_per_disorder_tensor
+        )
+    return scan_result
 
 
 if __name__ == "__main__":
@@ -761,7 +1291,7 @@ if __name__ == "__main__":
     # )
     #
     # print(
-    #     f"{'p':>8} {'q_top':>12} {'std_error':>12} "
+    #     f"{'p':>8} {'q_top':>12} {'std_dev':>12} "
     #     f"{'avg_acceptance_rate':>20}"
     # )
     # for point_index, data_error_probability in enumerate(
@@ -769,7 +1299,7 @@ if __name__ == "__main__":
     #     print(
     #         f"{data_error_probability:8.4f} "
     #         f"{scan_result['q_top_curve'][point_index]:12.6f} "
-    #         f"{scan_result['q_top_std_error_curve'][point_index]:12.6f} "
+    #         f"{scan_result['q_top_std_curve'][point_index]:12.6f} "
     #         f"{scan_result['average_acceptance_rate_curve'][point_index]:20.6f}"
     #     )
     #
@@ -813,6 +1343,7 @@ if __name__ == "__main__":
     num_burn_in_sweeps = 1000
     num_sweeps_between_measurements = 5
     num_measurements_per_disorder = 300
+    q0_num_start_chains = 4
     seed_base = 20240801
     burn_in_scaling_reference_num_qubits = 18
 
@@ -825,6 +1356,7 @@ if __name__ == "__main__":
         num_sweeps_between_measurements=num_sweeps_between_measurements,
         num_measurements_per_disorder=num_measurements_per_disorder,
         seed_base=seed_base,
+        q0_num_start_chains=q0_num_start_chains,
     )
 
     for lattice_index, lattice_size in enumerate(
@@ -842,15 +1374,32 @@ if __name__ == "__main__":
             f"{int(effective_num_burn_in_sweeps)})"
         )
         print(
-            f"{'p':>8} {'q_top':>12} {'std_error':>12} "
+            f"{'p':>8} {'q_top':>12} {'std_dev':>12} "
+            f"{'m_u_spread':>12} {'q_top_spread':>14} "
             f"{'acceptance_rate':>18}"
         )
         for point_index, data_error_probability in enumerate(
                 scan_result_multi["data_error_probability_list"]):
+            q0_m_u_spread_value = np.nan
+            q0_q_top_spread_value = np.nan
+            if "q0_mean_m_u_spread_linf_curve_matrix" in scan_result_multi:
+                q0_m_u_spread_value = (
+                    scan_result_multi[
+                        "q0_mean_m_u_spread_linf_curve_matrix"
+                    ][lattice_index, point_index]
+                )
+                q0_q_top_spread_value = (
+                    scan_result_multi["q0_mean_q_top_spread_curve_matrix"][
+                        lattice_index,
+                        point_index,
+                    ]
+                )
             print(
                 f"{data_error_probability:8.4f} "
                 f"{scan_result_multi['q_top_curve_matrix'][lattice_index, point_index]:12.6f} "
-                f"{scan_result_multi['q_top_std_error_curve_matrix'][lattice_index, point_index]:12.6f} "
+                f"{scan_result_multi['q_top_std_curve_matrix'][lattice_index, point_index]:12.6f} "
+                f"{q0_m_u_spread_value:12.6f} "
+                f"{q0_q_top_spread_value:14.6f} "
                 f"{scan_result_multi['average_acceptance_rate_curve_matrix'][lattice_index, point_index]:18.6f}"
             )
         print()
@@ -870,8 +1419,10 @@ if __name__ == "__main__":
             )
         print(row)
 
+    output_dir = _ensure_data_dir()
+    output_path = output_dir / "scan_result_multi_L_q0_geometric_multistart.npz"
     np.savez(
-        "scan_result_multi_L_kernel_mix.npz",
+        output_path,
         **scan_result_multi,
         code_type=np.array("2d_toric"),
         syndrome_error_probability=np.float64(syndrome_error_probability),
@@ -884,7 +1435,9 @@ if __name__ == "__main__":
             num_measurements_per_disorder
         ),
         seed_base=np.int64(seed_base),
+        q0_num_start_chains=np.int64(q0_num_start_chains),
         burn_in_scaling_reference_num_qubits=np.int64(
             burn_in_scaling_reference_num_qubits
         ),
     )
+    print(f"Saved scan result to {output_path}")

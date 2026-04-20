@@ -42,7 +42,8 @@ def initialize_mcmc_state(
         observed_syndrome_bits,
         disorder_data_error_bits,
         parity_check_matrix,
-        rng):
+        rng,
+        initial_chain_bits=None):
     """
     初始化 MCMC 动态状态。
 
@@ -52,6 +53,8 @@ def initialize_mcmc_state(
       disorder_data_error_bits: np.ndarray，shape (num_qubits,)，dtype=bool
       parity_check_matrix: np.ndarray，shape (num_checks, num_qubits)，dtype=bool
       rng: np.random.Generator，本实现不使用，但保留接口
+      initial_chain_bits: np.ndarray 或 None，shape (num_qubits,)，dtype=bool
+        若给定，则从该初态开始；否则默认从全零链开始
 
     输出：
       current_chain_bits: np.ndarray，shape (num_qubits,)，dtype=bool
@@ -60,7 +63,17 @@ def initialize_mcmc_state(
     """
     del rng
 
-    current_chain_bits = np.zeros(num_qubits, dtype=bool)
+    if initial_chain_bits is None:
+        current_chain_bits = np.zeros(num_qubits, dtype=bool)
+    else:
+        current_chain_bits = np.asarray(
+            initial_chain_bits,
+            dtype=bool,
+        ).copy()
+        if current_chain_bits.shape != (num_qubits,):
+            raise ValueError(
+                "initial_chain_bits must have shape (num_qubits,)"
+            )
     current_data_term_bits = current_chain_bits ^ disorder_data_error_bits
 
     parity_check_matrix_uint8 = parity_check_matrix.astype(np.uint8)

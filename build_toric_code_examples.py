@@ -86,6 +86,110 @@ def build_2d_toric_code(lattice_size):
     return parity_check_matrix, dual_logical_z_basis
 
 
+def build_2d_toric_zero_syndrome_move_data(lattice_size):
+    """
+    为 2D toric code 构造 q=0 采样所需的几何闭环 move。
+
+    输出：
+      zero_syndrome_move_data: dict
+        "contractible_moves":
+            np.ndarray，shape (L^2, 2L^2)，dtype=bool
+            每行是一个 vertex-star 型局部闭环，weight 固定为 4
+        "winding_moves":
+            np.ndarray，shape (2L, 2L^2)，dtype=bool
+            前 L 行是固定 column 的 horizontal winding loop，
+            后 L 行是固定 row 的 vertical winding loop，weight 固定为 L
+        "start_sector_generators":
+            np.ndarray，shape (2, 2L^2)，dtype=bool
+            两条独立的非平凡 kernel loop，用于生成 4 个 q=0 合法初态
+    """
+    parity_check_matrix, _ = build_2d_toric_code(lattice_size)
+
+    num_horizontal_edges = lattice_size * lattice_size
+    num_qubits = 2 * num_horizontal_edges
+    num_vertices = lattice_size * lattice_size
+
+    def horizontal_edge_qubit(row_index, column_index):
+        return row_index * lattice_size + column_index
+
+    def vertical_edge_qubit(row_index, column_index):
+        return num_horizontal_edges + row_index * lattice_size + column_index
+
+    contractible_moves = np.zeros((num_vertices, num_qubits), dtype=bool)
+    for row_index in range(lattice_size):
+        for column_index in range(lattice_size):
+            vertex_index = row_index * lattice_size + column_index
+            row_prev = (row_index - 1) % lattice_size
+            column_prev = (column_index - 1) % lattice_size
+
+            contractible_moves[
+                vertex_index,
+                horizontal_edge_qubit(row_index, column_index),
+            ] = True
+            contractible_moves[
+                vertex_index,
+                horizontal_edge_qubit(row_index, column_prev),
+            ] = True
+            contractible_moves[
+                vertex_index,
+                vertical_edge_qubit(row_index, column_index),
+            ] = True
+            contractible_moves[
+                vertex_index,
+                vertical_edge_qubit(row_prev, column_index),
+            ] = True
+
+    winding_moves = np.zeros(
+        (2 * lattice_size, num_qubits),
+        dtype=bool,
+    )
+    for column_index in range(lattice_size):
+        for row_index in range(lattice_size):
+            winding_moves[
+                column_index,
+                horizontal_edge_qubit(row_index, column_index),
+            ] = True
+
+    for row_index in range(lattice_size):
+        winding_row_index = lattice_size + row_index
+        for column_index in range(lattice_size):
+            winding_moves[
+                winding_row_index,
+                vertical_edge_qubit(row_index, column_index),
+            ] = True
+
+    start_sector_generators = np.stack(
+        (winding_moves[0], winding_moves[lattice_size]),
+        axis=0,
+    )
+
+    parity_check_matrix_uint8 = parity_check_matrix.astype(np.uint8)
+    contractible_syndrome_bits = (
+        parity_check_matrix_uint8 @ contractible_moves.T.astype(np.uint8)
+    ) % 2
+    winding_syndrome_bits = (
+        parity_check_matrix_uint8 @ winding_moves.T.astype(np.uint8)
+    ) % 2
+    assert not np.any(contractible_syndrome_bits), (
+        "contractible q=0 moves must lie in ker(H_Z)"
+    )
+    assert not np.any(winding_syndrome_bits), (
+        "winding q=0 moves must lie in ker(H_Z)"
+    )
+    assert np.all(contractible_moves.sum(axis=1) == 4), (
+        "contractible q=0 moves must have weight 4"
+    )
+    assert np.all(winding_moves.sum(axis=1) == lattice_size), (
+        "winding q=0 moves must have weight L"
+    )
+
+    return {
+        "contractible_moves": contractible_moves,
+        "winding_moves": winding_moves,
+        "start_sector_generators": start_sector_generators,
+    }
+
+
 # =========================================================
 # 3D toric code  (L × L × L torus)
 # =========================================================
