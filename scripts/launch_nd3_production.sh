@@ -228,19 +228,20 @@ $(quote_arg "$Q0_NUM_START_CHAINS") \
 $(quote_arg "$SEED_BASE") \
 $(quote_arg "$BURN_IN_SCALING_REFERENCE_NUM_QUBITS")' < $(quote_arg "$relay_remote_path"); rc=\$?; rm -f $(quote_arg "$relay_remote_path"); exit \$rc"
 
-  set +e
-  ssh yuany "$remote_command" < "$bootstrap_script_path"
-  rc=$?
-  set -e
+  if ssh yuany "$remote_command" < "$bootstrap_script_path"; then
+    rc=0
+  else
+    rc=$?
+  fi
   rm -f "$bootstrap_script_path"
   return "$rc"
 }
 
 
 fallback_archive_sync() {
-  echo "Remote git sync failed, falling back to git archive transfer." >&2
+  echo "Syncing local HEAD to nd-3 via git archive." >&2
   git -C "$PROJECT_ROOT" archive --format=tar HEAD \
-    | ssh yuany "ssh nd-3 'rm -rf $REMOTE_REPO_DIR && mkdir -p $REMOTE_REPO_DIR && tar -xf - -C $REMOTE_REPO_DIR'"
+    | ssh yuany "ssh nd-3 'rm -rf ~/.single_shot/repo && mkdir -p ~/.single_shot/repo && tar -xf - -C ~/.single_shot/repo'"
 }
 
 
@@ -251,23 +252,9 @@ main() {
   git -C "$PROJECT_ROOT" push origin main
 
   echo "Launching ND-3 production run: $RUN_ID"
-  set +e
-  run_nd3_bootstrap "0"
-  bootstrap_rc=$?
-  set -e
-  if [[ "$bootstrap_rc" -eq 0 ]]; then
-    echo "ND-3 production screen launched via remote git sync."
-    exit 0
-  fi
-
-  if [[ "$bootstrap_rc" -ne 17 && "$bootstrap_rc" -ne 18 ]]; then
-    echo "Remote bootstrap failed with exit code $bootstrap_rc." >&2
-    exit "$bootstrap_rc"
-  fi
-
   fallback_archive_sync
   run_nd3_bootstrap "1"
-  echo "ND-3 production screen launched via archive fallback."
+  echo "ND-3 production screen launched via archive sync."
 }
 
 
