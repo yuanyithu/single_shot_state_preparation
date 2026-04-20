@@ -20,11 +20,8 @@ from plot_scan_results import plot_scan_result
 
 
 PROJECT_ROOT = Path(__file__).resolve().parent
-FINAL_OUTPUT_FILENAME = (
-    "scan_result_multi_L_q0_geometric_multistart_threshold_deep.npz"
-)
-FINAL_PLOT_FILENAME = (
-    "scan_result_multi_L_q0_geometric_multistart_threshold_deep.png"
+DEFAULT_Q0_OUTPUT_STEM = (
+    "scan_result_multi_L_q0_geometric_multistart_threshold_deep"
 )
 DEFAULT_BURN_IN_SCALING_REFERENCE_NUM_QUBITS = 18
 
@@ -47,6 +44,27 @@ def _parse_float_csv(csv_value):
         for value in csv_value.split(",")
         if value.strip()
     ]
+
+
+def _format_probability_tag(probability):
+    probability_string = f"{float(probability):0.4f}"
+    return probability_string.replace(".", "p")
+
+
+def _build_default_output_stem(
+        syndrome_error_probability,
+        common_random_disorder_across_p):
+    if syndrome_error_probability == 0.0:
+        output_stem = DEFAULT_Q0_OUTPUT_STEM
+    else:
+        output_stem = (
+            "scan_result_multi_L_"
+            f"q{_format_probability_tag(syndrome_error_probability)}_"
+            "measurement_noise_threshold_deep"
+        )
+    if common_random_disorder_across_p:
+        output_stem += "_common_random"
+    return output_stem
 
 
 def _ensure_parent_dir(path):
@@ -131,6 +149,18 @@ def _build_submit_config_from_args(args):
         args.num_disorder_samples_total // args.chunk_size
     )
     git_commit_sha = _resolve_git_commit_sha(args.git_commit_sha)
+    syndrome_error_probability = float(args.syndrome_error_probability)
+    common_random_disorder_across_p = bool(
+        args.common_random_disorder_across_p
+    )
+    output_stem = args.output_stem
+    if output_stem is None:
+        output_stem = _build_default_output_stem(
+            syndrome_error_probability=syndrome_error_probability,
+            common_random_disorder_across_p=(
+                common_random_disorder_across_p
+            ),
+        )
 
     return {
         "run_root": str(run_root),
@@ -138,7 +168,10 @@ def _build_submit_config_from_args(args):
         "manifest_path": str(run_root / "manifest.json"),
         "lattice_size_list": lattice_size_list,
         "data_error_probability_list": data_error_probability_list,
-        "syndrome_error_probability": 0.0,
+        "syndrome_error_probability": syndrome_error_probability,
+        "common_random_disorder_across_p": (
+            common_random_disorder_across_p
+        ),
         "num_disorder_samples_total": int(args.num_disorder_samples_total),
         "chunk_size": int(args.chunk_size),
         "num_chunks_per_point": int(num_chunks_per_point),
@@ -158,8 +191,9 @@ def _build_submit_config_from_args(args):
         "git_commit_sha": git_commit_sha,
         "hostname": socket.gethostname(),
         "created_at": _timestamp(),
-        "final_output_path": str(run_root / FINAL_OUTPUT_FILENAME),
-        "final_plot_path": str(run_root / FINAL_PLOT_FILENAME),
+        "output_stem": output_stem,
+        "final_output_path": str(run_root / f"{output_stem}.npz"),
+        "final_plot_path": str(run_root / f"{output_stem}.png"),
     }
 
 
@@ -214,6 +248,9 @@ def _build_chunk_tasks(config):
                     "q0_num_start_chains": int(
                         config["q0_num_start_chains"]
                     ),
+                    "common_random_disorder_across_p": bool(
+                        config["common_random_disorder_across_p"]
+                    ),
                     "num_burn_in_sweeps": int(config["num_burn_in_sweeps"]),
                     "effective_num_burn_in_sweeps": int(
                         effective_num_burn_in_sweeps
@@ -229,6 +266,14 @@ def _build_chunk_tasks(config):
                     ),
                     "seed": int(
                         config["seed_base"] + 1000003 * seed_stride_index
+                    ),
+                    "disorder_seed": int(
+                        config["seed_base"]
+                        + 7000003 * (
+                            lattice_index * config["num_chunks_per_point"]
+                            + chunk_index
+                        )
+                        + 19
                     ),
                 }
                 task_data["output_path"] = str(
@@ -269,6 +314,7 @@ def _build_manifest(
             "num_disorder_samples": task_data["num_disorder_samples"],
             "output_path": task_data["output_path"],
             "seed": task_data["seed"],
+            "disorder_seed": task_data["disorder_seed"],
             "status": "pending",
             "started_at": None,
             "completed_at": None,
@@ -289,6 +335,9 @@ def _build_manifest(
             "syndrome_error_probability": (
                 config["syndrome_error_probability"]
             ),
+            "common_random_disorder_across_p": (
+                config["common_random_disorder_across_p"]
+            ),
             "num_disorder_samples_total": (
                 config["num_disorder_samples_total"]
             ),
@@ -307,6 +356,7 @@ def _build_manifest(
                 config["burn_in_scaling_reference_num_qubits"]
             ),
             "workers": config["workers"],
+            "output_stem": config["output_stem"],
             "num_qubits_list": num_qubits_list.tolist(),
             "num_logical_qubits_list": num_logical_qubits_list.tolist(),
             "effective_num_burn_in_sweeps_list": (
@@ -381,9 +431,26 @@ def _run_chunk_task(task_data):
         parity_check_matrix, dual_logical_z_basis = build_2d_toric_code(
             lattice_size=task_data["lattice_size"]
         )
-        zero_syndrome_move_data = build_2d_toric_zero_syndrome_move_data(
-            lattice_size=task_data["lattice_size"]
-        )
+        zero_syndrome_move_data = None
+        if task_data["syndrome_error_probability"] == 0.0:
+            zero_syndrome_move_data = build_2d_toric_zero_syndrome_move_data(
+                lattice_size=task_data["lattice_size"]
+            )
+        precomputed_syndrome_uniform_values_per_disorder = None
+        precomputed_data_uniform_values_per_disorder = None
+        if task_data["common_random_disorder_across_p"]:
+            num_checks, num_qubits = parity_check_matrix.shape
+            disorder_rng = np.random.default_rng(task_data["disorder_seed"])
+            precomputed_syndrome_uniform_values_per_disorder = (
+                disorder_rng.random(
+                    (task_data["num_disorder_samples"], num_checks)
+                )
+            )
+            precomputed_data_uniform_values_per_disorder = (
+                disorder_rng.random(
+                    (task_data["num_disorder_samples"], num_qubits)
+                )
+            )
         simulation_result = run_disorder_average_simulation(
             parity_check_matrix=parity_check_matrix,
             dual_logical_z_basis=dual_logical_z_basis,
@@ -400,6 +467,12 @@ def _run_chunk_task(task_data):
             seed=task_data["seed"],
             zero_syndrome_move_data=zero_syndrome_move_data,
             q0_num_start_chains=task_data["q0_num_start_chains"],
+            precomputed_syndrome_uniform_values_per_disorder=(
+                precomputed_syndrome_uniform_values_per_disorder
+            ),
+            precomputed_data_uniform_values_per_disorder=(
+                precomputed_data_uniform_values_per_disorder
+            ),
         )
 
         np.savez(
@@ -428,7 +501,11 @@ def _run_chunk_task(task_data):
                 task_data["num_measurements_per_disorder"]
             ),
             q0_num_start_chains=np.int64(task_data["q0_num_start_chains"]),
+            common_random_disorder_across_p=np.bool_(
+                task_data["common_random_disorder_across_p"]
+            ),
             seed=np.uint64(task_data["seed"]),
+            disorder_seed=np.uint64(task_data["disorder_seed"]),
         )
         temporary_output_path.replace(output_path)
         return {
@@ -529,6 +606,7 @@ def _merge_outputs(
     num_points = len(config["data_error_probability_list"])
     num_disorder_samples_total = config["num_disorder_samples_total"]
     q0_num_start_chains = config["q0_num_start_chains"]
+    has_q0_diagnostics = config["syndrome_error_probability"] == 0.0
     num_qubits_list = np.empty(num_sizes, dtype=np.int64)
     num_logical_qubits_list = np.empty(num_sizes, dtype=np.int64)
     effective_num_burn_in_sweeps_list = np.empty(num_sizes, dtype=np.int64)
@@ -539,14 +617,17 @@ def _merge_outputs(
         (num_sizes, num_points),
         dtype=np.float64,
     )
-    q0_mean_m_u_spread_linf_curve_matrix = np.empty(
-        (num_sizes, num_points),
-        dtype=np.float64,
-    )
-    q0_mean_q_top_spread_curve_matrix = np.empty(
-        (num_sizes, num_points),
-        dtype=np.float64,
-    )
+    q0_mean_m_u_spread_linf_curve_matrix = None
+    q0_mean_q_top_spread_curve_matrix = None
+    if has_q0_diagnostics:
+        q0_mean_m_u_spread_linf_curve_matrix = np.empty(
+            (num_sizes, num_points),
+            dtype=np.float64,
+        )
+        q0_mean_q_top_spread_curve_matrix = np.empty(
+            (num_sizes, num_points),
+            dtype=np.float64,
+        )
 
     num_masks = None
     q0_start_sector_labels = None
@@ -600,35 +681,36 @@ def _merge_outputs(
                 ),
                 dtype=np.float64,
             )
-            q0_logical_observable_mean_values_per_disorder_per_start_tensor = (
-                np.empty(
+            if has_q0_diagnostics:
+                q0_logical_observable_mean_values_per_disorder_per_start_tensor = (
+                    np.empty(
+                        (
+                            num_sizes,
+                            num_points,
+                            num_disorder_samples_total,
+                            q0_num_start_chains,
+                            num_masks,
+                        ),
+                        dtype=np.float64,
+                    )
+                )
+                q0_q_top_values_per_disorder_per_start_tensor = np.empty(
                     (
                         num_sizes,
                         num_points,
                         num_disorder_samples_total,
                         q0_num_start_chains,
-                        num_masks,
                     ),
                     dtype=np.float64,
                 )
-            )
-            q0_q_top_values_per_disorder_per_start_tensor = np.empty(
-                (
-                    num_sizes,
-                    num_points,
-                    num_disorder_samples_total,
-                    q0_num_start_chains,
-                ),
-                dtype=np.float64,
-            )
-            q0_m_u_spread_linf_per_disorder_tensor = np.empty(
-                (num_sizes, num_points, num_disorder_samples_total),
-                dtype=np.float64,
-            )
-            q0_q_top_spread_per_disorder_tensor = np.empty(
-                (num_sizes, num_points, num_disorder_samples_total),
-                dtype=np.float64,
-            )
+                q0_m_u_spread_linf_per_disorder_tensor = np.empty(
+                    (num_sizes, num_points, num_disorder_samples_total),
+                    dtype=np.float64,
+                )
+                q0_q_top_spread_per_disorder_tensor = np.empty(
+                    (num_sizes, num_points, num_disorder_samples_total),
+                    dtype=np.float64,
+                )
         elif current_num_masks != num_masks:
             raise ValueError("num_masks must be consistent across sizes")
 
@@ -649,14 +731,15 @@ def _merge_outputs(
                 stop_index = start_index + task_data["num_disorder_samples"]
                 total_loaded_num_disorders += task_data["num_disorder_samples"]
 
-                if q0_start_sector_labels is None:
-                    q0_start_sector_labels = loaded_chunk_result[
-                        "q0_start_sector_labels"
-                    ]
-                elif not np.array_equal(
-                        q0_start_sector_labels,
-                        loaded_chunk_result["q0_start_sector_labels"]):
-                    raise ValueError("q0_start_sector_labels mismatch")
+                if has_q0_diagnostics:
+                    if q0_start_sector_labels is None:
+                        q0_start_sector_labels = loaded_chunk_result[
+                            "q0_start_sector_labels"
+                        ]
+                    elif not np.array_equal(
+                            q0_start_sector_labels,
+                            loaded_chunk_result["q0_start_sector_labels"]):
+                        raise ValueError("q0_start_sector_labels mismatch")
 
                 disorder_q_top_values_tensor[
                     lattice_index,
@@ -676,33 +759,34 @@ def _merge_outputs(
                 ] = loaded_chunk_result[
                     "logical_observable_mean_values_per_disorder"
                 ]
-                q0_logical_observable_mean_values_per_disorder_per_start_tensor[
-                    lattice_index,
-                    point_index,
-                    start_index:stop_index,
-                    :,
-                    :,
-                ] = loaded_chunk_result[
-                    "q0_logical_observable_mean_values_per_disorder_per_start"
-                ]
-                q0_q_top_values_per_disorder_per_start_tensor[
-                    lattice_index,
-                    point_index,
-                    start_index:stop_index,
-                    :,
-                ] = loaded_chunk_result[
-                    "q0_q_top_values_per_disorder_per_start"
-                ]
-                q0_m_u_spread_linf_per_disorder_tensor[
-                    lattice_index,
-                    point_index,
-                    start_index:stop_index,
-                ] = loaded_chunk_result["q0_m_u_spread_linf_per_disorder"]
-                q0_q_top_spread_per_disorder_tensor[
-                    lattice_index,
-                    point_index,
-                    start_index:stop_index,
-                ] = loaded_chunk_result["q0_q_top_spread_per_disorder"]
+                if has_q0_diagnostics:
+                    q0_logical_observable_mean_values_per_disorder_per_start_tensor[
+                        lattice_index,
+                        point_index,
+                        start_index:stop_index,
+                        :,
+                        :,
+                    ] = loaded_chunk_result[
+                        "q0_logical_observable_mean_values_per_disorder_per_start"
+                    ]
+                    q0_q_top_values_per_disorder_per_start_tensor[
+                        lattice_index,
+                        point_index,
+                        start_index:stop_index,
+                        :,
+                    ] = loaded_chunk_result[
+                        "q0_q_top_values_per_disorder_per_start"
+                    ]
+                    q0_m_u_spread_linf_per_disorder_tensor[
+                        lattice_index,
+                        point_index,
+                        start_index:stop_index,
+                    ] = loaded_chunk_result["q0_m_u_spread_linf_per_disorder"]
+                    q0_q_top_spread_per_disorder_tensor[
+                        lattice_index,
+                        point_index,
+                        start_index:stop_index,
+                    ] = loaded_chunk_result["q0_q_top_spread_per_disorder"]
 
         if total_loaded_num_disorders != num_disorder_samples_total:
             raise ValueError(
@@ -720,15 +804,6 @@ def _merge_outputs(
                 lattice_index,
                 point_index,
             ]
-            q0_m_u_spread_values = q0_m_u_spread_linf_per_disorder_tensor[
-                lattice_index,
-                point_index,
-            ]
-            q0_q_top_spread_values = q0_q_top_spread_per_disorder_tensor[
-                lattice_index,
-                point_index,
-            ]
-
             q_top_curve_matrix[lattice_index, point_index] = float(
                 np.mean(disorder_q_top_values)
             )
@@ -742,14 +817,23 @@ def _merge_outputs(
                 lattice_index,
                 point_index,
             ] = float(np.mean(acceptance_values))
-            q0_mean_m_u_spread_linf_curve_matrix[
-                lattice_index,
-                point_index,
-            ] = float(np.mean(q0_m_u_spread_values))
-            q0_mean_q_top_spread_curve_matrix[
-                lattice_index,
-                point_index,
-            ] = float(np.mean(q0_q_top_spread_values))
+            if has_q0_diagnostics:
+                q0_m_u_spread_values = q0_m_u_spread_linf_per_disorder_tensor[
+                    lattice_index,
+                    point_index,
+                ]
+                q0_q_top_spread_values = q0_q_top_spread_per_disorder_tensor[
+                    lattice_index,
+                    point_index,
+                ]
+                q0_mean_m_u_spread_linf_curve_matrix[
+                    lattice_index,
+                    point_index,
+                ] = float(np.mean(q0_m_u_spread_values))
+                q0_mean_q_top_spread_curve_matrix[
+                    lattice_index,
+                    point_index,
+                ] = float(np.mean(q0_q_top_spread_values))
 
     merged_result = {
         "lattice_size_list": np.asarray(
@@ -770,13 +854,6 @@ def _merge_outputs(
         "average_acceptance_rate_curve_matrix": (
             average_acceptance_rate_curve_matrix
         ),
-        "q0_start_sector_labels": q0_start_sector_labels,
-        "q0_mean_m_u_spread_linf_curve_matrix": (
-            q0_mean_m_u_spread_linf_curve_matrix
-        ),
-        "q0_mean_q_top_spread_curve_matrix": (
-            q0_mean_q_top_spread_curve_matrix
-        ),
         "disorder_q_top_values_tensor": disorder_q_top_values_tensor,
         "average_acceptance_rate_per_disorder_tensor": (
             average_acceptance_rate_per_disorder_tensor
@@ -784,19 +861,27 @@ def _merge_outputs(
         "logical_observable_mean_values_per_disorder_tensor": (
             logical_observable_mean_values_per_disorder_tensor
         ),
-        "q0_logical_observable_mean_values_per_disorder_per_start_tensor": (
-            q0_logical_observable_mean_values_per_disorder_per_start_tensor
-        ),
-        "q0_q_top_values_per_disorder_per_start_tensor": (
-            q0_q_top_values_per_disorder_per_start_tensor
-        ),
-        "q0_m_u_spread_linf_per_disorder_tensor": (
-            q0_m_u_spread_linf_per_disorder_tensor
-        ),
-        "q0_q_top_spread_per_disorder_tensor": (
-            q0_q_top_spread_per_disorder_tensor
-        ),
     }
+    if has_q0_diagnostics:
+        merged_result["q0_start_sector_labels"] = q0_start_sector_labels
+        merged_result["q0_mean_m_u_spread_linf_curve_matrix"] = (
+            q0_mean_m_u_spread_linf_curve_matrix
+        )
+        merged_result["q0_mean_q_top_spread_curve_matrix"] = (
+            q0_mean_q_top_spread_curve_matrix
+        )
+        merged_result[
+            "q0_logical_observable_mean_values_per_disorder_per_start_tensor"
+        ] = q0_logical_observable_mean_values_per_disorder_per_start_tensor
+        merged_result["q0_q_top_values_per_disorder_per_start_tensor"] = (
+            q0_q_top_values_per_disorder_per_start_tensor
+        )
+        merged_result["q0_m_u_spread_linf_per_disorder_tensor"] = (
+            q0_m_u_spread_linf_per_disorder_tensor
+        )
+        merged_result["q0_q_top_spread_per_disorder_tensor"] = (
+            q0_q_top_spread_per_disorder_tensor
+        )
 
     np.savez(
         output_path,
@@ -814,6 +899,9 @@ def _merge_outputs(
             config["num_measurements_per_disorder"]
         ),
         q0_num_start_chains=np.int64(config["q0_num_start_chains"]),
+        common_random_disorder_across_p=np.bool_(
+            config["common_random_disorder_across_p"]
+        ),
         seed_base=np.int64(config["seed_base"]),
         burn_in_scaling_reference_num_qubits=np.int64(
             config["burn_in_scaling_reference_num_qubits"]
@@ -1063,6 +1151,9 @@ def _run_chunk_command(args):
         "disorder_offset": int(args.disorder_offset),
         "chunk_index": int(args.chunk_index),
         "q0_num_start_chains": int(args.q0_num_start_chains),
+        "common_random_disorder_across_p": bool(
+            args.common_random_disorder_across_p
+        ),
         "num_burn_in_sweeps": int(args.num_burn_in_sweeps),
         "effective_num_burn_in_sweeps": int(args.effective_num_burn_in_sweeps),
         "num_sweeps_between_measurements": int(
@@ -1075,6 +1166,7 @@ def _run_chunk_command(args):
             args.burn_in_scaling_reference_num_qubits
         ),
         "seed": int(args.seed),
+        "disorder_seed": int(args.disorder_seed),
         "output_path": str(Path(args.output_path).expanduser().resolve()),
     }
     task_data["task_id"] = _task_identifier(task_data)
@@ -1108,7 +1200,7 @@ def _merge_command(args):
 
 def _build_parser():
     parser = argparse.ArgumentParser(
-        description="Chunked production scan runner for q=0 toric code scans.",
+        description="Chunked production scan runner for toric code scans.",
     )
     subparsers = parser.add_subparsers(dest="command", required=True)
 
@@ -1130,6 +1222,11 @@ def _build_parser():
         "--lattice-sizes",
         required=True,
         help="Comma-separated list, e.g. 3,5,7",
+    )
+    common_submit_parser.add_argument(
+        "--syndrome-error-probability",
+        type=float,
+        default=0.0,
     )
     common_submit_parser.add_argument(
         "--num-burn-in-sweeps",
@@ -1164,6 +1261,14 @@ def _build_parser():
     common_submit_parser.add_argument(
         "--git-commit-sha",
         default=None,
+    )
+    common_submit_parser.add_argument(
+        "--output-stem",
+        default=None,
+    )
+    common_submit_parser.add_argument(
+        "--common-random-disorder-across-p",
+        action="store_true",
     )
 
     submit_parser = subparsers.add_parser(
@@ -1232,11 +1337,16 @@ def _build_parser():
         default=4,
     )
     run_chunk_parser.add_argument(
+        "--common-random-disorder-across-p",
+        action="store_true",
+    )
+    run_chunk_parser.add_argument(
         "--burn-in-scaling-reference-num-qubits",
         type=int,
         default=DEFAULT_BURN_IN_SCALING_REFERENCE_NUM_QUBITS,
     )
     run_chunk_parser.add_argument("--seed", type=int, required=True)
+    run_chunk_parser.add_argument("--disorder-seed", type=int, required=True)
 
     return parser
 

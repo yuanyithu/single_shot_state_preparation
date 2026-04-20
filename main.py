@@ -12,6 +12,7 @@ from linear_section import apply_linear_section, build_linear_section
 from mcmc import (
     accumulate_logical_observables,
     draw_disorder_sample,
+    draw_disorder_sample_from_uniform_values,
     initialize_mcmc_state,
 )
 from preprocessing import (
@@ -540,7 +541,9 @@ def run_disorder_average_simulation(
         num_measurements_per_disorder,
         seed,
         zero_syndrome_move_data=None,
-        q0_num_start_chains=4):
+        q0_num_start_chains=4,
+        precomputed_syndrome_uniform_values_per_disorder=None,
+        precomputed_data_uniform_values_per_disorder=None):
     rng = np.random.default_rng(seed)
 
     num_checks, num_qubits = parity_check_matrix.shape
@@ -574,6 +577,45 @@ def run_disorder_average_simulation(
         num_disorder_samples,
         dtype=np.float64,
     )
+    use_precomputed_disorder_uniforms = (
+        precomputed_syndrome_uniform_values_per_disorder is not None
+        or precomputed_data_uniform_values_per_disorder is not None
+    )
+    if (
+            precomputed_syndrome_uniform_values_per_disorder is None
+            ) != (
+                precomputed_data_uniform_values_per_disorder is None):
+        raise ValueError(
+            "precomputed_syndrome_uniform_values_per_disorder and "
+            "precomputed_data_uniform_values_per_disorder must be provided "
+            "together"
+        )
+    if use_precomputed_disorder_uniforms:
+        precomputed_syndrome_uniform_values_per_disorder = np.asarray(
+            precomputed_syndrome_uniform_values_per_disorder,
+            dtype=np.float64,
+        )
+        precomputed_data_uniform_values_per_disorder = np.asarray(
+            precomputed_data_uniform_values_per_disorder,
+            dtype=np.float64,
+        )
+        expected_syndrome_shape = (num_disorder_samples, num_checks)
+        expected_data_shape = (num_disorder_samples, num_qubits)
+        if (
+                precomputed_syndrome_uniform_values_per_disorder.shape
+                != expected_syndrome_shape):
+            raise ValueError(
+                "precomputed_syndrome_uniform_values_per_disorder must have "
+                f"shape {expected_syndrome_shape}"
+            )
+        if (
+                precomputed_data_uniform_values_per_disorder.shape
+                != expected_data_shape):
+            raise ValueError(
+                "precomputed_data_uniform_values_per_disorder must have "
+                f"shape {expected_data_shape}"
+            )
+
     q0_start_sector_labels = None
     if (
             syndrome_error_probability == 0.0
@@ -599,16 +641,35 @@ def run_disorder_average_simulation(
         )
 
     for disorder_index in range(num_disorder_samples):
-        (
-            observed_syndrome_bits,
-            disorder_data_error_bits,
-        ) = draw_disorder_sample(
-            num_checks=num_checks,
-            num_qubits=num_qubits,
-            syndrome_error_probability=syndrome_error_probability,
-            data_error_probability=data_error_probability,
-            rng=rng,
-        )
+        if use_precomputed_disorder_uniforms:
+            (
+                observed_syndrome_bits,
+                disorder_data_error_bits,
+            ) = draw_disorder_sample_from_uniform_values(
+                syndrome_uniform_values=(
+                    precomputed_syndrome_uniform_values_per_disorder[
+                        disorder_index
+                    ]
+                ),
+                data_uniform_values=(
+                    precomputed_data_uniform_values_per_disorder[
+                        disorder_index
+                    ]
+                ),
+                syndrome_error_probability=syndrome_error_probability,
+                data_error_probability=data_error_probability,
+            )
+        else:
+            (
+                observed_syndrome_bits,
+                disorder_data_error_bits,
+            ) = draw_disorder_sample(
+                num_checks=num_checks,
+                num_qubits=num_qubits,
+                syndrome_error_probability=syndrome_error_probability,
+                data_error_probability=data_error_probability,
+                rng=rng,
+            )
         if q0_start_sector_labels is not None:
             (
                 initial_chain_bits_per_start,
