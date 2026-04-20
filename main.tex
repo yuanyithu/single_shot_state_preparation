@@ -1,0 +1,1118 @@
+\documentclass[twoside,english,aps,showpacs,pra,superscriptaddress]{revtex4-2}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{amsfonts}
+\usepackage{amsthm}
+\usepackage{setspace}
+\usepackage{float}
+\usepackage{subfigure}
+\usepackage{graphicx}
+\usepackage{subfigure}
+\usepackage{braket}
+\usepackage{url}
+\usepackage{cancel}
+\usepackage{extarrows}
+\usepackage{color}
+\usepackage[plainpages = false, pdfpagelabels, 
+                % pdfpagelayout = useoutlines,
+                 bookmarks,
+                 bookmarksopen = true,
+                 bookmarksnumbered = true,
+                 breaklinks = true,
+                 linktocpage,
+                 %pagebackref,
+                 colorlinks = true,
+                 linkcolor = blue,
+                 urlcolor  = blue,
+                 citecolor = blue,
+                 anchorcolor = green,
+                 hyperindex = true,
+                 hyperfigures
+                 ]{hyperref} 
+\renewcommand{\d}{\mathrm{d}}
+\newcommand{\D}{\mathrm{D}}
+\newcommand{\e}{\mathrm{e}}
+\newcommand{\ii}{\mathrm{i}}
+\DeclareMathOperator{\Tr}{Tr}
+\DeclareMathOperator{\rank}{rank}
+\DeclareMathOperator{\tr}{tr}
+\DeclareMathOperator{\im}{im}
+\DeclareMathOperator{\sech}{sech}
+\DeclareMathOperator{\wt}{wt}
+\DeclareMathOperator*{\argmin}{argmin}
+\renewcommand{\vec}{\boldsymbol}
+\renewcommand{\abstractname}{}
+
+\newcommand{\sket}[1]{\left.\left| {#1} \right\rangle\right\rangle}
+\newcommand{\sbra}[1]{\left\langle\left\langle {#1} \right|\right.}
+\newcommand{\sbraket}[1]{\left\langle\left\langle {#1}\right\rangle\right\rangle}
+\newcommand{\norm}[1]{\left| \left| {#1}\right|\right|}
+
+\newtheorem{lemma}{Lemma}
+\newtheorem{theorem}{Theorem}
+\newtheorem{proposition}{Proposition}
+\newtheorem{definition}{Definition}
+
+\setcounter{equation}{0}
+\setcounter{figure}{0}
+\setcounter{table}{0}
+\setcounter{page}{1}
+\makeatletter
+
+
+\begin{document}
+\title{Single-shot State Preparation}  
+\maketitle
+\section{motivation}
+Confinement is a weaker condition compared with soundness to guarantee single-shot decoding \cite{quintavalleSingleShotErrorCorrection2021}. It could be satisfied by code with no check redundancy, e.g. quantum expander code \cite{fawziConstantOverheadQuantum2018b}. Such codes exhibit no thermodynamic stability but still support single-shot decoding as well as self-correction \cite{hongQuantumMemoryNonzero2025a}. The question is which condition suffices to guarantee measurement preparations of code states in the presence of stochastic readout errors? Does single-shot decoding imply single-shot preparation? Is confinement enough, or we further need soundness/thermodynamic stability?
+
+\section{outline}
+Measurement preparations of code states effectively induce a thermal state in the presence of stochastic readout errors.
+Consider a CSS code $\mathcal{K}$, which is defined by a length-3 chain complex,
+\begin{equation}
+\begin{aligned}
+    &C_2 \xrightarrow{\partial_2 = H_Z^T} C_1 \xrightarrow{\partial_1 = H_X}C_0,\\
+    &C^2 \xleftarrow{\delta_1 = H_Z} C^1 \xleftarrow{\delta_0 = H_X^T}C^0.
+\end{aligned}
+\end{equation}
+Here $H_X$ and $H_Z$ are party check matrices. The logical $Z$ operators are given by $H_1 = Z_1/B_1$, where $Z_1=\ker \partial_1$, $B_1=\im \partial_2$, and logical $X$ operators are given by $H^1 = Z^1/B^1$, where $Z^1=\ker \delta_0$, $B_1=\im \delta_1$. The basis of $C_2$ is denoted as $e_{2,i}$, and each of them induces a $Z$ stabilizer generator $g_{Z,i} = Z_{H_Z^T e_{2,i}} = \prod_{e_1 \in H_Z^T e_{2,i}} Z_{e_1}$. $X$ stabilizer generator $g_X$ can be defined similarly. 
+
+Suppose that we start from the product $+$ state $\ket{+}^{\otimes n}$ and measure all $Z$ checks (basis of $C_2$) to prepare logical $+$ state $[h^1] = 0$. The measurement of each generator $g_Z$ is given by the following channel
+\begin{equation}
+    ((1-q) \ket{0}_c\bra{0}_c + q\ket{1}_c \bra{1}_c)\Pi_+ \rho_0 \Pi_+ + ((1-q) \ket{1}_c\bra{1}_c + q\ket{0}_c \bra{0}_c)\Pi_- \rho_0 \Pi_-, \quad \Pi_{\pm} = \frac{1\pm g_Z}{2},
+\end{equation}
+where the measurement records are stored in the classical register.
+Since the initial product state can be expanded in the stabilizer basis as 
+\begin{equation}
+    \rho_0 = \ket{+}^{\otimes n} \bra{+}^{\otimes n} = \bigotimes_{g_Z'} \frac{1}{2}\left(\ket{g_Z'=+}  + \ket{g_Z'=-}\right)\left(\bra{g_Z'=+}  + \bra{g_Z'=-}\right) \bigotimes_{g_X'} \ket{g_X'=+} \bra{g_X'=+} \bigotimes_{L_X} \ket{L_X=+}\bra{L_X=+},
+\end{equation}
+where ${g_{Z}'}$ (${g_{X}'}$) is the full-rank generator set associated with $C_2/\ker H_Z^T$ ($C^0/\ker H_X^T$) without redundancy, and $L_Z$ ($L_X$) denotes the logical $Z$ ($X$) generator associated with basis of $H_1$ ($H^1$). Since stabilizer measurements commute with each other, we can apply all $g_Z'$ measurements to $\rho_0$ first, such that each $g_Z'$ sector becomes
+\begin{equation}
+    \begin{aligned}
+        &  \frac{1}{2}\sum_{s_{g_Z'} = \pm }((1-q) \ket{s_{g_Z'}}_c\bra{s_{g_Z'}}_c + q\ket{-s_{g_Z'}}_c \bra{-s_{g_Z'}}_c) \otimes \Pi_{s_{g_Z'}} \left(\ket{g_Z'=+}  + \ket{g_Z'=-}\right)\left(\bra{g_Z'=+}  + \bra{g_Z'=-}\right)\Pi_{s_{g_Z'}}\\
+        & =  \frac{1}{2}\sum_{s_{g_Z'} = \pm }((1-q) \ket{s_{g_Z'}}_c\bra{s_{g_Z'}}_c + q\ket{-s_{g_Z'}}_c \bra{-s_{g_Z'}}_c)\otimes\Pi_{s_{g_Z'}} \\
+        & =  \frac{1}{2}\sum_{s_{g_Z'} = \pm } \ket{s_{g_Z'}}_c\bra{s_{g_Z'}}_c \otimes \frac{1+(1-2q) s_{g_Z'} g_Z'}{2} \propto \sum_{s_{g_Z'} = \pm } \ket{s_{g_Z'}}_c\bra{s_{g_Z'}}_c \otimes \exp\left(\beta s_{g_Z'} g_Z'\right),
+    \end{aligned}
+\end{equation}
+where 
+\begin{equation}
+    \tanh \beta = 1-2q.
+\end{equation}
+Then we apply the remaining redundant $g_Z$ measurements. Since they commute with $ \exp\left(\beta s_{g_Z'} g_Z'\right)$ because every $g_Z$ is a product of several $g_Z'$, we have the post measurement state
+\begin{equation}
+    \rho_Q = \frac{1}{N}\sum_{\{s_{g_Z} \} } \ket{\{s_{g_Z}\}}_c\bra{\{s_{g_Z}\}}_c \otimes \exp\left(\beta \sum_{g_Z} s_{g_Z} g_Z\right) \bigotimes_{g_X'} \ket{g_X'=+} \bra{g_X'=+} \bigotimes_{L_X} \ket{L_X=+}\bra{L_X=+}.
+\end{equation}
+Denote $r_{X/Z}' = \rank H_{X/Z}$, $r_{X} = \dim C^0$, $r_Z = \dim C_2$. We have $n= r_Z'+r_X'+k$.
+The normalization constant is given by
+\begin{equation}
+\begin{aligned}
+    &N = \sum_{\{s_{g_Z} \} } \tr_Q \left(  \exp\left(\beta \sum_{g_Z} s_{g_Z} g_Z\right) \bigotimes_{g_X'} \ket{g_X'=+} \bra{g_X'=+} \bigotimes_{L_X} \ket{L_X=+}\bra{L_X=+}\right) \\
+    & = \frac{1}{2^{r_X'+k}}\sum_{\{s_{g_Z} \} } \tr_Q \exp\left(\beta \sum_{g_Z} s_{g_Z} g_Z\right) \\
+    & = \frac{2^n}{2^{r_X'+k}} (2\cosh\beta)^{r_Z} = 2^{r_Z'} (2\cosh\beta)^{r_Z}.
+\end{aligned}
+\end{equation}
+The probability of each measurement outcome configuration is given by 
+\begin{equation}
+\begin{aligned}
+    & \Pr(\{s_{g_Z}\}) =  \frac{1}{N} \tr_Q \left(  \exp\left(\beta \sum_{g_Z} s_{g_Z} g_Z\right) \bigotimes_{g_X'} \ket{g_X'=+} \bra{g_X'=+} \bigotimes_{L_X} \ket{L_X=+}\bra{L_X=+}\right)\\
+    & = \frac{1}{2^{r_Z'} (2\cosh\beta)^{r_Z}} \mathcal{Z}(\{s_{g_Z}\}), 
+\end{aligned}
+\end{equation}
+where
+\begin{equation}
+    \mathcal{Z}(\{s_{g_Z}\}) = \frac{1}{2^{r_X'+k}}\tr_Q \exp\left(\beta \sum_{g_Z} s_{g_Z} g_Z\right) 
+\end{equation}
+is the partition function. So we have
+\begin{equation}
+    \rho_Q = \sum_{\{s_{g_Z} \} } \Pr(\{s_{g_Z}\}) \ket{\{s_{g_Z}\}}_c\bra{\{s_{g_Z}\}}_c \bigotimes \frac{1}{\mathcal{Z}(\{s_{g_Z}\})}\exp\left(\beta \sum_{g_Z} s_{g_Z} g_Z\right) \bigotimes_{g_X'} \ket{g_X'=+} \bra{g_X'=+} \bigotimes_{L_X} \ket{L_X=+}\bra{L_X=+}.
+\end{equation}
+The common state preparation procedure involves a round of decoding to flip the syndrome towards the ideal logical state $g_Z=+$. The decoder applies certain correction channel $\mathcal{K}_{\{s_{g_Z}\}}$ to the system with respect to the measurement record $\{s_{g_Z}\}$. Normally the correction only involves Pauli $X$ operators, so it only applies to the $g_Z$ sector, such that  
+\begin{equation}
+    \mathcal{K}(\rho_Q) = \sum_{\{s_{g_Z}\} } \Pr(\{s_{g_Z}\} ) \ket{\{s_{g_Z}\}}_c\bra{\{s_{g_Z}\}}_c \bigotimes \mathcal{K}_{\{s_{g_Z}\}} \left(\frac{\exp\left(\beta \sum_{g_Z} s_{g_Z} g_Z\right) }{\mathcal{Z}(\{s_{g_Z}\})} \right)\bigotimes_{g_X'} \ket{g_X'=+} \bra{g_X'=+} \bigotimes_{L_X} \ket{L_X=+}\bra{L_X=+}.
+\end{equation}
+The next step is encode logical information in the above state. Physically it is done by logical operators but mathematically this could be described by the encoding channel
+\begin{equation}
+    \mathcal{E}'(\rho_L) = \sum_{\{s_{g_Z}\} } \Pr(\{s_{g_Z}\} ) \ket{\{s_{g_Z}\}}_c\bra{\{s_{g_Z}\}}_c \bigotimes \mathcal{K}_{\{s_{g_Z}\}} \left(\frac{\exp\left(\beta \sum_{g_Z} s_{g_Z} g_Z\right) }{\mathcal{Z}(\{s_{g_Z}\})} \right)\bigotimes_{g_X'} \ket{g_X'=+} \bra{g_X'=+} \bigotimes \rho_L.
+\end{equation}
+In comparison, the undecoded encoding channel is
+\begin{equation}
+    \mathcal{E}(\rho_L) = \sum_{\{s_{g_Z}\} } \Pr(\{s_{g_Z}\} ) \ket{\{s_{g_Z}\}}_c\bra{\{s_{g_Z}\}}_c \bigotimes  \frac{\exp\left(\beta \sum_{g_Z} s_{g_Z} g_Z\right) }{\mathcal{Z}(\{s_{g_Z}\})} \bigotimes_{g_X'} \ket{g_X'=+} \bra{g_X'=+} \bigotimes \rho_L.
+\end{equation}
+We want to show that the encoding $\mathcal{E}'$ cannot protect quantum information against stochastic $X$ noise,
+\begin{equation}
+    \mathcal{N} (\rho) = \sum_{c \in C_1} \Pr(c) X_c \rho X_c.
+\end{equation}
+
+To this end, we utilize coherent information of the composed channel $I_c(\rho_L,\mathcal{N\circ E'})$. Under the assumption that there are only $O(1)$ check redundancies, $\dim \ker H_Z^T = O(1)$, we need to address the following questions,
+\begin{enumerate}
+    \item Does $I_c(\rho_L,\mathcal{N\circ E'}) \leq I_c(\rho_L,\mathcal{N\circ E})$ hold?
+    \item Does $\lim_{n\rightarrow\infty} I_c(\rho_L,\mathcal{N\circ E}) < k\log 2$ (or $\lim_{n\rightarrow\infty} I_c(\rho_L,\mathcal{N\circ E})/n < \kappa\log 2$ and $\kappa$ is the code rate) hold?
+    \item Whether $\lim_{n\rightarrow\infty}  I_c(\rho_L,\mathcal{N\circ E'}) < k \log 2$ (or $\lim_{n\rightarrow\infty} I_c(\rho_L,\mathcal{N\circ E'})/n < \kappa\log 2$) implies $\lim_{n\rightarrow\infty}F_e(\mathcal{R\circ N\circ E'}) < 1$, $\forall\mathcal{R}$, especially when $\mathcal{E}'$ is a mixed state encoding?
+\end{enumerate}
+If the above three propositions holds, we conclude there is not single-shot preparation threshold without check redundancy.
+Additionally, we should address
+\begin{enumerate}
+    \item Given that 
+    \begin{equation}
+    \begin{aligned}
+        &\rho_Q = \sum_s \Pr(s) \ket{s}_c\bra{s}_c \otimes \frac{(2\cosh\beta)^{r_Z}}{\mathcal{Z}(s)}\sum_{s_e|s_e+s\in \im H_Z}  (1-q)^{r_Z - s_e} q^{s_e} \ket{\sigma_{Z} = s+s_e}\bra{\sigma_{Z} = s+s_e}\\& \otimes \ket{\sigma_{X}' = 0}\bra{\sigma_{X}' = 0} \otimes \ket{[h]=0}\bra{[h]=0},
+    \end{aligned}
+    \end{equation}
+    where we denoted the measurement record as $s\in C_2$ and the measurement error as $s_e \in C_2$, will soundness guarantee single-shot preparation? Note that $\sigma_X' \in C^0/\ker{H_X^T}$ has no redundancy, but $\sigma_Z \in C_2$ could lead to redundant projectors.
+    \item A Clifford simulation comparing quantum expander code and $3$-d toric code preparation? Procedure: product state $\rightarrow$ projection preparation $\rightarrow$ decode $\rightarrow$ encode logical information $\rightarrow$ stochastic $X$ noise $\rightarrow$ syndrome measurement $\rightarrow$ decode $\rightarrow$ ... $\rightarrow$ calculate logical error rate.
+\end{enumerate}
+
+\section{Proof of proposition 1}
+\begin{lemma}
+Suppose that $\mathcal{K}$ is a decoding channel that applies Pauli $X$ recovery according to the measurement record, such that the decoded encoding channel $\mathcal{E}' = \mathcal{K} \circ \mathcal{E}$. Then we have
+\begin{equation}
+    I_c(\rho_L, \mathcal{N} \circ \mathcal{E}') \leq I_c(\rho_L, \mathcal{N} \circ \mathcal{E}).
+\end{equation}
+\end{lemma}
+\begin{proof}
+The channel $\mathcal{K}$ reads the measurement record $s$ (stored in the classical register from Eq.~(10)) and applies a recovery operation $U_s$. According to the problem setup, the decoder aims to correct $Z$-stabilizer syndrome violations, and thus the recovery operator $U_s$ consists solely of Pauli $X$ operators.
+
+The noise channel $\mathcal{N}$, defined in Eq.~(14), corresponds to stochastic Pauli $X$ noise. Since any Pauli $X$ operator commutes with any other Pauli $X$ operator ($[X_i, X_j] = 0$), the recovery operators $U_s$ commute with the Kraus operators of the noise channel $\mathcal{N}$. Consequently, the correction channel commutes with the noise channel:
+\begin{equation}
+    [\mathcal{N}, \mathcal{K}] = 0 \implies \mathcal{N} \circ \mathcal{K} = \mathcal{K} \circ \mathcal{N}.
+\end{equation}
+By substituting this commutation relation into the composed channel expression, we have:
+\begin{equation}
+    \mathcal{N} \circ \mathcal{E}' = \mathcal{N} \circ (\mathcal{K} \circ \mathcal{E}) = (\mathcal{N} \circ \mathcal{K}) \circ \mathcal{E} = \mathcal{K} \circ (\mathcal{N} \circ \mathcal{E}).
+\end{equation}
+The coherent information $I_c$ satisfies the Data Processing Inequality \cite{schumacherQuantumDataProcessing1996}, which states that for any state $\rho$ and quantum channels $\Phi, \Lambda$, the inequality $I_c(\rho, \Lambda \circ \Phi) \leq I_c(\rho, \Phi)$ holds. Identifying $\Phi = \mathcal{N} \circ \mathcal{E}$ as the undecoded noisy channel and $\Lambda = \mathcal{K}$ as the post-processing correction, we obtain:
+\begin{equation}
+\begin{aligned}
+    I_c(\rho_L, \mathcal{N} \circ \mathcal{E}') &= I_c(\rho_L, \mathcal{K} \circ (\mathcal{N} \circ \mathcal{E})) \leq I_c(\rho_L, \mathcal{N} \circ \mathcal{E}).
+\end{aligned}
+\end{equation}
+This result implies that if the correction operations commute with the noise, the decoding step cannot recover the quantum information lost to the environment, confirming the proposition.
+\end{proof}
+
+\section{Proof of proposition 3}
+\begin{lemma}
+    if the coherent information density satisfies
+    \begin{equation}
+        \lim_{n\rightarrow \infty} I_c(\Gamma, \mathcal{N} \circ \mathcal{E}')/k < \log 2,
+    \end{equation}
+    where $\Gamma = I/2^k$ is the maximally mixed state. Then for any recovery channel $\mathcal{R}$, we have
+    \begin{equation}
+        \lim_{n\rightarrow \infty} F_e(\mathcal{R\circ N \circ E', I}) < 1,
+    \end{equation}
+    where $F_e(\mathcal{R\circ N \circ E', I})$ is the average entanglement fidelity between $\mathcal{R\circ N \circ E}$ and the identity channel $\mathcal{I}$.
+\end{lemma}
+\begin{proof}
+    The proof in \cite{zhaoExtractingErrorThresholds2024} still holds.
+    
+    The proof relies on the Quantum Fano Inequality (also known as the converse bound for quantum capacity). Let the effective channel after recovery be $\Lambda = \mathcal R \circ \mathcal N \circ \mathcal E'$. The relationship between the coherent information loss and the entanglement fidelity $F_e(\Lambda,\mathcal{I})$ is given by:
+\begin{equation} \label{eq:fano}
+    S(\Gamma) - I_c(\Gamma, \Lambda) \leq H_b(F_e(\Lambda,\mathcal{I})) + (1 - F_e(\Lambda,\mathcal{I})) \log(2^{2k} - 1),
+\end{equation}
+where $S(\Gamma) = k \log 2$ is the von Neumann entropy of the source, and $H_b(x) = -x\log x - (1-x)\log(1-x)$ is the binary entropy function.
+
+First, we apply the Data Processing Inequality (DPI) for coherent information. Since the recovery operation $\mathcal R$ is a trace-preserving completely positive (TPCP) map acting after the effective channel $\mathcal N \circ \mathcal E'$, it cannot increase the coherent information:
+\begin{equation} \label{eq:dpi}
+    I_c(\Gamma, \mathcal R \circ (\mathcal N \circ \mathcal E')) \leq I_c(\Gamma, \mathcal N \circ \mathcal E').
+\end{equation}
+
+Combining Eq. (\ref{eq:fano}) and Eq. (\ref{eq:dpi}), we obtain a lower bound on the ``error term'' (RHS of Eq. (\ref{eq:fano})):
+\begin{equation}
+    S(\Gamma) - I_c(\Gamma, \mathcal N \circ \mathcal E') \leq H_b(F_e(\Lambda,\mathcal{I})) + (1 - F_e(\Lambda,\mathcal{I})) \log(2^{2k} - 1).
+\end{equation}
+
+By the hypothesis, there exists a strictly positive deficit $\delta > 0$ such that in the asymptotic limit:
+\begin{equation}
+    \lim_{n\to\infty} \left(  \log 2 - I_c(\Gamma, \mathcal N \circ \mathcal E') /k\right) = \delta>0.
+\end{equation}
+Consequently, the fidelity $F_e$ must satisfy:
+\begin{equation}
+    \delta \leq \lim_{n\to\infty} \frac{1}{k}\left(H_b(F_e) + (1 - F_e) \log(2^{2k} - 1)\right).
+\end{equation}
+Consider the function $f(x) = (H_b(x) + (1-x)\log(2^{2k} - 1))/k$. We observe that $f(x)$ is continuous for $x \in [0, 1]$ and $f(1) = 0$ and is monotonically decreasing for $x\in [1/2,1]$. Since $\delta > 0$, it implies that $F_e$ cannot converge to 1. Notice that this conclusion holds even for $k=\omega(1)$, since in that case $f(x) \rightarrow (1-x) 2\log2$.
+
+\end{proof}
+
+
+\section{proof of proposition 2}
+To prove $\lim_{n\rightarrow\infty} I_c(\rho_L, \mathcal{N} \circ \mathcal{E})/k < \log 2 $, we notice that 
+\begin{equation}
+    \mathcal{E} = \sum_{s} \Pr(s) \ket{s}_c\bra{s}_c \otimes \mathcal{E}_s,
+\end{equation}
+where 
+\begin{equation}
+     \mathcal{E}_s(\rho_L) = \frac{\exp\left(\beta \sum_{g_Z} s_{g_Z} g_Z\right) }{\mathcal{Z}(\{s_{g_Z}\})} \bigotimes_{g_X'} \ket{g_X'=+} \bra{g_X'=+} \bigotimes \rho_L,
+\end{equation}
+such that
+\begin{equation}
+    I_c(\rho_L, \mathcal{N} \circ \mathcal{E}) = \sum_{s} \Pr(s) I_c(\rho_L, \mathcal{N} \circ \mathcal{E}_s).
+\end{equation}
+So it suffice to prove $\lim_{n\rightarrow\infty} I_c(\rho_L, \mathcal{N} \circ \mathcal{E}_s)/k < \log 2 $.
+To do so, we note that 
+\begin{equation}
+     \exp\left(\beta \sum_{g_Z} s_{g_Z} g_Z\right) = \cosh^{r_Z}\beta \sum_{\sigma_Z \in C_2} (\tanh \beta)^{|\sigma_Z|} s_{\sigma_Z} Z_{H_Z^T \sigma_Z},
+\end{equation}
+where \begin{equation}
+    Z_{H_Z^T \sigma_Z} = \prod_{e_1 \in H_Z^T \sigma_Z} Z_{e_1}, \quad s_{\sigma_Z} = \prod _{e_2 \in \sigma_Z} s_{e_2},
+\end{equation}
+each $Z$ generator $g_Z$ is associated with a basis vector $e_2$ of $C_2$. So
+\begin{equation}
+    \mathcal{Z}(\{s_{g_Z}\}) = \frac{1}{2^{r_X'+k}}\tr_Q \exp\left(\beta \sum_{g_Z} s_{g_Z} g_Z\right) = 2^{r_Z'} \cosh^{r_Z}\beta \sum_{\sigma_Z \in \ker H_Z^T} (\tanh \beta)^{|\sigma_Z|} s_{\sigma_Z}.
+\end{equation}
+\begin{equation}
+\begin{aligned}
+    & \Pr(\{s_{g_Z}\}) = \frac{1}{2^{r_Z'} (2\cosh\beta)^{r_Z}} \mathcal{Z}(\{s_{g_Z}\})\\
+    &= \frac{1}{2^{r_Z}}  \sum_{\sigma_Z \in \ker H_Z^T} (\tanh \beta)^{|\sigma_Z|} s_{\sigma_Z}
+\end{aligned}
+\end{equation}
+We want to prove $\lim_{n\rightarrow\infty} I_c(\rho_L, \mathcal{N} \circ \mathcal{E}_s)/k < \log 2 $ given that $\ker H_Z^T$ is finite dimensional, $\dim \ker H_Z^T = r_Z - r_Z'= O(1)$.
+
+\begin{equation}
+    \begin{aligned}
+        &\rho_0(s) =  \frac{(2\cosh\beta)^{r_Z}}{\mathcal{Z}(s)}\sum_{s_e|s_e+s\in \im H_Z}  (1-q)^{r_Z - s_e} q^{s_e} \ket{\sigma_{Z} = s+s_e}\bra{\sigma_{Z} = s+s_e} \otimes \ket{\sigma_{X}' = 0}\bra{\sigma_{X}' = 0} \otimes \Gamma\\
+        &=  \frac{1}{\mathcal{Z}(s)}\sum_{\sigma_{Z}\in \im H_Z}  \exp\left(\sum_{e_2}\beta (-1)^{{s}_{e_2}+ \sigma_{Z,e_2}}\right) \ket{\sigma_{Z}}\bra{\sigma_{Z}}\otimes \ket{\sigma_{X}' = 0}\bra{\sigma_{X}' = 0} \otimes \Gamma\\
+        &=  \frac{1}{\mathcal{Z}(s)}\sum_{s_e|s_e+s\in \im H_Z}  \exp\left(\sum_{e_2}\beta (-1)^{{s_e}_{,e_2}}\right) \ket{\sigma_{Z} = s+s_e}\bra{\sigma_{Z} = s+s_e}  \otimes \ket{\sigma_{X}' = 0}\bra{\sigma_{X}' = 0} \otimes \Gamma
+    \end{aligned}
+    \end{equation}
+Note that if $\sigma_Z \notin \im H_Z$, then $\ket{\sigma_Z}\bra{\sigma_Z}  = 0$.
+The post-noise state is 
+\begin{equation}
+    \begin{aligned}
+        &\mathcal N(\rho_0(s)) =\sum_c \sum_{\sigma_{Z}\in \im H_Z}  \Pr(c) \Pr(\sigma_Z) X_c \left[\ket{\sigma_{Z}}\bra{\sigma_{Z}} \otimes \ket{\sigma_{X}' = 0}\bra{\sigma_{X}' = 0} \otimes \Gamma \right] X_c\\
+    \end{aligned}
+\end{equation}
+where 
+\begin{equation}
+    \Pr(\sigma_Z) = \frac{1}{\mathcal{Z}(s)} \exp\left(\sum_{e_2}\beta (-1)^{{s}_{e_2}+ \sigma_{Z,e_2}}\right) = \frac{(2\cosh \beta)^{r_Z}}{\mathcal{Z}(s)} (1-q)^{r_Z -|s+\sigma_Z|} q^{|s+\sigma_Z|}.
+\end{equation}
+We purify the state as 
+\begin{equation}
+    \ket{\Psi_{RQAE}} = \frac{1}{\sqrt{2^k}} \sum_c \sum_{[h] \in H^1} \sum_{\sigma_{Z}\in \im H_Z}  \sqrt{\Pr(c) \Pr(\sigma_Z)} X_c \ket{\sigma_{Z}}\otimes \ket{\sigma_{X}' = 0} \otimes \ket{[h]} \otimes \ket{\sigma_Z}_A \otimes \ket{c}_E\otimes \ket{[h]}_R.
+\end{equation}
+Since
+\begin{equation}
+    -I_c +k \log 2 = - S(RAE) + S(AE) + S(R) = S(\rho_{RAE}||\rho_{AE} \otimes \rho_{R}) \geq \frac{1}{2\log 2} \norm{\rho_{RAE} - \rho_{AE} \otimes \rho_{R}}^2_1,
+\end{equation}
+define Schatten $\alpha$-norm as 
+\begin{equation}
+    \norm{X}_{\alpha} = \left(\tr \left[\left(\sqrt{X^\dagger X}\right)^\alpha\right]\right)^{\frac{1}{\alpha}},
+\end{equation}
+we have $\norm{X}_{\alpha} \leq \norm{X}_{1}$ for $\alpha \in (1,+\infty)$, thus
+\begin{equation}
+    S(\rho_{RAE}||\rho_{AE} \otimes \rho_{R})\geq \frac{1}{2\log 2} \norm{\rho_{RAE} - \rho_{AE} \otimes \rho_{R}}^2_2.
+\end{equation}
+Since every $X$ error chain $c$ is determined by a $Z$ syndrome $H_Z c$, a logical class and a $X$ stabilizer, we denote the logical class of c as $l(c) \in H^1$.
+We have
+\begin{equation}
+    \begin{aligned}
+        &\rho_{RAE} = \sum_{c_1,c_2 \in C^1} \sum_{\sigma_1,\sigma_2 \in \im H_Z} \sum_{[h_1],[h_2] \in H^1}\frac{1}{2^k} \delta(\sigma_1 + \sigma_2 + H_Z(c_1+c_2)= 0)\delta([h_1+h_2] + l(c_1+c_2) = 0)\\
+        &\times \sqrt{\Pr(c_1) \Pr(c_2) \Pr(\sigma_1) \Pr(\sigma_2)} \ket{c_1}_E\bra{c_2}_E\otimes \ket{\sigma_1}_A\bra{\sigma_2}_A\otimes \ket{[h_1]}_R\bra{[h_2]}_R,
+    \end{aligned}
+\end{equation}
+\begin{equation}
+    \begin{aligned}
+        &\rho_{AE} = \sum_{c_1,c_2 \in C^1} \sum_{\sigma_1,\sigma_2 \in \im H_Z} \frac{1}{2^k} \delta(\sigma_1 + \sigma_2 + H_Z(c_1+c_2)= 0)\delta( l(c_1+c_2) = 0)\\
+        &\times \sqrt{\Pr(c_1) \Pr(c_2) \Pr(\sigma_1) \Pr(\sigma_2)} \ket{c_1}_E\bra{c_2}_E\otimes \ket{\sigma_1}_A\bra{\sigma_2}_A,
+    \end{aligned}
+\end{equation}
+and $\rho_R = I_R/2^k$.
+\begin{equation}
+    \begin{aligned}
+        &\rho_{RAE}- \rho_{AE} \otimes \rho_{R} = \frac{1}{2^k}\sum_{c_1,c_2 \in C^1} \sum_{\sigma_1,\sigma_2 \in \im H_Z}  \delta(\sigma_1 + \sigma_2 + H_Z(c_1+c_2)= 0)\sqrt{\Pr(c_1) \Pr(c_2) \Pr(\sigma_1) \Pr(\sigma_2)} \ket{c_1}_E\bra{c_2}_E\otimes \ket{\sigma_1}_A\bra{\sigma_2}_A\\
+        &\otimes\sum_{[h_1],[h_2] \in H^1}\left\{ \delta([h_1+h_2] + l(c_1+c_2) = 0)- \delta([h_1]=[h_2])\delta( l(c_1+c_2) = 0)\right\}\ket{[h_1]}_R\bra{[h_2]}_R,
+    \end{aligned}
+\end{equation}
+
+\begin{equation}
+    \begin{aligned}
+        &\norm{\rho_{RAE}- \rho_{AE} \otimes \rho_{R}}^2_2 = \tr [(\rho_{RAE}- \rho_{AE} \otimes \rho_{R})^2]\\  
+        &=\frac{1}{2^{2k}} \sum_{c_1,c_2 \in C^1} \sum_{\sigma_1,\sigma_2 \in \im H_Z}  \delta(\sigma_1 + \sigma_2 + H_Z(c_1+c_2)= 0)\Pr(c_1) \Pr(c_2) \Pr(\sigma_1) \Pr(\sigma_2) \\
+        &\times\sum_{[h_1],[h_2] \in H^1}\left\{ \delta([h_1+h_2] + l(c_1+c_2) = 0)- \delta([h_1]=[h_2])\delta( l(c_1+c_2) = 0)\right\}^2,\\
+        &=\frac{1}{2^{2k}} \sum_{c_1,c_2 \in C^1} \sum_{\sigma_1,\sigma_2 \in \im H_Z}  \delta(\sigma_1 + \sigma_2 + H_Z(c_1+c_2)= 0)\Pr(c_1) \Pr(c_2) \Pr(\sigma_1) \Pr(\sigma_2) \\
+        &\times\sum_{[h_1],[h_2] \in H^1}\left\{ \delta([h_1+h_2] + l(c_1+c_2) = 0)- \delta([h_1]=[h_2])\delta( l(c_1+c_2) = 0)\right\},\\
+        &=\frac{1}{2^{k}} \sum_{c_1,c_2 \in C^1} \sum_{[h] \in H^1:[h]\neq 0}\sum_{\sigma_1,\sigma_2 \in \im H_Z}  \\
+        &\times \delta(\sigma_1 + \sigma_2 + H_Z(c_1+c_2)= 0) \delta([h] = l(c_1+c_2))\Pr(c_1) \Pr(c_2) \Pr(\sigma_1) \Pr(\sigma_2) \\
+        &=\frac{1}{2^{k}} \sum_{c_1,c_2 \in C^1} \sum_{[h] \in H^1:[h]\neq 0}\sum_{\sigma_1,\sigma_2 \in \im H_Z} \delta((\sigma_1)'=(\sigma_2)')  \delta([h] = l(c_1+c_2))\Pr(c_1) \Pr(c_2) \Pr(\sigma_1+H_Z c_1) \Pr(\sigma_2+H_Z c_2) \\
+        &=\frac{1}{2^{k}} \sum_{c_1,c_2 \in C^1} \sum_{[h] \in H^1:[h]\neq 0}\sum_{\sigma \in \im H_Z}   \delta([h] = l(c_1+c_2))\Pr(c_1) \Pr(c_2) \Pr(\sigma+H_Z c_1) \Pr(\sigma +H_Z c_2) 
+    \end{aligned}
+\end{equation}
+Since $\ker H_Z^T = (\im H_Z)^\perp$, we have
+\begin{equation}
+    \mathbb{I}_{\im H_Z} (x) = \frac{1}{|\ker H_Z^T|} \sum_{v \in \ker H_Z^T} (-1)^{\braket{v,x}}, 
+\end{equation}
+
+\section{Soundness guarantees single-shot preparation}
+\subsection{Notations and preliminary lemmas}
+For stochastic data errors $e\in C^1$ (or syndrome errors $s_e \in C^2$),  we denote the corresponding random variable using the capital letter $E$ ($S_e$). The probability of a specific configuration is denoted as 
+\begin{equation}
+    \Pr(E = e) = p(e).
+\end{equation}
+$\textrm{supp}(e)$ is the support of $e$, which is a set of data qubits ( $\textrm{supp}(s_e)$ for check bits). In the following parts, without leading to conflict, we use $e$ to represent both the error chain and its support set in order to simplify the notation. The probability that a set is contained in some error $E$ is denoted as 
+\begin{equation}
+    \Pr(e \subseteq E) = \sum_{e '\supseteq e} \Pr(E=e').
+\end{equation}
+\begin{definition}[Local stochastic error]
+    We say a random error $E$ is $(p)$-local stochastic if there exists a parameter $p$ such that 
+    \begin{equation}
+        \Pr(e \subseteq E) \leq O\left(p^{|e|} \right).
+    \end{equation}
+\end{definition}
+
+For an observed syndrome configuration $s \in C^2$, it might not stay in $\im H_Z$, so it is possible to be a nonphysical syndrome. So we need to project it back to the physical syndrome space $\im H_Z$. 
+Notice that the physical syndrome space defined a classical linear code $\im H_Z \subseteq C^2$ in the full syndrome space, which is usually called 'meta check'.
+The projection is performed by a minimum-weight decoder for syndrome errors. 
+\begin{definition}[minimum weight decoder for syndrome error]
+    Given the classical linear code $\im H_Z \subseteq C^2$, the minimum weight decoder $r: C^2 \rightarrow C^2$ is defined as follows: 
+    \begin{equation}
+        r(s) = \argmin_{s' \in V:s'+s\in \im H_Z}|s'|, \quad \forall s\in C^2.
+    \end{equation}
+\end{definition}
+After decoding, we have the residual syndrome
+\begin{equation}
+    \sigma = \pi(s) = s + r (s) \in \im H_z.
+\end{equation}
+Under the minimum weight decoder, the observed syndrome $s$ must occupy more than half of the residual syndrome $\sigma$. Moreover, this fact holds for any physical sub-syndrome of $\sigma$.
+\begin{lemma} \label{lemma:half-weight}
+    Given $\sigma = \pi(s) = s+r(s)$, if $b \subseteq \sigma$ and $b \in \im H_Z$, then $|s \cap b| \geq |b|/2$.
+\end{lemma}
+\begin{proof}
+    Because $r$ is the minimum weight decoder, $|r(s) \leq r(s)+b|$.
+    So
+    \begin{equation}
+        |r(s)+b| = |r(s)| + |b| - 2|r(s) \cap b| \geq |r(s)|, 
+    \end{equation}
+    and thus $|r(s)\cap b| \leq |b|/2$.
+    Denote the restriction of $\sigma$ on the support of $b$ as $\sigma|_b$. Since $\sigma|_b = \vec 1$, we have
+    \begin{equation}
+        s|_b = (\sigma + r(s))|_b = 1 + r(s)|_b, 
+    \end{equation}
+    and thus 
+    \begin{equation}
+        |\sigma \cap b| = |b| - |r(s) \cap b| \geq \frac{|b|}{2}.
+    \end{equation}
+\end{proof}
+
+
+For a physical syndrome $\sigma$, we can decode the data error using the minimum weight decoder of (Pauli $X$) data error.
+\begin{definition}[minimum weight decoder for data error]
+    Given the party check matrix $H_Z$, the minimum weight decoder $c: \im H_Z \rightarrow C^1$ is defined as follows: 
+    \begin{equation}
+        c(\sigma) = \argmin_{c \in C^1: H_Z c = \sigma}|c|, \quad \forall \sigma \in \im H_Z.
+    \end{equation}
+\end{definition}
+In this section, we will assume $H_Z$ is an LDPC code with check degree $d_c$ and variable degree $d_v$. Moreover, we require it to have linear soundness.
+\begin{definition}[$(t,f)$-soundness]
+    Let $t\in \mathbb{Z}$ and $f : \mathbb{Z} \rightarrow \mathbb{R}$ be a function with $f (0) = 0$. We say the parity check $H_Z$ is $(t,f)$ sound if for all physical syndromes $\sigma \in \im H_z$ with $\sigma \leq t $ it follows that $f(|\sigma|) \geq |c(\sigma)|$.
+\end{definition}
+\begin{definition}[Linear soundness]
+    For a $(t,f)$-sound parity check, we say it is $(t,\rho)$-linear sound if there exists a constant $\rho > 0$ such that $f(x) = x/ \rho$.
+\end{definition}
+Notice that the definition is strictly weaker than soundness in Ref. \cite{quintavalleSingleShotErrorCorrection2021} since it bounds the weights of reduced errors corresponding to syndrome $\sigma$ in all logical classes.
+
+Since $H_z$ is LDPC, we can define its bounded-degree adjacency graph as follows,
+\begin{definition}[Adjacency graph]
+Given a parity check matrix $H_Z$, we define the adjacency graph $G(H_Z)$ where we associate each of the $n$ qubits with a vertex and two qubits are connected by an edge if there is a check in $H_Z$ that acts nontrivially on both of them.    
+\end{definition}
+For $(d_v,d_c)$-LPDC $H_Z$, $G$ has a bounded vertex degree of at most $\Delta = (d_c-1)d_v$. In this paper, we always assume $\Delta > 1$.
+To examine whether a certain random error variable $E$ is local stochastic,
+for a set of vertices $e$ (or a data error configuration), we often need to consider the errors containing $e$, $e\subset E$. In the proof of the main theorem, we need to mediate this event by considering the connected components of $E$ that contain $e$. 
+\begin{definition}[$e$-anchored]
+Given two set of vertices $w$ and $e$, we say $w$ is $e$-anchored if $e \subseteq w$ and for the connected component of $w$, $w = w_1 \sqcup w_2 \cdots w_m$, we have $w_i \cap e \neq \emptyset$, $\forall w_i$.
+\end{definition}
+Note that here we use $\sqcup$ to denote the disconnected union on the adjacency graph. If $w$ is $e$-anchored, then each connected component of $w$ must contain some connected components of $e$. 
+There is a counting lemma for $e$-anchored sets,
+\begin{lemma}[Cluster counting lemma (lemma 2 of Ref. \cite{gottesmanFaultTolerantQuantumComputation2014})]
+\label{lemma:counting}
+Let $M_\Delta(\omega,e)$ be the total number of $e$-anchored sets that have weight $\omega$, then 
+\begin{equation}
+    M_\Delta(\omega,e) \leq \e^{|e|-1}(\Delta \e)^{\omega - |e|},
+\end{equation}
+where $\e$ is the base of the natural logarithm.
+\end{lemma}
+Given a set $w$, we often need to consider the case where $w$ is a union of some connected components of $E$. If $E = \bigsqcup_{i \in M} E_i$, then we denote $w \sqsubseteq E$ if there exists an index subset $M' \subseteq M$ such that $w = \bigsqcup_{i \in M'} E_i$. If here $E$ is given by the minimum weight decoder of data error, we have the following lemma
+\begin{lemma}
+\label{lemma:UCC}
+    Given the parity check $H_Z$ and $w \in C^1$, $\sigma \in \im H_Z$. If on the adjacency graph $G(H_Z)$ we have $w \sqsubseteq c(\sigma)$, then 
+    \begin{enumerate}
+        \item the support of $H_Z w$ is contained in the support of $\sigma$, $H_Z w \subseteq \Sigma$;
+        \item the minimum weight correction of $H_Z w$ is $w$, $c(H_Z w) = w$.
+    \end{enumerate}
+\end{lemma}
+\begin{proof}
+    Suppose that $c(\sigma) = w \sqcup f$. Since $w$ and $f$ are disconnected, they cannot share a syndrome check, otherwise they will be connected by this check on $G(H_Z)$. Then because $\sigma = H_z w + H_z f$ and $H_zw \cap H_z f = \emptyset$, we must have $H_Z w \subseteq \sigma$.
+
+    Suppose that $c(H_Z w) \neq w$, there exist $w' \in C^1$ such that $H_z w =H_z w'$ and $|w'| < |w|$. So
+    \begin{equation}
+        H_Z (w'+f) = H_Z(w+f) = H_Z(c(\sigma)) = \sigma.
+    \end{equation}
+    However,
+    \begin{equation}
+        |w'+f| \leq |w'|+|f| < |w|+|f| =|c(\sigma)|,
+    \end{equation}
+    which is in contradiction with that $c(\sigma)$ is the minimum weight decoder.
+    So $c(H_Z w) = w$.
+\end{proof}
+
+\subsection{state preparation process}
+Suppose that the readout suffer from a stochastic error $S_e$, which has the distribution $\Pr(S_e=s_e)=q(s_e)$. Then starting from $+$ product state, the post-measurement is
+    \begin{equation}
+    \begin{aligned}
+        &\rho_Q = \sum_s \Pr(s) \ket{s}_c\bra{s}_c \otimes  \sum_{s_e|s_e+s\in \im H_Z}  \tilde{q}(s_e) \ket{\sigma_{Z} = s+s_e}\bra{\sigma_{Z} = s+s_e}\\& \otimes \ket{\sigma_{X}' = 0}\bra{\sigma_{X}' = 0} \otimes \ket{[h_X]=0}\bra{[h_X]=0},\\
+        &= \sum_s \Pr(s) \ket{s}_c\bra{s}_c \otimes  \sum_{\sigma \in \im H_Z}  \tilde{q}(\sigma+s) \ket{\sigma_{Z} = \sigma}\bra{\sigma_{Z} = \sigma} \otimes \ket{\sigma_{X}' = 0}\bra{\sigma_{X}' = 0} \otimes \ket{[h_X]=0}\bra{[h_X]=0},
+    \end{aligned}
+    \end{equation}
+where the probability of observing a particular syndrome $s$ is
+\begin{equation}
+    \Pr(S=s) = \frac{1}{r_Z'}\sum_{\sigma \in \im H_z} q(\sigma+s) = \frac{1}{r_Z'} \Pr(S_e \in [s]_{\im H_Z})
+\end{equation}
+Here $[s]_{\im H_Z}$ denotes the equivalent class in the quotient space $C^2/\im H_z$. It means that the probability of observed syndrome depends only on its equivalent class. Also, since the projection of unphysical syndrome vanishes $\Pi_{\sigma_Z \notin \im H_Z}=0$, the post measurement state containes only superposition of physical syndrome, following from the distribution
+\begin{equation}
+\begin{aligned}
+    &\tilde{q}(s_e) = \frac{q(s_e)}{\sum_{\sigma \in \im H_z} q(\sigma+s)} = \frac{q(s_e)}{\Pr(S_e \in [s]_{\im H_Z})}.
+\end{aligned}
+\end{equation}
+Provided with the information of $s$, we apply the minimum weight decoder to correct syndrome error, and then apply accordingly the controlled Pauli $X$ correction. For each $s$ we apply $X_{c(\pi(s))}$ to $\rho(s)$, which yields the state
+    \begin{equation}
+    \begin{aligned}
+        & \frac{1}{2^{r_z'}}\sum_s  \ket{s}_c\bra{s}_c \otimes  \sum_{s_e|s_e+s\in \im H_Z}  q(s_e) X_{c(\pi(s))} \ket{\sigma_{Z} = s+s_e}\bra{\sigma_{Z} = s+s_e}  \otimes \ket{\sigma_{X}' = 0}\bra{\sigma_{X}' = 0} \otimes \ket{[h_X]=0}\bra{[h_X]=0} X_{c(\pi(s))},\\
+        &=\frac{1}{2^{r_z'}}\sum_s  \ket{s}_c\bra{s}_c \otimes  \sum_{s_e|s_e+s\in \im H_Z}  q(s_e) \ket{\sigma_{Z} = r(s)+s_e}\bra{\sigma_{Z} = r(s)+s_e}  \otimes \ket{\sigma_{X}' = 0}\bra{\sigma_{X}' = 0} \otimes \ket{[h_X]=0}\bra{[h_X]=0},\\
+        &=\frac{1}{2^{r_z'}}\sum_s  \ket{s}_c\bra{s}_c \otimes  \sum_{\sigma \in \im H_Z}  q(\sigma+r(s)) \ket{\sigma_{Z} = \sigma}\bra{\sigma_{Z} = \sigma}  \otimes \ket{\sigma_{X}' = 0}\bra{\sigma_{X}' = 0} \otimes \ket{[h_X]=0}\bra{[h_X]=0}
+    \end{aligned}
+    \end{equation}
+We then discard the classical register, such that the final state is 
+\begin{equation}
+        \rho_{\text{final}}= \sum_{\sigma \in \im H_Z}  \Pr(\Sigma = \sigma)\ket{\sigma_{Z} = \sigma}\bra{\sigma_{Z} = \sigma}  \otimes \ket{\sigma_{X}' = 0}\bra{\sigma_{X}' = 0} \otimes \ket{[h_X]=0}\bra{[h_X]=0}.
+\end{equation}
+where $\Sigma$ follows from the distribution
+\begin{equation}
+     \Pr(\Sigma = \sigma) = \frac{1}{2^{r_z'}}\sum_s q(\sigma+r(s)) .
+\end{equation}
+In the expression of $\rho_{\text{final}}$, the superposition of different syndromes $\sigma$ can be converted into the superposition of Pauli $c$ strings with has the corresponding syndrome $H_Z c = \sigma$. The choice could be arbitrary since $X$ stabilizers and $X$ logical operators act trivially on the logical $+$ state. In this section, we fix the choice as the minimum weight decoding for data error $c(\sigma)$. In that case, we have
+\begin{equation}
+    \rho_{\text{final}} = \mathcal{S}(\ket{\{+\}}_L \bra{\{+\}}_L ),
+\end{equation}
+where
+\begin{equation}
+    \mathcal{S}(\rho ) = \sum_{\sigma \in \im H_Z} \Pr(\Sigma = \sigma)  X_{c(\sigma)} \rho X_{c(\sigma)}.
+\end{equation}
+
+To analyze the single-shot preparation threshold, we need to study $\mathcal{S}$. However, a subtlety is that the set of Kraus operators $\{\sqrt{\Pr(\Sigma = \sigma)} X_{c(\sigma)} \}_{\sigma}$ exactly satisfies KL condition, 
+\begin{equation}
+    \Pi X_{c(\sigma_1)} X_{c(\sigma_2)} \Pi = \delta_{\sigma_1,\sigma_2} \Pi,
+\end{equation}
+since for $\sigma_1 \neq \sigma_2$, $c(\sigma_1)+c(\sigma_2)$ always have nontrivial syndrome, $H_Z(c(\sigma_1)+c(\sigma_2) ) = \sigma_1+\sigma_2 \neq 0$, thus yields $0$ under code space projection. This holds for arbitrary choices of the map $c: \im H_Z \rightarrow C^1$. Thus, the crucial criterion for state preparation is whether it remains correctable in the presence of additional stochastic Pauli $ X$-data noise. We need to determine whether the channel $\mathcal{N} \circ \mathcal{S}$ has a QEC threshold. It suffices to show $\mathcal{N} \circ \mathcal{S}$ is local stochastic, which follows the probability
+\begin{equation}
+    \Pr(F=\eta) = \sum_{\sigma \in \im H_Z } \Pr(\Sigma = \sigma) \Pr(E = \eta + c_{\sigma}).
+\end{equation}
+
+\subsection{local stochastic property of error distributions}
+Given that $\Pr(S_e=s_e)=q(s_e)$ is the local stochastic syndrome error with probability parameter $q$, we consider the random variable 
+\begin{equation}
+    \Sigma = \pi(S_e) = S_e + r(S_e). 
+\end{equation}
+Its probability is evaluated as follows. Consider the quotient space $C^2/\im H_z$, denote its elements as $[s]_{\im H_Z}$. For $s,s' \in [s]_{\im H_Z}$, we have $r(s) = r(s')$.
+So $[s]_{\im H_Z}$ is composed by $r(s) +\sigma$, $\sigma\in \im H_Z$. 
+Conversely, for every $[s]_{\im H_Z} \in C^2/\im H_Z$, $s = r(s) +\sigma$ is the unique element in $[s]_{\im H_Z}$ such that $\pi(s) = \sigma$.
+So the probability of $\pi(S_e) = \sigma$ is evaluated by collecting the probability of $S_e = r(s) +\sigma$ in each equivalent class.
+\begin{equation}
+    \Pr(\Sigma = \sigma)=\Pr(\pi(S_e) = \sigma) = \sum_{[s]\in C^2/\im H_Z} \Pr(S_e = \sigma + r(s)) = \frac{1}{2^{r_z'}} \sum_{s\in C^2}q(\sigma+r(s)).
+\end{equation}
+We then prove an important lemma that $c(\Sigma)$ is local stochastic.
+\begin{lemma}
+\label{lemma:local-stochastic-syndrome}
+    Given an $(\kappa n,\rho)$-linear sound $(d_v,d_c)$-LDPC $H_Z$, let $\Sigma = \pi(S_e) = S_e + r(S_e)$ where $S_e$ is a $(q)$-local stochastic syndrome error, then $c(\Sigma)$ is $(\tilde{q})$-local stochastic with $\tilde{q} = \e (2\sqrt q)^{\min\{\rho, \kappa\} }$, provided that $\tilde{q} < 1/\Delta$.
+\end{lemma}
+\begin{proof}
+    We need to evaluate the subset probability $\Pr(e \subseteq c(\Sigma))$. We then enumerate all the $e$-anchored sets $w$, such that $w$ is a union of some connected components of $c(\Sigma)$ (denoted as $w \sqsubseteq c(\Sigma)$). Therefore, for the event $\{e \subseteq c(\Sigma)\}$ we have
+    \begin{equation}
+        \{e \subseteq c(\Sigma)\} \subseteq \bigcup_{w: \text{ $e$-anchored}} \{w \sqsubseteq c(\Sigma)\}.
+    \end{equation}
+    Then the union lemma tells us
+    \begin{equation}
+        \Pr(e \subseteq c(\Sigma)) \leq \sum_{w: \text{ $e$-anchored}} \Pr(w \sqsubseteq c(\Sigma)).
+    \end{equation}
+    According to Lemma \ref{lemma:UCC}, if $w \sqsubseteq c(\Sigma)$ then $H_Z w \subseteq \Sigma$, so 
+    \begin{equation}
+        \Pr(e \subseteq c(\Sigma)) \leq \sum_{w: \text{ $e$-anchored}} \Pr(H_Z w \subseteq \Sigma).
+    \end{equation}
+    Since $\Sigma = \pi(S_e)$, for $H_Z w\subseteq \Sigma$, according to Lemma \ref{lemma:half-weight} we have $|S_e \cap H_Z w| \geq |H_Z w |/2$, therefore the event $\{H_Z w \subseteq \Sigma\}$ can be enumerated by the events that $S_e$ contains more than half of $H_Z w$,
+    \begin{equation}
+        \{H_Z w \subseteq \Sigma\} \subseteq \bigcup_{s \subseteq H_Z w: |s| \geq \lceil |H_z w |/2\rceil} \{s \subseteq S_e\}.
+    \end{equation}
+    So using the union lemma,
+    \begin{equation}
+    \begin{aligned}
+        &        \Pr(H_Z w \subseteq \Sigma) \leq \sum_{s \subseteq H_Z w: |s| \geq \lceil |H_z w |/2\rceil} \Pr(s \subseteq S_e) \leq \sum_{s \subseteq H_Z w: |s| \geq \lceil |H_z w |/2\rceil} q^{|s|}\\
+        & \leq \sum_{x = \lceil |H_z w |/2\rceil}^{|H_Z w|} \binom{|H_Zw|}{x} q^x \leq (2\sqrt{q})^{|H_Z w|}.
+    \end{aligned}
+    \end{equation}
+    Since $H_z$ is $(t,\rho)$-sound with $t=\Theta(n)$, assume $t \geq \kappa n$,
+    we have $|H_Z w| \geq \min \{\rho |w|, t \}$,
+    \begin{equation}
+        \Pr(H_Z w \subseteq \Sigma) \leq (2\sqrt{q})^{\min\{\rho|w|, \kappa n\}}.
+    \end{equation}
+    We can then evaluate
+    \begin{equation}
+    \begin{aligned}
+        &\Pr(e \subseteq c(\Sigma)) \leq \sum_{w: \text{ $e$-anchored}} (2\sqrt{q})^{\min\{\rho|w|, \kappa n\}} = \sum_{x \geq |e|} M_\Delta (x,e) (2\sqrt{q})^{\min\{\rho x, \kappa n\}}\\
+        & =\sum_{|e| \leq x \leq \kappa n/\rho} M_\Delta (x,e) (2\sqrt{q})^{\rho x} + (2\sqrt{q})^{\kappa n} \sum_{x > \kappa n/\rho} M_\Delta (x,e) \\
+        & \leq \sum_{|e| \leq x \leq \kappa n/\rho} \e^{|e|-1}(\Delta \e)^{x - |e|} (2\sqrt{q})^{\rho x} + (2\sqrt{q})^{\kappa n}\sum_{ \kappa n/\rho <x \leq n} \e^{|e|-1}(\Delta \e)^{x - |e|}\\
+        &=\e^{|e|-1}(2\sqrt q)^{\rho |e|}
+        \frac{1-\big[\Delta \e(2\sqrt q)^\rho\big]^{\,\lfloor \kappa n/\rho\rfloor-|e|+1}}
+        {1-\Delta \e(2\sqrt q)^\rho}+\e^{|e|-1}(2\sqrt q)^{\kappa n}
+        (\Delta \e)^{\lfloor \kappa n/\rho\rfloor+1-|e|}
+        \frac{(\Delta \e)^{\,n-\lfloor \kappa n/\rho\rfloor}-1}{\Delta \e-1}\\
+        & \leq
+        \frac{ (\e (2\sqrt q)^{\rho})^{|e|}}
+        {\e(1-\Delta \e(2\sqrt q)^\rho)}+
+        \frac{(\Delta \e) (\e (2\sqrt q)^\kappa)^{|e|}}{\e(\Delta \e-1)} \leq O\left( \left(\e (2\sqrt q)^{\min\{\rho, \kappa\} } \right)^{|e|}\right)
+    \end{aligned}
+    \end{equation}
+    Where we assumed $\Delta \e(2\sqrt q)^\rho < 1$ and $\Delta \e(2\sqrt q)^\kappa < 1$.
+\end{proof}
+
+
+The next lemma states that the composition of two local stochastic errors is still local stochastic.
+    \begin{lemma}
+        Let $E_1$ be a $(p_1)$-local stochastic error and $E_2$ be a $(p_2)$-local stochastic error, then $E_1+E_2$ is a $(p_1 + p_2)$-local stochastic error.
+    \end{lemma}
+    \begin{proof}
+        For any error configuration $e$ we have
+        \begin{equation}
+        \begin{aligned}
+            &\Pr(e \subseteq E_1 + E_2) \leq \sum_{e' \subseteq e} \Pr(e' \subseteq E_1) \Pr(e\setminus e' \subseteq E_2 )\leq const \times \sum_{e' \subseteq e} p_1^{|e'|} p_2^{|e|-|e'|} \leq O\left((p_1 +p_2)^{|e|} \right). 
+        \end{aligned}
+        \end{equation}
+    \end{proof}
+
+
+
+\section{Statistical Mechanical Mapping}
+In this section, we assume $c: \im H_Z \rightarrow C^1$ to be an arbitrary map satisfying $H_Zc(\sigma)=\sigma$. We assume that after the noise $\mathcal{N} \circ \mathcal{S}$ we apply a round of perfect error correction, that is, measure the syndrome of the residual error $F$ perfectly and apply the correction class with the largest probability. To find the optimal correction, we note that the decoding of the preparation round $r:C^2 \rightarrow C^2$ is done by a Pauli $X$ operator that commutes with the final correction, so we can postpone it and choose the correction according to both $s$ and $H_Z F$ in the final round. The post-measurement state would be
+\begin{equation}
+    \frac{1}{2^{r_z'}}\sum_{s\in C^2, \eta \in C^1}  \ket{s}_c\bra{s}_c \otimes \ket{H_Z \eta}_c\bra{H_Z \eta}_c \otimes  \sum_{\sigma \in \im H_Z}  q(\sigma+s) p(\eta + c(\sigma)) X_\eta \rho X_\eta.
+\end{equation}
+We denote the syndrome of $\eta$ as $\sigma_\eta = H_Z \eta$. By fixing the choice of  $c(\sigma_\eta)$, we can decompose $\eta = c(\sigma_\eta)+b+l$, $b \in B^1$, $[l] \in H^1$. Since both the choice of $c(\sigma)$ and $c(\sigma_\eta)$ are arbitrary, we can absorb the redefinition of $c(\sigma)$ into $c(\sigma_\eta)$. Consequently we have
+\begin{equation}
+    \sum_{s\in C^2, \sigma_\eta \in \im H_Z}  \ket{s}_c\bra{s}_c \otimes \ket{\sigma_\eta }_c\bra{\sigma_\eta }_c \otimes \sum_{[l]\in H^1} \Pr(s,\sigma_\eta,[l]) X_{c(\sigma_\eta)} X_l\rho X_{c(\sigma_\eta)} X_l,
+\end{equation}
+Where 
+\begin{equation}
+    \Pr(s,\sigma_\eta,[l]) = \frac{1}{2^{r_z'}}\sum_{\sigma\in \im H_Z, b\in B^1} q(\sigma+s)p(c(\sigma)+c(\sigma_\eta)+b+l).
+\end{equation}
+The maximum likelihood decoder (MLD) first fixes the syndrome part by applying $X_{c(\sigma_\eta)}$ and then applies the logical operator with the largest probability conditioned on $s$ and $\sigma_\eta$,
+\begin{equation}
+    l_{MLD}(s,\sigma_\eta) = \arg \max_{[l] \in H^1} \Pr([l]|s,\sigma_\eta).
+\end{equation}
+We define the disordered partition function as 
+\begin{equation}
+    \mathcal Z(s,\sigma_\eta)  =  \sum_{c\in C^1} q(H_Z c +s)p(c+\eta)  \propto \sum_{[l]} \Pr(s,\sigma_\eta,[l]),
+\end{equation}
+and view $c$ as the statistical mechanical d.o.f.. The disorder probability could be chosen as $\Pr(s,\sigma_\eta)$. To simplify the problem, according to the Nishimori physics, choosing a disorder probability proportional to the partition function is equivalent to choosing a disorder probability proportional to the Boltzmann weight. So we choose
+\begin{equation}
+    \Pr_{\text{dis}}(s,\eta) = q(s)p(\eta).
+\end{equation}
+The average free energy will be the same
+\begin{equation}
+\begin{aligned}
+    &\mathcal F = - \sum_{s,\sigma_\eta} \Pr(s,\sigma_\eta)\log Z(s,\sigma_\eta)\\
+    & \propto - \sum_{s,\eta} \sum_{c'\in C^1} q(H_Z c' +s)p(c'+\eta)\log \sum_{c\in C^1} q(H_Z c +s)p(c+\eta)\\
+    &(s\rightarrow s+H_Z c',\eta\rightarrow \eta+c') \propto - \sum_{s,\eta} \sum_{c'\in C^1} q( s)p(\eta)\log \sum_{c\in C^1} q(H_Z (c+c') +s)p(c+c'+\eta)\\
+    &(c\rightarrow c+c') \propto - \sum_{s,\eta}  q( s)p(\eta)\log \sum_{c\in C^1} q(H_Z c +s)p(c+\eta)\\
+    &\propto - \sum_{s,\eta} \Pr_{\text{dis}}(s,\eta)\log Z(s,\sigma_\eta).
+\end{aligned}
+\end{equation}
+We will consider single-qubit noise
+\begin{equation}
+    q(s) = q^{|s|}(1-q)^{r_Z-|s|}, \qquad p(\eta) = p^{|\eta|}(1-p)^{n-|\eta|}.
+\end{equation}
+
+\section{KW duality}
+Let
+\begin{equation}\label{eq:Zseta-csum}
+Z_{s,\eta}
+=\sum_{c\in C^1}
+\left(\frac{q}{1-q}\right)^{|Hc+s|}
+\left(\frac{p}{1-p}\right)^{|c+\eta|}.
+\end{equation}
+Introducing the Fourier representation of the binary delta function,
+\begin{equation}\label{eq:binary-delta}
+\delta(x)=2^{-r_Z}\sum_{\tau\in C^2}(-1)^{\langle \tau,x\rangle},
+\end{equation}
+we obtain
+\begin{equation}\label{eq:Zseta-fourier}
+Z_{s,\eta}
+=2^{-r_Z}\sum_{\tau\in C^2}\sum_{\sigma\in C^2,c\in C^1}
+\left(\frac{q}{1-q}\right)^{|\sigma+s|}
+\left(\frac{p}{1-p}\right)^{|c+\eta|}
+(-1)^{\langle \tau,\sigma+Hc\rangle}.
+\end{equation}
+After shifting variables \(u=\sigma+s\) and \(d=c+\eta\), and using
+\begin{align}
+\sum_{u\in C^2} a^{|u|}(-1)^{\langle \tau,u\rangle}
+&=(1+a)^{m-|\tau|}(1-a)^{|\tau|},
+\label{eq:hadamard-u}
+\\
+\sum_{d\in C^1} b^{|d|}(-1)^{\langle H^T\tau,d\rangle}
+&=(1+b)^{n-|H^T\tau|}(1-b)^{|H^T\tau|},
+\label{eq:hadamard-d}
+\end{align}
+with \(a=\frac{q}{1-q}\) and \(b=\frac{p}{1-p}\), one finds
+\begin{equation}\label{eq:Zseta-dual-intermediate}
+Z_{s,\eta}
+=
+2^{-r_Z}(1-q)^{-r_Z}(1-p)^{-n}
+\sum_{\tau\in C^2}
+(-1)^{\langle \tau,s\rangle+\langle H^T\tau,\eta\rangle}
+(1-2q)^{|\tau|}(1-2p)^{|H^T\tau|}.
+\end{equation}
+Finally, using \(\langle H^T\tau,\eta\rangle=\langle \tau,H\eta\rangle\), this becomes
+\begin{equation}\label{eq:Zseta-KW}
+Z_{s,\eta}
+=
+2^{-r_Z}(1-q)^{-r_Z}(1-p)^{-n}
+\sum_{\tau\in C^2}
+(-1)^{\langle \tau,s+H\eta\rangle}
+(1-2q)^{|\tau|}(1-2p)^{|H^T\tau|},
+\end{equation}
+which is the desired KW-dual form.
+
+\section{Order Parameter}
+To diagnose the MLD threshold, it is natural to decompose the partition function into logical sectors,
+\begin{equation}
+    \mathcal Z(s,\sigma_\eta)=\sum_{[l]\in H^1}\mathcal Z_{[l]}(s,\sigma_\eta),\qquad 
+    \mathcal Z_{[l]}(s,\sigma_\eta):=\sum_{\sigma\in \im H_Z}\sum_{b\in B^1} q(\sigma+s)\,p\!\left(c(\sigma)+c(\sigma_\eta)+b+l\right),
+\end{equation}
+and to define the posterior distribution on \(H^1\cong \mathbb F_2^k\) by
+\begin{equation}
+    P_{s,\sigma_\eta}([l]):=\Pr([l]\mid s,\sigma_\eta)=\frac{\mathcal Z_{[l]}(s,\sigma_\eta)}{\mathcal Z(s,\sigma_\eta)}.
+\end{equation}
+After choosing a basis of logical \(X\)-classes and a dual basis of logical \(Z\)-cycles, every \(u\in H_1\cong \mathbb F_2^k\) defines a logical Wilson loop
+\begin{equation}
+    W_u([l]):=\chi_u([l])=(-1)^{u\cdot [l]},
+\end{equation}
+which depends only on the logical class \([l]\), not on the microscopic representative. Its thermal expectation value in the disorder sample \((s,\sigma_\eta)\) is
+\begin{equation}
+    m_u(s,\sigma_\eta):=\langle W_u\rangle_{s,\sigma_\eta}
+    =\sum_{[l]\in H^1} \chi_u([l])\,P_{s,\sigma_\eta}([l])
+    =\frac{1}{\mathcal Z(s,\sigma_\eta)}\sum_{[l]\in H^1}\chi_u([l])\,\mathcal Z_{[l]}(s,\sigma_\eta).
+\end{equation}
+Thus the family \(\{m_u\}_{u\in H_1}\) is precisely the Fourier transform of the posterior on logical sectors; in particular, the ordered phase relevant for decoding is the phase in which the Gibbs measure is polarized into one logical sector, equivalently \(m_u\to 1\) for all \(u\neq 0\) after a suitable choice of the reference sector, whereas in the disordered phase \(m_u\to 0\) for all \(u\neq 0\). A convenient gauge-invariant scalar order parameter is
+\begin{equation}
+    q_{\rm top}(s,\sigma_\eta):=\frac{1}{2^k-1}\sum_{u\neq 0} m_u(s,\sigma_\eta)^2.
+\end{equation}
+
+\begin{theorem}[Logical Wilson loops and MLD success probability]
+Let \(k=\dim H^1\), and let
+\begin{equation}
+    P_{\rm succ}(s,\sigma_\eta):=\max_{[l]\in H^1} P_{s,\sigma_\eta}([l])
+\end{equation}
+be the success probability of the maximum-likelihood decoder for a fixed disorder sample \((s,\sigma_\eta)\). Then:
+\begin{enumerate}
+    \item The posterior is recovered exactly from the logical Wilson loop expectation values via
+    \begin{equation}\label{eq:fourier-inversion-posterior}
+        P_{s,\sigma_\eta}([l])=\frac{1}{2^k}\sum_{u\in H_1} \chi_u([l])\,m_u(s,\sigma_\eta).
+    \end{equation}
+    Consequently,
+    \begin{equation}\label{eq:exact-success}
+        P_{\rm succ}(s,\sigma_\eta)
+        =\frac{1}{2^k}\max_{[l]\in H^1}\sum_{u\in H_1} \chi_u([l])\,m_u(s,\sigma_\eta).
+    \end{equation}
+    \item If \(q_{\rm top}(s,\sigma_\eta)=\frac{1}{2^k-1}\sum_{u\neq 0}m_u(s,\sigma_\eta)^2\), then
+    \begin{equation}\label{eq:success-bounds}
+        \frac{1+(2^k-1)q_{\rm top}(s,\sigma_\eta)}{2^k}
+        \;\le\;
+        P_{\rm succ}(s,\sigma_\eta)
+        \;\le\;
+        \sqrt{\frac{1+(2^k-1)q_{\rm top}(s,\sigma_\eta)}{2^k}}.
+    \end{equation}
+\end{enumerate}
+In particular, \(q_{\rm top}\to 0\) implies \(P_{\rm succ}\to 2^{-k}\), while \(q_{\rm top}\to 1\) implies \(P_{\rm succ}\to 1\).
+\end{theorem}
+
+\begin{proof}
+Since \(H^1\cong \mathbb F_2^k\) is a finite abelian group, its characters satisfy the orthogonality relation
+\begin{equation}
+    \frac{1}{2^k}\sum_{u\in H_1} \chi_u([l])\chi_u([l'])=\delta_{[l],[l']}.
+\end{equation}
+Using the definition \(m_u=\sum_{[l']} \chi_u([l'])P_{s,\sigma_\eta}([l'])\), we obtain
+\begin{equation}
+    \frac{1}{2^k}\sum_{u} \chi_u([l])\,m_u
+    =\frac{1}{2^k}\sum_{u}\sum_{[l']} \chi_u([l])\chi_u([l'])P_{s,\sigma_\eta}([l'])
+    =\sum_{[l']} \delta_{[l],[l']} P_{s,\sigma_\eta}([l'])
+    =P_{s,\sigma_\eta}([l]),
+\end{equation}
+which proves \eqref{eq:fourier-inversion-posterior}. Taking the maximum over \([l]\) immediately gives \eqref{eq:exact-success}. Next, Parseval's identity on the finite group \(H^1\) yields
+\begin{equation}
+    \sum_{[l]\in H^1} P_{s,\sigma_\eta}([l])^2
+    =\frac{1}{2^k}\sum_{u\in H_1} m_u(s,\sigma_\eta)^2
+    =\frac{1+(2^k-1)q_{\rm top}(s,\sigma_\eta)}{2^k},
+\end{equation}
+since \(m_0=1\). For any probability distribution \(P\) on a finite set,
+\begin{equation}
+    \sum_x P(x)^2 \le \max_x P(x)\le \sqrt{\sum_x P(x)^2},
+\end{equation}
+because the left inequality follows from \(P(x)^2\le P(x)\max_y P(y)\) and summing over \(x\), while the right inequality is immediate from \(\max_x P(x)^2\le \sum_x P(x)^2\). Applying this to \(P_{s,\sigma_\eta}\) gives \eqref{eq:success-bounds}. The final claims follow by taking the limits \(q_{\rm top}\to 0\) and \(q_{\rm top}\to 1\).
+\end{proof}
+
+\begin{proposition}
+Let $H^1\simeq \mathbb F_2^k$ be the logical sector group, and set
+\[
+N:=|H^1|=2^k.
+\]
+For each disorder sample $x=(s,\eta)$, let
+\begin{equation}\label{eq:posterior-sector}
+P_x([l]) := \Pr([l]\mid s,\sigma_\eta), \qquad [l]\in H^1,
+\end{equation}
+be the posterior distribution on logical sectors, and define the samplewise MLD success probability by
+\begin{equation}\label{eq:psucc-sample}
+P_{\mathrm{succ}}(x):=\max_{[l]\in H^1} P_x([l]).
+\end{equation}
+For each character $u\in \widehat{H^1}\cong \mathbb F_2^k$, define the logical Wilson expectation
+\begin{equation}\label{eq:logical-wilson}
+m_u(x):=\sum_{[l]\in H^1} (-1)^{u\cdot [l]} P_x([l]),
+\end{equation}
+and the topological Edwards--Anderson parameter
+\begin{equation}\label{eq:qtop-def}
+q_{\mathrm{top}}(x):=\frac{1}{N-1}\sum_{u\neq 0} m_u(x)^2.
+\end{equation}
+Then, for every disorder sample $x$,
+\begin{equation}\label{eq:sample-two-sided}
+\frac{1+(N-1)q_{\mathrm{top}}(x)}{N}
+\;\le\;
+P_{\mathrm{succ}}(x)
+\;\le\;
+\sqrt{\frac{1+(N-1)q_{\mathrm{top}}(x)}{N}}.
+\end{equation}
+Consequently, after averaging over disorder,
+\begin{equation}\label{eq:disorder-two-sided}
+\frac{1+(N-1)[q_{\mathrm{top}}]_{\mathrm{dis}}}{N}
+\;\le\;
+[P_{\mathrm{succ}}]_{\mathrm{dis}}
+\;\le\;
+\sqrt{\frac{1+(N-1)[q_{\mathrm{top}}]_{\mathrm{dis}}}{N}},
+\end{equation}
+where
+\[
+[P_{\mathrm{succ}}]_{\mathrm{dis}}:=\sum_x \Pr_{\mathrm{dis}}(x)\,P_{\mathrm{succ}}(x),
+\qquad
+[q_{\mathrm{top}}]_{\mathrm{dis}}:=\sum_x \Pr_{\mathrm{dis}}(x)\,q_{\mathrm{top}}(x).
+\]
+Equivalently, since $N=2^k$,
+\begin{equation}\label{eq:disorder-two-sided-2k}
+\frac{1+(2^k-1)[q_{\mathrm{top}}]_{\mathrm{dis}}}{2^k}
+\;\le\;
+[P_{\mathrm{succ}}]_{\mathrm{dis}}
+\;\le\;
+\sqrt{\frac{1+(2^k-1)[q_{\mathrm{top}}]_{\mathrm{dis}}}{2^k}}.
+\end{equation}
+\end{proposition}
+
+\begin{proof}
+Fix a disorder sample $x=(s,\eta)$ and abbreviate
+\[
+P([l]) := P_x([l]), \qquad m_u:=m_u(x), \qquad q_{\mathrm{top}}:=q_{\mathrm{top}}(x).
+\]
+Since $P$ is a probability distribution on the finite abelian group $H^1$, Parseval's identity on $H^1$ gives
+\begin{equation}\label{eq:parseval-proof}
+\sum_{[l]\in H^1} P([l])^2
+=
+\frac{1}{N}\sum_{u\in \widehat{H^1}} m_u^2.
+\end{equation}
+Moreover, by definition of the trivial character,
+\[
+m_0=\sum_{[l]\in H^1}P([l])=1.
+\]
+Therefore, using \eqref{eq:qtop-def},
+\begin{equation}\label{eq:l2-via-qtop}
+\sum_{[l]\in H^1} P([l])^2
+=
+\frac{1}{N}\left(1+\sum_{u\neq 0}m_u^2\right)
+=
+\frac{1+(N-1)q_{\mathrm{top}}}{N}.
+\end{equation}
+
+Now let
+\[
+P_{\max}:=\max_{[l]\in H^1}P([l])=P_{\mathrm{succ}}(x).
+\]
+For any probability distribution on $N$ points one has
+\begin{equation}\label{eq:elementary-bounds}
+\sum_{[l]\in H^1}P([l])^2 \le P_{\max} \le \sqrt{\sum_{[l]\in H^1}P([l])^2}.
+\end{equation}
+Indeed, the left inequality follows from
+\[
+\sum_{[l]}P([l])^2 \le P_{\max}\sum_{[l]}P([l])=P_{\max},
+\]
+while the right inequality follows from
+\[
+P_{\max}^2 \le \sum_{[l]}P([l])^2.
+\]
+Substituting \eqref{eq:l2-via-qtop} into \eqref{eq:elementary-bounds} yields the samplewise bound \eqref{eq:sample-two-sided}.
+
+Finally, average \eqref{eq:sample-two-sided} over the disorder distribution. The lower bound averages directly:
+\[
+[P_{\mathrm{succ}}]_{\mathrm{dis}}
+\ge
+\frac{1+(N-1)[q_{\mathrm{top}}]_{\mathrm{dis}}}{N}.
+\]
+For the upper bound, by concavity of $\sqrt{\cdot}$ and Jensen's inequality,
+\[
+[P_{\mathrm{succ}}]_{\mathrm{dis}}
+\le
+\sum_x \Pr_{\mathrm{dis}}(x)\sqrt{\frac{1+(N-1)q_{\mathrm{top}}(x)}{N}}
+\le
+\sqrt{\frac{1+(N-1)[q_{\mathrm{top}}]_{\mathrm{dis}}}{N}}.
+\]
+This proves \eqref{eq:disorder-two-sided}, and \eqref{eq:disorder-two-sided-2k} is just the specialization $N=2^k$.
+\end{proof}
+\subsection{A local logical order parameter}
+
+The natural order parameter for the MLD threshold is the polarization of the Gibbs measure among logical sectors. 
+To realize this polarization by an observable that factorizes over sites, it is convenient to choose a \emph{linear} section
+\begin{equation}\label{eq:linear-section}
+    r:\im H_Z \to C^1,
+    \qquad
+    H_Z r(\sigma)=\sigma,
+\end{equation}
+which always exists after choosing a linear complement of \(\ker H_Z\subset C^1\). 
+For a fixed disorder sample \((s,\eta)\), with \(\sigma_\eta:=H_Z\eta\), define the syndrome-corrected total error
+\begin{equation}\label{eq:ell-r-def}
+    \ell_r(c;\eta):=c+\eta+r\!\bigl(H_Z(c+\eta)\bigr)
+    =c+\eta+r(H_Zc+\sigma_\eta).
+\end{equation}
+By construction,
+\begin{equation}\label{eq:ell-r-cocycle}
+    H_Z\ell_r(c;\eta)=H_Z(c+\eta)+H_Zr(H_Z(c+\eta))=0,
+\end{equation}
+hence \(\ell_r(c;\eta)\in Z^1\), so its homology class \([\ell_r(c;\eta)]\in H^1=Z^1/B^1\) is well defined. 
+Now let \(u\in H_1\cong \mathbb F_2^k\) be a nontrivial logical character, and choose a representative \(\bar z_u\in C_1\) satisfying
+\begin{equation}\label{eq:dual-logical-rep}
+    \langle \bar z_u,b\rangle =0 \quad \forall\, b\in B^1,
+    \qquad
+    \langle \bar z_u,l\rangle =u\cdot [l] \quad \forall\, l\in Z^1 .
+\end{equation}
+Equivalently, \(\bar z_u\) represents a dual logical \(Z\)-operator. 
+We then define the local logical order parameter
+\begin{equation}\label{eq:local-order-parameter}
+    O_u(c;\eta):=(-1)^{\langle \bar z_u,\ell_r(c;\eta)\rangle}
+    =(-1)^{u\cdot [\ell_r(c;\eta)]}.
+\end{equation}
+Since \(r\) is linear, \eqref{eq:ell-r-def} becomes
+\begin{equation}\label{eq:ell-r-linear}
+    \ell_r(c;\eta)=(I+rH_Z)c+(\eta+r\sigma_\eta),
+\end{equation}
+and therefore
+\begin{equation}\label{eq:local-order-factorized}
+    O_u(c;\eta)
+    =(-1)^{\langle \bar z_u,\eta+r\sigma_\eta\rangle}
+     (-1)^{\langle (I+rH_Z)^T\bar z_u,\,c\rangle}
+    =\xi_u(\eta)\prod_{i=1}^n (-1)^{\Lambda_{u,i}c_i},
+\end{equation}
+where
+\begin{equation}\label{eq:Lambda-def}
+    \Lambda_u:=(I+rH_Z)^T\bar z_u\in C_1,
+    \qquad
+    \xi_u(\eta):=(-1)^{\langle \bar z_u,\eta+r\sigma_\eta\rangle}.
+\end{equation}
+Thus \(O_u(c;\eta)\) indeed factorizes over sites, up to the disorder-dependent Mattis gauge factor \(\xi_u(\eta)\). Note that this factor is canceled in $q_{\text{top}}$. So we can equivalently consider the order parameter
+\begin{equation}
+    O_u(c)=(-1)^{\langle (I+rH_Z)^T\bar z_u,\,c\rangle}
+    =\prod_{i=1}^n (-1)^{\Lambda_{u,i}c_i}.
+\end{equation}
+
+The corresponding thermal average is
+\begin{equation}\label{eq:m-u-local}
+    m_u(s,\eta)
+    :=\frac{1}{\mathcal Z(s,\sigma_\eta)}
+    \sum_{c\in C^1}
+    O_u(c;\eta)\,q(H_Zc+s)\,p(c+\eta).
+\end{equation}
+Since \(O_u(c;\eta)\) depends only on the logical class \([\ell_r(c;\eta)]\), if we denote by
+\begin{equation}\label{eq:sector-posterior-local}
+    P_{s,\sigma_\eta}([l])
+    :=\Pr([l]\mid s,\sigma_\eta)
+\end{equation}
+the posterior distribution of the logical class under the Gibbs measure, then grouping the sum in \eqref{eq:m-u-local} by logical sectors gives
+\begin{equation}\label{eq:m-u-fourier}
+    m_u(s,\eta)
+    =\sum_{[l]\in H^1} (-1)^{u\cdot [l]} P_{s,\sigma_\eta}([l]).
+\end{equation}
+Hence \(\{m_u\}_{u\in H_1}\) is precisely the Fourier transform of the posterior distribution on \(H^1\).
+
+
+Equation \eqref{eq:local-order-factorized} shows that \(O_u(c;\eta)\) is a genuine site-factorized observable, of Mattis type, whose thermal expectation detects whether the Gibbs measure is polarized in a definite logical sector. Therefore the MLD threshold can be studied as an ordering transition of the local observables \(O_u(c;\eta)\), or equivalently of the scalar quantity \(q_{\mathrm{top}}(s,\eta)\).
+
+\subsection{Changing the section without changing the MLD success probability}
+
+The definition of the logical-sector weights involves a choice of section
+\begin{equation}\label{eq:section-c-def}
+    c:\im H_Z\to C^1,
+    \qquad
+    H_Z c(\sigma)=\sigma .
+\end{equation}
+A different choice of representatives does not necessarily change the decoding problem. 
+The correct invariance is under adding boundaries pointwise.
+
+\begin{proposition}\label{prop:boundary-shift-invariance}
+Let \(c:\im H_Z\to C^1\) be a section as in \eqref{eq:section-c-def}, and let
+\begin{equation}\label{eq:r-boundary-shift}
+    r:\im H_Z\to C^1,
+    \qquad
+    r(\sigma)=c(\sigma)+\beta(\sigma),
+    \qquad
+    \beta(\sigma)\in B^1
+\end{equation}
+for every \(\sigma\in \im H_Z\). Then \(r\) is also a section,
+\begin{equation}\label{eq:r-is-section}
+    H_Z r(\sigma)=\sigma,
+\end{equation}
+and the logical-sector weights defined using \(r\),
+\begin{equation}\label{eq:Zl-r-def}
+    \mathcal Z^{(r)}_{[l]}(s,\sigma_\eta)
+    :=\sum_{\sigma\in \im H_Z}\sum_{b\in B^1}
+    q(\sigma+s)\,
+    p\!\left(r(\sigma)+r(\sigma_\eta)+b+l\right),
+\end{equation}
+coincide exactly with those defined using \(c\),
+\begin{equation}\label{eq:Zl-c-def}
+    \mathcal Z^{(c)}_{[l]}(s,\sigma_\eta)
+    :=\sum_{\sigma\in \im H_Z}\sum_{b\in B^1}
+    q(\sigma+s)\,
+    p\!\left(c(\sigma)+c(\sigma_\eta)+b+l\right).
+\end{equation}
+Consequently,
+\begin{equation}\label{eq:posterior-invariance}
+    \Pr_r([l]\mid s,\sigma_\eta)=\Pr_c([l]\mid s,\sigma_\eta)
+\end{equation}
+for all \([l]\in H^1\), and therefore the MLD success probability is unchanged:
+\begin{equation}\label{eq:success-invariance}
+    P_{\mathrm{succ}}^{(r)}(s,\sigma_\eta)
+    =
+    P_{\mathrm{succ}}^{(c)}(s,\sigma_\eta).
+\end{equation}
+\end{proposition}
+
+\begin{proof}
+Since \(B^1\subset \ker H_Z\), we have
+\begin{equation}\label{eq:section-proof-1}
+    H_Z r(\sigma)=H_Z c(\sigma)+H_Z\beta(\sigma)=\sigma,
+\end{equation}
+so \(r\) is a section. Next, substituting \eqref{eq:r-boundary-shift} into \eqref{eq:Zl-r-def} gives
+\begin{equation}\label{eq:section-proof-2}
+\begin{aligned}
+    \mathcal Z^{(r)}_{[l]}(s,\sigma_\eta)
+    &=\sum_{\sigma\in \im H_Z}\sum_{b\in B^1}
+    q(\sigma+s)\,
+    p\!\left(c(\sigma)+\beta(\sigma)+c(\sigma_\eta)+\beta(\sigma_\eta)+b+l\right) \\
+    &=\sum_{\sigma\in \im H_Z}\sum_{b\in B^1}
+    q(\sigma+s)\,
+    p\!\left(c(\sigma)+c(\sigma_\eta)+\bigl(b+\beta(\sigma)+\beta(\sigma_\eta)\bigr)+l\right).
+\end{aligned}
+\end{equation}
+For each fixed \(\sigma\), the map
+\begin{equation}\label{eq:b-translation}
+    b\longmapsto b+\beta(\sigma)+\beta(\sigma_\eta)
+\end{equation}
+is a bijection of \(B^1\). Hence the sum over \(b\in B^1\) is unchanged, and
+\begin{equation}\label{eq:section-proof-3}
+    \mathcal Z^{(r)}_{[l]}(s,\sigma_\eta)
+    =
+    \mathcal Z^{(c)}_{[l]}(s,\sigma_\eta).
+\end{equation}
+Dividing by the total partition function \(\mathcal Z(s,\sigma_\eta)=\sum_{[l]}\mathcal Z_{[l]}(s,\sigma_\eta)\) proves \eqref{eq:posterior-invariance}, and \eqref{eq:success-invariance} follows by taking the maximum over \([l]\in H^1\).
+\end{proof}
+
+Proposition~\ref{prop:boundary-shift-invariance} shows that one may freely replace \(c(\sigma)\) by any representative in the same affine set
+\begin{equation}\label{eq:affine-coset}
+    c(\sigma)+B^1
+\end{equation}
+without changing the posterior on logical sectors or the MLD success probability. 
+A convenient canonical construction is obtained by fixing a direct-sum decomposition
+\begin{equation}\label{eq:direct-sum-U}
+    C^1=B^1\oplus U
+\end{equation}
+and letting
+\begin{equation}\label{eq:pi-U-def}
+    \pi_U:C^1\to U
+\end{equation}
+be the linear projection along \(B^1\). Then one may define
+\begin{equation}\label{eq:r-canonical}
+    r(\sigma):=\pi_U\bigl(c(\sigma)\bigr).
+\end{equation}
+Since \(c(\sigma)-r(\sigma)\in B^1\), this choice satisfies the hypothesis of Proposition~\ref{prop:boundary-shift-invariance}, and therefore leaves the MLD success probability unchanged. 
+In practice, one can choose \(U\) by Gaussian elimination on a basis of \(B^1\), so that the projection \(\pi_U\) is efficiently computable and provides a deterministic gauge-fixing of the section \(c\).
+
+\subsection{A linear section \(r:\im H_Z\to C^1\) suitable for classical simulation.}
+Let \(H_Z\in \mathbb F_2^{m\times n}\) be the parity-check matrix, and let \(\rho=\rank H_Z\). 
+A convenient, exact construction of a linear section
+\begin{equation}\label{eq:r-section-def}
+    r:\im H_Z\to C^1=\mathbb F_2^n,
+    \qquad
+    H_Z r(\sigma)=\sigma \quad \forall\, \sigma\in \im H_Z,
+\end{equation}
+is obtained by Gaussian elimination over \(\mathbb F_2\). 
+More precisely, one may choose an invertible matrix \(E\in GL(m,\mathbb F_2)\) and a permutation matrix \(\Pi\in GL(n,\mathbb F_2)\) such that
+\begin{equation}\label{eq:HZ-systematic}
+    E H_Z \Pi
+    =
+    \begin{pmatrix}
+        I_\rho & A\\
+        0 & 0
+    \end{pmatrix},
+\end{equation}
+for some matrix \(A\in \mathbb F_2^{\rho\times (n-\rho)}\). 
+For any \(\sigma\in \im H_Z\), define
+\begin{equation}\label{eq:y-def}
+    y:=E\sigma.
+\end{equation}
+Since \(\sigma\in \im H_Z\), the last \(m-\rho\) components of \(y\) vanish automatically, so \(y\) has the form
+\begin{equation}\label{eq:y-split}
+    y=
+    \binom{\hat \sigma}{0},
+    \qquad
+    \hat \sigma\in \mathbb F_2^\rho.
+\end{equation}
+We then define the section \(r\) by setting all non-pivot variables to zero:
+\begin{equation}\label{eq:r-def-systematic}
+    r(\sigma):=
+    \Pi
+    \binom{\hat \sigma}{0}
+    \in \mathbb F_2^n.
+\end{equation}
+This map is linear, since it is obtained by composition of linear maps, and it satisfies
+\begin{equation}\label{eq:r-right-inverse}
+    H_Z r(\sigma)=\sigma
+    \qquad \forall\, \sigma\in \im H_Z.
+\end{equation}
+Indeed,
+\begin{equation}\label{eq:r-right-inverse-proof}
+    E H_Z r(\sigma)
+    =
+    E H_Z \Pi \binom{\hat \sigma}{0}
+    =
+    \begin{pmatrix}
+        I_\rho & A\\
+        0 & 0
+    \end{pmatrix}
+    \binom{\hat \sigma}{0}
+    =
+    \binom{\hat \sigma}{0}
+    =
+    E\sigma,
+\end{equation}
+and since \(E\) is invertible, \eqref{eq:r-right-inverse} follows.
+
+This construction is particularly suitable for classical simulation, because the expensive preprocessing step---Gaussian elimination producing \(E\) and \(\Pi\)---is performed only once. 
+After that, evaluating \(r(\sigma)\) for many syndromes requires only:
+\begin{enumerate}
+    \item computing \(y=E\sigma\),
+    \item reading off the first \(\rho\) entries \(\hat \sigma\),
+    \item padding with \(n-\rho\) zeros,
+    \item and applying the inverse column permutation \(\Pi\).
+\end{enumerate}
+Thus the section can be applied efficiently in Monte Carlo sampling or exact summation routines. 
+In practice, one should store the row-reduction producing \(E\) as a sequence of xor operations, rather than as a dense matrix, so that applying \(E\) to a syndrome is computationally cheap. 
+If \(H_Z\) is sparse, a sparsity-aware pivot choice is preferable to reduce fill-in. 
+We stress, however, that while this \(r\) is exact and efficient for classical computation, it is generally not geometrically local.
+\bibliography{ref}
+\end{document}
