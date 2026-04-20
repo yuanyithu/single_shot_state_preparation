@@ -37,6 +37,39 @@ def draw_disorder_sample(
     return observed_syndrome_bits, disorder_data_error_bits
 
 
+def draw_disorder_sample_from_uniform_values(
+        syndrome_uniform_values,
+        data_uniform_values,
+        syndrome_error_probability,
+        data_error_probability):
+    """
+    用预生成的 Uniform[0, 1) 随机数构造一个 disorder 样本。
+
+    这样可以在不同 data_error_probability p 之间复用同一批底层随机数，
+    从而实现 common random numbers 降低跨 p 差分方差。
+    """
+    syndrome_uniform_values = np.asarray(
+        syndrome_uniform_values,
+        dtype=np.float64,
+    )
+    data_uniform_values = np.asarray(
+        data_uniform_values,
+        dtype=np.float64,
+    )
+    if syndrome_uniform_values.ndim != 1:
+        raise ValueError("syndrome_uniform_values must be 1D")
+    if data_uniform_values.ndim != 1:
+        raise ValueError("data_uniform_values must be 1D")
+
+    observed_syndrome_bits = (
+        syndrome_uniform_values < syndrome_error_probability
+    )
+    disorder_data_error_bits = (
+        data_uniform_values < data_error_probability
+    )
+    return observed_syndrome_bits, disorder_data_error_bits
+
+
 def initialize_mcmc_state(
         num_qubits,
         observed_syndrome_bits,
