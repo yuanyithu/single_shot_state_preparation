@@ -4,8 +4,9 @@ set -euo pipefail
 
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 MASTER_RUN_ID="3d_toric_q0_threshold_deep_$(date +%Y%m%d_%H%M%S)"
-REMOTE_RUN_ROOT='$HOME/.single_shot/runs/'"$MASTER_RUN_ID"
-REMOTE_LOG_PATH='$HOME/.single_shot/logs/'"${MASTER_RUN_ID}.log"
+REMOTE_BASE='/home/DATA1/users/yuany/.single_shot'
+REMOTE_RUN_ROOT="$REMOTE_BASE/runs/$MASTER_RUN_ID"
+REMOTE_LOG_PATH="$REMOTE_BASE/logs/${MASTER_RUN_ID}.log"
 REMOTE_RUNNER_PATH="$REMOTE_RUN_ROOT/run_3d_toric_q0_threshold_deep.sh"
 REMOTE_SCREEN_NAME="ssprep_${MASTER_RUN_ID}"
 COMMIT_SHA="$(git -C "$PROJECT_ROOT" rev-parse HEAD)"
@@ -80,7 +81,7 @@ PY
 fallback_archive_sync() {
   echo "Syncing local HEAD to nd-1 via git archive." >&2
   git -C "$PROJECT_ROOT" archive --format=tar HEAD \
-    | ssh yuany "ssh nd-1 'rm -rf ~/.single_shot/repo && mkdir -p ~/.single_shot/repo && tar -xf - -C ~/.single_shot/repo'"
+    | ssh yuany "ssh nd-1 'rm -rf $(quote_arg "$REMOTE_BASE/repo") && mkdir -p $(quote_arg "$REMOTE_BASE/repo") && tar -xf - -C $(quote_arg "$REMOTE_BASE/repo")'"
 }
 
 
@@ -96,7 +97,7 @@ build_remote_runner_script() {
 set -euo pipefail
 
 export MPLCONFIGDIR=\$HOME/.single_shot/mpl-cache
-cd \$HOME/.single_shot/repo
+cd $(quote_arg "$REMOTE_BASE/repo")
 output_stem="scan_result_multi_L_3d_toric_q0_threshold_deep"
 conda run -n 11 python production_chunked_scan.py submit \
   --run-root $(quote_arg "$REMOTE_RUN_ROOT") \
@@ -130,7 +131,7 @@ launch_remote_runner() {
   runner_tmp="$(mktemp)"
   build_remote_runner_script "$data_error_probabilities" > "$runner_tmp"
 
-  ssh yuany "ssh nd-1 'mkdir -p $(quote_arg "$REMOTE_RUN_ROOT") \$HOME/.single_shot/logs \$HOME/.single_shot/mpl-cache'"
+  ssh yuany "ssh nd-1 'mkdir -p $(quote_arg "$REMOTE_RUN_ROOT") $(quote_arg "$REMOTE_BASE/logs") $(quote_arg "$REMOTE_BASE/mpl-cache")'"
   ssh yuany "ssh nd-1 'cat > $(quote_arg "$REMOTE_RUNNER_PATH")'" < "$runner_tmp"
   ssh yuany "ssh nd-1 'chmod +x $(quote_arg "$REMOTE_RUNNER_PATH") && screen -dmS $(quote_arg "$REMOTE_SCREEN_NAME") bash -lc \"exec $(quote_arg "$REMOTE_RUNNER_PATH") >> $(quote_arg "$REMOTE_LOG_PATH") 2>&1\" && printf \"MASTER_RUN_ID=%s\nSCREEN_NAME=%s\nLOG_PATH=%s\nRUN_ROOT=%s\nP_VALUES=%s\n\" $(quote_arg "$MASTER_RUN_ID") $(quote_arg "$REMOTE_SCREEN_NAME") $(quote_arg "$REMOTE_LOG_PATH") $(quote_arg "$REMOTE_RUN_ROOT") $(quote_arg "$data_error_probabilities")'"
 
