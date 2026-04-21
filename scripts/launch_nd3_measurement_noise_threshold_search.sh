@@ -14,6 +14,7 @@ COMMIT_SHA="$(git -C "$PROJECT_ROOT" rev-parse HEAD)"
 
 LATTICE_SIZES='3,5,7'
 Q_AND_P_WINDOWS=$'0.0025|0.0850,0.0875,0.0900,0.0925,0.0950,0.0975,0.1000,0.1025,0.1050,0.1075,0.1100\n0.0050|0.0800,0.0825,0.0850,0.0875,0.0900,0.0925,0.0950,0.0975,0.1000,0.1025,0.1050,0.1075\n0.0075|0.0725,0.0750,0.0775,0.0800,0.0825,0.0850,0.0875,0.0900,0.0925,0.0950,0.0975,0.1000\n0.0100|0.0600,0.0625,0.0650,0.0675,0.0700,0.0725,0.0750,0.0775,0.0800,0.0825,0.0850,0.0875,0.0900\n0.0150|0.0450,0.0475,0.0500,0.0525,0.0550,0.0575,0.0600,0.0625,0.0650,0.0675,0.0700,0.0725,0.0750,0.0775,0.0800\n0.0200|0.0350,0.0375,0.0400,0.0425,0.0450,0.0475,0.0500,0.0525,0.0550,0.0575,0.0600,0.0625,0.0650,0.0675,0.0700'
+Q_AND_P_WINDOWS_BASE64="$(printf '%s' "$Q_AND_P_WINDOWS" | base64 | tr -d '\n')"
 NUM_DISORDER_SAMPLES_TOTAL='2048'
 CHUNK_SIZE='64'
 REQUESTED_WORKERS='96'
@@ -60,7 +61,7 @@ set -euo pipefail
 master_run_id="$1"
 commit_sha="$2"
 lattice_sizes="$3"
-q_and_p_windows="$4"
+q_and_p_windows_base64="$4"
 num_disorder_samples_total="$5"
 chunk_size="$6"
 requested_workers="$7"
@@ -80,6 +81,15 @@ mpl_cache_dir="$remote_base/mpl-cache"
 master_run_root="$remote_base/runs/$master_run_id"
 log_path="$logs_dir/${master_run_id}.log"
 screen_name="ssprep_${master_run_id}"
+
+if command -v python3 >/dev/null 2>&1; then
+  q_and_p_windows="$(python3 -c 'import base64, sys; print(base64.b64decode(sys.argv[1]).decode(), end="")' "$q_and_p_windows_base64")"
+elif command -v base64 >/dev/null 2>&1; then
+  q_and_p_windows="$(printf '%s' "$q_and_p_windows_base64" | base64 --decode)"
+else
+  echo "python3 or base64 is required to decode q/p window payload." >&2
+  exit 17
+fi
 
 mkdir -p "$remote_base" "$logs_dir" "$master_run_root" "$mpl_cache_dir"
 
@@ -243,7 +253,7 @@ run_nd3_bootstrap() {
 $(quote_arg "$MASTER_RUN_ID") \
 $(quote_arg "$COMMIT_SHA") \
 $(quote_arg "$LATTICE_SIZES") \
-$(quote_arg "$Q_AND_P_WINDOWS") \
+$(quote_arg "$Q_AND_P_WINDOWS_BASE64") \
 $(quote_arg "$NUM_DISORDER_SAMPLES_TOTAL") \
 $(quote_arg "$CHUNK_SIZE") \
 $(quote_arg "$REQUESTED_WORKERS") \
