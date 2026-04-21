@@ -204,8 +204,18 @@ def _default_output_paths(input_path, output_dir=None, output_stem=None):
     }
 
 
+def _format_q_p_title(syndrome_error_probability, probability_list):
+    probability_list = np.asarray(probability_list, dtype=np.float64)
+    return (
+        f"measurement error q={syndrome_error_probability:0.4f}, "
+        f"Pauli error p in [{probability_list[0]:0.4f}, "
+        f"{probability_list[-1]:0.4f}]"
+    )
+
+
 def _plot_sem95(probability_list, lattice_size_list, q_top_curve_matrix,
-                q_top_ci95_curve_matrix, output_path):
+                q_top_ci95_curve_matrix, syndrome_error_probability,
+                output_path):
     figure, axis = plt.subplots(
         1,
         1,
@@ -224,7 +234,10 @@ def _plot_sem95(probability_list, lattice_size_list, q_top_curve_matrix,
         )
     axis.set_xlabel("data error probability p")
     axis.set_ylabel("q_top")
-    axis.set_title("Threshold search result (95% CI)")
+    axis.set_title(
+        "Threshold search (95% CI): "
+        + _format_q_p_title(syndrome_error_probability, probability_list)
+    )
     axis.grid(True, alpha=0.3)
     axis.legend(title="Error bar: 95% CI")
     figure.savefig(output_path, dpi=200)
@@ -242,6 +255,7 @@ def _plot_gap_crossing(
         pooled_sem_57_curve,
         pair_35_crossings,
         pair_57_crossings,
+        syndrome_error_probability,
         output_path):
     figure, axes = plt.subplots(
         2,
@@ -264,7 +278,10 @@ def _plot_gap_crossing(
             label=f"L={int(lattice_size)}",
         )
     top_axis.set_ylabel("q_top")
-    top_axis.set_title("Threshold search with pairwise gap diagnostics")
+    top_axis.set_title(
+        "Threshold search with pairwise gap diagnostics: "
+        + _format_q_p_title(syndrome_error_probability, probability_list)
+    )
     top_axis.grid(True, alpha=0.3)
     top_axis.legend(title="Error bar: 95% CI")
 
@@ -468,6 +485,7 @@ def analyze_threshold_crossing(
         lattice_size_list=lattice_size_list,
         q_top_curve_matrix=q_top_curve_matrix,
         q_top_ci95_curve_matrix=q_top_ci95_curve_matrix,
+        syndrome_error_probability=syndrome_error_probability,
         output_path=sem95_plot_path,
     )
     _plot_gap_crossing(
@@ -481,6 +499,7 @@ def analyze_threshold_crossing(
         pooled_sem_57_curve=pooled_sem_57_curve,
         pair_35_crossings=pair_35_summary["crossing_intervals"],
         pair_57_crossings=pair_57_summary["crossing_intervals"],
+        syndrome_error_probability=syndrome_error_probability,
         output_path=gap_plot_path,
     )
 
