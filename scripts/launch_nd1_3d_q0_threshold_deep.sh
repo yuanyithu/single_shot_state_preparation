@@ -4,8 +4,8 @@ set -euo pipefail
 
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 MASTER_RUN_ID="3d_toric_q0_threshold_deep_$(date +%Y%m%d_%H%M%S)"
-REMOTE_RUN_ROOT="$HOME/.single_shot/runs/$MASTER_RUN_ID"
-REMOTE_LOG_PATH="$HOME/.single_shot/logs/${MASTER_RUN_ID}.log"
+REMOTE_RUN_ROOT='$HOME/.single_shot/runs/'"$MASTER_RUN_ID"
+REMOTE_LOG_PATH='$HOME/.single_shot/logs/'"${MASTER_RUN_ID}.log"
 REMOTE_RUNNER_PATH="$REMOTE_RUN_ROOT/run_3d_toric_q0_threshold_deep.sh"
 REMOTE_SCREEN_NAME="ssprep_${MASTER_RUN_ID}"
 COMMIT_SHA="$(git -C "$PROJECT_ROOT" rev-parse HEAD)"
