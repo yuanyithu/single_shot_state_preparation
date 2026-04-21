@@ -168,7 +168,8 @@ cat > "$runner_script_path" <<EOF_RUNNER
 set -euo pipefail
 
 export MPLCONFIGDIR=$(printf '%q' "$mpl_cache_dir")
-cd $quoted_repo_dir
+repo_dir=$quoted_repo_dir
+cd "$repo_dir"
 conda_bin=$quoted_conda_bin
 master_run_root=$quoted_master_run_root
 output_stem="scan_result_multi_L_3d_toric_q0_threshold_deep"
