@@ -23,11 +23,19 @@ from preprocessing import (
 
 PROJECT_ROOT = Path(__file__).resolve().parent
 DATA_DIR = PROJECT_ROOT / "data"
+LOCAL_RUNS_DIR = DATA_DIR / "local_runs"
 
 
 def _ensure_data_dir():
     DATA_DIR.mkdir(exist_ok=True)
     return DATA_DIR
+
+
+def _ensure_local_run_dir(run_family):
+    _ensure_data_dir()
+    output_dir = LOCAL_RUNS_DIR / run_family
+    output_dir.mkdir(parents=True, exist_ok=True)
+    return output_dir
 
 
 def _compute_log_odds(probability):
@@ -1480,7 +1488,7 @@ if __name__ == "__main__":
             )
         print(row)
 
-    output_dir = _ensure_data_dir()
+    output_dir = _ensure_local_run_dir("q0_geometric_multistart")
     output_path = output_dir / "scan_result_multi_L_q0_geometric_multistart.npz"
     np.savez(
         output_path,
