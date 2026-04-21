@@ -134,8 +134,29 @@ touch "$log_path"
 
 printf -v quoted_repo_dir '%q' "$repo_dir"
 printf -v quoted_log_path '%q' "$log_path"
-printf -v python_cmd_serialized '%q ' "${python_cmd[@]}"
 printf -v quoted_run_root '%q' "$run_root"
+
+runner_cmd=(
+  "${python_cmd[@]}"
+  "$repo_dir/production_chunked_scan.py"
+  submit
+  --run-root "$run_root"
+  --workers "$workers"
+  --chunk-size "$chunk_size"
+  --num-disorder-samples-total "$num_disorder_samples_total"
+  --data-error-probabilities "$data_error_probabilities"
+  --lattice-sizes "$lattice_sizes"
+  --syndrome-error-probability 0.0
+  --num-burn-in-sweeps "$num_burn_in_sweeps"
+  --num-sweeps-between-measurements "$num_sweeps_between_measurements"
+  --num-measurements-per-disorder "$num_measurements_per_disorder"
+  --q0-num-start-chains "$q0_num_start_chains"
+  --seed-base "$seed_base"
+  --burn-in-scaling-reference-num-qubits "$burn_in_scaling_reference_num_qubits"
+  --output-stem "$output_stem"
+  --git-commit-sha "$commit_sha"
+)
+printf -v quoted_runner_cmd '%q ' "${runner_cmd[@]}"
 
 runner_script_path="$run_root/run_q0_control_extension.sh"
 cat > "$runner_script_path" <<EOF_RUNNER
@@ -143,23 +164,7 @@ cat > "$runner_script_path" <<EOF_RUNNER
 set -euo pipefail
 export MPLCONFIGDIR=$(printf '%q' "$mpl_cache_dir")
 cd $quoted_repo_dir
-python_cmd=($python_cmd_serialized)
-"${python_cmd[@]}" "$repo_dir/production_chunked_scan.py" submit \
-  --run-root $quoted_run_root \
-  --workers $(printf '%q' "$workers") \
-  --chunk-size $(printf '%q' "$chunk_size") \
-  --num-disorder-samples-total $(printf '%q' "$num_disorder_samples_total") \
-  --data-error-probabilities $(printf '%q' "$data_error_probabilities") \
-  --lattice-sizes $(printf '%q' "$lattice_sizes") \
-  --syndrome-error-probability 0.0 \
-  --num-burn-in-sweeps $(printf '%q' "$num_burn_in_sweeps") \
-  --num-sweeps-between-measurements $(printf '%q' "$num_sweeps_between_measurements") \
-  --num-measurements-per-disorder $(printf '%q' "$num_measurements_per_disorder") \
-  --q0-num-start-chains $(printf '%q' "$q0_num_start_chains") \
-  --seed-base $(printf '%q' "$seed_base") \
-  --burn-in-scaling-reference-num-qubits $(printf '%q' "$burn_in_scaling_reference_num_qubits") \
-  --output-stem $(printf '%q' "$output_stem") \
-  --git-commit-sha $(printf '%q' "$commit_sha")
+exec $quoted_runner_cmd
 EOF_RUNNER
 chmod +x "$runner_script_path"
 
