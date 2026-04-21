@@ -18,8 +18,8 @@
     0.0675,
     0.07
   ],
-  "gap_plot_path": "/home/DATA1/users/yuany/.single_shot/runs/measurement_noise_threshold_search_20260421_104427/q_0p0200/scan_result_multi_L_q0p0200_measurement_noise_threshold_search_common_random_gap_crossing.png",
-  "input_path": "/home/DATA1/users/yuany/.single_shot/runs/measurement_noise_threshold_search_20260421_104427/q_0p0200/scan_result_multi_L_q0p0200_measurement_noise_threshold_search_common_random.npz",
+  "gap_plot_path": "/Users/yuan/Desktop/Desktop/workspace/projects/project D/data/nd3_runs/measurement_noise_threshold_search_20260421_104427/q_0p0200/scan_result_multi_L_q0p0200_measurement_noise_threshold_search_common_random_gap_crossing.png",
+  "input_path": "/Users/yuan/Desktop/Desktop/workspace/projects/project D/data/nd3_runs/measurement_noise_threshold_search_20260421_104427/q_0p0200/scan_result_multi_L_q0p0200_measurement_noise_threshold_search_common_random.npz",
   "lattice_size_list": [
     3,
     5,
@@ -353,7 +353,7 @@
     "step_reference": 0.0025000000000000022
   },
   "secondary_proximity_hit": false,
-  "sem95_plot_path": "/home/DATA1/users/yuany/.single_shot/runs/measurement_noise_threshold_search_20260421_104427/q_0p0200/scan_result_multi_L_q0p0200_measurement_noise_threshold_search_common_random_sem95.png",
-  "summary_path": "/home/DATA1/users/yuany/.single_shot/runs/measurement_noise_threshold_search_20260421_104427/q_0p0200/threshold_summary.json",
+  "sem95_plot_path": "/Users/yuan/Desktop/Desktop/workspace/projects/project D/data/nd3_runs/measurement_noise_threshold_search_20260421_104427/q_0p0200/scan_result_multi_L_q0p0200_measurement_noise_threshold_search_common_random_sem95.png",
+  "summary_path": "/Users/yuan/Desktop/Desktop/workspace/projects/project D/data/nd3_runs/measurement_noise_threshold_search_20260421_104427/q_0p0200/threshold_summary.json",
   "syndrome_error_probability": 0.02
 }

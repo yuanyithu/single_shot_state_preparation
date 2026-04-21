@@ -1,4 +1,5 @@
 import argparse
+import math
 import os
 import tempfile
 from pathlib import Path
@@ -19,6 +20,7 @@ PROJECT_ROOT = Path(__file__).resolve().parent
 DEFAULT_INPUT_PATH = (
     PROJECT_ROOT / "data" / "scan_result_multi_L_q0_geometric_multistart.npz"
 )
+CI95_Z_SCORE = 1.96
 
 
 def _build_output_path(input_path, output_path):
@@ -39,6 +41,46 @@ def _load_q_top_std_curve_matrix(loaded_result):
     return loaded_result["q_top_std_error_curve_matrix"]
 
 
+def _format_probability_range(probability_list):
+    probability_list = np.asarray(probability_list, dtype=np.float64)
+    return (
+        f"measurement error q={{q_value}}, "
+        f"Pauli error p in [{probability_list[0]:0.4f}, {probability_list[-1]:0.4f}]"
+    )
+
+
+def _format_q_value(loaded_result):
+    if "syndrome_error_probability" not in loaded_result.files:
+        return None
+    return float(loaded_result["syndrome_error_probability"])
+
+
+def _build_main_title(loaded_result):
+    probability_list = loaded_result["data_error_probability_list"]
+    q_value = _format_q_value(loaded_result)
+    probability_range_template = _format_probability_range(probability_list)
+    if q_value is None:
+        return (
+            "Toric code scan "
+            + probability_range_template.format(q_value="unknown")
+        )
+    return (
+        "Toric code scan "
+        + probability_range_template.format(q_value=f"{q_value:0.4f}")
+    )
+
+
+def _build_error_bar_values(std_curve, loaded_result):
+    std_curve = np.asarray(std_curve, dtype=np.float64)
+    if "num_disorder_samples" not in loaded_result.files:
+        return std_curve, "disorder std dev"
+    num_disorder_samples = int(loaded_result["num_disorder_samples"])
+    if num_disorder_samples <= 0:
+        return std_curve, "disorder std dev"
+    sem_curve = std_curve / math.sqrt(float(num_disorder_samples))
+    return CI95_Z_SCORE * sem_curve, "95% CI of disorder mean"
+
+
 def _has_q0_spread_diagnostics(loaded_result):
     return (
         "q0_mean_m_u_spread_linf_curve" in loaded_result.files
@@ -51,12 +93,16 @@ def _plot_single_size_result(loaded_result, axes):
     q_top_curve = loaded_result["q_top_curve"]
     q_top_std_curve = _load_q_top_std_curve(loaded_result)
     lattice_size = int(loaded_result["lattice_size"])
+    yerr_curve, yerr_label = _build_error_bar_values(
+        q_top_std_curve,
+        loaded_result=loaded_result,
+    )
 
     axis = axes[0]
     axis.errorbar(
         data_error_probability_list,
         q_top_curve,
-        yerr=q_top_std_curve,
+        yerr=yerr_curve,
         marker="o",
         linewidth=1.5,
         capsize=3.0,
@@ -64,9 +110,9 @@ def _plot_single_size_result(loaded_result, axes):
     )
     axis.set_xlabel("data error probability p")
     axis.set_ylabel("q_top")
-    axis.set_title("Toric code scan result")
+    axis.set_title(_build_main_title(loaded_result))
     axis.grid(True, alpha=0.3)
-    axis.legend(title="Error bar: disorder std dev")
+    axis.legend(title=f"Error bar: {yerr_label}")
     if len(axes) > 1:
         diagnostic_axis = axes[1]
         diagnostic_axis.plot(
@@ -88,6 +134,10 @@ def _plot_multi_size_result(loaded_result, axes):
     lattice_size_list = loaded_result["lattice_size_list"]
     q_top_curve_matrix = loaded_result["q_top_curve_matrix"]
     q_top_std_curve_matrix = _load_q_top_std_curve_matrix(loaded_result)
+    yerr_curve_matrix, yerr_label = _build_error_bar_values(
+        q_top_std_curve_matrix,
+        loaded_result=loaded_result,
+    )
 
     axis = axes[0]
 
@@ -96,7 +146,7 @@ def _plot_multi_size_result(loaded_result, axes):
         axis.errorbar(
             data_error_probability_list,
             q_top_curve_matrix[lattice_index],
-            yerr=q_top_std_curve_matrix[lattice_index],
+            yerr=yerr_curve_matrix[lattice_index],
             marker="o",
             linewidth=1.5,
             capsize=3.0,
@@ -105,9 +155,9 @@ def _plot_multi_size_result(loaded_result, axes):
 
     axis.set_xlabel("data error probability p")
     axis.set_ylabel("q_top")
-    axis.set_title("Toric code multi-size scan result")
+    axis.set_title(_build_main_title(loaded_result))
     axis.grid(True, alpha=0.3)
-    axis.legend(title="Error bar: disorder std dev")
+    axis.legend(title=f"Error bar: {yerr_label}")
     if len(axes) > 1:
         diagnostic_axis = axes[1]
         q0_mean_m_u_spread_linf_curve_matrix = loaded_result[
