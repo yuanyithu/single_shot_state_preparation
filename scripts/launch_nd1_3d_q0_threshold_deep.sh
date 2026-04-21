@@ -131,7 +131,8 @@ launch_remote_runner() {
   build_remote_runner_script "$data_error_probabilities" > "$runner_tmp"
 
   ssh yuany "ssh nd-1 'mkdir -p $(quote_arg "$REMOTE_RUN_ROOT") \$HOME/.single_shot/logs \$HOME/.single_shot/mpl-cache'"
-  ssh yuany "cat > $(quote_arg "$REMOTE_RUNNER_PATH") && ssh nd-1 'chmod +x $(quote_arg "$REMOTE_RUNNER_PATH") && screen -dmS $(quote_arg "$REMOTE_SCREEN_NAME") bash -lc \"exec $(quote_arg "$REMOTE_RUNNER_PATH") >> $(quote_arg "$REMOTE_LOG_PATH") 2>&1\" && printf \"MASTER_RUN_ID=%s\nSCREEN_NAME=%s\nLOG_PATH=%s\nRUN_ROOT=%s\nP_VALUES=%s\n\" $(quote_arg "$MASTER_RUN_ID") $(quote_arg "$REMOTE_SCREEN_NAME") $(quote_arg "$REMOTE_LOG_PATH") $(quote_arg "$REMOTE_RUN_ROOT") $(quote_arg "$data_error_probabilities")'" < "$runner_tmp"
+  ssh yuany "ssh nd-1 'cat > $(quote_arg "$REMOTE_RUNNER_PATH")'" < "$runner_tmp"
+  ssh yuany "ssh nd-1 'chmod +x $(quote_arg "$REMOTE_RUNNER_PATH") && screen -dmS $(quote_arg "$REMOTE_SCREEN_NAME") bash -lc \"exec $(quote_arg "$REMOTE_RUNNER_PATH") >> $(quote_arg "$REMOTE_LOG_PATH") 2>&1\" && printf \"MASTER_RUN_ID=%s\nSCREEN_NAME=%s\nLOG_PATH=%s\nRUN_ROOT=%s\nP_VALUES=%s\n\" $(quote_arg "$MASTER_RUN_ID") $(quote_arg "$REMOTE_SCREEN_NAME") $(quote_arg "$REMOTE_LOG_PATH") $(quote_arg "$REMOTE_RUN_ROOT") $(quote_arg "$data_error_probabilities")'"
 
   rm -f "$runner_tmp"
 }
