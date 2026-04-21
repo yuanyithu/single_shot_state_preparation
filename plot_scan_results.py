@@ -18,7 +18,11 @@ import matplotlib.pyplot as plt
 
 PROJECT_ROOT = Path(__file__).resolve().parent
 DEFAULT_INPUT_PATH = (
-    PROJECT_ROOT / "data" / "scan_result_multi_L_q0_geometric_multistart.npz"
+    PROJECT_ROOT
+    / "data"
+    / "legacy_local_runs"
+    / "q0_geometric_multistart"
+    / "scan_result_multi_L_q0_geometric_multistart.npz"
 )
 CI95_Z_SCORE = 1.96
 
