@@ -3,6 +3,8 @@ import numpy as np
 from build_toric_code_examples import (
     build_2d_toric_code,
     build_2d_toric_zero_syndrome_move_data,
+    build_3d_toric_code,
+    build_3d_toric_zero_syndrome_move_data,
 )
 from linear_section import build_linear_section
 from main import (
@@ -201,7 +203,9 @@ def _run_validation_case(
 def _run_zero_syndrome_move_structure_test(
         parity_check_matrix,
         zero_syndrome_move_data,
-        lattice_size):
+        lattice_size,
+        expected_contractible_weight,
+        expected_winding_weight):
     all_moves = np.concatenate(
         (
             zero_syndrome_move_data["contractible_moves"],
@@ -216,11 +220,68 @@ def _run_zero_syndrome_move_structure_test(
         "q=0 move structure test failed: some moves are not in ker(H_Z)"
     )
     assert np.all(
-        zero_syndrome_move_data["contractible_moves"].sum(axis=1) == 4
-    ), "q=0 move structure test failed: local moves must have weight 4"
+        zero_syndrome_move_data["contractible_moves"].sum(axis=1)
+        == expected_contractible_weight
+    ), (
+        "q=0 move structure test failed: local moves must have weight "
+        f"{expected_contractible_weight}"
+    )
     assert np.all(
-        zero_syndrome_move_data["winding_moves"].sum(axis=1) == lattice_size
-    ), "q=0 move structure test failed: winding moves must have weight L"
+        zero_syndrome_move_data["winding_moves"].sum(axis=1)
+        == expected_winding_weight
+    ), (
+        "q=0 move structure test failed: winding moves must have weight "
+        f"{expected_winding_weight}"
+    )
+
+
+def _run_3d_q0_sector_distinguishability_test():
+    lattice_size = 2
+    parity_check_matrix, dual_logical_z_basis = build_3d_toric_code(
+        lattice_size=lattice_size
+    )
+    linear_section_data = build_linear_section(parity_check_matrix)
+    logical_observable_masks = build_logical_observable_masks(
+        parity_check_matrix=parity_check_matrix,
+        dual_logical_z_basis=dual_logical_z_basis,
+        linear_section_data=linear_section_data,
+    )
+    zero_syndrome_move_data = build_3d_toric_zero_syndrome_move_data(
+        lattice_size=lattice_size
+    )
+    _run_zero_syndrome_move_structure_test(
+        parity_check_matrix=parity_check_matrix,
+        zero_syndrome_move_data=zero_syndrome_move_data,
+        lattice_size=lattice_size,
+        expected_contractible_weight=6,
+        expected_winding_weight=lattice_size * lattice_size,
+    )
+    initial_chain_bits_per_start, start_sector_labels = (
+        _build_q0_initial_chain_bits_per_start(
+            observed_syndrome_bits=np.zeros(
+                parity_check_matrix.shape[0],
+                dtype=bool,
+            ),
+            linear_section_data=linear_section_data,
+            zero_syndrome_move_data=zero_syndrome_move_data,
+            q0_num_start_chains=8,
+        )
+    )
+    assert len(np.unique(start_sector_labels)) == 8, (
+        "3D q=0 start sector labels must enumerate 8 distinct sectors"
+    )
+
+    logical_signature_list = []
+    for chain_bits in initial_chain_bits_per_start:
+        logical_parity_bits = np.bitwise_xor.reduce(
+            logical_observable_masks & chain_bits[None, :],
+            axis=1,
+        ).astype(np.int8, copy=False)
+        logical_signature_list.append(tuple(logical_parity_bits.tolist()))
+
+    assert len(set(logical_signature_list)) == 8, (
+        "3D q=0 start sectors must induce distinct logical signatures"
+    )
 
 
 def _run_q0_multi_start_validation_case(
@@ -237,7 +298,7 @@ def _run_q0_multi_start_validation_case(
         num_sweeps_between_measurements,
         tolerance):
     """
-    q=0 下对 4 个合法初态分别做 exact-vs-MCMC 回归。
+    q=0 下对合法初态分别做 exact-vs-MCMC 回归。
     """
     num_checks, num_qubits = parity_check_matrix.shape
     rng = np.random.default_rng(seed)
@@ -262,7 +323,10 @@ def _run_q0_multi_start_validation_case(
             observed_syndrome_bits=observed_syndrome_bits,
             linear_section_data=linear_section_data,
             zero_syndrome_move_data=zero_syndrome_move_data,
-            q0_num_start_chains=4,
+            q0_num_start_chains=(
+                1
+                << zero_syndrome_move_data["start_sector_generators"].shape[0]
+            ),
         )
     )
 
@@ -335,8 +399,12 @@ if __name__ == "__main__":
         parity_check_matrix=parity_check_matrix,
         zero_syndrome_move_data=zero_syndrome_move_data,
         lattice_size=lattice_size,
+        expected_contractible_weight=4,
+        expected_winding_weight=lattice_size,
     )
     print("Test 0 passed: q=0 move structure")
+    _run_3d_q0_sector_distinguishability_test()
+    print("Test 0b passed: 3D q=0 sector distinguishability")
 
     print(
         f"{'test_name':<10} "
