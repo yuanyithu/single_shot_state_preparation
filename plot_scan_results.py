@@ -59,17 +59,26 @@ def _format_q_value(loaded_result):
     return float(loaded_result["syndrome_error_probability"])
 
 
+def _format_code_family(loaded_result):
+    if "code_family" in loaded_result.files:
+        return str(loaded_result["code_family"]).replace("_", " ")
+    if "code_type" in loaded_result.files:
+        return str(loaded_result["code_type"]).replace("_", " ")
+    return "toric code"
+
+
 def _build_main_title(loaded_result):
     probability_list = loaded_result["data_error_probability_list"]
     q_value = _format_q_value(loaded_result)
+    code_family_label = _format_code_family(loaded_result)
     probability_range_template = _format_probability_range(probability_list)
     if q_value is None:
         return (
-            "Toric code scan "
+            f"{code_family_label} scan "
             + probability_range_template.format(q_value="unknown")
         )
     return (
-        "Toric code scan "
+        f"{code_family_label} scan "
         + probability_range_template.format(q_value=f"{q_value:0.4f}")
     )
 

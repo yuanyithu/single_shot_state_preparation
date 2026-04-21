@@ -5,8 +5,8 @@ from pathlib import Path
 import numpy as np
 
 from build_toric_code_examples import (
-    build_2d_toric_code,
-    build_2d_toric_zero_syndrome_move_data,
+    build_toric_code_by_family,
+    build_zero_syndrome_move_data_by_family,
 )
 from linear_section import apply_linear_section, build_linear_section
 from mcmc import (
@@ -349,10 +349,25 @@ def _run_one_zero_syndrome_sweep(
     )
 
 
-def _build_q0_start_sector_labels(q0_num_start_chains):
-    if q0_num_start_chains < 1 or q0_num_start_chains > 4:
-        raise ValueError("q0_num_start_chains must be in [1, 4]")
-    all_labels = np.array(["00", "10", "01", "11"])
+def _build_q0_start_sector_labels(
+        q0_num_start_chains,
+        num_start_sector_generators):
+    max_num_start_chains = 1 << num_start_sector_generators
+    if q0_num_start_chains < 1 or q0_num_start_chains > max_num_start_chains:
+        raise ValueError(
+            "q0_num_start_chains must be in "
+            f"[1, {max_num_start_chains}] for "
+            f"{num_start_sector_generators} start generators"
+        )
+    all_labels = np.array(
+        [
+            "".join(
+                "1" if (sector_index >> generator_index) & 1 else "0"
+                for generator_index in range(num_start_sector_generators)
+            )
+            for sector_index in range(max_num_start_chains)
+        ]
+    )
     return all_labels[:q0_num_start_chains]
 
 
@@ -369,10 +384,14 @@ def _build_q0_initial_chain_bits_per_start(
             "zero_syndrome_move_data is required for q=0 multi-start chains"
         )
 
-    start_sector_labels = _build_q0_start_sector_labels(q0_num_start_chains)
     start_sector_generators = zero_syndrome_move_data[
         "start_sector_generators"
     ]
+    num_start_sector_generators = start_sector_generators.shape[0]
+    start_sector_labels = _build_q0_start_sector_labels(
+        q0_num_start_chains=q0_num_start_chains,
+        num_start_sector_generators=num_start_sector_generators,
+    )
     section_representative = apply_linear_section(
         observed_syndrome_bits,
         linear_section_data,
@@ -384,14 +403,11 @@ def _build_q0_initial_chain_bits_per_start(
     )
 
     for start_index, label in enumerate(start_sector_labels):
-        if label[0] == "1":
-            initial_chain_bits_per_start[start_index] ^= (
-                start_sector_generators[0]
-            )
-        if label[1] == "1":
-            initial_chain_bits_per_start[start_index] ^= (
-                start_sector_generators[1]
-            )
+        for generator_index, bit in enumerate(label):
+            if bit == "1":
+                initial_chain_bits_per_start[start_index] ^= (
+                    start_sector_generators[generator_index]
+                )
 
     return initial_chain_bits_per_start, start_sector_labels
 
@@ -628,9 +644,12 @@ def run_disorder_average_simulation(
     if (
             syndrome_error_probability == 0.0
             and zero_syndrome_move_data is not None):
-        q0_start_sector_labels = _build_q0_start_sector_labels(
-            q0_num_start_chains
-        )
+        q0_start_sector_labels = _build_q0_initial_chain_bits_per_start(
+            observed_syndrome_bits=np.zeros(num_checks, dtype=bool),
+            linear_section_data=linear_section_data,
+            zero_syndrome_move_data=zero_syndrome_move_data,
+            q0_num_start_chains=q0_num_start_chains,
+        )[1]
         q0_logical_observable_mean_values_per_disorder_per_start = np.empty(
             (num_disorder_samples, q0_num_start_chains, num_masks),
             dtype=np.float64,
@@ -899,9 +918,9 @@ def scan_data_error_probability(
         "average_acceptance_rate_curve": average_acceptance_rate_curve,
     }
     if q0_mean_m_u_spread_linf_curve is not None:
-        scan_result["q0_start_sector_labels"] = _build_q0_start_sector_labels(
-            q0_num_start_chains
-        )
+        scan_result["q0_start_sector_labels"] = result[
+            "q0_start_sector_labels"
+        ]
         scan_result["q0_mean_m_u_spread_linf_curve"] = (
             q0_mean_m_u_spread_linf_curve
         )
@@ -930,14 +949,17 @@ def _run_single_scan_point_task(task_data):
     )
     q0_num_start_chains = task_data["q0_num_start_chains"]
     seed = task_data["seed"]
+    code_family = task_data["code_family"]
 
-    parity_check_matrix, dual_logical_z_basis = build_2d_toric_code(
-        lattice_size=lattice_size
+    parity_check_matrix, dual_logical_z_basis = build_toric_code_by_family(
+        code_family=code_family,
+        lattice_size=lattice_size,
     )
     zero_syndrome_move_data = None
     if syndrome_error_probability == 0.0:
-        zero_syndrome_move_data = build_2d_toric_zero_syndrome_move_data(
-            lattice_size=lattice_size
+        zero_syndrome_move_data = build_zero_syndrome_move_data_by_family(
+            code_family=code_family,
+            lattice_size=lattice_size,
         )
     simulation_result = run_disorder_average_simulation(
         parity_check_matrix=parity_check_matrix,
@@ -1070,9 +1092,10 @@ def scan_multiple_code_sizes(
         num_sweeps_between_measurements,
         num_measurements_per_disorder,
         seed_base,
-        q0_num_start_chains=4):
+        q0_num_start_chains=4,
+        code_family="2d_toric"):
     """
-    扫描多个 2D toric code 尺寸，并在内部对 burn-in 做线性放大。
+    扫描多个 toric code 尺寸，并在内部对 burn-in 做线性放大。
     """
     burn_in_scaling_reference_num_qubits = 18
     lattice_size_array = np.asarray(lattice_size_list, dtype=np.int64)
@@ -1100,8 +1123,9 @@ def scan_multiple_code_sizes(
     task_data_list = []
 
     for lattice_index, lattice_size in enumerate(lattice_size_array):
-        parity_check_matrix, dual_logical_z_basis = build_2d_toric_code(
-            lattice_size=int(lattice_size)
+        parity_check_matrix, dual_logical_z_basis = build_toric_code_by_family(
+            code_family=code_family,
+            lattice_size=int(lattice_size),
         )
         num_qubits = parity_check_matrix.shape[1]
         num_logical_qubits = dual_logical_z_basis.shape[0]
@@ -1136,6 +1160,7 @@ def scan_multiple_code_sizes(
                     num_measurements_per_disorder
                 ),
                 "q0_num_start_chains": q0_num_start_chains,
+                "code_family": code_family,
                 "seed": (
                     seed_base + lattice_index * num_points + point_index
                 ),
@@ -1149,8 +1174,10 @@ def scan_multiple_code_sizes(
     q0_m_u_spread_linf_per_disorder_tensor = None
     q0_q_top_spread_per_disorder_tensor = None
     if syndrome_error_probability == 0.0:
+        q0_num_start_sector_generators = int(num_logical_qubits_list[0])
         q0_start_sector_labels = _build_q0_start_sector_labels(
-            q0_num_start_chains
+            q0_num_start_chains=q0_num_start_chains,
+            num_start_sector_generators=q0_num_start_sector_generators,
         )
         q0_mean_m_u_spread_linf_curve_matrix = np.empty(
             (num_sizes, num_points),
