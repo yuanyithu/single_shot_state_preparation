@@ -1,0 +1,109 @@
+{
+  "rows": [
+    {
+      "crossing_window": null,
+      "delta_35_min_abs_p": 0.0875,
+      "delta_35_min_abs_value": 0.00483402913411457,
+      "delta_57_min_abs_p": 0.085,
+      "delta_57_min_abs_value": 0.01846384277343749,
+      "primary_crossing_window_hit": false,
+      "q": 0.0025,
+      "recommended_server_window": {
+        "p_max": 0.0875,
+        "p_min": 0.0625,
+        "reason": "both_pairwise_gaps_positive_shift_left",
+        "step_reference": 0.0025000000000000022
+      },
+      "secondary_proximity_hit": true
+    },
+    {
+      "crossing_window": {
+        "p_max": 0.08042765759046783,
+        "p_min": 0.08042765759046783
+      },
+      "delta_35_min_abs_p": 0.08,
+      "delta_35_min_abs_value": -0.0019669169108073037,
+      "delta_57_min_abs_p": 0.0875,
+      "delta_57_min_abs_value": 0.026984615071614537,
+      "primary_crossing_window_hit": false,
+      "q": 0.005,
+      "recommended_server_window": {
+        "p_max": 0.09624999999999999,
+        "p_min": 0.07125,
+        "reason": "mixed_pairwise_signatures_center_on_min_abs_gap",
+        "step_reference": 0.0025000000000000022
+      },
+      "secondary_proximity_hit": true
+    },
+    {
+      "crossing_window": {
+        "p_max": 0.08577673097029945,
+        "p_min": 0.07498171409171278
+      },
+      "delta_35_min_abs_p": 0.075,
+      "delta_35_min_abs_value": 0.0001156290690105255,
+      "delta_57_min_abs_p": 0.075,
+      "delta_57_min_abs_value": 0.029737432861328128,
+      "primary_crossing_window_hit": false,
+      "q": 0.0075,
+      "recommended_server_window": {
+        "p_max": 0.0875,
+        "p_min": 0.0625,
+        "reason": "mixed_pairwise_signatures_center_on_min_abs_gap",
+        "step_reference": 0.0025000000000000022
+      },
+      "secondary_proximity_hit": true
+    },
+    {
+      "crossing_window": {
+        "p_max": 0.07394682615351239,
+        "p_min": 0.07394682615351239
+      },
+      "delta_35_min_abs_p": 0.07,
+      "delta_35_min_abs_value": -0.0018627868652344448,
+      "delta_57_min_abs_p": 0.06,
+      "delta_57_min_abs_value": 0.026782690429687395,
+      "primary_crossing_window_hit": false,
+      "q": 0.01,
+      "recommended_server_window": {
+        "p_max": 0.0775,
+        "p_min": 0.052500000000000005,
+        "reason": "mixed_pairwise_signatures_center_on_min_abs_gap",
+        "step_reference": 0.0025000000000000022
+      },
+      "secondary_proximity_hit": true
+    },
+    {
+      "crossing_window": null,
+      "delta_35_min_abs_p": 0.0525,
+      "delta_35_min_abs_value": 0.0255749918619792,
+      "delta_57_min_abs_p": 0.045,
+      "delta_57_min_abs_value": 0.04597125244140632,
+      "primary_crossing_window_hit": false,
+      "q": 0.015,
+      "recommended_server_window": {
+        "p_max": 0.04749999999999999,
+        "p_min": 0.02249999999999999,
+        "reason": "both_pairwise_gaps_positive_shift_left",
+        "step_reference": 0.0025000000000000022
+      },
+      "secondary_proximity_hit": false
+    },
+    {
+      "crossing_window": null,
+      "delta_35_min_abs_p": 0.035,
+      "delta_35_min_abs_value": 0.02709080607096359,
+      "delta_57_min_abs_p": 0.035,
+      "delta_57_min_abs_value": 0.0556721638997395,
+      "primary_crossing_window_hit": false,
+      "q": 0.02,
+      "recommended_server_window": {
+        "p_max": 0.03749999999999999,
+        "p_min": 0.012499999999999994,
+        "reason": "both_pairwise_gaps_positive_shift_left",
+        "step_reference": 0.0025000000000000022
+      },
+      "secondary_proximity_hit": false
+    }
+  ]
+}
