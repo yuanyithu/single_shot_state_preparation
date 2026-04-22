@@ -15,6 +15,7 @@ import numpy as np
 
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
+from matplotlib.ticker import FormatStrFormatter, ScalarFormatter
 
 
 CI95_Z_SCORE = 1.96
@@ -81,16 +82,58 @@ def _plot_sem95_overview(result_list, output_path):
         q_top_curve_matrix = item["q_top_curve_matrix"]
         q_top_ci95_curve_matrix = item["q_top_ci95_curve_matrix"]
         q_value = item["syndrome_error_probability"]
+        plotted_group_list = []
         for lattice_index, lattice_size in enumerate(lattice_size_list):
+            curve = q_top_curve_matrix[lattice_index]
+            ci95_curve = q_top_ci95_curve_matrix[lattice_index]
+            matching_group = None
+            for group in plotted_group_list:
+                if np.array_equal(curve, group["curve"]):
+                    matching_group = group
+                    break
+            if matching_group is None:
+                matching_group = {
+                    "curve": curve,
+                    "ci95_curve_list": [ci95_curve],
+                    "lattice_size_list": [int(lattice_size)],
+                }
+                plotted_group_list.append(matching_group)
+            else:
+                matching_group["ci95_curve_list"].append(ci95_curve)
+                matching_group["lattice_size_list"].append(int(lattice_size))
+
+        for group_index, group in enumerate(plotted_group_list):
+            size_label = ",".join(str(size) for size in group["lattice_size_list"])
+            if len(group["lattice_size_list"]) > 1:
+                curve_label = f"L={size_label} (same mean)"
+            else:
+                curve_label = f"L={size_label}"
+            ci95_envelope = np.max(
+                np.vstack(group["ci95_curve_list"]),
+                axis=0,
+            )
             axis.errorbar(
                 probability_list,
-                q_top_curve_matrix[lattice_index],
-                yerr=q_top_ci95_curve_matrix[lattice_index],
+                group["curve"],
+                yerr=ci95_envelope,
                 marker="o",
                 linewidth=1.3,
                 capsize=2.5,
-                label=f"L={int(lattice_size)}",
+                label=curve_label,
+                color=f"C{group_index}",
             )
+        y_min = float(np.min(q_top_curve_matrix - q_top_ci95_curve_matrix))
+        y_max = float(np.max(q_top_curve_matrix + q_top_ci95_curve_matrix))
+        y_range = y_max - y_min
+        if y_max <= 1.001 and y_min >= 0.97 and y_range < 0.02:
+            y_padding = max(5e-4, 0.15 * max(y_range, 1e-6))
+            axis.set_ylim(max(0.0, y_min - y_padding), min(1.001, y_max + y_padding))
+            axis.yaxis.set_major_formatter(FormatStrFormatter("%.4f"))
+        else:
+            formatter = ScalarFormatter(useOffset=False)
+            formatter.set_scientific(False)
+            axis.yaxis.set_major_formatter(formatter)
+        axis.yaxis.get_offset_text().set_visible(False)
         axis.set_title(
             "Threshold search overview: "
             f"measurement error q={q_value:0.4f}, "
@@ -100,13 +143,16 @@ def _plot_sem95_overview(result_list, output_path):
         axis.set_xlabel("data error probability p")
         axis.set_ylabel("q_top")
         axis.grid(True, alpha=0.3)
-        axis.legend(title="Error bar: 95% CI")
+        axis.legend(title="Linear size L, error bar: 95% CI")
 
     figure.savefig(output_path, dpi=220)
     plt.close(figure)
 
 
 def _plot_gap_summary(result_list, output_path):
+    lattice_size_list = result_list[0]["lattice_size_list"]
+    lower_pair_label = f"L{int(lattice_size_list[0])}-L{int(lattice_size_list[1])}"
+    upper_pair_label = f"L{int(lattice_size_list[1])}-L{int(lattice_size_list[2])}"
     q_value_list = np.array(
         [item["syndrome_error_probability"] for item in result_list],
         dtype=np.float64,
@@ -166,14 +212,14 @@ def _plot_gap_summary(result_list, output_path):
         delta_35_min_abs_list,
         marker="o",
         linewidth=1.5,
-        label="min |L3-L5|",
+        label=f"min |{lower_pair_label}|",
     )
     top_axis.plot(
         q_value_list,
         delta_57_min_abs_list,
         marker="o",
         linewidth=1.5,
-        label="min |L5-L7|",
+        label=f"min |{upper_pair_label}|",
     )
     top_axis.set_title(
         "Pairwise gap summary: "
@@ -190,14 +236,14 @@ def _plot_gap_summary(result_list, output_path):
         delta_35_min_abs_p_list,
         marker="o",
         linewidth=1.5,
-        label="argmin |L3-L5|",
+        label=f"argmin |{lower_pair_label}|",
     )
     bottom_axis.plot(
         q_value_list,
         delta_57_min_abs_p_list,
         marker="o",
         linewidth=1.5,
-        label="argmin |L5-L7|",
+        label=f"argmin |{upper_pair_label}|",
     )
     finite_window_mask = np.isfinite(recommended_p_min_list) & np.isfinite(
         recommended_p_max_list
