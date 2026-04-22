@@ -444,4 +444,103 @@ num_disorder_samples_total = 1024
 
 ## With Measurement Noise
 
-暂无实验数据。
+## 2026-04-22 16:52 3D toric `q>0` 管线接入与本地预检
+
+摘要：
+- 做什么：把 3D `q>0` threshold-search 编排层接入现有生产扫描管线，并完成本地轻量预检。
+- 结论：3D measurement-noise 路径已能稳定跑通 `submit -> merge -> analyze`，输出目录、命名和 `threshold_summary.json` 全部落到 3D 专属路径。
+- 看图：[scan_result_multi_L_3d_toric_q0p0050_measurement_noise_threshold_scout_common_random_sem95.png](data/3d_toric_code/with_measurement_noise/measurement_noise_threshold_scout_local/precheck_20260422/q_0p0050/scan_result_multi_L_3d_toric_q0p0050_measurement_noise_threshold_scout_common_random_sem95.png)
+
+### 代码变更
+
+- `src/measurement_noise_threshold_scout.py`
+  - 新增 `--code-family {2d_toric,3d_toric}`
+  - 默认 lattice sizes 改为按 code family 选择：
+    - 2D：`[3,5,7]`
+    - 3D：`[3,4,5]`
+  - 默认输出根目录改为按 family 路由到
+    `data/<family>_code/with_measurement_noise/...`
+  - `q>0` 的 output stem 改为包含 `code_family`
+  - 本地 scout 统一写出 `threshold_summary.json`
+- `scripts/launch_3d_measurement_noise_threshold_search.sh`
+  - 新增可复用的 3D measurement-noise 远端 launcher
+  - 支持 `REMOTE_COMPUTE_HOST=nd-1/nd-2/nd-3`
+  - 远端固定使用 `conda run -n 11 python`
+  - 统一导出 `CONDA_NO_PLUGINS=true`
+  - 通过 `Q_AND_P_WINDOWS` 参数化多 `q` 多窗口扫描
+  - 单个 host 任务结束后自动汇总：
+    - `threshold_summary.json`
+    - `measurement_noise_threshold_search_summary.json`
+    - overview 图
+
+### 本地预检参数
+
+- `code_family = 3d_toric`
+- `L = [3,4,5]`
+- `q = 0.0050`
+- `p = [0.1600, 0.2200, 0.2800]`
+- 每个 `(L,p)`：
+  - `num_disorder_samples_total = 32`
+  - `chunk_size = 16`
+  - `num_chunks_per_point = 2`
+  - `num_burn_in_sweeps = 1200`
+  - `num_sweeps_between_measurements = 6`
+  - `num_measurements_per_disorder = 240`
+  - `workers = 4`
+  - `common_random_disorder_across_p = true`
+
+### 预检输出
+
+- 归档目录：
+  - `data/3d_toric_code/with_measurement_noise/measurement_noise_threshold_scout_local/precheck_20260422/`
+- 主要文件：
+  - `q_0p0050/manifest.json`
+  - `q_0p0050/scan_result_multi_L_3d_toric_q0p0050_measurement_noise_threshold_scout_common_random.npz`
+  - `q_0p0050/scan_result_multi_L_3d_toric_q0p0050_measurement_noise_threshold_scout_common_random.png`
+  - `q_0p0050/scan_result_multi_L_3d_toric_q0p0050_measurement_noise_threshold_scout_common_random_sem95.png`
+  - `q_0p0050/scan_result_multi_L_3d_toric_q0p0050_measurement_noise_threshold_scout_common_random_gap_crossing.png`
+  - `q_0p0050/threshold_summary.json`
+  - `threshold_scout_index.json`
+
+### 校验结果
+
+- `manifest.json` 中：
+  - `config.code_family = 3d_toric`
+  - `final_outputs.status = completed`
+  - `completed_chunks = 18`
+  - `failed_chunks = 0`
+- 预检期间运行了 `exact_enumeration.py`，其内置校验全部通过。
+- `threshold_summary.json` 已正常生成；这轮轻量预检的物理判读是：
+
+```text
+boundary_saturation_artifact = true
+primary_crossing_window_hit  = false
+interior_crossing_window     = null
+recommended_server_window    = null
+right_edge_gap_signs         = {'3-4': 0, '4-5': 0}
+```
+
+- 这个结果只说明轻量预检窗口太窄且样本太少，不用于判断是否存在真实 threshold；
+  本轮目的只是验证 3D `q>0` 管线、命名和分析接口已经全部接通。
+
+### 运行时间观察
+
+- 本地 `L=5` chunk 明显更重：
+
+```text
+L=3 chunk 约 9s
+L=4 chunk 约 43s
+L=5 chunk 约 154~164s
+```
+
+- 这和此前 `q=0` 的经验一致，说明真正的 Stage A/B/C 重型扫描应继续放在
+  `nd-1/nd-2/nd-3` 上运行，不适合在本地做大样本搜索。
+
+### 下一步
+
+- 预检完成后，可以直接按既定 Stage A 在三个节点并行开 broad scout：
+  - `nd-1`: `q = [0.0010, 0.0025]`
+  - `nd-2`: `q = [0.0050, 0.0100]`
+  - `nd-3`: `q = [0.0200, 0.0400]`
+- Stage A 产物回收后，按每个 `q` 的 `threshold_summary.json`
+  进入自适应 Stage B。
