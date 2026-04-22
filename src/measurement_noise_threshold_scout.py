@@ -9,17 +9,19 @@ from pathlib import Path
 import numpy as np
 
 from analyze_threshold_crossing import analyze_threshold_crossing
-from production_chunked_scan import (
-    _build_default_output_stem,
-    _format_probability_tag,
-)
+from build_toric_code_examples import SUPPORTED_CODE_FAMILIES
+from production_chunked_scan import _format_probability_tag
 
 
 SOURCE_DIR = Path(__file__).resolve().parent
 PROJECT_ROOT = SOURCE_DIR.parent
-DEFAULT_LATTICE_SIZES = [3, 5, 7]
+DEFAULT_LATTICE_SIZES_BY_CODE_FAMILY = {
+    "2d_toric": [3, 5, 7],
+    "3d_toric": [3, 4, 5],
+}
 DEFAULT_Q_VALUES = [0.0025, 0.0050, 0.0075, 0.0100, 0.0150, 0.0200]
 DEFAULT_P_VALUES = np.arange(0.0300, 0.1000 + 0.0001, 0.0050)
+DEFAULT_COMMON_RANDOM_DISORDER_ACROSS_P = True
 
 
 def _timestamp_tag():
@@ -34,11 +36,20 @@ def _csv_from_int_list(values):
     return ",".join(str(int(value)) for value in values)
 
 
-def _build_default_run_root(run_id):
+def _build_default_run_root(code_family, run_id):
+    if code_family == "2d_toric":
+        code_family_dir = "2d_toric_code"
+    elif code_family == "3d_toric":
+        code_family_dir = "3d_toric_code"
+    else:
+        raise ValueError(
+            f"Unsupported code_family={code_family!r}; "
+            f"expected one of {SUPPORTED_CODE_FAMILIES}"
+        )
     return (
         PROJECT_ROOT
         / "data"
-        / "2d_toric_code"
+        / code_family_dir
         / "with_measurement_noise"
         / "measurement_noise_threshold_scout_local"
         / run_id
@@ -49,10 +60,10 @@ def _run_command(command, cwd):
     subprocess.run(command, cwd=cwd, check=True)
 
 
-def _build_q_output_stem(q_value):
+def _build_q_output_stem(code_family, q_value):
     q_tag = _format_probability_tag(q_value)
     return (
-        f"scan_result_multi_L_q{q_tag}_"
+        f"scan_result_multi_L_{code_family}_q{q_tag}_"
         "measurement_noise_threshold_scout_common_random"
     )
 
@@ -62,17 +73,22 @@ def _build_parser():
         description="Run local scouting scans for q>0 threshold search."
     )
     parser.add_argument(
+        "--code-family",
+        choices=SUPPORTED_CODE_FAMILIES,
+        default="2d_toric",
+    )
+    parser.add_argument(
         "--run-root",
         default=None,
         help=(
             "Defaults to "
-            "data/2d_toric_code/with_measurement_noise/"
+            "data/<code_family>_code/with_measurement_noise/"
             "measurement_noise_threshold_scout_local/<timestamp>/"
         ),
     )
     parser.add_argument(
         "--lattice-sizes",
-        default=_csv_from_int_list(DEFAULT_LATTICE_SIZES),
+        default=None,
     )
     parser.add_argument(
         "--q-values",
@@ -113,14 +129,22 @@ def main():
     parser = _build_parser()
     args = parser.parse_args()
 
+    code_family = str(args.code_family)
     if args.run_root is None:
         run_id = f"measurement_noise_threshold_scout_local_{_timestamp_tag()}"
-        run_root = _build_default_run_root(run_id)
+        run_root = _build_default_run_root(
+            code_family=code_family,
+            run_id=run_id,
+        )
     else:
         run_root = Path(args.run_root).expanduser().resolve()
     run_root.mkdir(parents=True, exist_ok=True)
 
     lattice_sizes_csv = args.lattice_sizes
+    if lattice_sizes_csv is None:
+        lattice_sizes_csv = _csv_from_int_list(
+            DEFAULT_LATTICE_SIZES_BY_CODE_FAMILY[code_family]
+        )
     q_values = [
         float(value.strip())
         for value in args.q_values.split(",")
@@ -130,22 +154,31 @@ def main():
 
     scout_index = {
         "run_root": str(run_root),
+        "code_family": code_family,
         "lattice_sizes": lattice_sizes_csv,
         "q_values": q_values,
         "data_error_probabilities": data_error_probabilities_csv,
+        "common_random_disorder_across_p": (
+            DEFAULT_COMMON_RANDOM_DISORDER_ACROSS_P
+        ),
         "outputs": [],
     }
 
     for q_index, q_value in enumerate(q_values):
         q_tag = _format_probability_tag(q_value)
         q_run_root = run_root / f"q_{q_tag}"
-        output_stem = _build_q_output_stem(q_value)
+        output_stem = _build_q_output_stem(
+            code_family=code_family,
+            q_value=q_value,
+        )
         submit_command = [
             sys.executable,
             str(SOURCE_DIR / "production_chunked_scan.py"),
             "submit",
             "--run-root",
             str(q_run_root),
+            "--code-family",
+            code_family,
             "--workers",
             str(args.workers),
             "--chunk-size",
@@ -172,8 +205,9 @@ def main():
             str(args.burn_in_scaling_reference_num_qubits),
             "--output-stem",
             output_stem,
-            "--common-random-disorder-across-p",
         ]
+        if DEFAULT_COMMON_RANDOM_DISORDER_ACROSS_P:
+            submit_command.append("--common-random-disorder-across-p")
         if args.git_commit_sha is not None:
             submit_command.extend(["--git-commit-sha", args.git_commit_sha])
         if args.resume:
@@ -187,7 +221,7 @@ def main():
             input_path=merged_npz_path,
             output_dir=q_run_root,
             output_stem=output_stem,
-            summary_path=q_run_root / "threshold_scout_summary.json",
+            summary_path=q_run_root / "threshold_summary.json",
             sem95_plot_path=q_run_root / f"{output_stem}_sem95.png",
             gap_plot_path=q_run_root / f"{output_stem}_gap_crossing.png",
         )
@@ -199,8 +233,14 @@ def main():
             "sem95_plot_path": summary["sem95_plot_path"],
             "gap_plot_path": summary["gap_plot_path"],
             "summary_path": summary["summary_path"],
+            "boundary_saturation_artifact": (
+                summary["boundary_saturation_artifact"]
+            ),
             "primary_crossing_window_hit": (
                 summary["primary_crossing_window_hit"]
+            ),
+            "interior_crossing_window": (
+                summary["interior_crossing_window"]
             ),
             "recommended_server_window": (
                 summary["recommended_server_window"]
