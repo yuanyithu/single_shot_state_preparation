@@ -113,6 +113,7 @@ build_remote_runner_script() {
 set -euo pipefail
 
 export MPLCONFIGDIR=\$HOME/.single_shot/mpl-cache
+export CONDA_NO_PLUGINS=true
 cd $(quote_arg "$REMOTE_BASE/repo")
 output_stem="scan_result_multi_L_3d_toric_q0_threshold_deep"
 conda run -n 11 python production_chunked_scan.py submit \
