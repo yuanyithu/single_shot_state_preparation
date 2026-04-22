@@ -95,8 +95,8 @@ if [[ "$skip_git_sync" != "1" ]]; then
   git -C "$repo_dir" checkout "$commit_sha" || exit 17
 fi
 
-if [[ ! -f "$repo_dir/production_chunked_scan.py" ]]; then
-  echo "Missing production_chunked_scan.py in $repo_dir" >&2
+if [[ ! -f "$repo_dir/src/production_chunked_scan.py" ]]; then
+  echo "Missing src/production_chunked_scan.py in $repo_dir" >&2
   exit 18
 fi
 
@@ -158,7 +158,7 @@ fi
 
 runner_cmd=(
   "${python_cmd[@]}"
-  "$repo_dir/production_chunked_scan.py"
+  "$repo_dir/src/production_chunked_scan.py"
   submit
   --run-root "$run_root"
   --workers "$workers"

@@ -15,7 +15,8 @@ from production_chunked_scan import (
 )
 
 
-PROJECT_ROOT = Path(__file__).resolve().parent
+SOURCE_DIR = Path(__file__).resolve().parent
+PROJECT_ROOT = SOURCE_DIR.parent
 DEFAULT_LATTICE_SIZES = [3, 5, 7]
 DEFAULT_Q_VALUES = [0.0025, 0.0050, 0.0075, 0.0100, 0.0150, 0.0200]
 DEFAULT_P_VALUES = np.arange(0.0300, 0.1000 + 0.0001, 0.0050)
@@ -35,7 +36,12 @@ def _csv_from_int_list(values):
 
 def _build_default_run_root(run_id):
     return (
-        PROJECT_ROOT / "data" / "local_threshold_scout" / run_id
+        PROJECT_ROOT
+        / "data"
+        / "2d_toric_code"
+        / "with_measurement_noise"
+        / "measurement_noise_threshold_scout_local"
+        / run_id
     )
 
 
@@ -58,7 +64,11 @@ def _build_parser():
     parser.add_argument(
         "--run-root",
         default=None,
-        help="Defaults to data/local_threshold_scout/<timestamp>/",
+        help=(
+            "Defaults to "
+            "data/2d_toric_code/with_measurement_noise/"
+            "measurement_noise_threshold_scout_local/<timestamp>/"
+        ),
     )
     parser.add_argument(
         "--lattice-sizes",
@@ -104,7 +114,7 @@ def main():
     args = parser.parse_args()
 
     if args.run_root is None:
-        run_id = f"threshold_scout_{_timestamp_tag()}"
+        run_id = f"measurement_noise_threshold_scout_local_{_timestamp_tag()}"
         run_root = _build_default_run_root(run_id)
     else:
         run_root = Path(args.run_root).expanduser().resolve()
@@ -132,7 +142,7 @@ def main():
         output_stem = _build_q_output_stem(q_value)
         submit_command = [
             sys.executable,
-            str(PROJECT_ROOT / "production_chunked_scan.py"),
+            str(SOURCE_DIR / "production_chunked_scan.py"),
             "submit",
             "--run-root",
             str(q_run_root),

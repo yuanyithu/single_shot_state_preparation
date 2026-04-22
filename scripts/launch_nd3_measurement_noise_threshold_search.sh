@@ -93,8 +93,8 @@ fi
 
 mkdir -p "$remote_base" "$logs_dir" "$master_run_root" "$mpl_cache_dir"
 
-if [[ ! -f "$repo_dir/production_chunked_scan.py" ]]; then
-  echo "Missing production_chunked_scan.py in $repo_dir" >&2
+if [[ ! -f "$repo_dir/src/production_chunked_scan.py" ]]; then
+  echo "Missing src/production_chunked_scan.py in $repo_dir" >&2
   exit 18
 fi
 
@@ -191,7 +191,7 @@ while IFS='|' read -r syndrome_error_probability data_error_probabilities; do
   output_stem="scan_result_multi_L_q\${q_tag}_measurement_noise_threshold_search_common_random"
   final_npz="\$run_root/\${output_stem}.npz"
   echo "[launcher] starting q=\$syndrome_error_probability run_root=\$run_root seed_base=\$current_seed_base"
-  "\${python_cmd[@]}" "$repo_dir/production_chunked_scan.py" submit \
+  "\${python_cmd[@]}" "$repo_dir/src/production_chunked_scan.py" submit \
     --run-root "\$run_root" \
     --workers "\$workers" \
     --chunk-size "\$chunk_size" \
@@ -208,7 +208,7 @@ while IFS='|' read -r syndrome_error_probability data_error_probabilities; do
     --output-stem "\$output_stem" \
     --common-random-disorder-across-p \
     --git-commit-sha "\$commit_sha"
-  "\${python_cmd[@]}" "$repo_dir/analyze_threshold_crossing.py" \
+  "\${python_cmd[@]}" "$repo_dir/src/analyze_threshold_crossing.py" \
     "\$final_npz" \
     --output-dir "\$run_root" \
     --output-stem "\$output_stem" \

@@ -230,7 +230,10 @@ def main():
     parser = argparse.ArgumentParser(
         description="Plot overview figures for a threshold-search run root."
     )
-    parser.add_argument("run_root", help="Path to data/nd3_runs/<run_id>")
+    parser.add_argument(
+        "run_root",
+        help="Path to a threshold-search run root under data/2d_toric_code/with_measurement_noise/",
+    )
     args = parser.parse_args()
 
     sem95_output_path, gap_output_path = plot_threshold_search_overview(

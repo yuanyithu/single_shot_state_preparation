@@ -1,3 +1,5 @@
+非主报告，仅保留备忘。正式引用请优先看 [实验报告_2D_toric_code.md](实验报告_2D_toric_code.md) 与 [README.md](README.md)。
+
 目前不能“确保”很小 p 区域绝对没有 threshold，只能说现有数据不支持存在一个有限的正阈值。
 
 现有依据是三层：

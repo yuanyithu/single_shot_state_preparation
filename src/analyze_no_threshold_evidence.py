@@ -18,7 +18,8 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
 
-PROJECT_ROOT = Path(__file__).resolve().parent
+SOURCE_DIR = Path(__file__).resolve().parent
+PROJECT_ROOT = SOURCE_DIR.parent
 CI95_Z_SCORE = 1.96
 DEFAULT_LEVEL_LIST = [0.55, 0.50]
 DEFAULT_TOLERANCE = 1.0e-12

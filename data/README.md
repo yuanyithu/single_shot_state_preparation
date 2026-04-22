@@ -1,17 +1,25 @@
-# data 目录整理说明
+# data 目录索引
 
-当前 `data/` 采用以下约定：
+当前 `data/` 按 `2D/3D` 与是否考虑 measurement noise 组织。看图时优先 `*_sem95.png` 或 gap/crossing 图，不优先看旧 default `png`。
 
-- `nd3_runs/`
-  - 服务器批量实验产物，保留原始运行目录、日志、`manifest.json`、分块结果与汇总图。
-- `local_threshold_scout/`
-  - 本地 threshold scout 脚本的按时间戳输出目录。
-- `local_runs/`
-  - 后续本地直接运行 `main.py` 等脚本时的默认落盘位置，避免结果继续散落在根目录。
-- `legacy_local_runs/`
-  - 早期直接保存在 `data/` 根目录的本地实验结果归档。
-  - `baseline_multisize/`：最早的多尺寸基线扫描。
-  - `kernel_mix/`：随机闭环 / kernel mix 相关本地试验。
-  - `q0_geometric_multistart/`：`q=0` geometric multistart 相关本地试验。
+## 2D Toric Code
 
-根目录原则上只保留说明性文件和一级分类目录，不再直接存放实验 `.npz` / `.png` 结果。
+- 分类目录：[without_measurement_noise](2d_toric_code/without_measurement_noise/) / [with_measurement_noise](2d_toric_code/with_measurement_noise/)
+- `baseline_multisize_local`：最早多尺寸基线；未见干净 crossing；key plot [scan_result_multi_L.png](2d_toric_code/without_measurement_noise/baseline_multisize_local/scan_result_multi_L.png)；raw result [scan_result_multi_L.npz](2d_toric_code/without_measurement_noise/baseline_multisize_local/scan_result_multi_L.npz)。
+- `kernel_mix_local`：随机闭环 proposal 改善混合；阈值窗口更接近预期；key plot [scan_result_multi_L_kernel_mix_focus.png](2d_toric_code/without_measurement_noise/kernel_mix_local/scan_result_multi_L_kernel_mix_focus.png)；raw result [scan_result_multi_L_kernel_mix_focus.npz](2d_toric_code/without_measurement_noise/kernel_mix_local/scan_result_multi_L_kernel_mix_focus.npz)。
+- `q0_geometric_multistart_local`：几何 multistart sampler 降低大尺寸 spread；key plot [scan_result_multi_L_q0_geometric_multistart.png](2d_toric_code/without_measurement_noise/q0_geometric_multistart_local/scan_result_multi_L_q0_geometric_multistart.png)；raw result [scan_result_multi_L_q0_geometric_multistart.npz](2d_toric_code/without_measurement_noise/q0_geometric_multistart_local/scan_result_multi_L_q0_geometric_multistart.npz)。
+- `q0_threshold_deep_nd3_20260420_221142`：`512` disorder deep run；`q=0` crossing 收敛到 `p≈0.10~0.106`；key plot [scan_result_multi_L_q0_geometric_multistart_threshold_deep_sem95.png](2d_toric_code/without_measurement_noise/q0_threshold_deep_nd3_20260420_221142/scan_result_multi_L_q0_geometric_multistart_threshold_deep_sem95.png)；raw result [scan_result_multi_L_q0_geometric_multistart_threshold_deep.npz](2d_toric_code/without_measurement_noise/q0_threshold_deep_nd3_20260420_221142/scan_result_multi_L_q0_geometric_multistart_threshold_deep.npz)。
+- `q0_control_extension_nd3_20260421_225303`：`q=0` 对照补跑 `L=9,11`；支持有限 threshold 但 `L7-L9` 尚未闭合；key plot [q0_control_sem95.png](2d_toric_code/without_measurement_noise/q0_control_summary_20260422/q0_control_sem95.png)；raw result [scan_result_multi_L_q0_control_extension.npz](2d_toric_code/without_measurement_noise/q0_control_extension_nd3_20260421_225303/scan_result_multi_L_q0_control_extension.npz)。
+- `measurement_noise_overnight_nd3_20260421_004035`：overnight 扫描确认非零 `q` 的 crossing 左移出原窗口；key plot [measurement_noise_q_scan_sem95_overview.png](2d_toric_code/with_measurement_noise/measurement_noise_overnight_nd3_20260421_004035/measurement_noise_q_scan_sem95_overview.png)；raw result [q_0p0100 npz](2d_toric_code/with_measurement_noise/measurement_noise_overnight_nd3_20260421_004035/q_0p0100/scan_result_multi_L_q0p0100_measurement_noise_threshold_deep_common_random.npz)。
+- `measurement_noise_threshold_search_nd3_20260421_104427`：按 `q` 左移 threshold search；仍未出现稳定三尺寸共同 crossing；key plot [measurement_noise_threshold_search_gap_summary.png](2d_toric_code/with_measurement_noise/measurement_noise_threshold_search_nd3_20260421_104427/measurement_noise_threshold_search_gap_summary.png)；raw result [q_0p0100 npz](2d_toric_code/with_measurement_noise/measurement_noise_threshold_search_nd3_20260421_104427/q_0p0100/scan_result_multi_L_q0p0100_measurement_noise_threshold_search_common_random.npz)。
+- `no_threshold_final_nd3_20260421_225039`：最终大尺寸主任务当前只完整产出 `q=0.0010`；key plot 在综合证据目录中看；raw result [q_0p0010 npz](2d_toric_code/with_measurement_noise/no_threshold_final_nd3_20260421_225039/q_0p0010/scan_result_multi_L_q0p0010_no_threshold_final_common_random.npz)。
+- `no_threshold_evidence_nd3_20260422`：综合论文图与表；支持“固定非零 `q` 下未观察到稳定有限 threshold”；key plot [q_positive_pseudocritical_drift.png](2d_toric_code/with_measurement_noise/no_threshold_evidence_nd3_20260422/q_positive_pseudocritical_drift.png)；summary [no_threshold_evidence_summary.json](2d_toric_code/with_measurement_noise/no_threshold_evidence_nd3_20260422/no_threshold_evidence_summary.json)。
+
+## 3D Toric Code
+
+- 分类目录：[without_measurement_noise](3d_toric_code/without_measurement_noise/) / [with_measurement_noise](3d_toric_code/with_measurement_noise/)
+- `q0_smoke_local_20260421_234202`：3D 管线 smoke；只验证可运行性；key plot [scan_result_multi_L_3d_toric_q0_smoke.png](3d_toric_code/without_measurement_noise/q0_smoke_local_20260421_234202/scan_result_multi_L_3d_toric_q0_smoke.png)；raw result [scan_result_multi_L_3d_toric_q0_smoke.npz](3d_toric_code/without_measurement_noise/q0_smoke_local_20260421_234202/scan_result_multi_L_3d_toric_q0_smoke.npz)。
+- `q0_threshold_scout_nd1_20260421_235447`：首轮 scout 排除了 `p≤0.12` 的真实 crossing；key plot [scan_result_multi_L_3d_toric_q0_threshold_scout_local_gap_crossing.png](3d_toric_code/without_measurement_noise/q0_threshold_scout_nd1_20260421_235447/scan_result_multi_L_3d_toric_q0_threshold_scout_local_gap_crossing.png)；raw result [scan_result_multi_L_3d_toric_q0_threshold_scout.npz](3d_toric_code/without_measurement_noise/q0_threshold_scout_nd1_20260421_235447/scan_result_multi_L_3d_toric_q0_threshold_scout.npz)。
+- `q0_threshold_scout_stageA_nd1_20260422_100557`：右移到 `0.10~0.20` 仍未 crossing；key plot [scan_result_multi_L_3d_toric_q0_threshold_scout_local_gap_crossing.png](3d_toric_code/without_measurement_noise/q0_threshold_scout_stageA_nd1_20260422_100557/local_reanalysis/scan_result_multi_L_3d_toric_q0_threshold_scout_local_gap_crossing.png)；raw result [scan_result_multi_L_3d_toric_q0_threshold_scout.npz](3d_toric_code/without_measurement_noise/q0_threshold_scout_stageA_nd1_20260422_100557/scan_result_multi_L_3d_toric_q0_threshold_scout.npz)。
+- `q0_threshold_scout_stageB_nd3_20260422_101018`：在 `p≈0.218~0.230` 观察到 interior crossing；key plot [scan_result_multi_L_3d_toric_q0_threshold_scout_local_gap_crossing.png](3d_toric_code/without_measurement_noise/q0_threshold_scout_stageB_nd3_20260422_101018/local_reanalysis/scan_result_multi_L_3d_toric_q0_threshold_scout_local_gap_crossing.png)；raw result [scan_result_multi_L_3d_toric_q0_threshold_scout.npz](3d_toric_code/without_measurement_noise/q0_threshold_scout_stageB_nd3_20260422_101018/scan_result_multi_L_3d_toric_q0_threshold_scout.npz)。
+- `3d_toric_code/with_measurement_noise/`：当前为空，后续实验占位。

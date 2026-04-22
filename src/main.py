@@ -21,9 +21,12 @@ from preprocessing import (
 )
 
 
-PROJECT_ROOT = Path(__file__).resolve().parent
+SOURCE_DIR = Path(__file__).resolve().parent
+PROJECT_ROOT = SOURCE_DIR.parent
 DATA_DIR = PROJECT_ROOT / "data"
-LOCAL_RUNS_DIR = DATA_DIR / "local_runs"
+LOCAL_RUNS_DIR = (
+    DATA_DIR / "2d_toric_code" / "without_measurement_noise"
+)
 
 
 def _ensure_data_dir():
@@ -1515,7 +1518,7 @@ if __name__ == "__main__":
             )
         print(row)
 
-    output_dir = _ensure_local_run_dir("q0_geometric_multistart")
+    output_dir = _ensure_local_run_dir("q0_geometric_multistart_local")
     output_path = output_dir / "scan_result_multi_L_q0_geometric_multistart.npz"
     np.savez(
         output_path,

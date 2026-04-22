@@ -20,7 +20,8 @@ from main import run_disorder_average_simulation
 from plot_scan_results import plot_scan_result
 
 
-PROJECT_ROOT = Path(__file__).resolve().parent
+SOURCE_DIR = Path(__file__).resolve().parent
+PROJECT_ROOT = SOURCE_DIR.parent
 DEFAULT_Q0_OUTPUT_STEM = (
     "scan_result_multi_L_q0_geometric_multistart_threshold_deep"
 )
@@ -589,7 +590,7 @@ def _build_multiprocessing_context():
 def _run_exact_enumeration_validation():
     _log("Running exact_enumeration.py validation")
     subprocess.run(
-        [sys.executable, str(PROJECT_ROOT / "exact_enumeration.py")],
+        [sys.executable, str(SOURCE_DIR / "exact_enumeration.py")],
         cwd=PROJECT_ROOT,
         check=True,
     )

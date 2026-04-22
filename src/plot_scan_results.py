@@ -16,12 +16,14 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
 
-PROJECT_ROOT = Path(__file__).resolve().parent
+SOURCE_DIR = Path(__file__).resolve().parent
+PROJECT_ROOT = SOURCE_DIR.parent
 DEFAULT_INPUT_PATH = (
     PROJECT_ROOT
     / "data"
-    / "legacy_local_runs"
-    / "q0_geometric_multistart"
+    / "2d_toric_code"
+    / "without_measurement_noise"
+    / "q0_geometric_multistart_local"
     / "scan_result_multi_L_q0_geometric_multistart.npz"
 )
 CI95_Z_SCORE = 1.96

@@ -83,8 +83,8 @@ screen_name="ssprep_${run_id}"
 
 mkdir -p "$remote_base" "$logs_dir" "$run_root" "$mpl_cache_dir"
 
-if [[ ! -f "$repo_dir/production_chunked_scan.py" ]]; then
-  echo "Missing production_chunked_scan.py in $repo_dir" >&2
+if [[ ! -f "$repo_dir/src/production_chunked_scan.py" ]]; then
+  echo "Missing src/production_chunked_scan.py in $repo_dir" >&2
   exit 18
 fi
 if ! command -v screen >/dev/null 2>&1; then
@@ -138,7 +138,7 @@ printf -v quoted_run_root '%q' "$run_root"
 
 runner_cmd=(
   "${python_cmd[@]}"
-  "$repo_dir/production_chunked_scan.py"
+  "$repo_dir/src/production_chunked_scan.py"
   submit
   --run-root "$run_root"
   --workers "$workers"

@@ -17,7 +17,8 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
 
-PROJECT_ROOT = Path(__file__).resolve().parent
+SOURCE_DIR = Path(__file__).resolve().parent
+PROJECT_ROOT = SOURCE_DIR.parent
 DEFAULT_TOLERANCE = 1.0e-12
 CI95_Z_SCORE = 1.96
 SATURATION_Q_TOP_TOLERANCE = 1.0e-9
