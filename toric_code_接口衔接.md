@@ -1,6 +1,6 @@
 # Toric code 示例与主框架的衔接
 
-`build_toric_code_examples.py` 提供两个构造函数，用来产生架构设计里
+`src/build_toric_code_examples.py` 提供两个构造函数，用来产生架构设计里
 `run_disorder_average_simulation` 的前两个输入参数。dtype / shape 已经严格
 按照接口约定准备好，不需要任何后处理。
 
@@ -21,7 +21,7 @@
 
 ```python
 from build_toric_code_examples import build_3d_toric_code
-from <主框架模块> import run_disorder_average_simulation
+from main import run_disorder_average_simulation
 
 parity_check_matrix, dual_logical_z_basis = build_3d_toric_code(lattice_size=3)
 
@@ -37,6 +37,8 @@ result = run_disorder_average_simulation(
     rng=np.random.default_rng(0),
 )
 ```
+
+说明：源码现在统一放在 `src/` 目录里；如果在仓库根目录直接跑示例，请从 `src/` 下执行对应脚本，或先把 `src/` 加到 `PYTHONPATH`。
 
 ## 给 Codex 的几条注意事项
 

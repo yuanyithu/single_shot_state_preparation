@@ -85,8 +85,8 @@ screen_name="ssprep_${master_run_id}"
 
 mkdir -p "$remote_base" "$logs_dir" "$master_run_root" "$mpl_cache_dir"
 
-if [[ ! -f "$repo_dir/production_chunked_scan.py" ]]; then
-  echo "Missing production_chunked_scan.py in $repo_dir" >&2
+if [[ ! -f "$repo_dir/src/production_chunked_scan.py" ]]; then
+  echo "Missing src/production_chunked_scan.py in $repo_dir" >&2
   exit 18
 fi
 
@@ -182,7 +182,7 @@ for syndrome_error_probability in "\${q_values[@]}"; do
   run_root="\$master_run_root/q_\$q_tag"
   current_seed_base=\$((seed_base + q_index * 1000000000))
   echo "[launcher] starting q=\$syndrome_error_probability run_root=\$run_root seed_base=\$current_seed_base"
-  "\${python_cmd[@]}" "$repo_dir/production_chunked_scan.py" submit \
+  "\${python_cmd[@]}" "$repo_dir/src/production_chunked_scan.py" submit \
     --run-root "\$run_root" \
     --workers "\$workers" \
     --chunk-size "\$chunk_size" \

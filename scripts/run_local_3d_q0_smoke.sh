@@ -3,11 +3,11 @@
 set -euo pipefail
 
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-RUN_ID="3d_toric_q0_smoke_$(date +%Y%m%d_%H%M%S)"
-RUN_ROOT="$PROJECT_ROOT/data/local_runs/$RUN_ID"
+RUN_ID="q0_smoke_local_$(date +%Y%m%d_%H%M%S)"
+RUN_ROOT="$PROJECT_ROOT/data/3d_toric_code/without_measurement_noise/$RUN_ID"
 OUTPUT_STEM="scan_result_multi_L_3d_toric_q0_smoke"
 
-conda run -n 12 python "$PROJECT_ROOT/production_chunked_scan.py" submit \
+conda run -n 12 python "$PROJECT_ROOT/src/production_chunked_scan.py" submit \
   --run-root "$RUN_ROOT" \
   --code-family 3d_toric \
   --workers 4 \

@@ -1,0 +1,342 @@
+{
+  "code_family": "3d_toric",
+  "common_random_disorder_across_p": false,
+  "crossing_window": {
+    "p_max": 0.06,
+    "p_min": 0.02
+  },
+  "data_error_probability_list": [
+    0.02,
+    0.03,
+    0.04,
+    0.05,
+    0.06,
+    0.07,
+    0.08,
+    0.09,
+    0.1,
+    0.11,
+    0.12
+  ],
+  "gap_plot_path": "data/3d_toric_code/without_measurement_noise/q0_threshold_scout_nd1_20260421_235447/scan_result_multi_L_3d_toric_q0_threshold_scout_local_gap_crossing.png",
+  "input_path": "/Users/yuan/Desktop/Desktop/workspace/projects/project D/data/3d_toric_code/without_measurement_noise/q0_threshold_scout_nd1_20260421_235447/scan_result_multi_L_3d_toric_q0_threshold_scout.npz",
+  "lattice_size_list": [
+    3,
+    4,
+    5
+  ],
+  "num_disorder_samples": 256,
+  "pairwise_gap_analysis": {
+    "delta_35": {
+      "crossing_intervals": [
+        {
+          "crossing_estimate_p": 0.02,
+          "left_index": 0,
+          "left_p": 0.02,
+          "right_index": 0,
+          "right_p": 0.02
+        },
+        {
+          "crossing_estimate_p": 0.03,
+          "left_index": 1,
+          "left_p": 0.03,
+          "right_index": 1,
+          "right_p": 0.03
+        }
+      ],
+      "crossing_location_classification": "right_of_window",
+      "delta_curve": [
+        0.0,
+        0.0,
+        -0.000675206260075667,
+        -0.000960804772755397,
+        -0.0012740774003285882,
+        -0.003799624972873339,
+        -0.006647835383339462,
+        -0.02419029841347342,
+        -0.03163092476981022,
+        -0.055437329004681346,
+        -0.08062418619791656
+      ],
+      "min_abs_delta_index": 0,
+      "min_abs_delta_p": 0.02,
+      "min_abs_delta_value": 0.0,
+      "pair_label": "3-4",
+      "pooled_ci95_curve": [
+        0.0,
+        0.0,
+        0.0009226407036122726,
+        0.0012714319840708282,
+        0.001533144817842741,
+        0.0032326410779188732,
+        0.0037445691855685008,
+        0.009944336341471056,
+        0.013130046792749987,
+        0.019103452256568572,
+        0.02413495376223907
+      ],
+      "pooled_sem_at_min_abs": 0.0,
+      "pooled_sem_curve": [
+        0.0,
+        0.0,
+        0.00047073505286340437,
+        0.000648689787791239,
+        0.0007822167437973168,
+        0.0016493066724075885,
+        0.0019104944824329085,
+        0.005073640990546457,
+        0.006699003465688769,
+        0.009746659314575802,
+        0.01231375191950973
+      ],
+      "secondary_proximity_hit": true,
+      "sign_flip_detected": true,
+      "sign_pattern": [
+        0,
+        0,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1
+      ]
+    },
+    "delta_57": {
+      "crossing_intervals": [
+        {
+          "crossing_estimate_p": 0.02,
+          "left_index": 0,
+          "left_p": 0.02,
+          "right_index": 0,
+          "right_p": 0.02
+        },
+        {
+          "crossing_estimate_p": 0.03,
+          "left_index": 1,
+          "left_p": 0.03,
+          "right_index": 1,
+          "right_p": 0.03
+        },
+        {
+          "crossing_estimate_p": 0.04,
+          "left_index": 2,
+          "left_p": 0.04,
+          "right_index": 2,
+          "right_p": 0.04
+        },
+        {
+          "crossing_estimate_p": 0.05,
+          "left_index": 3,
+          "left_p": 0.05,
+          "right_index": 3,
+          "right_p": 0.05
+        },
+        {
+          "crossing_estimate_p": 0.06,
+          "left_index": 4,
+          "left_p": 0.06,
+          "right_index": 4,
+          "right_p": 0.06
+        }
+      ],
+      "crossing_location_classification": "right_of_window",
+      "delta_curve": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        -0.0003955344548300932,
+        -6.927732437378431e-05,
+        -0.00019830370706230838,
+        -0.0024192325652592217,
+        -0.007679637121775662,
+        -0.016532546754867372
+      ],
+      "min_abs_delta_index": 0,
+      "min_abs_delta_p": 0.02,
+      "min_abs_delta_value": 0.0,
+      "pair_label": "4-5",
+      "pooled_ci95_curve": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0007571849453044093,
+        0.00012696522972043496,
+        0.0002354559491617608,
+        0.004330262748723719,
+        0.007078148567211328,
+        0.01138486082826789
+      ],
+      "pooled_sem_at_min_abs": 0.0,
+      "pooled_sem_curve": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0003863188496451068,
+        6.477817842879336e-05,
+        0.00012013058630702081,
+        0.002209317728940673,
+        0.0036113002893935348,
+        0.005808602463401985
+      ],
+      "secondary_proximity_hit": true,
+      "sign_flip_detected": true,
+      "sign_pattern": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1
+      ]
+    }
+  },
+  "primary_crossing_window_hit": true,
+  "q_top_ci95_curve_matrix": [
+    [
+      0.0,
+      0.0,
+      0.0009226407036122726,
+      0.0012714319840708282,
+      0.001533144817842741,
+      0.003142712092644322,
+      0.003742416093374864,
+      0.009941548459284714,
+      0.012395440827450225,
+      0.017743783877933524,
+      0.021289120822634136
+    ],
+    [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0007571849453044093,
+      0.00012696522972043496,
+      0.0002354559491617608,
+      0.004330262748723719,
+      0.0070781368884884725,
+      0.011369667000607514
+    ],
+    [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      1.2857967744027384e-05,
+      0.0005879867127113845
+    ]
+  ],
+  "q_top_curve_matrix": [
+    [
+      1.0,
+      1.0,
+      0.9993247937399243,
+      0.9990391952272446,
+      0.9987259225996714,
+      0.9958048405722966,
+      0.9932828872922868,
+      0.9756113978794643,
+      0.9659498426649306,
+      0.9368737381223649,
+      0.9023378014942957
+    ],
+    [
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      0.9996044655451699,
+      0.9999307226756262,
+      0.9998016962929377,
+      0.9975807674347408,
+      0.9923110671270462,
+      0.9829619876922122
+    ],
+    [
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      0.9999907042488219,
+      0.9994945344470796
+    ]
+  ],
+  "q_top_sem_curve_matrix": [
+    [
+      0.0,
+      0.0,
+      0.00047073505286340437,
+      0.000648689787791239,
+      0.0007822167437973168,
+      0.0016034245370634297,
+      0.0019093959660075837,
+      0.005072218601675875,
+      0.006324204503801135,
+      0.009052950958129349,
+      0.010861796338078641
+    ],
+    [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0003863188496451068,
+      6.477817842879336e-05,
+      0.00012013058630702081,
+      0.002209317728940673,
+      0.0036112943308614655,
+      0.005800850510514038
+    ],
+    [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      6.560187624503767e-06,
+      0.0002999932207711145
+    ]
+  ],
+  "recommended_server_window": {
+    "p_max": 0.059999999999999984,
+    "p_min": -0.019999999999999987,
+    "reason": "both_pairwise_gaps_cross_zero",
+    "step_reference": 0.009999999999999997
+  },
+  "secondary_proximity_hit": true,
+  "sem95_plot_path": "data/3d_toric_code/without_measurement_noise/q0_threshold_scout_nd1_20260421_235447/scan_result_multi_L_3d_toric_q0_threshold_scout_local_sem95.png",
+  "summary_path": "data/3d_toric_code/without_measurement_noise/q0_threshold_scout_nd1_20260421_235447/threshold_summary.json",
+  "syndrome_error_probability": 0.0
+}

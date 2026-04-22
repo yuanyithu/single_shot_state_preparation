@@ -1,0 +1,1066 @@
+# 实验报告：2D Toric Code
+
+按是否考虑 measurement noise 重排原始实验记录；原始时间线内容保留，但每条记录前增加了极简摘要和看图入口。
+
+## Without Measurement Noise
+
+## 2026-04-20 17:45:30 CST
+
+摘要：
+- 做什么：2D `q=0` 多尺寸基线扫描，检查 `L=3,5,7` 是否出现 crossing。
+- 结论：未见干净 crossing，`L=7` 在过渡区明显偏高。
+- 看图：[scan_result_multi_L.png](data/2d_toric_code/without_measurement_noise/baseline_multisize_local/scan_result_multi_L.png)
+
+### 实验目的
+
+对 2D toric code 做多尺寸扫描，检查 `q_top(p)` 是否在 `L=3,5,7`
+之间出现 crossing，并记录过渡区的 MCMC 接受率。
+
+### 代码变更
+
+- 仅修改 `main.py`
+- 新增 `scan_multiple_code_sizes(...)`
+- 在多尺寸扫描内部启用自适应 burn-in：
+  `effective_num_burn_in_sweeps = ceil(num_burn_in_sweeps * (num_qubits / 18))`
+- 保留原 `L=3` 单尺寸主入口为注释
+- 新增多尺寸主入口，结果保存到
+  `data/2d_toric_code/without_measurement_noise/baseline_multisize_local/scan_result_multi_L.npz`
+
+### 运行参数
+
+- `lattice_size_list = [3, 5, 7]`
+- `syndrome_error_probability = 0.0`
+- `data_error_probability_list = np.linspace(0.06, 0.14, 9)`
+- `num_disorder_samples = 40`
+- `num_burn_in_sweeps = 500`
+- `num_sweeps_between_measurements = 5`
+- `num_measurements_per_disorder = 400`
+- `seed_base = 20240801`
+- 自适应 burn-in 结果：
+  - `L=3`: `num_qubits=18`, `effective_num_burn_in_sweeps=500`
+  - `L=5`: `num_qubits=50`, `effective_num_burn_in_sweeps=1389`
+  - `L=7`: `num_qubits=98`, `effective_num_burn_in_sweeps=2723`
+
+### 运行输出
+
+```text
+L=3 (num_qubits=18, effective_num_burn_in_sweeps=500)
+       p        q_top    std_error    acceptance_rate
+  0.0600     0.791737     0.031243           0.021882
+  0.0700     0.757567     0.033817           0.023387
+  0.0800     0.676875     0.043299           0.020994
+  0.0900     0.589821     0.044054           0.043270
+  0.1000     0.600180     0.045144           0.044491
+  0.1100     0.538836     0.045388           0.055383
+  0.1200     0.473670     0.050385           0.072233
+  0.1300     0.362416     0.038785           0.082231
+  0.1400     0.434554     0.038377           0.067575
+
+L=5 (num_qubits=50, effective_num_burn_in_sweeps=1389)
+       p        q_top    std_error    acceptance_rate
+  0.0600     0.942895     0.024800           0.005592
+  0.0700     0.820116     0.037423           0.012430
+  0.0800     0.790556     0.047138           0.016708
+  0.0900     0.635854     0.052565           0.027152
+  0.1000     0.599846     0.051225           0.033031
+  0.1100     0.533963     0.052886           0.024323
+  0.1200     0.469342     0.050523           0.037232
+  0.1300     0.378378     0.047864           0.044738
+  0.1400     0.250529     0.034819           0.057867
+
+L=7 (num_qubits=98, effective_num_burn_in_sweeps=2723)
+       p        q_top    std_error    acceptance_rate
+  0.0600     0.986752     0.006980           0.003234
+  0.0700     0.952128     0.024493           0.007337
+  0.0800     0.861659     0.038492           0.011780
+  0.0900     0.788224     0.043810           0.017979
+  0.1000     0.783506     0.039461           0.018874
+  0.1100     0.559378     0.059420           0.021941
+  0.1200     0.593811     0.049849           0.024047
+  0.1300     0.327342     0.046284           0.034135
+  0.1400     0.358226     0.048492           0.033752
+
+       p        L=3        L=5        L=7
+  0.0600   0.791737   0.942895   0.986752
+  0.0700   0.757567   0.820116   0.952128
+  0.0800   0.676875   0.790556   0.861659
+  0.0900   0.589821   0.635854   0.788224
+  0.1000   0.600180   0.599846   0.783506
+  0.1100   0.538836   0.533963   0.559378
+  0.1200   0.473670   0.469342   0.593811
+  0.1300   0.362416   0.378378   0.327342
+  0.1400   0.434554   0.250529   0.358226
+```
+
+### 结果判断
+
+- 本轮没有看到干净的 crossing
+- `L=7` 在 `p=0.10~0.12` 仍明显高于 `L=3,5`
+- `p=0.13` 时 `L=7` 低于 `L=5`，但高 `p` 端存在明显非单调波动，
+  当前结果不足以判断 crossing 已稳定出现
+
+### 接受率观察
+
+- `L=7` 在过渡区 `p=0.10, 0.11, 0.12` 的平均接受率约为
+  `(0.018874 + 0.021941 + 0.024047) / 3 = 0.021621`
+- 即约 `2.16%`
+- 高于 `1%`，因此暂时不到“必须优先加长 burn-in”的阈值
+
+### 可能原因与后续排查方向
+
+- 大尺寸 `L=5` 或 `L=7` 可能仍未充分达到 equilibrium
+- `num_disorder_samples = 40` 对大尺寸可能噪声仍偏大
+- 也不能排除存在尚未发现的实现 bug
+- 按约束，本轮没有通过调参去“凑 crossing”
+
+### 产物
+
+- 结果文件：
+  `data/2d_toric_code/without_measurement_noise/baseline_multisize_local/scan_result_multi_L.npz`
+- 键检查通过：
+  - `q_top_curve_matrix.shape == (3, 9)`
+  - `q_top_std_error_curve_matrix.shape == (3, 9)`
+  - `average_acceptance_rate_curve_matrix.shape == (3, 9)`
+
+## 2026-04-20 18:44:01 CST
+
+摘要：
+- 做什么：在 2D `q=0` 基线框架上提高 burn-in 并改进 `(L,p)` 并行效率。
+- 结论：统计噪声变小，但仍未看到可信 crossing，说明问题不只是 burn-in 不足。
+- 看图：[scan_result_multi_L.png](data/2d_toric_code/without_measurement_noise/baseline_multisize_local/scan_result_multi_L.png)
+
+### 实验目的
+
+在保持 `(L, p)` 多尺寸扫描框架不变的前提下：
+
+- 改进 `(L, p)` 层面的多进程并行效率
+- 进一步提高 burn-in，检查 `L=7` 是否因平衡不足而导致 crossing 不明显
+
+### 代码变更
+
+- 修改 `main.py`
+- `(L, p)` 并行路径的进程上下文从固定 `spawn` 改为：
+  - 优先 `fork`
+  - 不可用时回退 `spawn`
+- 仍保留受限环境下的串行回退逻辑
+- 主入口参数改为：
+  - `num_disorder_samples = 120`
+  - `num_burn_in_sweeps = 1000`
+
+### 运行参数
+
+- `lattice_size_list = [3, 5, 7]`
+- `syndrome_error_probability = 0.0`
+- `data_error_probability_list = np.linspace(0.06, 0.14, 9)`
+- `num_disorder_samples = 120`
+- `num_burn_in_sweeps = 1000`
+- `num_sweeps_between_measurements = 5`
+- `num_measurements_per_disorder = 400`
+- `seed_base = 20240801`
+- 自适应 burn-in 结果：
+  - `L=3`: `num_qubits=18`, `effective_num_burn_in_sweeps=1000`
+  - `L=5`: `num_qubits=50`, `effective_num_burn_in_sweeps=2778`
+  - `L=7`: `num_qubits=98`, `effective_num_burn_in_sweeps=5445`
+
+### 运行输出
+
+```text
+L=3 (num_qubits=18, effective_num_burn_in_sweeps=1000)
+       p        q_top    std_error    acceptance_rate
+  0.0600     0.848457     0.017238           0.010847
+  0.0700     0.776447     0.022305           0.020833
+  0.0800     0.681787     0.023393           0.031368
+  0.0900     0.596830     0.026577           0.042311
+  0.1000     0.536512     0.025502           0.052575
+  0.1100     0.506614     0.026722           0.059764
+  0.1200     0.506349     0.025178           0.058543
+  0.1300     0.382888     0.023191           0.081970
+  0.1400     0.354230     0.025689           0.092065
+
+L=5 (num_qubits=50, effective_num_burn_in_sweeps=2778)
+       p        q_top    std_error    acceptance_rate
+  0.0600     0.907198     0.017245           0.009831
+  0.0700     0.870945     0.018486           0.009954
+  0.0800     0.805326     0.023467           0.015738
+  0.0900     0.742722     0.026310           0.016806
+  0.1000     0.640323     0.027414           0.024061
+  0.1100     0.573521     0.029091           0.031437
+  0.1200     0.445036     0.028809           0.037479
+  0.1300     0.417668     0.028730           0.043250
+  0.1400     0.265183     0.020322           0.058378
+
+L=7 (num_qubits=98, effective_num_burn_in_sweeps=5445)
+       p        q_top    std_error    acceptance_rate
+  0.0600     0.955593     0.014291           0.007333
+  0.0700     0.958514     0.011430           0.006530
+  0.0800     0.927587     0.013957           0.009372
+  0.0900     0.848546     0.022200           0.011945
+  0.1000     0.806461     0.021770           0.015276
+  0.1100     0.618099     0.028623           0.021678
+  0.1200     0.598397     0.029310           0.026529
+  0.1300     0.484610     0.029777           0.028851
+  0.1400     0.341358     0.025386           0.037861
+
+       p        L=3        L=5        L=7
+  0.0600   0.848457   0.907198   0.955593
+  0.0700   0.776447   0.870945   0.958514
+  0.0800   0.681787   0.805326   0.927587
+  0.0900   0.596830   0.742722   0.848546
+  0.1000   0.536512   0.640323   0.806461
+  0.1100   0.506614   0.573521   0.618099
+  0.1200   0.506349   0.445036   0.598397
+  0.1300   0.382888   0.417668   0.484610
+  0.1400   0.354230   0.265183   0.341358
+```
+
+### 结果判断
+
+- 这轮没有看到 crossing
+- 曲线的统计误差相较早期结果更小，但 `L=7` 仍整体偏高
+- 提高 burn-in 后，`L=7` 在 `p=0.10~0.13` 没有向预期 crossing 区明显下移
+- 因此“仅仅是 burn-in 不够”不能完整解释之前的异常趋势
+
+### 并行效果
+
+- `(L, p)` 进程并行在本轮实际生效
+- wall-clock 约为 1 分钟量级，明显快于此前串行扫描
+- 说明优先 `fork` 的上下文选择对本机运行有效
+
+### 当前结论
+
+- 平滑性已有改善，但物理上仍未得到可信的 crossing
+- 现在更值得继续排查的是：
+  - `L=7` 链是否仍存在混合问题
+  - `q=0` 专用 `ker(H_Z)` 更新路径是否存在系统性偏差
+  - 是否需要做更直接的 equilibration / 初始化依赖诊断
+
+## 2026-04-20 19:26:34 CST
+
+摘要：
+- 做什么：把 2D `q=0` 更新改成随机闭环 proposal，测试 kernel mix 是否改善混合。
+- 结论：曲线更平滑，阈值窗口行为更接近预期，但三尺寸 crossing 仍不够尖锐。
+- 看图：[scan_result_multi_L_kernel_mix_focus.png](data/2d_toric_code/without_measurement_noise/kernel_mix_local/scan_result_multi_L_kernel_mix_focus.png)
+
+### 实验目的
+
+在不改动 `preprocessing.py`、`linear_section.py` 和 toric code 构造器的前提下，
+把 `q=0` 的更新从固定 basis sweep 改成随机闭环 proposal，检查是否能改善
+`d=3,5,7` 在阈值附近的混合与 crossing 可见性。
+
+### 代码变更
+
+- `main.py`
+  - 新增 `_sample_random_kernel_move_bits(...)`
+  - `q=0` 分支改为：随机抽取 1-3 个 `ker(H_Z)` 基向量做 XOR，再用现有
+    Metropolis 接受率判断
+  - 其余 `q>0` 的单点 local update 不变
+- 结果文件改为新的命名，避免覆盖旧基线：
+  - `data/2d_toric_code/without_measurement_noise/kernel_mix_local/scan_result_multi_L_kernel_mix.npz`
+
+### 实验记录
+
+1. Smoke run
+   - 参数：`p = 0.085 ... 0.120`，`num_disorder_samples = 20`，
+     `num_measurements_per_disorder = 120`
+   - 文件：
+     `data/2d_toric_code/without_measurement_noise/kernel_mix_local/scan_result_multi_L_kernel_mix_smoke.npz`
+   - 现象：接受率保持非零，曲线比旧版更平滑，但统计误差仍较大
+
+2. Threshold window run
+   - 参数：`p = 0.100 ... 0.125`，`num_disorder_samples = 40`，
+     `num_measurements_per_disorder = 150`
+   - 文件：
+     `data/2d_toric_code/without_measurement_noise/kernel_mix_local/scan_result_multi_L_kernel_mix_focus.npz`
+   - 关键结果：
+
+```text
+L=3:  p=0.120 -> q_top=0.443920, p=0.125 -> q_top=0.402972
+L=5:  p=0.120 -> q_top=0.453861, p=0.125 -> q_top=0.454874
+L=7:  p=0.120 -> q_top=0.563724, p=0.125 -> q_top=0.489040
+```
+
+   - 现象：`L=3` 和 `L=5` 在 `p≈0.12~0.125` 附近开始互换大小顺序；
+     `L=7` 仍偏高，说明还需要更大样本数才能把三条曲线的交点压得更尖锐
+
+3. Higher-p check
+   - 参数：`p = 0.125 ... 0.145`，`num_disorder_samples = 30`，
+     `num_measurements_per_disorder = 100`
+   - 文件：
+     `data/2d_toric_code/without_measurement_noise/kernel_mix_local/scan_result_multi_L_kernel_mix_highp.npz`
+   - 关键结果：
+
+```text
+L=3:  p=0.140 -> q_top=0.362507, p=0.145 -> q_top=0.343876
+L=5:  p=0.140 -> q_top=0.321129, p=0.145 -> q_top=0.276587
+L=7:  p=0.140 -> q_top=0.451689, p=0.145 -> q_top=0.403022
+```
+
+4. Far-right check
+   - 参数：`p = 0.150 ... 0.180`，`num_disorder_samples = 20`，
+     `num_measurements_per_disorder = 80`
+   - 文件：
+     `data/2d_toric_code/without_measurement_noise/kernel_mix_local/scan_result_multi_L_kernel_mix_farhigh.npz`
+   - 关键结果：
+
+```text
+L=3:  p=0.180 -> q_top=0.207042
+L=5:  p=0.180 -> q_top=0.156062
+L=7:  p=0.180 -> q_top=0.188854
+```
+
+   - 现象：右侧失序区已经能稳定看到 `q_top` 明显下降，`L=5` 在高 `p`
+     端下降最快；`L=7` 也不再卡在高平台上
+
+### 结论
+
+- 新的随机闭环 kernel move 的确让 `q=0` 分支摆脱了纯 basis 顺序 sweep 的局部
+  陷阱，接受率和曲线平滑性都比之前稳定。
+- 在当前样本预算下，三条尺寸曲线还没有形成“教科书式很尖锐”的三向 crossing，
+  但阈值附近的行为已经更接近预期，且右侧失序区的下降趋势已明确。
+- 如果后续要把 crossing 压得更清楚，优先增加 `num_disorder_samples`，
+  再把 `p` 网格继续细化到 `0.125~0.175`。
+
+## 2026-04-20 21:34:44 CST
+
+摘要：
+- 做什么：上线 2D `q=0` 几何 multistart sampler，并加入多初态 spread 诊断。
+- 结论：新 sampler 明显优于旧 kernel-basis 路径，但大尺寸过渡区仍有混合长尾。
+- 看图：[scan_result_multi_L_q0_geometric_multistart.png](data/2d_toric_code/without_measurement_noise/q0_geometric_multistart_local/scan_result_multi_L_q0_geometric_multistart.png)
+
+### 实验目的
+
+落实新的 `q=0` 动力学与收敛诊断方案：
+
+- 用几何局部闭环和显式 winding loop 替换 kernel-basis 随机 XOR 主路径
+- 对每个 disorder 默认跑 4 条合法初态链
+- 把多初态 spread 写进结果文件，作为主要收敛诊断
+- 先用 `L=3` exact regression 卡住正确性，再做 `L=7` 烟雾诊断和多尺寸正式扫描
+
+### 代码变更
+
+- `build_toric_code_examples.py`
+  - 新增 `build_2d_toric_zero_syndrome_move_data(...)`
+  - 预计算 `contractible_moves`、`winding_moves` 和两条独立的
+    `start_sector_generators`
+- `mcmc.py`
+  - `initialize_mcmc_state(...)` 新增 `initial_chain_bits` 可选参数
+- `main.py`
+  - `q=0` 分支新增几何 sweep：先扫全部局部 loop，再扫全部 winding loop
+  - 保留 kernel-basis sampler 作为无几何 metadata 时的 fallback
+  - `run_disorder_average_simulation(...)` 新增：
+    - `zero_syndrome_move_data`
+    - `q0_num_start_chains`
+    - `q0_start_sector_labels`
+    - `q0_logical_observable_mean_values_per_disorder_per_start`
+    - `q0_q_top_values_per_disorder_per_start`
+    - `q0_m_u_spread_linf_per_disorder`
+    - `q0_q_top_spread_per_disorder`
+  - 多尺寸扫描结果新增对应的 curve/tensor 键
+- `exact_enumeration.py`
+  - 新增 `q=0` 几何 move 结构测试
+  - 新增 `L=3, q=0` 的 4 初态 exact-vs-MCMC regression
+- `plot_scan_results.py`
+  - 默认输入文件切到新的 multistart 结果
+  - 若结果里存在 `q0_mean_m_u_spread_linf_curve(_matrix)`，则额外绘制诊断面板
+
+### 实现备注
+
+- 计划里原本写的是 `section_representative XOR (b0*z0) XOR (b1*z1)`。
+- 实现时先核对了代码约定，发现当前 `dual_logical_z_basis` **不在**
+  `ker(H_Z)` 中，不能直接拿来做 `q=0` 的合法初态。
+- 因此实际落地为：
+  `section_representative XOR (b0*w0) XOR (b1*w1)`，
+  其中 `w0, w1` 是两条独立的 kernel winding loops。
+- 扇区标签仍保留 `00/10/01/11`，但它们对应的是 kernel 扇区而不是
+  `dual_logical_z_basis` 本身。
+
+### 正确性验证
+
+- `conda run -n 12 python src/exact_enumeration.py`
+- 结果：
+  - `q=0` move 结构测试通过
+  - 旧的 `Test 1/2/3` exact regression 全部通过
+  - 新增的 `Test 4:00/10/01/11` 4 起点 regression 全部通过
+- 说明：
+  - 新的几何 `q=0` sampler 在 `L=3` 上与 exact enumeration 一致
+  - 多起点机制本身没有引入权重或观测量偏差
+
+### 烟雾实验：`L=7` spread 对照
+
+- 新 sampler 文件：
+  - `data/2d_toric_code/without_measurement_noise/q0_geometric_multistart_local/scan_result_L7_q0_geometric_multistart_smoke.npz`
+- 参数：
+  - `p ∈ {0.10, 0.11, 0.12}`
+  - `num_disorder_samples = 12`
+  - `num_burn_in_sweeps = 1000`
+  - `num_sweeps_between_measurements = 5`
+  - `num_measurements_per_disorder = 120`
+  - `q0_num_start_chains = 4`
+- 新 sampler 的平均诊断：
+
+```text
+p=0.10  mean_m_u_spread=0.3333  mean_q_top_spread=0.2287  mean_accept=0.0491
+p=0.11  mean_m_u_spread=0.3069  mean_q_top_spread=0.1580  mean_accept=0.0529
+p=0.12  mean_m_u_spread=0.2486  mean_q_top_spread=0.1374  mean_accept=0.0570
+```
+
+- 用相同 4 个合法起点、相同预算做的 kernel-basis 基线对照：
+
+```text
+p=0.10  mean_m_u_spread=0.7250  mean_q_top_spread=0.3152  mean_accept=0.0074
+p=0.11  mean_m_u_spread=0.6833  mean_q_top_spread=0.2876  mean_accept=0.0091
+p=0.12  mean_m_u_spread=0.7931  mean_q_top_spread=0.3830  mean_accept=0.0089
+```
+
+- 结论：
+  - 新的几何 sampler 把 `L=7` 的 `m_u` spread 大致压低到了旧基线的
+    `1/3 ~ 1/2`
+  - 接受率也从约 `0.8%` 提高到了约 `5%`
+  - 这说明此前的主要问题确实是 `q=0` 扇区混合，而不是 burn-in 长度本身
+
+### 多尺寸正式扫描
+
+- 文件：
+  - 结果：
+    `data/2d_toric_code/without_measurement_noise/q0_geometric_multistart_local/scan_result_multi_L_q0_geometric_multistart.npz`
+  - 图像：
+    `data/2d_toric_code/without_measurement_noise/q0_geometric_multistart_local/scan_result_multi_L_q0_geometric_multistart.png`
+- 参数：
+  - `lattice_size_list = [3, 5, 7]`
+  - `syndrome_error_probability = 0.0`
+  - `data_error_probability_list = [0.080, 0.085, ..., 0.130]`
+  - `num_disorder_samples = 12`
+  - `num_burn_in_sweeps = 1000`
+  - `num_sweeps_between_measurements = 5`
+  - `num_measurements_per_disorder = 100`
+  - `q0_num_start_chains = 4`
+  - `seed_base = 20260421`
+- 说明：
+  - 原本直接跑 `main.py` 中的大预算默认参数会进入小时级 wall-clock，
+    不适合在本轮会话里完成；因此这里改用缩减但完整的正式扫描预算
+  - 结果文件已经包含新的 `q0_*` 张量键，完整保存了每个 `(L, p, disorder, start)`
+    的 spread 诊断
+
+### 关键结果
+
+- 过渡窗口 `p = 0.10, 0.105, 0.11, 0.115, 0.12` 的平均量：
+
+```text
+L=3  mean_q_top=0.4744  mean_m_u_spread=0.1753  mean_q_top_spread=0.1087  mean_accept=0.0714
+L=5  mean_q_top=0.4568  mean_m_u_spread=0.2213  mean_q_top_spread=0.1265  mean_accept=0.0526
+L=7  mean_q_top=0.4875  mean_m_u_spread=0.2893  mean_q_top_spread=0.1637  mean_accept=0.0539
+```
+
+- 若只看个别点：
+  - `p=0.105`：`L=7 > L=3 > L=5`
+  - `p=0.115`：`L=5 > L=3 > L=7`
+  - `p=0.120`：`L=3 > L=5 > L=7`
+- 这说明：
+  - 曲线顺序已经不再像旧版那样长期“`L=7` 被卡在高平台”
+  - 但在当前缩减预算下，阈值附近仍有明显统计波动，crossing 还不够稳定
+
+### 本轮结论
+
+- 新的 `q=0` 几何 sampler 明显优于旧的 kernel-basis 随机 XOR 路径。
+- 多初态 spread 现在可以直接从结果文件中读出，已经能作为比 acceptance 更可信的
+  收敛诊断。
+- `L=7` 的 spread 虽然显著下降，但在过渡区仍高于 `L=3` 和 `L=5`，
+  说明大尺寸混合还没有完全解决。
+- 下一步若继续推进，优先级建议为：
+  - 固定当前 sampler，不再回退到 kernel-basis 主路径
+  - 增加 `num_disorder_samples`
+  - 对 `p ≈ 0.10 ~ 0.12` 继续细化网格
+  - 若仍看到大尺寸 spread 偏高，再考虑 parallel tempering / replica exchange
+
+## 2026-04-21 00:16 ND-3 大规模阈值窗口正式运行结果回收
+
+摘要：
+- 做什么：对 2D `q=0` 几何 multistart 做 `512` disorder 的 deep run。
+- 结论：crossing 收敛到 `p≈0.10~0.106`，支持 `q=0` 下存在有限 threshold。
+- 看图：[scan_result_multi_L_q0_geometric_multistart_threshold_deep_sem95.png](data/2d_toric_code/without_measurement_noise/q0_threshold_deep_nd3_20260420_221142/scan_result_multi_L_q0_geometric_multistart_threshold_deep_sem95.png)
+
+### 运行与回收信息
+
+- 远端运行目录：
+  - `~/.single_shot/runs/threshold_deep_20260420_221142/`
+- 本地回收目录：
+  - `data/2d_toric_code/without_measurement_noise/q0_threshold_deep_nd3_20260420_221142/`
+- 主要文件：
+  - 结果：`data/2d_toric_code/without_measurement_noise/q0_threshold_deep_nd3_20260420_221142/scan_result_multi_L_q0_geometric_multistart_threshold_deep.npz`
+  - 远端原图：`data/2d_toric_code/without_measurement_noise/q0_threshold_deep_nd3_20260420_221142/scan_result_multi_L_q0_geometric_multistart_threshold_deep.png`
+  - 本地重绘：`data/2d_toric_code/without_measurement_noise/q0_threshold_deep_nd3_20260420_221142/scan_result_multi_L_q0_geometric_multistart_threshold_deep_local_replot.png`
+  - 95% CI 图：`data/2d_toric_code/without_measurement_noise/q0_threshold_deep_nd3_20260420_221142/scan_result_multi_L_q0_geometric_multistart_threshold_deep_sem95.png`
+  - manifest：`data/2d_toric_code/without_measurement_noise/q0_threshold_deep_nd3_20260420_221142/manifest.json`
+  - 日志：`data/2d_toric_code/without_measurement_noise/q0_threshold_deep_nd3_20260420_221142/threshold_deep_20260420_221142.log`
+- manifest 汇总：
+  - `completed_chunks = 720`
+  - `failed_chunks = 0`
+  - `pending_chunks = 0`
+  - `completed_at = 2026-04-20T22:55:19+08:00`
+
+### 运行参数
+
+- `lattice_size_list = [3, 5, 7]`
+- `data_error_probability_list = [0.0900, 0.0925, ..., 0.1250]`，共 `15` 个点
+- 每个 `(L, p)`：
+  - `num_disorder_samples = 512`
+  - `chunk_size = 32`
+  - `num_chunks_per_point = 16`
+  - `q0_num_start_chains = 4`
+  - `num_burn_in_sweeps = 1500`
+  - `num_sweeps_between_measurements = 5`
+  - `num_measurements_per_disorder = 400`
+  - `seed_base = 20260422`
+- 并行：
+  - `workers = 96`
+- 远端日志显示：
+  - `exact_enumeration.py` 验证通过
+  - preflight 成功
+  - 正式 chunk 全部完成并成功 merge
+
+### 结果解读
+
+- 先澄清一个关键点：
+  - 当前默认图中的 `q_top` 误差条画的是 disorder 样本标准差，
+    不是均值的标准误
+  - 这次 512 个 disorder 下，`q_top_std_curve_matrix` 仍在
+    `0.256 ~ 0.318`，但对应的均值标准误只有
+    `0.0113 ~ 0.0144`
+  - 换成 95% CI 后，均值误差条宽度约为 `0.022 ~ 0.028`
+  - 因此“图上误差条看起来很大”并不等价于“均值曲线没有意义”
+
+### 关键数值
+
+- `p ∈ [0.10, 0.125]` 窗口平均：
+
+```text
+L=3  mean_q_top=0.4879  mean_m_u_spread=0.0925  mean_q_top_spread=0.0568  mean_accept=0.0709
+L=5  mean_q_top=0.4810  mean_m_u_spread=0.1036  mean_q_top_spread=0.0591  mean_accept=0.0571
+L=7  mean_q_top=0.4632  mean_m_u_spread=0.1604  mean_q_top_spread=0.0895  mean_accept=0.0575
+```
+
+- 线性插值得到的 pairwise crossing 估计：
+
+```text
+L=3 vs L=5  -> p ≈ 0.0996
+L=3 vs L=7  -> p ≈ 0.1061
+L=5 vs L=7  -> p ≈ 0.1060
+```
+
+- 若只看 `L=7` 的多初态诊断，`m_u spread` 的 disorder 分布分位数为：
+
+```text
+p=0.1000  median=0.1400  q90=0.3245  q99=0.6250
+p=0.1100  median=0.1450  q90=0.2950  q99=0.5128
+p=0.1200  median=0.1500  q90=0.2800  q99=0.4389
+p=0.1250  median=0.1600  q90=0.2700  q99=0.3883
+```
+
+### 与此前本地小样本结果的比较
+
+- 对比
+  `data/2d_toric_code/without_measurement_noise/q0_geometric_multistart_local/scan_result_multi_L_q0_geometric_multistart.npz`
+  中的缩减预算结果，`L=7` 的 `mean_m_u_spread` 在共同点上的下降幅度为：
+
+```text
+p=0.090  old=0.3933  new=0.1336  ratio=0.34
+p=0.100  old=0.2600  new=0.1583  ratio=0.61
+p=0.110  old=0.2433  new=0.1585  ratio=0.65
+p=0.120  old=0.2983  new=0.1639  ratio=0.55
+p=0.125  old=0.2833  new=0.1660  ratio=0.59
+```
+
+- 这说明：
+  - 大样本后曲线确实比本地小样本稳定得多
+  - `q=0` 多初态 spread 明显下降，新的几何 sampler 已经有效缓解了
+    逻辑扇区混合不足
+  - 但 `L=7` 仍存在长尾 disorder，少数样本上的 `spread` 依旧偏高，
+    因而还不能说“大尺寸混合问题已经完全解决”
+
+### 当前判断
+
+- 这轮 `nd-3` 大规模运行已经足以说明：
+  - 之前“看起来离谱”的大误差条，主要来自 disorder 本身的宽分布，
+    不是 512 样本下均值还没有统计意义
+  - 新的 `q=0` sampler 相对旧版有实质改进，而且改进在 `L=7`
+    上是可见的
+- 但这轮结果还没有把阈值估计钉死在一个很窄的区间：
+  - crossing 仍分散在 `p ≈ 0.10 ~ 0.106`
+  - `L=7` 的高分位 spread 仍提示有一部分 disorder 很难混合
+- 若继续推进，下一步更合理的是：
+  - 保持当前 sampler 不变
+  - 在 `p ≈ 0.098 ~ 0.108` 之间再细化网格
+  - 若目标是更稳的 crossing，再继续提高 disorder 数
+  - 若目标是进一步压缩 `L=7` 长尾 spread，再考虑 tempering / replica exchange
+
+## With Measurement Noise
+
+这一部分也吸收了原 `2D没有threshold.md` 的核心结论：当前更稳妥的表述是 `strong numerical evidence that no finite positive threshold is observed for any fixed q>0 in 2D`，而不是对 `p→0^+` 做严格封口。
+
+## 2026-04-21 10:13 Measurement-Noise Overnight 结果回收与分析
+
+摘要：
+- 做什么：对 2D `q>0` 先做 overnight 扫描，检查 measurement noise 下 crossing 是否还在原窗口。
+- 结论：`q=0.01,0.02,0.03` 的 crossing 全部左移出原窗口，当前窗口只剩单调尺寸分离。
+- 看图：[measurement_noise_q_scan_sem95_overview.png](data/2d_toric_code/with_measurement_noise/measurement_noise_overnight_nd3_20260421_004035/measurement_noise_q_scan_sem95_overview.png)
+
+### 运行与回收信息
+
+- 远端 master run：
+  - `~/.single_shot/runs/measurement_noise_overnight_20260421_004035/`
+- 本地回收目录：
+  - `data/2d_toric_code/with_measurement_noise/measurement_noise_overnight_nd3_20260421_004035/`
+- 主日志：
+  - `data/2d_toric_code/with_measurement_noise/measurement_noise_overnight_nd3_20260421_004035/measurement_noise_overnight_20260421_004035.log`
+- 子任务：
+  - `q=0.0100`：`q_0p0100/`
+  - `q=0.0200`：`q_0p0200/`
+  - `q=0.0300`：`q_0p0300/`
+- 每个子任务都包含：
+  - `manifest.json`
+  - 最终 `npz`
+  - 远端原图 `png`
+  - 本地补画的 `*_sem95.png`
+- 总览图：
+  - `data/2d_toric_code/with_measurement_noise/measurement_noise_overnight_nd3_20260421_004035/measurement_noise_q_scan_sem95_overview.png`
+  - `data/2d_toric_code/with_measurement_noise/measurement_noise_overnight_nd3_20260421_004035/measurement_noise_compare_across_q_by_L_sem95.png`
+
+### 运行参数
+
+- `lattice_size_list = [3, 5, 7]`
+- `data_error_probability_list = [0.0900, 0.0925, ..., 0.1250]`
+- `syndrome_error_probability_list = [0.0100, 0.0200, 0.0300]`
+- 每个 `(L, p, q)`：
+  - `num_disorder_samples = 2048`
+  - `chunk_size = 64`
+  - `num_chunks_per_point = 32`
+  - `num_burn_in_sweeps = 2000`
+  - `num_sweeps_between_measurements = 10`
+  - `num_measurements_per_disorder = 800`
+- 额外改动：
+  - 开启了 `common random disorder across p`
+  - 即同一 `(L, disorder_index)` 在不同 `p` 上复用同一组底层 Uniform 随机数，
+    用来压低跨 `p` 差分方差
+
+### 完成情况
+
+- 三个 `q` 都完整完成：
+
+```text
+q=0.0100  completed_chunks=1440  failed=0  completed_at=2026-04-21T02:13:22+08:00
+q=0.0200  completed_chunks=1440  failed=0  completed_at=2026-04-21T03:47:42+08:00
+q=0.0300  completed_chunks=1440  failed=0  completed_at=2026-04-21T05:21:04+08:00
+```
+
+### 关键结果
+
+- 三个 `q` 下，所有尺寸曲线都随 `p` 严格单调下降：
+
+```text
+q=0.010  monotone_decreasing: L3=True L5=True L7=True
+q=0.020  monotone_decreasing: L3=True L5=True L7=True
+q=0.030  monotone_decreasing: L3=True L5=True L7=True
+```
+
+- 而且在当前窗口 `p ∈ [0.09, 0.125]` 内，始终有：
+
+```text
+q=0.010  L3-L5 ∈ [0.0300, 0.0880],  L5-L7 ∈ [0.0525, 0.0956]
+q=0.020  L3-L5 ∈ [0.0596, 0.1029],  L5-L7 ∈ [0.1006, 0.1113]
+q=0.030  L3-L5 ∈ [0.0980, 0.1262],  L5-L7 ∈ [0.1094, 0.1335]
+```
+
+- 这说明：
+  - 三个非零 `q` 下，`L=3 > L=5 > L=7` 在整个扫描窗口里都没有翻转
+  - crossing 已经整体移到 `p < 0.09`
+  - 因而当前窗口不再适合用来定位带测量噪声时的 threshold crossing
+
+### 统计误差
+
+- 尽管 disorder 样本标准差仍然不小，但由于 `n = 2048`，均值标准误已经很小：
+
+```text
+q=0.010  SEM ∈ [0.0060, 0.0073],  95% CI ∈ [0.0117, 0.0143]
+q=0.020  SEM ∈ [0.0043, 0.0070],  95% CI ∈ [0.0084, 0.0138]
+q=0.030  SEM ∈ [0.0034, 0.0066],  95% CI ∈ [0.0066, 0.0130]
+```
+
+- 因此这轮曲线的“均值位置”已经很稳定，主要不确定性不再是统计噪声，
+  而是扫描窗口是否覆盖了真正的 crossing。
+
+### 与 `q=0` 大样本结果的对比
+
+- 在 `q=0` 的大样本窗口深挖里，`p≈0.10~0.106` 仍能看到 crossing；
+  但在本轮：
+
+```text
+p=0.100
+q=0.000  L3=0.5685  L5=0.5654  L7=0.5824
+q=0.010  L3=0.5865  L5=0.5446  L7=0.4771
+q=0.020  L3=0.5239  L5=0.4427  L7=0.3334
+q=0.030  L3=0.4916  L5=0.3832  L7=0.2497
+
+p=0.110
+q=0.000  L3=0.5145  L5=0.5057  L7=0.4878
+q=0.010  L3=0.5327  L5=0.4729  L7=0.4046
+q=0.020  L3=0.4675  L5=0.3748  L7=0.2674
+q=0.030  L3=0.4388  L5=0.3199  L7=0.1974
+```
+
+- 现象很明确：
+  - 非零 `q` 对大尺寸的压低更强
+  - 只要到 `q=0.01`，当前 `p` 窗口里就已经完全变成 `L=3 > L=5 > L=7`
+  - `q` 继续升高时，这个尺寸分离还会进一步扩大
+
+### acceptance 变化
+
+- 平均 acceptance 随 `q` 增大而增大：
+
+```text
+q=0.010  acceptance ≈ 0.0037 ~ 0.0054
+q=0.020  acceptance ≈ 0.0077 ~ 0.0107
+q=0.030  acceptance ≈ 0.0122 ~ 0.0167
+```
+
+- 这符合直觉：
+  - 测量噪声增大后，syndrome term 对单比特翻转的惩罚减弱
+  - 但 acceptance 变高并没有改变“crossing 已经移出扫描窗口”这个结论
+
+### 当前判断
+
+- 这轮 overnight 运行达到了两个目的：
+  - 用更高统计量和 common-random 采样把 measurement-noise 曲线压得足够平滑
+  - 明确确认了：对 `q = 0.01, 0.02, 0.03`，当前 `p ∈ [0.09, 0.125]`
+    扫描窗口已经偏高，crossing 不在这里
+
+- 因而下一步不该继续在这个窗口加点，而应该：
+  - 把 measurement-noise 扫描窗口整体左移
+  - 优先试 `p ≈ 0.04 ~ 0.10` 或至少 `0.06 ~ 0.10`
+  - 继续保留 common-random 设计
+  - 若目标是拟合 threshold line `p_c(q)`，可以固定 `q` 小列表后，
+    对每个 `q` 单独做更靠左的细网格扫描
+
+## 2026-04-21 22:35 Measurement-Noise Threshold Search 结果回收与分析
+
+摘要：
+- 做什么：对 2D `q>0` 分 `q` 左移窗口做 threshold search。
+- 结论：没有任何 `q` 出现稳定三尺寸共同 crossing，有限尺寸 crossing proxy 继续向更小 `p` 漂移。
+- 看图：[measurement_noise_threshold_search_gap_summary.png](data/2d_toric_code/with_measurement_noise/measurement_noise_threshold_search_nd3_20260421_104427/measurement_noise_threshold_search_gap_summary.png)
+
+### 归档位置
+
+- 远端 master run：
+  - `~/.single_shot/runs/measurement_noise_threshold_search_20260421_104427/`
+- 本地归档目录：
+  - `data/2d_toric_code/with_measurement_noise/measurement_noise_threshold_search_nd3_20260421_104427/`
+- 主日志：
+  - `data/2d_toric_code/with_measurement_noise/measurement_noise_threshold_search_nd3_20260421_104427/measurement_noise_threshold_search_20260421_104427.log`
+- 每个 `q` 子目录均包含：
+  - `manifest.json`
+  - merged `npz`
+  - 默认 `png`
+  - `*_sem95.png`
+  - `*_gap_crossing.png`
+  - `threshold_summary.json`
+- 本地补充总览：
+  - `data/2d_toric_code/with_measurement_noise/measurement_noise_threshold_search_nd3_20260421_104427/measurement_noise_threshold_search_sem95_overview.png`
+  - `data/2d_toric_code/with_measurement_noise/measurement_noise_threshold_search_nd3_20260421_104427/measurement_noise_threshold_search_gap_summary.png`
+  - `data/2d_toric_code/with_measurement_noise/measurement_noise_threshold_search_nd3_20260421_104427/measurement_noise_threshold_search_summary.json`
+
+### 作图口径修正
+
+- 检查代码后确认：旧版默认 `scan_result_*.png` 的 error bar 画的是
+  disorder 样本标准差，不是均值的统计不确定度。
+- 这会让图看起来“误差条极大”，但那反映的是 disorder 分布宽度，
+  不适合用来判断均值曲线是否稳定。
+- 因此已将默认 plotting 口径改为 `95% CI of disorder mean`，并把本轮
+  threshold-search 归档中的全部图片重新生成。
+- 现在每张图标题都会明确标注：
+  - measurement error `q`
+  - Pauli error `p` 的扫描区间
+- 从本条记录开始，应以重绘后的图为准；旧图不再作为统计误差解释依据。
+
+### 运行参数
+
+- 代码尺寸：`L = [3, 5, 7]`
+- 使用 `common random disorder across p`
+- 所有点统一：
+  - `num_disorder_samples_total = 2048`
+  - `chunk_size = 64`
+  - `num_burn_in_sweeps = 2000`
+  - `num_sweeps_between_measurements = 10`
+  - `num_measurements_per_disorder = 800`
+- `q` 与对应扫描窗口：
+  - `q=0.0025`：`p = 0.0850, 0.0875, ..., 0.1100`
+  - `q=0.0050`：`p = 0.0800, 0.0825, ..., 0.1075`
+  - `q=0.0075`：`p = 0.0725, 0.0750, ..., 0.1000`
+  - `q=0.0100`：`p = 0.0600, 0.0625, ..., 0.0900`
+  - `q=0.0150`：`p = 0.0450, 0.0475, ..., 0.0800`
+  - `q=0.0200`：`p = 0.0350, 0.0375, ..., 0.0700`
+
+### 完成情况
+
+- 六个 `q` 子任务全部完成，均为 `failed_chunks = 0`
+
+```text
+q=0.0025  completed_chunks=1056  completed_at=2026-04-21T12:03:55+08:00
+q=0.0050  completed_chunks=1152  completed_at=2026-04-21T13:36:19+08:00
+q=0.0075  completed_chunks=1152  completed_at=2026-04-21T15:06:53+08:00
+q=0.0100  completed_chunks=1248  completed_at=2026-04-21T16:39:32+08:00
+q=0.0150  completed_chunks=1440  completed_at=2026-04-21T18:31:12+08:00
+q=0.0200  completed_chunks=1440  completed_at=2026-04-21T20:21:42+08:00
+```
+
+### 关键结果
+
+- 这轮没有任何一个 `q` 满足“`delta_35` 和 `delta_57` 都在窗口内过零”的主判据：
+
+```text
+q=0.0025  primary=False  secondary=True
+q=0.0050  primary=False  secondary=True
+q=0.0075  primary=False  secondary=True
+q=0.0100  primary=False  secondary=True
+q=0.0150  primary=False  secondary=False
+q=0.0200  primary=False  secondary=False
+```
+
+- 但结果已经把不同 `q` 的情况区分得更清楚：
+  - `q=0.0025`
+    - `L3-L5` 最小 gap 出现在 `p=0.0875`，值约 `+0.00483`
+    - `L5-L7` 最小 gap 出现在 `p=0.0850`，值约 `+0.01846`
+    - 两个 pair gap 都仍为正，说明真正 crossing 还在当前窗口左侧，
+      但已经非常接近
+  - `q=0.0050`
+    - `L3-L5` 已在 `p≈0.08043` 过零
+    - 但 `L5-L7` 在整个窗口仍保持正值，最小也还有 `+0.02698`
+    - 这说明当前窗口已经碰到 `L3-L5` crossing，但三尺寸共同 crossing
+      还要继续往左找
+  - `q=0.0075`
+    - `L3-L5` 在窗口内多次接近并穿过零，最小 gap 约 `+1.16e-4`
+    - 但 `L5-L7` 最小仍有 `+0.02974`
+    - 结论与 `q=0.0050` 一样：只命中了 `L3-L5`
+  - `q=0.0100`
+    - `L3-L5` 在 `p≈0.07395` 过零
+    - `L5-L7` 在窗口最左端 `p=0.0600` 仍有 `+0.02678`
+    - 说明对 `q=0.01`，真正三尺寸 crossing 还要进一步左移
+  - `q=0.0150`
+    - `L3-L5` 最小 gap 仍有 `+0.02557`
+    - `L5-L7` 最小 gap 仍有 `+0.04597`
+    - 当前窗口仍明显偏高
+  - `q=0.0200`
+    - `L3-L5` 最小 gap 仍有 `+0.02709`
+    - `L5-L7` 最小 gap 仍有 `+0.05567`
+    - crossing 依然在更左侧
+
+### 统计误差与 acceptance
+
+- 这轮所有点的均值标准误都已经不大：
+
+```text
+q=0.0025  SEM ∈ [0.0050, 0.0070], acceptance ∈ [0.0008, 0.0011]
+q=0.0050  SEM ∈ [0.0061, 0.0076], acceptance ∈ [0.0015, 0.0022]
+q=0.0075  SEM ∈ [0.0062, 0.0074], acceptance ∈ [0.0022, 0.0032]
+q=0.0100  SEM ∈ [0.0054, 0.0073], acceptance ∈ [0.0024, 0.0038]
+q=0.0150  SEM ∈ [0.0043, 0.0070], acceptance ∈ [0.0029, 0.0052]
+q=0.0200  SEM ∈ [0.0041, 0.0067], acceptance ∈ [0.0036, 0.0066]
+```
+
+- 因此这轮未能直接锁定 threshold，并不是因为统计噪声太大，而是因为：
+  - `q=0.005 ~ 0.010` 只命中了 `L3-L5`
+  - `q=0.0025, 0.0150, 0.0200` 则仍然整体偏右
+
+### 当前判断
+
+- 这轮结果给出了比上一轮更具体的结论：
+  - `q=0.0025` 的 threshold 已经非常接近当前窗口左边界附近，
+    下一轮只需小幅左移
+  - `q=0.0050, 0.0075, 0.0100` 的 `L3-L5` 已经碰到或穿过零，
+    但 `L5-L7` 仍没过零；因此真正三尺寸 crossing 仍在更左侧
+  - `q=0.0150, 0.0200` 的窗口还明显偏高，应整体进一步左移
+
+- `threshold_summary.json` 给出的下一轮推荐窗口为：
+
+```text
+q=0.0025  next p ≈ [0.0625, 0.0875]
+q=0.0050  next p ≈ [0.07125, 0.09625]
+q=0.0075  next p ≈ [0.0625, 0.0875]
+q=0.0100  next p ≈ [0.0525, 0.0775]
+q=0.0150  next p ≈ [0.0225, 0.0475]
+q=0.0200  next p ≈ [0.0125, 0.0375]
+```
+
+- 若继续做下一轮 nd-3 搜索，更合理的策略是：
+  - 对 `q=0.0025, 0.0050, 0.0075, 0.0100` 再开一轮更靠左、仍保留
+    `0.0025` 步长的精扫
+  - 对 `q=0.0150, 0.0200` 直接把窗口整体左移到推荐区间
+  - 继续保留 common-random 设计，不必先加更多 disorder 数
+
+## 2026-04-22 11:20 论文级“无 threshold”确认实验结果回收与综合分析
+
+摘要：
+- 做什么：汇总 2D `q=0` 对照扩展与 `q>0` 大尺寸证据，检查“无有限 threshold”论据是否闭合。
+- 结论：`q>0` 方向证据很强，但论文级最终口径还差 `q=0` calibration 再向右补一点窗口。
+- 看图：[q_positive_pseudocritical_drift.png](data/2d_toric_code/with_measurement_noise/no_threshold_evidence_nd3_20260422/q_positive_pseudocritical_drift.png)
+
+### 归档位置
+
+- `q=0` 对照补跑结果：
+  - `data/2d_toric_code/without_measurement_noise/q0_control_extension_nd3_20260421_225303/`
+- 最终 `q>0` 大尺寸主任务归档：
+  - `data/2d_toric_code/with_measurement_noise/no_threshold_final_nd3_20260421_225039/`
+- 综合证据整理与作图输出：
+  - `data/2d_toric_code/with_measurement_noise/no_threshold_evidence_nd3_20260422/`
+
+### 运行与回收信息
+
+- `q=0` 对照补跑任务 `q0_control_extension_20260421_225303` 已完整完成：
+  - `L = [9, 11]`
+  - `p = 0.0950, 0.0975, ..., 0.1100`
+  - `1024` 个 disorder
+  - 日志显示 `448/448` 个 chunk 全部完成，`failed_chunks = 0`
+- 最终 `q>0` 主任务 `no_threshold_final_20260421_225039` 的采样部分只完整跑完了
+  `q=0.0010`：
+  - `L = [3, 5, 7, 9, 11]`
+  - `p = 0.0750, 0.0775, ..., 0.1000`
+  - `1024` 个 disorder
+  - 日志显示 `1760/1760` 个 chunk 全部完成，merge 完成，数据有效
+- 该 `screen` 在 `q=0.0010` merge 之后退出，原因不是采样失败，而是后处理脚本
+  `analyze_threshold_crossing.py` 仍假设“恰好 3 个 lattice size”，在读到
+  `L = [3, 5, 7, 9, 11]` 时抛出异常：
+
+```text
+ValueError: threshold crossing analysis currently expects exactly 3 sizes
+```
+
+- 因此本轮真正新增的“最终大尺寸”数据只有：
+  - `q=0` 的 `L=9,11` 对照补跑
+  - `q=0.0010` 的 `L=3,5,7,9,11` 主结果
+- 其余 `q=0.0025, 0.0050, 0.0100` 仍沿用上一轮 threshold-search 的
+  `L=3,5,7` 结果，与本轮 `q=0.0010` 一起做综合证据分析
+
+### 本轮新增分析产物
+
+- 新增综合分析目录 `data/2d_toric_code/with_measurement_noise/no_threshold_evidence_nd3_20260422/`，其中包含：
+  - `q0_control_sem95.png`
+  - `q0_control_crossing_drift.png`
+  - `q_positive_pseudocritical_drift.png`
+  - `q_positive_levelset_drift.png`
+  - `fixed_p_size_trends.png`
+  - `q_positive_pairwise_gap_supplement.png`
+  - `pseudocritical_crossing_table.csv`
+  - `levelset_drift_table.csv`
+  - `fixed_p_size_trend_summary.json`
+  - `no_threshold_evidence_summary.json`
+- 综合分析脚本会把：
+  - 现有 `q=0` 大样本基线 `L=3,5,7`
+  - 本轮 `q=0` 对照补跑 `L=9,11`
+  - 以及 `q>0` 的综合结果
+  统一整理成论文图和摘要表格
+
+### `q=0` 对照补跑结果
+
+- `q=0` 基线与对照补跑的公共 `p` 窗口只有
+  `p = 0.0950, 0.0975, ..., 0.1100`
+- 在这个公共窗口内，相邻尺寸 pair 的 crossing / bound 为：
+
+```text
+L3-L5   crossing   p ≈ 0.09959
+L5-L7   crossing   p ≈ 0.10596
+L7-L9   lower_bound only, crossing > 0.1100
+L9-L11  crossing   p ≈ 0.10209
+```
+
+- 这个结果与 `q=0` 存在有限 threshold 的直觉是一致的，特征尺度仍落在
+  `p ≈ 0.10 ~ 0.106` 一带。
+- 但由于 `q=0` 对照扩展只补跑到了 `p=0.1100`，`L7-L9` 的 crossing 没有被
+  明确夹住，只能给出 `crossing > 0.1100` 的下界。
+- 因此，本轮 `q=0` 对照足以说明分析流程没有出现明显病态，但还不足以作为
+  “完全闭合”的论文级 calibration：
+  - 它支持“`q=0` 有有限 threshold”
+  - 但没能在统一公共窗口上把全部相邻尺寸 crossing 都显式锁定
+
+### `q=0.0010` 大尺寸主结果
+
+- 对 `q=0.0010`、`L = [3,5,7,9,11]`，在整个扫描窗口
+  `p ∈ [0.0750, 0.1000]` 内，所有相邻尺寸 pair gap 都保持正值：
+
+```text
+L3-L5   upper_bound   p_cross < 0.0750
+L5-L7   upper_bound   p_cross < 0.0750
+L7-L9   upper_bound   p_cross < 0.0750
+L9-L11  upper_bound   p_cross < 0.0750
+```
+
+- 也就是说，即便把 lattice size 扩到 `L=11`，`q=0.0010` 仍然没有出现任何
+  稳定的有限-`p` crossing；所有 pairwise pseudocritical proxy 都继续向更小
+  的 `p` 漂移。
+
+- 固定 `p` 的尺寸趋势也非常干净，所选 3 个截面全部严格随 `L` 单调下降：
+
+```text
+p=0.0750  [0.9820, 0.9719, 0.9630, 0.9529, 0.9448]
+p=0.0875  [0.9763, 0.9640, 0.9479, 0.9356, 0.9190]
+p=0.1000  [0.9809, 0.9586, 0.9367, 0.9216, 0.8984]
+```
+
+- 这说明在任意固定正 `p` 上，增大尺寸只会进一步压低逻辑性能，没有形成
+  thermodynamic plateau，也没有出现“先下降后收敛回升”的迹象。
+
+### 与此前 `q>0` 数据合并后的综合判断
+
+- 将本轮 `q=0.0010` 大尺寸结果与此前已经完成的
+  `q=0.0025, 0.0050, 0.0100` 数据合并后，综合分析摘要为：
+
+```text
+paper_claim_supported                = False
+q0_control_recovers_threshold        = False
+q_positive_no_stable_common_crossing = True
+q_positive_crossing_or_bound_drift_left = True
+q_positive_fixed_p_tail_monotone     = True
+q_positive_levelset_drift_left       = True
+```
+
+- 这里 `paper_claim_supported = False` 并不是说“无 threshold 结论被反驳”，而是说：
+  - 当前脚本定义的论文主张门槛要求 `q=0` 对照本身先完整恢复有限 `p_c`
+  - 但本轮 `q=0` 公共窗口不足，导致 `q0_control_recovers_threshold = False`
+- 换句话说，阻碍最终自动判定通过的，不是 `q>0` 数据，而是 `q=0` calibration
+  还没有完全闭合
+
+- 对 `q>0` 而言，现有证据方向是一致的：
+  - `q=0.0010`：所有相邻尺寸 pair 都只给出 `p_cross < 0.0750`
+  - `q=0.0025`：`L3-L5` 与 `L5-L7` 都仍只给出 upper bound
+  - `q=0.0050`：`L3-L5` crossing 已左移到 `p ≈ 0.08043`，但 `L5-L7` 仍未进入窗口
+  - `q=0.0100`：`L3-L5` crossing 已左移到 `p ≈ 0.07395`，但 `L5-L7` 仍未进入窗口
+- 这组结果共同支持的图景是：
+  - 对任意固定 `q>0`，有限尺寸 pseudocritical proxy 并没有趋向某个稳定的
+    正 `p_c(q)`，而是在随尺寸继续向 `p → 0` 漂移
+  - 当前数据未显示任何稳定的多尺寸共同 crossing
+
+### 关于 level-set 证据的说明
+
+- 本轮分析同时计算了 `q_top = 0.55` 和 `q_top = 0.50` 的 level-set 漂移。
+- 但对本轮采用的若干窗口，很多 level-set 其实仍然落在窗口右边界之外，因此
+  在 `levelset_drift_table.csv` 中主要体现为 `upper_bound`，而不是精确插值点。
+- 因此：
+  - level-set 图仍可作为“继续向更小 `p` 漂移”的辅助证据
+  - 但它在本轮里不应作为最核心的主论据
+- 更强的主证据仍然是：
+  - `q=0.0010` 大尺寸下所有 pair gap 全部保持正值
+  - fixed-`p` 截面在 `L=3,5,7,9,11` 上严格单调下降
+
+### 当前结论
+
+- 本轮新增数据显著加强了下面这件事：
+  - 对固定非零测量噪声 `q>0`，2D 代码没有显示出稳定有限 threshold 的数值迹象
+- 尤其是 `q=0.0010` 的 `L=11` 扩展后，所有相邻尺寸 crossing proxy 仍整体落在
+  `p < 0.0750`，说明即使在极小非零 `q` 下，pseudo-threshold 也继续向零漂移
+- 但若要在论文中写成更强口径的
+  `strong numerical evidence that finite p_c(q) is absent for any fixed q>0`，
+  目前还差最后一块 calibration：
+  - 需要再把 `q=0` 对照的公共窗口略向右扩，使 `L7-L9` 的 crossing 也被显式锁定
+  - 这样才能让“`q=0` 有限 threshold 可恢复，而 `q>0` 全部继续左漂”这个对照
+    结构完全闭合
+
+- 因此，截至本条记录，更准确的总结是：
+  - `q>0` 数据已经强烈支持“无有限 threshold”的方向性结论
+  - 但论文级最终表述还应等待 `q=0` calibration 再补一小段右侧窗口之后再定稿

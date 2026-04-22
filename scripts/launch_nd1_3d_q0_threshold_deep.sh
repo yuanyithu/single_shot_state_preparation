@@ -46,7 +46,13 @@ resolve_scout_summary_path() {
     return 0
   fi
   local latest_path
-  latest_path="$(find "$PROJECT_ROOT/data/nd1_runs" -name 'threshold_summary.json' -path '*3d_toric_q0_threshold_scout_*' | sort | tail -n 1)"
+  latest_path="$(
+    find \
+      "$PROJECT_ROOT/data/3d_toric_code/without_measurement_noise" \
+      -name 'threshold_summary.json' \
+      -path '*q0_threshold_scout*' \
+      | sort | tail -n 1
+  )"
   if [[ -z "$latest_path" ]]; then
     echo "Provide a local scout threshold_summary.json path." >&2
     exit 2
@@ -116,7 +122,7 @@ export MPLCONFIGDIR=\$HOME/.single_shot/mpl-cache
 export CONDA_NO_PLUGINS=true
 cd $(quote_arg "$REMOTE_BASE/repo")
 output_stem="scan_result_multi_L_3d_toric_q0_threshold_deep"
-conda run -n 11 python production_chunked_scan.py submit \
+conda run -n 11 python src/production_chunked_scan.py submit \
   --run-root $(quote_arg "$REMOTE_RUN_ROOT") \
   --code-family 3d_toric \
   --workers $(quote_arg "$REQUESTED_WORKERS") \
@@ -133,7 +139,7 @@ conda run -n 11 python production_chunked_scan.py submit \
   --burn-in-scaling-reference-num-qubits $(quote_arg "$BURN_IN_SCALING_REFERENCE_NUM_QUBITS") \
   --output-stem "\$output_stem" \
   --git-commit-sha $(quote_arg "$COMMIT_SHA")
-conda run -n 11 python analyze_threshold_crossing.py \
+conda run -n 11 python src/analyze_threshold_crossing.py \
   $(quote_arg "$REMOTE_RUN_ROOT/scan_result_multi_L_3d_toric_q0_threshold_deep.npz") \
   --output-dir $(quote_arg "$REMOTE_RUN_ROOT") \
   --output-stem scan_result_multi_L_3d_toric_q0_threshold_deep \
