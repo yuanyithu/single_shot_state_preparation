@@ -62,10 +62,12 @@ def _read_npz_result(npz_path):
 def _load_measurement_run_root(run_root):
     run_root = Path(run_root)
     result_by_q = {}
-    for summary_path in sorted(run_root.glob("q_*/threshold_summary.json")):
-        q_dir = summary_path.parent
+    for q_dir in sorted(path for path in run_root.glob("q_*") if path.is_dir()):
         npz_path = next(q_dir.glob("*.npz"))
-        summary = json.loads(summary_path.read_text(encoding="utf-8"))
+        summary_path = q_dir / "threshold_summary.json"
+        summary = None
+        if summary_path.exists():
+            summary = json.loads(summary_path.read_text(encoding="utf-8"))
         result = _read_npz_result(npz_path)
         result["threshold_summary"] = summary
         q_value = float(result["syndrome_error_probability"])
@@ -80,21 +82,52 @@ def _merge_q0_results(base_result, extension_result):
     base_size_set = set(int(value) for value in base_result["lattice_size_list"])
     if base_size_set & extension_size_set:
         raise ValueError("q=0 base and extension sizes must be disjoint")
-    if not np.allclose(
-            base_result["data_error_probability_list"],
-            extension_result["data_error_probability_list"]):
-        raise ValueError("q=0 base and extension p grids must match")
+
+    base_probability_list = np.asarray(
+        base_result["data_error_probability_list"],
+        dtype=np.float64,
+    )
+    extension_probability_list = np.asarray(
+        extension_result["data_error_probability_list"],
+        dtype=np.float64,
+    )
+    common_probability_list = np.array([
+        probability
+        for probability in base_probability_list
+        if np.any(np.isclose(probability, extension_probability_list))
+    ], dtype=np.float64)
+    if common_probability_list.size == 0:
+        raise ValueError("q=0 base and extension p grids must overlap")
+
+    base_index_list = np.array([
+        int(np.where(np.isclose(base_probability_list, probability))[0][0])
+        for probability in common_probability_list
+    ], dtype=np.int64)
+    extension_index_list = np.array([
+        int(np.where(np.isclose(extension_probability_list, probability))[0][0])
+        for probability in common_probability_list
+    ], dtype=np.int64)
 
     size_to_row = {}
     for row_index, lattice_size in enumerate(base_result["lattice_size_list"]):
         size_to_row[int(lattice_size)] = {
-            "curve": base_result["q_top_curve_matrix"][row_index],
-            "std": base_result["q_top_std_curve_matrix"][row_index],
+            "curve": base_result["q_top_curve_matrix"][row_index, base_index_list],
+            "std": base_result["q_top_std_curve_matrix"][row_index, base_index_list],
         }
     for row_index, lattice_size in enumerate(extension_result["lattice_size_list"]):
         size_to_row[int(lattice_size)] = {
-            "curve": extension_result["q_top_curve_matrix"][row_index],
-            "std": extension_result["q_top_std_curve_matrix"][row_index],
+            "curve": (
+                extension_result["q_top_curve_matrix"][
+                    row_index,
+                    extension_index_list,
+                ]
+            ),
+            "std": (
+                extension_result["q_top_std_curve_matrix"][
+                    row_index,
+                    extension_index_list,
+                ]
+            ),
         }
 
     merged_sizes = np.asarray(sorted(size_to_row.keys()), dtype=np.int64)
@@ -109,7 +142,7 @@ def _merge_q0_results(base_result, extension_result):
     return {
         "npz_path": None,
         "lattice_size_list": merged_sizes,
-        "data_error_probability_list": base_result["data_error_probability_list"],
+        "data_error_probability_list": common_probability_list,
         "q_top_curve_matrix": merged_curve_matrix,
         "q_top_std_curve_matrix": merged_std_matrix,
         "num_disorder_samples": int(base_result["num_disorder_samples"]),
