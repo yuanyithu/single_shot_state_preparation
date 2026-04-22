@@ -1,0 +1,210 @@
+{
+  "0.0010": {
+    "selected_p_points": [
+      {
+        "lattice_size_list": [
+          3,
+          5,
+          7,
+          9,
+          11
+        ],
+        "monotone_descending_all_sizes": true,
+        "monotone_descending_tail_sizes": true,
+        "q_top_values": [
+          0.9820267433449075,
+          0.9718754701967594,
+          0.9630007595486111,
+          0.952917505787037,
+          0.9448177300347222
+        ],
+        "selected_p": 0.075
+      },
+      {
+        "lattice_size_list": [
+          3,
+          5,
+          7,
+          9,
+          11
+        ],
+        "monotone_descending_all_sizes": true,
+        "monotone_descending_tail_sizes": true,
+        "q_top_values": [
+          0.9763475622106481,
+          0.9640488859953704,
+          0.9478673321759259,
+          0.9356298032407406,
+          0.9189850477430554
+        ],
+        "selected_p": 0.0875
+      },
+      {
+        "lattice_size_list": [
+          3,
+          5,
+          7,
+          9,
+          11
+        ],
+        "monotone_descending_all_sizes": true,
+        "monotone_descending_tail_sizes": true,
+        "q_top_values": [
+          0.9808935474537037,
+          0.9586013888888889,
+          0.9366654730902778,
+          0.9216433015046296,
+          0.898361009837963
+        ],
+        "selected_p": 0.1
+      }
+    ]
+  },
+  "0.0025": {
+    "selected_p_points": [
+      {
+        "lattice_size_list": [
+          3,
+          5,
+          7
+        ],
+        "monotone_descending_all_sizes": true,
+        "monotone_descending_tail_sizes": true,
+        "q_top_values": [
+          0.8891663859049479,
+          0.8827278177897135,
+          0.864263975016276
+        ],
+        "selected_p": 0.085
+      },
+      {
+        "lattice_size_list": [
+          3,
+          5,
+          7
+        ],
+        "monotone_descending_all_sizes": true,
+        "monotone_descending_tail_sizes": true,
+        "q_top_values": [
+          0.872292598470052,
+          0.8527765014648437,
+          0.8123959533691406
+        ],
+        "selected_p": 0.0975
+      },
+      {
+        "lattice_size_list": [
+          3,
+          5,
+          7
+        ],
+        "monotone_descending_all_sizes": true,
+        "monotone_descending_tail_sizes": true,
+        "q_top_values": [
+          0.8549781026204426,
+          0.819161464436849,
+          0.7765627624511718
+        ],
+        "selected_p": 0.11
+      }
+    ]
+  },
+  "0.0050": {
+    "selected_p_points": [
+      {
+        "lattice_size_list": [
+          3,
+          5,
+          7
+        ],
+        "monotone_descending_all_sizes": false,
+        "monotone_descending_tail_sizes": true,
+        "q_top_values": [
+          0.7939596435546875,
+          0.7959265604654948,
+          0.7669770548502604
+        ],
+        "selected_p": 0.08
+      },
+      {
+        "lattice_size_list": [
+          3,
+          5,
+          7
+        ],
+        "monotone_descending_all_sizes": true,
+        "monotone_descending_tail_sizes": true,
+        "q_top_values": [
+          0.7453045817057291,
+          0.7175347351074219,
+          0.6602698608398437
+        ],
+        "selected_p": 0.095
+      },
+      {
+        "lattice_size_list": [
+          3,
+          5,
+          7
+        ],
+        "monotone_descending_all_sizes": true,
+        "monotone_descending_tail_sizes": true,
+        "q_top_values": [
+          0.7117444274902345,
+          0.6403421630859374,
+          0.5838242167154948
+        ],
+        "selected_p": 0.1075
+      }
+    ]
+  },
+  "0.0100": {
+    "selected_p_points": [
+      {
+        "lattice_size_list": [
+          3,
+          5,
+          7
+        ],
+        "monotone_descending_all_sizes": false,
+        "monotone_descending_tail_sizes": true,
+        "q_top_values": [
+          0.7990923807779947,
+          0.8054369913736978,
+          0.7786543009440104
+        ],
+        "selected_p": 0.06
+      },
+      {
+        "lattice_size_list": [
+          3,
+          5,
+          7
+        ],
+        "monotone_descending_all_sizes": true,
+        "monotone_descending_tail_sizes": true,
+        "q_top_values": [
+          0.7198221333821614,
+          0.7144572428385416,
+          0.6794319376627604
+        ],
+        "selected_p": 0.075
+      },
+      {
+        "lattice_size_list": [
+          3,
+          5,
+          7
+        ],
+        "monotone_descending_all_sizes": true,
+        "monotone_descending_tail_sizes": true,
+        "q_top_values": [
+          0.6416826009114583,
+          0.6077628316243491,
+          0.5589875
+        ],
+        "selected_p": 0.09
+      }
+    ]
+  }
+}
