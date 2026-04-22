@@ -6,6 +6,7 @@ PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 RUN_TIMESTAMP="$(date +%Y%m%d_%H%M%S)"
 MASTER_RUN_SUFFIX="${MASTER_RUN_SUFFIX:-}"
 MASTER_RUN_ID="${MASTER_RUN_ID:-3d_toric_q0_threshold_deep_${RUN_TIMESTAMP}${MASTER_RUN_SUFFIX}}"
+REMOTE_COMPUTE_HOST="${REMOTE_COMPUTE_HOST:-nd-1}"
 REMOTE_BASE='/home/DATA1/users/yuany/.single_shot'
 REMOTE_RUN_ROOT="$REMOTE_BASE/runs/$MASTER_RUN_ID"
 REMOTE_LOG_PATH="$REMOTE_BASE/logs/${MASTER_RUN_ID}.log"
@@ -94,14 +95,14 @@ PY
 
 
 fallback_archive_sync() {
-  echo "Syncing local HEAD to nd-1 via git archive." >&2
+  echo "Syncing local HEAD to ${REMOTE_COMPUTE_HOST} via git archive." >&2
   git -C "$PROJECT_ROOT" archive --format=tar HEAD \
-    | ssh yuany "ssh nd-1 'rm -rf $(quote_arg "$REMOTE_BASE/repo") && mkdir -p $(quote_arg "$REMOTE_BASE/repo") && tar -xf - -C $(quote_arg "$REMOTE_BASE/repo")'"
+    | ssh yuany "ssh ${REMOTE_COMPUTE_HOST} 'rm -rf $(quote_arg "$REMOTE_BASE/repo") && mkdir -p $(quote_arg "$REMOTE_BASE/repo") && tar -xf - -C $(quote_arg "$REMOTE_BASE/repo")'"
 }
 
 
 verify_remote_env() {
-  ssh yuany "ssh nd-1 'set -e; command -v screen >/dev/null 2>&1; command -v conda >/dev/null 2>&1; conda run -n 11 python -c \"import numpy, matplotlib\" >/dev/null'"
+  ssh yuany "ssh ${REMOTE_COMPUTE_HOST} 'set -e; command -v screen >/dev/null 2>&1; command -v conda >/dev/null 2>&1; conda run -n 11 python -c \"import numpy, matplotlib\" >/dev/null'"
 }
 
 
@@ -146,9 +147,9 @@ launch_remote_runner() {
   runner_tmp="$(mktemp)"
   build_remote_runner_script "$data_error_probabilities" > "$runner_tmp"
 
-  ssh yuany "ssh nd-1 'mkdir -p $(quote_arg "$REMOTE_RUN_ROOT") $(quote_arg "$REMOTE_BASE/logs") $(quote_arg "$REMOTE_BASE/mpl-cache")'"
-  ssh yuany "ssh nd-1 'cat > $(quote_arg "$REMOTE_RUNNER_PATH")'" < "$runner_tmp"
-  ssh yuany "ssh nd-1 'chmod +x $(quote_arg "$REMOTE_RUNNER_PATH") && screen -dmS $(quote_arg "$REMOTE_SCREEN_NAME") bash -lc \"exec $(quote_arg "$REMOTE_RUNNER_PATH") >> $(quote_arg "$REMOTE_LOG_PATH") 2>&1\" && printf \"MASTER_RUN_ID=%s\nSCREEN_NAME=%s\nLOG_PATH=%s\nRUN_ROOT=%s\nP_VALUES=%s\n\" $(quote_arg "$MASTER_RUN_ID") $(quote_arg "$REMOTE_SCREEN_NAME") $(quote_arg "$REMOTE_LOG_PATH") $(quote_arg "$REMOTE_RUN_ROOT") $(quote_arg "$data_error_probabilities")'"
+  ssh yuany "ssh ${REMOTE_COMPUTE_HOST} 'mkdir -p $(quote_arg "$REMOTE_RUN_ROOT") $(quote_arg "$REMOTE_BASE/logs") $(quote_arg "$REMOTE_BASE/mpl-cache")'"
+  ssh yuany "ssh ${REMOTE_COMPUTE_HOST} 'cat > $(quote_arg "$REMOTE_RUNNER_PATH")'" < "$runner_tmp"
+  ssh yuany "ssh ${REMOTE_COMPUTE_HOST} 'chmod +x $(quote_arg "$REMOTE_RUNNER_PATH") && screen -dmS $(quote_arg "$REMOTE_SCREEN_NAME") bash -lc \"exec $(quote_arg "$REMOTE_RUNNER_PATH") >> $(quote_arg "$REMOTE_LOG_PATH") 2>&1\" && printf \"MASTER_RUN_ID=%s\nREMOTE_COMPUTE_HOST=%s\nSCREEN_NAME=%s\nLOG_PATH=%s\nRUN_ROOT=%s\nP_VALUES=%s\n\" $(quote_arg "$MASTER_RUN_ID") $(quote_arg "$REMOTE_COMPUTE_HOST") $(quote_arg "$REMOTE_SCREEN_NAME") $(quote_arg "$REMOTE_LOG_PATH") $(quote_arg "$REMOTE_RUN_ROOT") $(quote_arg "$data_error_probabilities")'"
 
   rm -f "$runner_tmp"
 }
@@ -160,8 +161,8 @@ main() {
   scout_summary_path="$(resolve_scout_summary_path "$@")"
   data_error_probabilities="$(build_p_csv_from_summary "$scout_summary_path")"
   if [[ "$DRY_RUN" == "1" ]]; then
-    printf "MASTER_RUN_ID=%s\nRUN_ROOT=%s\nLOG_PATH=%s\nSCOUT_SUMMARY=%s\nP_VALUES=%s\nSEED_BASE=%s\n" \
-      "$MASTER_RUN_ID" "$REMOTE_RUN_ROOT" "$REMOTE_LOG_PATH" \
+    printf "MASTER_RUN_ID=%s\nREMOTE_COMPUTE_HOST=%s\nRUN_ROOT=%s\nLOG_PATH=%s\nSCOUT_SUMMARY=%s\nP_VALUES=%s\nSEED_BASE=%s\n" \
+      "$MASTER_RUN_ID" "$REMOTE_COMPUTE_HOST" "$REMOTE_RUN_ROOT" "$REMOTE_LOG_PATH" \
       "$scout_summary_path" "$data_error_probabilities" "$SEED_BASE"
     exit 0
   fi
