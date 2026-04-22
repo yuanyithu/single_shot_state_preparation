@@ -204,9 +204,17 @@ def _default_output_paths(input_path, output_dir=None, output_stem=None):
     }
 
 
-def _format_q_p_title(syndrome_error_probability, probability_list):
+def _format_code_family_label(code_family):
+    return str(code_family).replace("_", " ")
+
+
+def _format_q_p_title(
+        code_family,
+        syndrome_error_probability,
+        probability_list):
     probability_list = np.asarray(probability_list, dtype=np.float64)
     return (
+        f"{_format_code_family_label(code_family)}, "
         f"measurement error q={syndrome_error_probability:0.4f}, "
         f"Pauli error p in [{probability_list[0]:0.4f}, "
         f"{probability_list[-1]:0.4f}]"
@@ -214,7 +222,8 @@ def _format_q_p_title(syndrome_error_probability, probability_list):
 
 
 def _plot_sem95(probability_list, lattice_size_list, q_top_curve_matrix,
-                q_top_ci95_curve_matrix, syndrome_error_probability,
+                q_top_ci95_curve_matrix, code_family,
+                syndrome_error_probability,
                 output_path):
     figure, axis = plt.subplots(
         1,
@@ -236,7 +245,11 @@ def _plot_sem95(probability_list, lattice_size_list, q_top_curve_matrix,
     axis.set_ylabel("q_top")
     axis.set_title(
         "Threshold search (95% CI): "
-        + _format_q_p_title(syndrome_error_probability, probability_list)
+        + _format_q_p_title(
+            code_family,
+            syndrome_error_probability,
+            probability_list,
+        )
     )
     axis.grid(True, alpha=0.3)
     axis.legend(title="Error bar: 95% CI")
@@ -255,6 +268,7 @@ def _plot_gap_crossing(
         pooled_sem_57_curve,
         pair_35_crossings,
         pair_57_crossings,
+        code_family,
         syndrome_error_probability,
         output_path):
     figure, axes = plt.subplots(
@@ -280,7 +294,11 @@ def _plot_gap_crossing(
     top_axis.set_ylabel("q_top")
     top_axis.set_title(
         "Threshold search with pairwise gap diagnostics: "
-        + _format_q_p_title(syndrome_error_probability, probability_list)
+        + _format_q_p_title(
+            code_family,
+            syndrome_error_probability,
+            probability_list,
+        )
     )
     top_axis.grid(True, alpha=0.3)
     top_axis.legend(title="Error bar: 95% CI")
@@ -390,6 +408,12 @@ def analyze_threshold_crossing(
         common_random_disorder_across_p = bool(
             loaded_result["common_random_disorder_across_p"]
         )
+        if "code_family" in loaded_result.files:
+            code_family = str(loaded_result["code_family"])
+        elif "code_type" in loaded_result.files:
+            code_family = str(loaded_result["code_type"])
+        else:
+            code_family = "2d_toric"
 
     if q_top_curve_matrix.shape[0] != 3:
         raise ValueError(
@@ -453,6 +477,7 @@ def analyze_threshold_crossing(
         "summary_path": str(summary_path),
         "sem95_plot_path": str(sem95_plot_path),
         "gap_plot_path": str(gap_plot_path),
+        "code_family": code_family,
         "syndrome_error_probability": syndrome_error_probability,
         "common_random_disorder_across_p": common_random_disorder_across_p,
         "num_disorder_samples": num_disorder_samples,
@@ -485,6 +510,7 @@ def analyze_threshold_crossing(
         lattice_size_list=lattice_size_list,
         q_top_curve_matrix=q_top_curve_matrix,
         q_top_ci95_curve_matrix=q_top_ci95_curve_matrix,
+        code_family=code_family,
         syndrome_error_probability=syndrome_error_probability,
         output_path=sem95_plot_path,
     )
@@ -499,6 +525,7 @@ def analyze_threshold_crossing(
         pooled_sem_57_curve=pooled_sem_57_curve,
         pair_35_crossings=pair_35_summary["crossing_intervals"],
         pair_57_crossings=pair_57_summary["crossing_intervals"],
+        code_family=code_family,
         syndrome_error_probability=syndrome_error_probability,
         output_path=gap_plot_path,
     )

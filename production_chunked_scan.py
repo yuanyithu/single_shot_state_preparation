@@ -12,8 +12,9 @@ from pathlib import Path
 import numpy as np
 
 from build_toric_code_examples import (
-    build_2d_toric_code,
-    build_2d_toric_zero_syndrome_move_data,
+    SUPPORTED_CODE_FAMILIES,
+    build_toric_code_by_family,
+    build_zero_syndrome_move_data_by_family,
 )
 from main import run_disorder_average_simulation
 from plot_scan_results import plot_scan_result
@@ -52,13 +53,22 @@ def _format_probability_tag(probability):
 
 
 def _build_default_output_stem(
+        code_family,
         syndrome_error_probability,
         common_random_disorder_across_p):
+    code_family_tag = code_family
     if syndrome_error_probability == 0.0:
-        output_stem = DEFAULT_Q0_OUTPUT_STEM
+        if code_family == "2d_toric":
+            output_stem = DEFAULT_Q0_OUTPUT_STEM
+        else:
+            output_stem = (
+                f"scan_result_multi_L_{code_family_tag}_"
+                "q0_geometric_multistart_threshold_deep"
+            )
     else:
         output_stem = (
             "scan_result_multi_L_"
+            f"{code_family_tag}_"
             f"q{_format_probability_tag(syndrome_error_probability)}_"
             "measurement_noise_threshold_deep"
         )
@@ -153,9 +163,11 @@ def _build_submit_config_from_args(args):
     common_random_disorder_across_p = bool(
         args.common_random_disorder_across_p
     )
+    code_family = str(args.code_family)
     output_stem = args.output_stem
     if output_stem is None:
         output_stem = _build_default_output_stem(
+            code_family=code_family,
             syndrome_error_probability=syndrome_error_probability,
             common_random_disorder_across_p=(
                 common_random_disorder_across_p
@@ -166,6 +178,7 @@ def _build_submit_config_from_args(args):
         "run_root": str(run_root),
         "chunks_dir": str(chunks_dir),
         "manifest_path": str(run_root / "manifest.json"),
+        "code_family": code_family,
         "lattice_size_list": lattice_size_list,
         "data_error_probability_list": data_error_probability_list,
         "syndrome_error_probability": syndrome_error_probability,
@@ -205,8 +218,9 @@ def _build_chunk_tasks(config):
     num_points = len(config["data_error_probability_list"])
 
     for lattice_index, lattice_size in enumerate(config["lattice_size_list"]):
-        parity_check_matrix, dual_logical_z_basis = build_2d_toric_code(
-            lattice_size=lattice_size
+        parity_check_matrix, dual_logical_z_basis = build_toric_code_by_family(
+            code_family=config["code_family"],
+            lattice_size=lattice_size,
         )
         num_qubits = parity_check_matrix.shape[1]
         num_logical_qubits = dual_logical_z_basis.shape[0]
@@ -248,6 +262,7 @@ def _build_chunk_tasks(config):
                     "q0_num_start_chains": int(
                         config["q0_num_start_chains"]
                     ),
+                    "code_family": str(config["code_family"]),
                     "common_random_disorder_across_p": bool(
                         config["common_random_disorder_across_p"]
                     ),
@@ -328,6 +343,7 @@ def _build_manifest(
         "hostname": config["hostname"],
         "git_commit_sha": config["git_commit_sha"],
         "config": {
+            "code_family": config["code_family"],
             "lattice_size_list": config["lattice_size_list"],
             "data_error_probability_list": (
                 config["data_error_probability_list"]
@@ -428,13 +444,15 @@ def _run_chunk_task(task_data):
     start_time = time.time()
 
     try:
-        parity_check_matrix, dual_logical_z_basis = build_2d_toric_code(
-            lattice_size=task_data["lattice_size"]
+        parity_check_matrix, dual_logical_z_basis = build_toric_code_by_family(
+            code_family=task_data["code_family"],
+            lattice_size=task_data["lattice_size"],
         )
         zero_syndrome_move_data = None
         if task_data["syndrome_error_probability"] == 0.0:
-            zero_syndrome_move_data = build_2d_toric_zero_syndrome_move_data(
-                lattice_size=task_data["lattice_size"]
+            zero_syndrome_move_data = build_zero_syndrome_move_data_by_family(
+                code_family=task_data["code_family"],
+                lattice_size=task_data["lattice_size"],
             )
         precomputed_syndrome_uniform_values_per_disorder = None
         precomputed_data_uniform_values_per_disorder = None
@@ -645,8 +663,9 @@ def _merge_outputs(
         grouped_tasks.setdefault(key, []).append(task_data)
 
     for lattice_index, lattice_size in enumerate(config["lattice_size_list"]):
-        parity_check_matrix, dual_logical_z_basis = build_2d_toric_code(
-            lattice_size=lattice_size
+        parity_check_matrix, dual_logical_z_basis = build_toric_code_by_family(
+            code_family=config["code_family"],
+            lattice_size=lattice_size,
         )
         num_qubits = parity_check_matrix.shape[1]
         num_logical_qubits = dual_logical_z_basis.shape[0]
@@ -886,7 +905,8 @@ def _merge_outputs(
     np.savez(
         output_path,
         **merged_result,
-        code_type=np.array("2d_toric"),
+        code_family=np.array(config["code_family"]),
+        code_type=np.array(config["code_family"]),
         syndrome_error_probability=np.float64(
             config["syndrome_error_probability"]
         ),
@@ -1145,6 +1165,7 @@ def _run_chunk_command(args):
         "lattice_index": int(args.lattice_index),
         "point_index": int(args.point_index),
         "lattice_size": int(args.lattice_size),
+        "code_family": str(args.code_family),
         "data_error_probability": float(args.data_error_probability),
         "syndrome_error_probability": float(args.syndrome_error_probability),
         "num_disorder_samples": int(args.num_disorder_samples),
@@ -1206,6 +1227,11 @@ def _build_parser():
 
     common_submit_parser = argparse.ArgumentParser(add_help=False)
     common_submit_parser.add_argument("--run-root", required=True)
+    common_submit_parser.add_argument(
+        "--code-family",
+        choices=SUPPORTED_CODE_FAMILIES,
+        default="2d_toric",
+    )
     common_submit_parser.add_argument("--workers", type=int, default=1)
     common_submit_parser.add_argument("--chunk-size", type=int, default=32)
     common_submit_parser.add_argument(
@@ -1291,6 +1317,11 @@ def _build_parser():
 
     run_chunk_parser = subparsers.add_parser("run-chunk")
     run_chunk_parser.add_argument("--output-path", required=True)
+    run_chunk_parser.add_argument(
+        "--code-family",
+        choices=SUPPORTED_CODE_FAMILIES,
+        default="2d_toric",
+    )
     run_chunk_parser.add_argument("--lattice-index", type=int, required=True)
     run_chunk_parser.add_argument("--point-index", type=int, required=True)
     run_chunk_parser.add_argument("--lattice-size", type=int, required=True)
