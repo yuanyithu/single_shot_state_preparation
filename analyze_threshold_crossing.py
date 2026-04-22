@@ -20,6 +20,7 @@ import matplotlib.pyplot as plt
 PROJECT_ROOT = Path(__file__).resolve().parent
 DEFAULT_TOLERANCE = 1.0e-12
 CI95_Z_SCORE = 1.96
+SATURATION_Q_TOP_TOLERANCE = 1.0e-9
 
 
 def _load_q_top_std_curve_matrix(loaded_result):
@@ -108,84 +109,244 @@ def _classify_crossing_location(signs):
     return "inside_or_touching_window"
 
 
+def _is_q_top_saturated_at_unity(q_top_values, q_top_ci95_values):
+    q_top_values = np.asarray(q_top_values, dtype=np.float64)
+    q_top_ci95_values = np.asarray(q_top_ci95_values, dtype=np.float64)
+    return bool(np.all(
+        q_top_values >= 1.0 - q_top_ci95_values - SATURATION_Q_TOP_TOLERANCE
+    ))
+
+
+def _build_left_saturation_profile(q_top_curve_matrix, q_top_ci95_curve_matrix):
+    saturated_point_flags = np.array([
+        _is_q_top_saturated_at_unity(
+            q_top_curve_matrix[:, point_index],
+            q_top_ci95_curve_matrix[:, point_index],
+        )
+        for point_index in range(q_top_curve_matrix.shape[1])
+    ], dtype=bool)
+    left_edge_end_index = -1
+    for point_index, is_saturated in enumerate(saturated_point_flags.tolist()):
+        if not is_saturated:
+            break
+        left_edge_end_index = point_index
+    return saturated_point_flags, left_edge_end_index
+
+
+def _group_consecutive_indices(index_list):
+    if not index_list:
+        return []
+    grouped = [[int(index_list[0])]]
+    for index in index_list[1:]:
+        if index == grouped[-1][-1] + 1:
+            grouped[-1].append(int(index))
+        else:
+            grouped.append([int(index)])
+    return grouped
+
+
+def _build_window_record(
+        p_min,
+        p_max,
+        representative_p,
+        reason,
+        index_min=None,
+        index_max=None,
+        representative_index=None):
+    window = {
+        "p_min": float(min(p_min, p_max)),
+        "p_max": float(max(p_min, p_max)),
+        "representative_p": float(representative_p),
+        "reason": str(reason),
+    }
+    if index_min is not None:
+        window["index_min"] = int(index_min)
+    if index_max is not None:
+        window["index_max"] = int(index_max)
+    if representative_index is not None:
+        window["representative_index"] = int(representative_index)
+    return window
+
+
+def _window_from_crossing_entry(crossing_entry, reason):
+    return _build_window_record(
+        p_min=crossing_entry["left_p"],
+        p_max=crossing_entry["right_p"],
+        representative_p=crossing_entry["crossing_estimate_p"],
+        reason=reason,
+        index_min=crossing_entry["left_index"],
+        index_max=crossing_entry["right_index"],
+        representative_index=crossing_entry["left_index"],
+    )
+
+
+def _window_from_near_group(probability_list, delta_curve, index_group, reason):
+    representative_index = min(
+        index_group,
+        key=lambda index: abs(float(delta_curve[index])),
+    )
+    return _build_window_record(
+        p_min=probability_list[index_group[0]],
+        p_max=probability_list[index_group[-1]],
+        representative_p=probability_list[representative_index],
+        reason=reason,
+        index_min=index_group[0],
+        index_max=index_group[-1],
+        representative_index=representative_index,
+    )
+
+
+def _build_common_crossing_window(pair_35_summary, pair_57_summary):
+    if not (
+            pair_35_summary["interior_crossing_intervals"]
+            and pair_57_summary["interior_crossing_intervals"]):
+        return None
+    pair_35_crossing = pair_35_summary["interior_crossing_intervals"][0]
+    pair_57_crossing = pair_57_summary["interior_crossing_intervals"][0]
+    estimate_values = [
+        pair_35_crossing["crossing_estimate_p"],
+        pair_57_crossing["crossing_estimate_p"],
+    ]
+    return _build_window_record(
+        p_min=min(estimate_values),
+        p_max=max(estimate_values),
+        representative_p=float(np.mean(estimate_values)),
+        reason="both_pairwise_gaps_cross_zero_interior",
+    )
+
+
+def _build_common_near_crossing_window(pair_35_summary, pair_57_summary):
+    pair_target_windows = []
+    target_reasons = []
+    for pair_summary in (pair_35_summary, pair_57_summary):
+        if pair_summary["interior_crossing_intervals"]:
+            pair_target_windows.append(_window_from_crossing_entry(
+                pair_summary["interior_crossing_intervals"][0],
+                reason="pairwise_gap_cross_zero_interior",
+            ))
+            target_reasons.append("crossing")
+        elif pair_summary["interior_near_crossing_windows"]:
+            pair_target_windows.append(
+                pair_summary["interior_near_crossing_windows"][0]
+            )
+            target_reasons.append("near")
+        else:
+            return None
+
+    representative_values = [
+        window["representative_p"] for window in pair_target_windows
+    ]
+    if target_reasons == ["near", "near"]:
+        reason = "both_pairwise_gaps_within_pooled_ci95_interior"
+    else:
+        reason = "one_pair_crosses_zero_other_within_pooled_ci95_interior"
+    return _build_window_record(
+        p_min=min(representative_values),
+        p_max=max(representative_values),
+        representative_p=float(np.mean(representative_values)),
+        reason=reason,
+    )
+
+
 def _build_recommended_window(
         probability_list,
-        delta_35_curve,
-        delta_57_curve,
-        pair_35_crossings,
-        pair_57_crossings):
+        interior_crossing_window,
+        interior_near_crossing_window):
     step = float(np.median(np.diff(probability_list)))
-    half_width = max(0.0125, 4.0 * step)
-
-    if pair_35_crossings and pair_57_crossings:
-        crossing_estimates = [
-            pair_35_crossings[0]["crossing_estimate_p"],
-            pair_57_crossings[0]["crossing_estimate_p"],
-        ]
-        center = float(np.mean(crossing_estimates))
-        reason = "both_pairwise_gaps_cross_zero"
-    else:
-        pair_35_min_index = int(np.argmin(np.abs(delta_35_curve)))
-        pair_57_min_index = int(np.argmin(np.abs(delta_57_curve)))
-        center = float(np.mean([
-            probability_list[pair_35_min_index],
-            probability_list[pair_57_min_index],
-        ]))
-        signs_35 = _sign_with_tolerance(delta_35_curve)
-        signs_57 = _sign_with_tolerance(delta_57_curve)
-        location_35 = _classify_crossing_location(signs_35)
-        location_57 = _classify_crossing_location(signs_57)
-        if (
-                location_35 == "left_of_window"
-                and location_57 == "left_of_window"):
-            center = float(probability_list[0] - 4.0 * step)
-            reason = "both_pairwise_gaps_positive_shift_left"
-        elif (
-                location_35 == "right_of_window"
-                and location_57 == "right_of_window"):
-            center = float(probability_list[-1] + 4.0 * step)
-            reason = "both_pairwise_gaps_negative_shift_right"
-        else:
-            reason = "mixed_pairwise_signatures_center_on_min_abs_gap"
-
-    return {
-        "p_min": float(center - half_width),
-        "p_max": float(center + half_width),
-        "step_reference": step,
-        "reason": reason,
-    }
+    if interior_crossing_window is not None:
+        window = dict(interior_crossing_window)
+        window["step_reference"] = step
+        return window
+    if interior_near_crossing_window is not None:
+        window = dict(interior_near_crossing_window)
+        window["step_reference"] = step
+        return window
+    return None
 
 
 def _build_pair_summary(
         probability_list,
         delta_curve,
         pooled_sem_curve,
-        label):
+        label,
+        left_saturation_end_index):
     delta_curve = np.asarray(delta_curve, dtype=np.float64)
     pooled_sem_curve = np.asarray(pooled_sem_curve, dtype=np.float64)
+    pooled_ci95_curve = CI95_Z_SCORE * pooled_sem_curve
     min_abs_index = int(np.argmin(np.abs(delta_curve)))
     sign_array = _sign_with_tolerance(delta_curve)
     crossings = _detect_crossings(probability_list, delta_curve)
+    boundary_crossings = []
+    interior_crossings = []
+    for crossing_entry in crossings:
+        if (
+                left_saturation_end_index >= 0
+                and crossing_entry["right_index"] <= left_saturation_end_index):
+            boundary_crossings.append(crossing_entry)
+        else:
+            interior_crossings.append(crossing_entry)
+    candidate_index_list = [
+        index
+        for index in range(left_saturation_end_index + 1, len(delta_curve))
+        if abs(float(delta_curve[index])) <= float(pooled_ci95_curve[index])
+    ]
+    interior_near_windows = [
+        _window_from_near_group(
+            probability_list=probability_list,
+            delta_curve=delta_curve,
+            index_group=index_group,
+            reason="abs_gap_within_pooled_ci95_interior",
+        )
+        for index_group in _group_consecutive_indices(candidate_index_list)
+    ]
+    if left_saturation_end_index + 1 < len(delta_curve):
+        non_saturated_slice = np.abs(delta_curve[left_saturation_end_index + 1:])
+        non_saturated_min_abs_index = int(
+            np.argmin(non_saturated_slice) + left_saturation_end_index + 1
+        )
+    else:
+        non_saturated_min_abs_index = None
     min_abs_delta_value = float(delta_curve[min_abs_index])
     pooled_sem_at_min_abs = float(pooled_sem_curve[min_abs_index])
     return {
         "pair_label": label,
         "delta_curve": _safe_float_list(delta_curve),
         "pooled_sem_curve": _safe_float_list(pooled_sem_curve),
-        "pooled_ci95_curve": _safe_float_list(CI95_Z_SCORE * pooled_sem_curve),
+        "pooled_ci95_curve": _safe_float_list(pooled_ci95_curve),
         "min_abs_delta_index": min_abs_index,
         "min_abs_delta_p": float(probability_list[min_abs_index]),
         "min_abs_delta_value": min_abs_delta_value,
         "pooled_sem_at_min_abs": pooled_sem_at_min_abs,
-        "secondary_proximity_hit": bool(
-            abs(min_abs_delta_value) <= 2.0 * pooled_sem_at_min_abs
-        ),
-        "sign_flip_detected": bool(len(crossings) > 0),
+        "secondary_proximity_hit": bool(len(interior_near_windows) > 0),
+        "sign_flip_detected": bool(len(interior_crossings) > 0),
         "sign_pattern": [int(value) for value in sign_array.tolist()],
         "crossing_location_classification": (
             _classify_crossing_location(sign_array)
         ),
-        "crossing_intervals": crossings,
+        "crossing_intervals": interior_crossings,
+        "raw_crossing_intervals": crossings,
+        "boundary_crossing_intervals": boundary_crossings,
+        "boundary_artifact_crossing_detected": bool(len(boundary_crossings) > 0),
+        "interior_crossing_intervals": interior_crossings,
+        "interior_sign_flip_detected": bool(len(interior_crossings) > 0),
+        "interior_near_crossing_windows": interior_near_windows,
+        "interior_near_crossing_hit": bool(len(interior_near_windows) > 0),
+        "non_saturated_min_abs_delta_index": non_saturated_min_abs_index,
+        "non_saturated_min_abs_delta_p": (
+            None if non_saturated_min_abs_index is None
+            else float(probability_list[non_saturated_min_abs_index])
+        ),
+        "non_saturated_min_abs_delta_value": (
+            None if non_saturated_min_abs_index is None
+            else float(delta_curve[non_saturated_min_abs_index])
+        ),
+        "right_edge_sign": int(sign_array[-1]),
+        "right_edge_delta": float(delta_curve[-1]),
+        "right_edge_pooled_sem": float(pooled_sem_curve[-1]),
+        "right_edge_pooled_ci95": float(pooled_ci95_curve[-1]),
+        "right_edge_near_hit": bool(
+            abs(float(delta_curve[-1])) <= float(pooled_ci95_curve[-1])
+        ),
     }
 
 
@@ -268,6 +429,8 @@ def _plot_gap_crossing(
         pooled_sem_57_curve,
         pair_35_crossings,
         pair_57_crossings,
+        pair_35_boundary_crossings,
+        pair_57_boundary_crossings,
         code_family,
         syndrome_error_probability,
         output_path):
@@ -348,6 +511,22 @@ def _plot_gap_crossing(
             linewidth=1.0,
             alpha=0.5,
         )
+    for crossing_entry in pair_35_boundary_crossings:
+        bottom_axis.axvline(
+            crossing_entry["crossing_estimate_p"],
+            color="0.45",
+            linestyle=":",
+            linewidth=1.0,
+            alpha=0.5,
+        )
+    for crossing_entry in pair_57_boundary_crossings:
+        bottom_axis.axvline(
+            crossing_entry["crossing_estimate_p"],
+            color="0.65",
+            linestyle=":",
+            linewidth=1.0,
+            alpha=0.5,
+        )
     bottom_axis.set_xlabel("data error probability p")
     bottom_axis.set_ylabel("pairwise gap")
     bottom_axis.grid(True, alpha=0.3)
@@ -425,6 +604,12 @@ def analyze_threshold_crossing(
         num_disorder_samples=num_disorder_samples,
     )
     q_top_ci95_curve_matrix = CI95_Z_SCORE * q_top_sem_curve_matrix
+    saturated_point_flags, left_saturation_end_index = (
+        _build_left_saturation_profile(
+            q_top_curve_matrix=q_top_curve_matrix,
+            q_top_ci95_curve_matrix=q_top_ci95_curve_matrix,
+        )
+    )
 
     delta_35_curve = q_top_curve_matrix[0] - q_top_curve_matrix[1]
     delta_57_curve = q_top_curve_matrix[1] - q_top_curve_matrix[2]
@@ -440,37 +625,61 @@ def analyze_threshold_crossing(
         delta_curve=delta_35_curve,
         pooled_sem_curve=pooled_sem_35_curve,
         label=f"{int(lattice_size_list[0])}-{int(lattice_size_list[1])}",
+        left_saturation_end_index=left_saturation_end_index,
     )
     pair_57_summary = _build_pair_summary(
         probability_list=probability_list,
         delta_curve=delta_57_curve,
         pooled_sem_curve=pooled_sem_57_curve,
         label=f"{int(lattice_size_list[1])}-{int(lattice_size_list[2])}",
+        left_saturation_end_index=left_saturation_end_index,
     )
+    interior_crossing_window = _build_common_crossing_window(
+        pair_35_summary=pair_35_summary,
+        pair_57_summary=pair_57_summary,
+    )
+    interior_near_crossing_window = None
+    if interior_crossing_window is None:
+        interior_near_crossing_window = _build_common_near_crossing_window(
+            pair_35_summary=pair_35_summary,
+            pair_57_summary=pair_57_summary,
+        )
     recommended_window = _build_recommended_window(
         probability_list=probability_list,
-        delta_35_curve=delta_35_curve,
-        delta_57_curve=delta_57_curve,
-        pair_35_crossings=pair_35_summary["crossing_intervals"],
-        pair_57_crossings=pair_57_summary["crossing_intervals"],
+        interior_crossing_window=interior_crossing_window,
+        interior_near_crossing_window=interior_near_crossing_window,
     )
 
-    primary_hit = bool(
-        pair_35_summary["sign_flip_detected"]
-        and pair_57_summary["sign_flip_detected"]
-    )
-    crossing_estimate_list = [
+    raw_crossing_estimate_list = [
         crossing_entry["crossing_estimate_p"]
-        for crossing_entry in pair_35_summary["crossing_intervals"]
-        + pair_57_summary["crossing_intervals"]
+        for crossing_entry in pair_35_summary["raw_crossing_intervals"]
+        + pair_57_summary["raw_crossing_intervals"]
     ]
-    if crossing_estimate_list:
-        crossing_window = {
-            "p_min": float(np.min(crossing_estimate_list)),
-            "p_max": float(np.max(crossing_estimate_list)),
+    if raw_crossing_estimate_list:
+        raw_crossing_window = {
+            "p_min": float(np.min(raw_crossing_estimate_list)),
+            "p_max": float(np.max(raw_crossing_estimate_list)),
         }
     else:
-        crossing_window = None
+        raw_crossing_window = None
+    boundary_saturation_artifact = bool(
+        pair_35_summary["boundary_artifact_crossing_detected"]
+        or pair_57_summary["boundary_artifact_crossing_detected"]
+    )
+    right_edge_gap_signs = {
+        pair_35_summary["pair_label"]: pair_35_summary["right_edge_sign"],
+        pair_57_summary["pair_label"]: pair_57_summary["right_edge_sign"],
+    }
+    right_edge_gap_values = {
+        pair_35_summary["pair_label"]: {
+            "delta": pair_35_summary["right_edge_delta"],
+            "pooled_ci95": pair_35_summary["right_edge_pooled_ci95"],
+        },
+        pair_57_summary["pair_label"]: {
+            "delta": pair_57_summary["right_edge_delta"],
+            "pooled_ci95": pair_57_summary["right_edge_pooled_ci95"],
+        },
+    }
 
     summary = {
         "input_path": str(input_path),
@@ -492,16 +701,33 @@ def analyze_threshold_crossing(
         "q_top_ci95_curve_matrix": [
             _safe_float_list(row) for row in q_top_ci95_curve_matrix
         ],
+        "left_edge_saturated_point_flags": [
+            bool(value) for value in saturated_point_flags.tolist()
+        ],
+        "left_edge_saturation_end_index": int(left_saturation_end_index),
+        "left_edge_saturation_end_p": (
+            None if left_saturation_end_index < 0
+            else float(probability_list[left_saturation_end_index])
+        ),
         "pairwise_gap_analysis": {
             "delta_35": pair_35_summary,
             "delta_57": pair_57_summary,
         },
-        "primary_crossing_window_hit": primary_hit,
+        "pair_labels": [
+            pair_35_summary["pair_label"],
+            pair_57_summary["pair_label"],
+        ],
+        "boundary_saturation_artifact": boundary_saturation_artifact,
+        "primary_crossing_window_hit": bool(interior_crossing_window is not None),
         "secondary_proximity_hit": bool(
-            pair_35_summary["secondary_proximity_hit"]
-            or pair_57_summary["secondary_proximity_hit"]
+            interior_near_crossing_window is not None
         ),
-        "crossing_window": crossing_window,
+        "raw_crossing_window": raw_crossing_window,
+        "crossing_window": interior_crossing_window,
+        "interior_crossing_window": interior_crossing_window,
+        "interior_near_crossing_window": interior_near_crossing_window,
+        "right_edge_gap_signs": right_edge_gap_signs,
+        "right_edge_gap_values": right_edge_gap_values,
         "recommended_server_window": recommended_window,
     }
 
@@ -525,6 +751,8 @@ def analyze_threshold_crossing(
         pooled_sem_57_curve=pooled_sem_57_curve,
         pair_35_crossings=pair_35_summary["crossing_intervals"],
         pair_57_crossings=pair_57_summary["crossing_intervals"],
+        pair_35_boundary_crossings=pair_35_summary["boundary_crossing_intervals"],
+        pair_57_boundary_crossings=pair_57_summary["boundary_crossing_intervals"],
         code_family=code_family,
         syndrome_error_probability=syndrome_error_probability,
         output_path=gap_plot_path,
