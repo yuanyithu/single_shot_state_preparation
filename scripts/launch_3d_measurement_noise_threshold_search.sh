@@ -8,6 +8,8 @@ MASTER_RUN_SUFFIX="${MASTER_RUN_SUFFIX:-}"
 MASTER_RUN_ID="${MASTER_RUN_ID:-3d_toric_measurement_noise_threshold_search_${RUN_TIMESTAMP}${MASTER_RUN_SUFFIX}}"
 REMOTE_COMPUTE_HOST="${REMOTE_COMPUTE_HOST:-nd-1}"
 REMOTE_BASE='/home/DATA1/users/yuany/.single_shot'
+REMOTE_REPO_ROOT="$REMOTE_BASE/repos"
+REMOTE_REPO_DIR="$REMOTE_REPO_ROOT/$MASTER_RUN_ID"
 REMOTE_RUN_ROOT="$REMOTE_BASE/runs/$MASTER_RUN_ID"
 REMOTE_LOG_PATH="$REMOTE_BASE/logs/${MASTER_RUN_ID}.log"
 REMOTE_RUNNER_PATH="$REMOTE_RUN_ROOT/run_3d_measurement_noise_threshold_search.sh"
@@ -83,7 +85,7 @@ resolve_q_and_p_windows() {
 fallback_archive_sync() {
   echo "Syncing local HEAD to ${REMOTE_COMPUTE_HOST} via git archive." >&2
   git -C "$PROJECT_ROOT" archive --format=tar HEAD \
-    | ssh yuany "ssh ${REMOTE_COMPUTE_HOST} 'rm -rf $(quote_arg "$REMOTE_BASE/repo") && mkdir -p $(quote_arg "$REMOTE_BASE/repo") && tar -xf - -C $(quote_arg "$REMOTE_BASE/repo")'"
+    | ssh yuany "ssh ${REMOTE_COMPUTE_HOST} 'mkdir -p $(quote_arg "$REMOTE_REPO_DIR") && tar -xf - -C $(quote_arg "$REMOTE_REPO_DIR")'"
 }
 
 
@@ -100,7 +102,7 @@ set -euo pipefail
 
 export MPLCONFIGDIR=\$HOME/.single_shot/mpl-cache
 export CONDA_NO_PLUGINS=true
-cd $(quote_arg "$REMOTE_BASE/repo")
+cd $(quote_arg "$REMOTE_REPO_DIR")
 
 if command -v python3 >/dev/null 2>&1; then
   q_and_p_windows="\$(python3 -c 'import base64, sys; print(base64.b64decode(sys.argv[1]).decode(), end="")' $(quote_arg "$q_and_p_windows_base64"))"
@@ -214,7 +216,7 @@ launch_remote_runner() {
   runner_tmp="$(mktemp)"
   build_remote_runner_script "$q_and_p_windows_base64" > "$runner_tmp"
 
-  ssh yuany "ssh ${REMOTE_COMPUTE_HOST} 'mkdir -p $(quote_arg "$REMOTE_RUN_ROOT") $(quote_arg "$REMOTE_BASE/logs") $(quote_arg "$REMOTE_BASE/mpl-cache")'"
+  ssh yuany "ssh ${REMOTE_COMPUTE_HOST} 'mkdir -p $(quote_arg "$REMOTE_REPO_DIR") $(quote_arg "$REMOTE_RUN_ROOT") $(quote_arg "$REMOTE_BASE/logs") $(quote_arg "$REMOTE_BASE/mpl-cache")'"
   ssh yuany "ssh ${REMOTE_COMPUTE_HOST} 'cat > $(quote_arg "$REMOTE_RUNNER_PATH")'" < "$runner_tmp"
   ssh yuany "ssh ${REMOTE_COMPUTE_HOST} 'chmod +x $(quote_arg "$REMOTE_RUNNER_PATH") && screen -dmS $(quote_arg "$REMOTE_SCREEN_NAME") bash -lc \"exec $(quote_arg "$REMOTE_RUNNER_PATH") >> $(quote_arg "$REMOTE_LOG_PATH") 2>&1\" && printf \"MASTER_RUN_ID=%s\nREMOTE_COMPUTE_HOST=%s\nSCREEN_NAME=%s\nLOG_PATH=%s\nRUN_ROOT=%s\n\" $(quote_arg "$MASTER_RUN_ID") $(quote_arg "$REMOTE_COMPUTE_HOST") $(quote_arg "$REMOTE_SCREEN_NAME") $(quote_arg "$REMOTE_LOG_PATH") $(quote_arg "$REMOTE_RUN_ROOT")'"
 
