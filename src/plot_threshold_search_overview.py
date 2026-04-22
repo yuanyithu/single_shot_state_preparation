@@ -136,11 +136,19 @@ def _plot_gap_summary(result_list, output_path):
         for item in result_list
     ], dtype=np.float64)
     recommended_p_min_list = np.array([
-        item["summary"]["recommended_server_window"]["p_min"]
+        (
+            item["summary"]["recommended_server_window"]["p_min"]
+            if item["summary"]["recommended_server_window"] is not None
+            else np.nan
+        )
         for item in result_list
     ], dtype=np.float64)
     recommended_p_max_list = np.array([
-        item["summary"]["recommended_server_window"]["p_max"]
+        (
+            item["summary"]["recommended_server_window"]["p_max"]
+            if item["summary"]["recommended_server_window"] is not None
+            else np.nan
+        )
         for item in result_list
     ], dtype=np.float64)
 
@@ -191,13 +199,18 @@ def _plot_gap_summary(result_list, output_path):
         linewidth=1.5,
         label="argmin |L5-L7|",
     )
-    bottom_axis.fill_between(
-        q_value_list,
-        recommended_p_min_list,
-        recommended_p_max_list,
-        alpha=0.2,
-        label="recommended next p window",
+    finite_window_mask = np.isfinite(recommended_p_min_list) & np.isfinite(
+        recommended_p_max_list
     )
+    if np.any(finite_window_mask):
+        bottom_axis.fill_between(
+            q_value_list,
+            recommended_p_min_list,
+            recommended_p_max_list,
+            where=finite_window_mask,
+            alpha=0.2,
+            label="recommended next p window",
+        )
     bottom_axis.set_title(
         "Recommended next windows: "
         f"measurement error q in [{q_value_list[0]:0.4f}, "

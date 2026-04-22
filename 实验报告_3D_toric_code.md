@@ -544,3 +544,179 @@ L=5 chunk 约 154~164s
   - `nd-3`: `q = [0.0200, 0.0400]`
 - Stage A 产物回收后，按每个 `q` 的 `threshold_summary.json`
   进入自适应 Stage B。
+
+## 2026-04-22 20:10 3D toric `q>0` Stage A broad scout 回收、重绘与分析
+
+摘要：
+- 做什么：回收 `nd-1/nd-2/nd-3` 的 3D measurement-noise Stage A broad scout，全量下载数据与日志，在本地统一重绘 overview 并汇总判据。
+- 结论：这轮 `q = 0.0010 ~ 0.0400` 没有任何一个点出现可信的三尺寸共同 interior crossing；`q=0.0200` 和 `q=0.0400` 只出现 secondary proximity，仍不足以宣称 finite threshold。
+- 看图：[measurement_noise_threshold_search_gap_summary.png](data/3d_toric_code/with_measurement_noise/measurement_noise_threshold_search_stageA_20260422_165518/measurement_noise_threshold_search_gap_summary.png)
+
+### 运行与回收信息
+
+- 远端 run root：
+  - `nd-1`
+    - `/home/DATA1/users/yuany/.single_shot/runs/3d_toric_measurement_noise_threshold_search_20260422_165518_stageA_nd1/`
+  - `nd-2`
+    - `/home/DATA1/users/yuany/.single_shot/runs/3d_toric_measurement_noise_threshold_search_20260422_165518_stageA_nd2/`
+  - `nd-3`
+    - `/home/DATA1/users/yuany/.single_shot/runs/3d_toric_measurement_noise_threshold_search_20260422_165518_stageA_nd3/`
+- 本地统一归档目录：
+  - `data/3d_toric_code/with_measurement_noise/measurement_noise_threshold_search_stageA_20260422_165518/`
+- 本地归档包含：
+  - 六个 `q_*` 子目录
+  - `measurement_noise_threshold_search_sem95_overview.png`
+  - `measurement_noise_threshold_search_gap_summary.png`
+  - `measurement_noise_threshold_search_summary.json`
+  - `nd1_stageA.log`
+  - `nd2_stageA.log`
+  - `nd3_stageA.log`
+
+### 统一参数
+
+- `code_family = 3d_toric`
+- `L = [3,4,5]`
+- `p = 0.04, 0.06, ..., 0.28`
+- `q = [0.0010, 0.0025, 0.0050, 0.0100, 0.0200, 0.0400]`
+- 每个 `(L,p,q)`：
+  - `num_disorder_samples_total = 256`
+  - `chunk_size = 16`
+  - `num_chunks_per_point = 16`
+  - `num_burn_in_sweeps = 1200`
+  - `num_sweeps_between_measurements = 6`
+  - `num_measurements_per_disorder = 240`
+  - `burn_in_scaling_reference_num_qubits = 18`
+  - `common_random_disorder_across_p = true`
+- workers：
+  - `nd-1 = 48`
+  - `nd-2 = 48`
+  - `nd-3 = 96`
+
+### 完成情况
+
+- 三个 host 的主扫描都完整完成：
+  - 每个 `q` 都是 `completed=624, failed=0, pending=0`
+  - 六个 `q` 子目录都包含 merged `npz`、默认图、`sem95` 图、`gap_crossing` 图和 `threshold_summary.json`
+- 远端 `nd-3` 的 host-level overview 正常生成。
+- 远端 `nd-1` / `nd-2` 在 host-level overview 步骤失败，但不是采样失败。
+  - 原因是旧版 `plot_threshold_search_overview.py` 假设每个 `q` 都有
+    `recommended_server_window`
+  - 对 `recommended_server_window = null` 的 `q` 会抛出 `TypeError`
+  - 已在本地修复此脚本并成功重绘 Stage A 总览图
+
+### 本地重绘与汇总产物
+
+- 总览图：
+  - `data/3d_toric_code/with_measurement_noise/measurement_noise_threshold_search_stageA_20260422_165518/measurement_noise_threshold_search_sem95_overview.png`
+  - `data/3d_toric_code/with_measurement_noise/measurement_noise_threshold_search_stageA_20260422_165518/measurement_noise_threshold_search_gap_summary.png`
+- 汇总表：
+  - `data/3d_toric_code/with_measurement_noise/measurement_noise_threshold_search_stageA_20260422_165518/measurement_noise_threshold_search_summary.json`
+
+### 各 `q` 的核心判据
+
+```text
+q=0.0010
+  boundary_saturation_artifact = true
+  primary_crossing_window_hit  = false
+  secondary_proximity_hit      = false
+  recommended_server_window    = null
+  right_edge_gap_signs         = {3-4: 0, 4-5: 0}
+
+q=0.0025
+  boundary_saturation_artifact = false
+  primary_crossing_window_hit  = false
+  secondary_proximity_hit      = false
+  recommended_server_window    = null
+  right_edge_gap_signs         = {3-4: +1, 4-5: -1}
+
+q=0.0050
+  boundary_saturation_artifact = true
+  primary_crossing_window_hit  = false
+  secondary_proximity_hit      = false
+  recommended_server_window    = null
+  right_edge_gap_signs         = {3-4: -1, 4-5: 0}
+
+q=0.0100
+  boundary_saturation_artifact = true
+  primary_crossing_window_hit  = false
+  secondary_proximity_hit      = false
+  recommended_server_window    = null
+  right_edge_gap_signs         = {3-4: +1, 4-5: -1}
+
+q=0.0200
+  boundary_saturation_artifact = false
+  primary_crossing_window_hit  = false
+  secondary_proximity_hit      = true
+  recommended_server_window    ≈ [0.0400, 0.0693]
+  right_edge_gap_signs         = {3-4: +1, 4-5: +1}
+
+q=0.0400
+  boundary_saturation_artifact = false
+  primary_crossing_window_hit  = false
+  secondary_proximity_hit      = true
+  recommended_server_window    ≈ [0.0400, 0.1400]
+  right_edge_gap_signs         = {3-4: +1, 4-5: +1}
+```
+
+### 端点行为
+
+- 用 merged `npz` 直接检查窗口两端与中点，可见：
+
+```text
+q=0.0010
+  p=0.04  -> [1.0000, 1.0000, 1.0000]
+  p=0.16  -> [1.0000, 1.0000, 1.0000]
+  p=0.28  -> [1.0000, 1.0000, 1.0000]
+
+q=0.0200
+  p=0.04  -> [0.9983, 0.9964, 0.9923]
+  p=0.16  -> [0.9923, 0.9944, 0.9771]
+  p=0.28  -> [0.9904, 0.9903, 0.9750]
+
+q=0.0400
+  p=0.04  -> [0.9901, 0.9782, 0.9743]
+  p=0.16  -> [0.9560, 0.9301, 0.9021]
+  p=0.28  -> [0.9059, 0.8971, 0.8355]
+```
+
+- 因而当前 Stage A 给出的图景是：
+  - 极小 `q` 端：
+    - `q=0.0010` 完全落在饱和平台上
+    - `q=0.0025, 0.0050, 0.0100` 仍然强烈受平台/边界伪 crossing 影响
+    - 这几组数据当前不足以定位真实 threshold 窗口
+  - 中等 `q` 端：
+    - `q=0.0200` 已开始离开完美平台
+    - `L3-L4` 出现 interior sign flip，但 `L4-L5` 仍未共同过零
+    - `q=0.0400` 没有 sign flip，只是两对 gap 在一段窗口内落入 pooled CI95
+
+### 本轮判断
+
+- 按预先设定的主判据，这轮 Stage A 的结论是：
+  - 六个 `q` 都**没有**出现可信的三尺寸共同 interior crossing
+  - 因而目前**不能**宣称 3D `q>0` 已观察到 finite threshold
+- 其中最值得继续跟进的是：
+  - `q=0.0200`
+    - 已出现 secondary proximity
+    - 且推荐窗口最窄，优先级最高
+  - `q=0.0400`
+    - 也有 secondary proximity
+    - 但当前更像“接近”而非真正 crossing
+- 对 `q≤0.0100`：
+  - 当前 Stage A 窗口主要给出的是平台饱和或边界伪 crossing
+  - 暂时不能据此判定“有 threshold”或“无 threshold”
+
+### 下一步建议
+
+- 若继续按原计划进入 Stage B，自适应细扫的优先顺序应改为：
+  - 第一优先级：`q=0.0200`
+    - 细扫 `p ≈ 0.0400 ~ 0.0700`
+    - 步长 `0.005`
+    - `num_disorder_samples_total = 512`
+  - 第二优先级：`q=0.0400`
+    - 细扫 `p ≈ 0.0400 ~ 0.1400`
+    - 但这段窗口较宽，建议先压缩到
+      `0.06, 0.08, ..., 0.14` 试跑一轮再决定是否 deep
+- 对 `q = 0.0010, 0.0025, 0.0050, 0.0100`：
+  - 先不要直接开 deep
+  - 更合理的是先重做一轮更有判别力的 scout，再决定窗口该左移还是右移
+  - 否则很容易被平台饱和与边界零 gap 误导
