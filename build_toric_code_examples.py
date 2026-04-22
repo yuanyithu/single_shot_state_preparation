@@ -17,6 +17,9 @@
 import numpy as np
 
 
+SUPPORTED_CODE_FAMILIES = ("2d_toric", "3d_toric")
+
+
 # =========================================================
 # 2D toric code  (L × L torus)
 # =========================================================
@@ -282,6 +285,128 @@ def build_3d_toric_code(lattice_size):
         dual_logical_z_basis[2, edge_qubit(2, 0, 0, k)] = True
 
     return parity_check_matrix, dual_logical_z_basis
+
+
+def build_3d_toric_zero_syndrome_move_data(lattice_size):
+    """
+    为 3D toric code 构造 q=0 采样所需的几何零-syndrome move。
+
+    输出：
+      zero_syndrome_move_data: dict
+        "contractible_moves":
+            np.ndarray，shape (L^3, 3L^3)，dtype=bool
+            每行是一个 3D vertex-star 型局部 move，weight 固定为 6
+        "winding_moves":
+            np.ndarray，shape (3L, 3L^3)，dtype=bool
+            依次为 x/y/z 三个方向的非平凡 winding sheet family，
+            每个 move 的 weight 固定为 L^2
+        "start_sector_generators":
+            np.ndarray，shape (3, 3L^3)，dtype=bool
+            三条独立的非平凡 kernel loop，用于生成 8 个 q=0 合法初态
+    """
+    parity_check_matrix, _ = build_3d_toric_code(lattice_size)
+
+    L = lattice_size
+    L_cubed = L * L * L
+    num_qubits = 3 * L_cubed
+    num_vertices = L_cubed
+
+    def edge_qubit(edge_type_index, i, j, k):
+        return edge_type_index * L_cubed + (i * L + j) * L + k
+
+    contractible_moves = np.zeros((num_vertices, num_qubits), dtype=bool)
+    for i in range(L):
+        for j in range(L):
+            for k in range(L):
+                vertex_index = (i * L + j) * L + k
+                i_prev = (i - 1) % L
+                j_prev = (j - 1) % L
+                k_prev = (k - 1) % L
+
+                contractible_moves[vertex_index, edge_qubit(0, i, j, k)] = True
+                contractible_moves[vertex_index, edge_qubit(0, i_prev, j, k)] = True
+                contractible_moves[vertex_index, edge_qubit(1, i, j, k)] = True
+                contractible_moves[vertex_index, edge_qubit(1, i, j_prev, k)] = True
+                contractible_moves[vertex_index, edge_qubit(2, i, j, k)] = True
+                contractible_moves[vertex_index, edge_qubit(2, i, j, k_prev)] = True
+
+    winding_moves = np.zeros((3 * L, num_qubits), dtype=bool)
+
+    for i in range(L):
+        for j in range(L):
+            for k in range(L):
+                winding_moves[i, edge_qubit(0, i, j, k)] = True
+
+    y_offset = L
+    for j in range(L):
+        winding_index = y_offset + j
+        for i in range(L):
+            for k in range(L):
+                winding_moves[winding_index, edge_qubit(1, i, j, k)] = True
+
+    z_offset = 2 * L
+    for k in range(L):
+        winding_index = z_offset + k
+        for i in range(L):
+            for j in range(L):
+                winding_moves[winding_index, edge_qubit(2, i, j, k)] = True
+
+    start_sector_generators = np.stack(
+        (
+            winding_moves[0],
+            winding_moves[y_offset],
+            winding_moves[z_offset],
+        ),
+        axis=0,
+    )
+
+    parity_check_matrix_uint8 = parity_check_matrix.astype(np.uint8)
+    contractible_syndrome_bits = (
+        parity_check_matrix_uint8 @ contractible_moves.T.astype(np.uint8)
+    ) % 2
+    winding_syndrome_bits = (
+        parity_check_matrix_uint8 @ winding_moves.T.astype(np.uint8)
+    ) % 2
+    assert not np.any(contractible_syndrome_bits), (
+        "contractible 3D q=0 moves must lie in ker(H_Z)"
+    )
+    assert not np.any(winding_syndrome_bits), (
+        "winding 3D q=0 moves must lie in ker(H_Z)"
+    )
+    assert np.all(contractible_moves.sum(axis=1) == 6), (
+        "contractible 3D q=0 moves must have weight 6"
+    )
+    assert np.all(winding_moves.sum(axis=1) == lattice_size * lattice_size), (
+        "winding 3D q=0 moves must have weight L^2"
+    )
+
+    return {
+        "contractible_moves": contractible_moves,
+        "winding_moves": winding_moves,
+        "start_sector_generators": start_sector_generators,
+    }
+
+
+def build_toric_code_by_family(code_family, lattice_size):
+    if code_family == "2d_toric":
+        return build_2d_toric_code(lattice_size)
+    if code_family == "3d_toric":
+        return build_3d_toric_code(lattice_size)
+    raise ValueError(
+        f"Unsupported code_family={code_family!r}; "
+        f"expected one of {SUPPORTED_CODE_FAMILIES}"
+    )
+
+
+def build_zero_syndrome_move_data_by_family(code_family, lattice_size):
+    if code_family == "2d_toric":
+        return build_2d_toric_zero_syndrome_move_data(lattice_size)
+    if code_family == "3d_toric":
+        return build_3d_toric_zero_syndrome_move_data(lattice_size)
+    raise ValueError(
+        f"Unsupported code_family={code_family!r}; "
+        f"expected one of {SUPPORTED_CODE_FAMILIES}"
+    )
 
 
 # =========================================================
