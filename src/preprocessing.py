@@ -1,6 +1,9 @@
 import numpy as np
 
-from build_toric_code_examples import build_2d_toric_code
+from build_toric_code_examples import (
+    build_2d_toric_code,
+    build_3d_toric_code,
+)
 from linear_section import (
     apply_linear_section,
     apply_linear_section_transpose,
@@ -88,25 +91,21 @@ def build_logical_observable_masks(
     return logical_observable_masks
 
 
-if __name__ == "__main__":
-    lattice_size = 3
-    random_number_generator = np.random.default_rng(0)
-
-    # Step 1: 通过 builder 获取 H_Z 和 dual logical Z 基
-    parity_check_matrix, dual_logical_z_basis = build_2d_toric_code(
-        lattice_size=lattice_size
-    )
-
-    # Step 2: 构造并验证 linear section
+def _run_preprocessing_self_check(
+        code_family_name,
+        parity_check_matrix,
+        dual_logical_z_basis,
+        lattice_size,
+        seed):
+    random_number_generator = np.random.default_rng(seed)
     linear_section_data = build_linear_section(parity_check_matrix)
     verify_linear_section(
         parity_check_matrix,
         linear_section_data,
         num_random_tests=20,
-        rng=np.random.default_rng(1),
+        rng=np.random.default_rng(seed + 1),
     )
 
-    # Step 3: 预处理结果
     checks_touching_each_qubit = build_checks_touching_each_qubit(
         parity_check_matrix
     )
@@ -116,7 +115,6 @@ if __name__ == "__main__":
         linear_section_data,
     )
 
-    # Step 4(A): 邻接表必须和按列直接取 nonzero 的结果一致
     num_qubits = parity_check_matrix.shape[1]
     for qubit_index in range(num_qubits):
         expected_touching_checks = np.flatnonzero(
@@ -125,9 +123,8 @@ if __name__ == "__main__":
         assert np.array_equal(
             checks_touching_each_qubit[qubit_index],
             expected_touching_checks,
-        ), f"邻接表错误: qubit_index={qubit_index}"
+        ), f"{code_family_name} 邻接表错误: qubit_index={qubit_index}"
 
-    # Step 4(B): 检查 Λ_u 与 z_bar_u 的 gauge 等价性
     num_logical_qubits = dual_logical_z_basis.shape[0]
     num_masks = logical_observable_masks.shape[0]
     parity_check_matrix_uint8 = parity_check_matrix.astype(np.uint8)
@@ -169,12 +166,47 @@ if __name__ == "__main__":
                 )
             )
             assert logical_observable_parity == logical_z_parity, (
-                "逻辑观测量掩码 gauge 等价性失败: "
+                f"{code_family_name} 逻辑观测量掩码 gauge 等价性失败: "
                 f"mask_index={mask_index}"
             )
 
-    # Step 5: 打印关键规模和每个 mask 的 Hamming weight
     mask_hamming_weights = logical_observable_masks.astype(np.int32).sum(axis=1)
-    print(f"num_logical_qubits: {num_logical_qubits}")
-    print(f"logical_observable_masks.shape: {logical_observable_masks.shape}")
-    print(f"mask_hamming_weights: {mask_hamming_weights}")
+    print(
+        f"{code_family_name} L={lattice_size}: "
+        f"num_logical_qubits={num_logical_qubits}, "
+        f"logical_observable_masks.shape={logical_observable_masks.shape}, "
+        f"mask_hamming_weights={mask_hamming_weights}"
+    )
+
+
+if __name__ == "__main__":
+    parity_check_matrix_2d, dual_logical_z_basis_2d = build_2d_toric_code(
+        lattice_size=3
+    )
+    parity_check_matrix_3d_l2, dual_logical_z_basis_3d_l2 = (
+        build_3d_toric_code(lattice_size=2)
+    )
+    parity_check_matrix_3d_l3, dual_logical_z_basis_3d_l3 = (
+        build_3d_toric_code(lattice_size=3)
+    )
+    _run_preprocessing_self_check(
+        code_family_name="2D toric",
+        parity_check_matrix=parity_check_matrix_2d,
+        dual_logical_z_basis=dual_logical_z_basis_2d,
+        lattice_size=3,
+        seed=0,
+    )
+    _run_preprocessing_self_check(
+        code_family_name="3D toric",
+        parity_check_matrix=parity_check_matrix_3d_l2,
+        dual_logical_z_basis=dual_logical_z_basis_3d_l2,
+        lattice_size=2,
+        seed=10,
+    )
+    _run_preprocessing_self_check(
+        code_family_name="3D toric",
+        parity_check_matrix=parity_check_matrix_3d_l3,
+        dual_logical_z_basis=dual_logical_z_basis_3d_l3,
+        lattice_size=3,
+        seed=20,
+    )

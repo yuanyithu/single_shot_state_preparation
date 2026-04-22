@@ -1,6 +1,6 @@
 # 实验报告：3D Toric Code
 
-按是否考虑 measurement noise 重排原始实验记录；当前仅有 `q=0` 相关实验。
+按是否考虑 measurement noise 重排原始实验记录。
 
 ## Without Measurement Noise
 
@@ -443,6 +443,112 @@ num_disorder_samples_total = 1024
   `q=0` 数据当作后续 `q>0` 搜索的 calibration 基线。
 
 ## With Measurement Noise
+
+> 2026-04-22 审核说明：
+> 本节 16:52 和 20:10 两轮 3D `q>0` 旧结果已判定失效。
+> 根因不是 plotting，而是旧 `q>0` sampler 只做单比特更新、没有混入 zero-syndrome move，
+> 导致低 `q` 时链冻结在局部 sector，`q_top` 被假性顶到接近 `1`。
+> 对应本地目录
+> `data/3d_toric_code/with_measurement_noise/measurement_noise_threshold_scout_local/precheck_20260422/`
+> 与
+> `data/3d_toric_code/with_measurement_noise/measurement_noise_threshold_search_stageA_20260422_165518/`
+> 已删除，不再作为任何物理结论的依据。
+
+## 2026-04-22 3D toric `q>0` 回归排查、sampler 修复与失效数据清理
+
+摘要：
+- 做什么：按 “3D exact regression → 单步 acceptance 对拍 → `q→0` continuity → 3D mask/section 自检” 的顺序排查 3D `q>0` 异常。
+- 结论：定位到旧 `q>0` 路径的核心问题是采样核不完整，不是单步 acceptance 公式错误。修复后，3D `L=2` 的 9 个 `q>0` exact-vs-MCMC 点全部通过；旧预检与 Stage A 数据已删除。
+
+### 本轮代码变更
+
+- `src/exact_enumeration.py`
+  - exact 枚举改为分块/流式实现，支持 3D `L=2` 的 `24` qubit 小系统
+  - 新增 3D `q>0` exact-vs-MCMC 回归：
+    - `q ∈ {1e-3, 1e-2, 4e-2}`
+    - `p ∈ {0.05, 0.15, 0.25}`
+  - 输出并校验：
+    - `m_u`
+    - `q_top`
+    - `logZ`
+    - posterior normalization `sum(exp(logw-logZ))`
+  - 新增 `q→0` continuity 诊断
+- `src/main.py`
+  - 抽出单比特 `log_acceptance` 计算
+  - 新增 `q>0` 单步 acceptance brute-force 对拍
+  - `q>0` 采样路径改为 hybrid sweep：
+    - 保留单比特更新
+    - 额外混入 zero-syndrome move
+  - 生产路径现在对 `q>0` 也会预构造 `zero_syndrome_move_data`
+- `src/preprocessing.py`
+  - 自检入口扩展到 3D `L=2` / `L=3`
+  - 明确覆盖：
+    - `H_Z r(σ) = σ`
+    - 转置关系
+    - logical mask 与 gauge-fixed representative 奇偶一致
+
+### 关键回归结果
+
+- `conda run -n 12 python src/exact_enumeration.py`
+  - 旧 2D `Test 1/2/3/4` 全通过
+  - `q>0` 单比特 brute-force local ratio test 全通过
+  - 3D `L=2` 的 9 个 `q>0` exact-vs-MCMC 点全通过
+  - 典型修复前后对比：
+
+```text
+旧 sampler, L=2, p=0.15, q=0.001:
+  exact q_top = 0.266864
+  mcmc  q_top = 1.000000
+
+修复后:
+  exact q_top = 0.266864
+  mcmc  q_top = 0.265142
+```
+
+- `conda run -n 12 python src/mcmc.py`
+  - 旧有 cache consistency / infinite-temperature / low-temperature / realistic smoke 全通过
+- `conda run -n 12 python src/preprocessing.py`
+  - 2D 与 3D `L=2,3` 的 linear section / logical mask 自检全通过
+
+### 根因判断
+
+- 单步 acceptance 公式本身没有错。
+- 真正的问题是：
+  - 旧 `q>0` 路径只做单比特 flip
+  - 在低 `q` 区域，链会被 syndrome 罚项卡死在某个固定 `H_Z c` sector
+  - 尤其 3D 小系统 exact regression 里，旧链会直接停在 `m_u = 1`
+  - 这不是 posterior 本身，而是采样核缺少沿 `ker(H_Z)` 的零-syndrome 混合
+- 修复方式是对 `q>0` 也混入 zero-syndrome move，使链能在固定 syndrome contour 内移动。
+
+### `q→0` continuity 诊断
+
+固定同一 disorder、`L=2`、`p=0.15`、同一 seed family 后：
+
+```text
+q=0      -> q_top = 0.381102
+q=1e-6   -> q_top = 0.386342
+q=1e-4   -> q_top = 0.386342
+q=1e-3   -> q_top = 0.386342
+```
+
+- `q=1e-6` 与 `q=0` 已连续接近，不再出现旧路径那种“刚离开 0 就直接顶到 1”的假信号。
+
+### 失效数据清理
+
+- 已删除：
+  - `data/3d_toric_code/with_measurement_noise/measurement_noise_threshold_scout_local/precheck_20260422/`
+  - `data/3d_toric_code/with_measurement_noise/measurement_noise_threshold_search_stageA_20260422_165518/`
+- 删除原因：
+  - 它们全部来自修复前的旧 `q>0` sampler
+  - 已被 exact regression 证明会在低 `q` 区域产生系统性假性高 `q_top`
+
+### 后续建议
+
+- 不要继续使用旧 Stage A 图做任何 threshold 判读。
+- 下一步应基于修复后的 hybrid sampler 重新做：
+  - 本地轻量预检
+  - 远端 3D `q>0` Stage A broad scout
+- 在新一轮远端扫描前，应把 `src/exact_enumeration.py` 作为 preflight 必跑项保留。
 
 ## 2026-04-22 16:52 3D toric `q>0` 管线接入与本地预检
 

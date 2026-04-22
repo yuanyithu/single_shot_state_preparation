@@ -69,6 +69,40 @@ def _attempt_single_bit_metropolis_update_safe(
     关键差异：当某一项的 delta_weight == 0 时，直接跳过该项，避免
     0 * (+/-inf) 产生 nan。
     """
+    log_acceptance = _compute_single_bit_log_acceptance(
+        current_data_term_bits=current_data_term_bits,
+        current_syndrome_term_bits=current_syndrome_term_bits,
+        qubit_index=qubit_index,
+        checks_touching_each_qubit=checks_touching_each_qubit,
+        log_odds_data=log_odds_data,
+        log_odds_syndrome=log_odds_syndrome,
+    )
+
+    if log_acceptance >= 0.0:
+        accepted = True
+    else:
+        accepted = bool(rng.random() < np.exp(log_acceptance))
+
+    if not accepted:
+        return False
+
+    touched_checks = checks_touching_each_qubit[qubit_index]
+    current_chain_bits[qubit_index] ^= True
+    current_data_term_bits[qubit_index] ^= True
+    current_syndrome_term_bits[touched_checks] ^= True
+    return True
+
+
+def _compute_single_bit_log_acceptance(
+        current_data_term_bits,
+        current_syndrome_term_bits,
+        qubit_index,
+        checks_touching_each_qubit,
+        log_odds_data,
+        log_odds_syndrome):
+    """
+    计算翻转单个 qubit 的 Metropolis 对数接受率。
+    """
     touched_checks = checks_touching_each_qubit[qubit_index]
 
     if current_data_term_bits[qubit_index]:
@@ -88,19 +122,143 @@ def _attempt_single_bit_metropolis_update_safe(
         log_acceptance += delta_data_weight * log_odds_data
     if delta_syndrome_weight != 0:
         log_acceptance += delta_syndrome_weight * log_odds_syndrome
+    return float(log_acceptance)
 
-    if log_acceptance >= 0.0:
-        accepted = True
-    else:
-        accepted = bool(rng.random() < np.exp(log_acceptance))
 
-    if not accepted:
-        return False
+def _compute_total_log_weight(
+        current_chain_bits,
+        disorder_data_error_bits,
+        observed_syndrome_bits,
+        parity_check_matrix,
+        log_odds_data,
+        log_odds_syndrome):
+    """
+    用完整权重重算当前链的非规范化对数后验，供诊断测试对拍。
+    """
+    data_weight = int(
+        np.count_nonzero(current_chain_bits ^ disorder_data_error_bits)
+    )
+    syndrome_bits = (
+        parity_check_matrix.astype(np.uint8)
+        @ current_chain_bits.astype(np.uint8)
+    ) % 2
+    syndrome_weight = int(
+        np.count_nonzero(syndrome_bits.astype(bool) ^ observed_syndrome_bits)
+    )
+    return float(
+        data_weight * log_odds_data
+        + syndrome_weight * log_odds_syndrome
+    )
 
-    current_chain_bits[qubit_index] ^= True
-    current_data_term_bits[qubit_index] ^= True
-    current_syndrome_term_bits[touched_checks] ^= True
-    return True
+
+def run_q_positive_single_bit_acceptance_bruteforce_test(
+        parity_check_matrix,
+        checks_touching_each_qubit,
+        syndrome_error_probability,
+        data_error_probability,
+        rng,
+        num_random_cases=256,
+        atol=1e-12):
+    """
+    对拍 q>0 单比特更新的 log_acceptance 与暴力总权重差值。
+    """
+    if syndrome_error_probability <= 0.0:
+        raise ValueError(
+            "run_q_positive_single_bit_acceptance_bruteforce_test requires q>0"
+        )
+    if data_error_probability <= 0.0:
+        raise ValueError(
+            "run_q_positive_single_bit_acceptance_bruteforce_test requires p>0"
+        )
+
+    num_checks, num_qubits = parity_check_matrix.shape
+    log_odds_data = _compute_log_odds(data_error_probability)
+    log_odds_syndrome = _compute_log_odds(syndrome_error_probability)
+    matched_zero_delta_syndrome_case = False
+
+    for case_index in range(num_random_cases):
+        current_chain_bits = rng.integers(0, 2, size=num_qubits).astype(bool)
+        disorder_data_error_bits = (
+            rng.random(num_qubits) < data_error_probability
+        )
+        observed_syndrome_bits = (
+            rng.random(num_checks) < syndrome_error_probability
+        )
+        current_data_term_bits = (
+            current_chain_bits ^ disorder_data_error_bits
+        )
+        current_syndrome_term_bits = (
+            (
+                parity_check_matrix.astype(np.uint8)
+                @ current_chain_bits.astype(np.uint8)
+            ) % 2
+        ).astype(bool) ^ observed_syndrome_bits
+        qubit_index = int(rng.integers(0, num_qubits))
+
+        touched_checks = checks_touching_each_qubit[qubit_index]
+        delta_syndrome_weight = 0
+        for check_index in touched_checks:
+            if current_syndrome_term_bits[check_index]:
+                delta_syndrome_weight -= 1
+            else:
+                delta_syndrome_weight += 1
+        if delta_syndrome_weight == 0:
+            matched_zero_delta_syndrome_case = True
+
+        implementation_log_acceptance = _compute_single_bit_log_acceptance(
+            current_data_term_bits=current_data_term_bits,
+            current_syndrome_term_bits=current_syndrome_term_bits,
+            qubit_index=qubit_index,
+            checks_touching_each_qubit=checks_touching_each_qubit,
+            log_odds_data=log_odds_data,
+            log_odds_syndrome=log_odds_syndrome,
+        )
+        flipped_chain_bits = current_chain_bits.copy()
+        flipped_chain_bits[qubit_index] ^= True
+        brute_force_log_acceptance = (
+            _compute_total_log_weight(
+                current_chain_bits=flipped_chain_bits,
+                disorder_data_error_bits=disorder_data_error_bits,
+                observed_syndrome_bits=observed_syndrome_bits,
+                parity_check_matrix=parity_check_matrix,
+                log_odds_data=log_odds_data,
+                log_odds_syndrome=log_odds_syndrome,
+            )
+            - _compute_total_log_weight(
+                current_chain_bits=current_chain_bits,
+                disorder_data_error_bits=disorder_data_error_bits,
+                observed_syndrome_bits=observed_syndrome_bits,
+                parity_check_matrix=parity_check_matrix,
+                log_odds_data=log_odds_data,
+                log_odds_syndrome=log_odds_syndrome,
+            )
+        )
+        if not np.isclose(
+                implementation_log_acceptance,
+                brute_force_log_acceptance,
+                atol=atol,
+                rtol=0.0):
+            raise AssertionError(
+                "q>0 single-bit log_acceptance mismatch: "
+                f"case_index={case_index}, qubit_index={qubit_index}, "
+                f"delta_syndrome_weight={delta_syndrome_weight}, "
+                f"implementation={implementation_log_acceptance:.16e}, "
+                f"bruteforce={brute_force_log_acceptance:.16e}"
+            )
+
+    if not matched_zero_delta_syndrome_case:
+        raise AssertionError(
+            "q>0 single-bit brute-force test did not hit delta_syndrome_weight=0"
+        )
+
+    return {
+        "num_random_cases": int(num_random_cases),
+        "syndrome_error_probability": float(syndrome_error_probability),
+        "data_error_probability": float(data_error_probability),
+        "matched_zero_delta_syndrome_case": (
+            matched_zero_delta_syndrome_case
+        ),
+    }
 
 
 def _run_one_sweep_safe(
@@ -328,6 +486,15 @@ def _count_zero_syndrome_proposals(
     return kernel_basis.shape[0]
 
 
+def _has_zero_syndrome_proposals(
+        zero_syndrome_move_data=None,
+        kernel_basis=None):
+    return _count_zero_syndrome_proposals(
+        zero_syndrome_move_data=zero_syndrome_move_data,
+        kernel_basis=kernel_basis,
+    ) > 0
+
+
 def _run_one_zero_syndrome_sweep(
         current_chain_bits,
         current_data_term_bits,
@@ -456,10 +623,7 @@ def _run_single_disorder_measurement(
         log_odds_data = _compute_log_odds(data_error_probability)
     if log_odds_syndrome is None:
         log_odds_syndrome = _compute_log_odds(syndrome_error_probability)
-    if (
-            syndrome_error_probability == 0.0
-            and zero_syndrome_move_data is None
-            and kernel_basis is None):
+    if zero_syndrome_move_data is None and kernel_basis is None:
         linear_section_data = build_linear_section(parity_check_matrix)
         kernel_basis = _build_kernel_basis_from_linear_section(
             parity_check_matrix=parity_check_matrix,
@@ -493,6 +657,10 @@ def _run_single_disorder_measurement(
         zero_syndrome_move_data=zero_syndrome_move_data,
         kernel_basis=kernel_basis,
     )
+    use_hybrid_zero_syndrome_sweeps = _has_zero_syndrome_proposals(
+        zero_syndrome_move_data=zero_syndrome_move_data,
+        kernel_basis=kernel_basis,
+    )
 
     for _ in range(num_burn_in_sweeps):
         if syndrome_error_probability == 0.0:
@@ -514,6 +682,15 @@ def _run_single_disorder_measurement(
                 log_odds_syndrome=log_odds_syndrome,
                 rng=rng,
             )
+            if use_hybrid_zero_syndrome_sweeps:
+                _run_one_zero_syndrome_sweep(
+                    current_chain_bits=current_chain_bits,
+                    current_data_term_bits=current_data_term_bits,
+                    log_odds_data=log_odds_data,
+                    rng=rng,
+                    zero_syndrome_move_data=zero_syndrome_move_data,
+                    kernel_basis=kernel_basis,
+                )
 
     num_masks = logical_observable_masks.shape[0]
     logical_observable_sum_values = np.zeros(num_masks, dtype=np.int64)
@@ -543,6 +720,16 @@ def _run_single_disorder_measurement(
                     rng=rng,
                 )
                 total_attempted_count += num_qubits
+                if use_hybrid_zero_syndrome_sweeps:
+                    total_accepted_count += _run_one_zero_syndrome_sweep(
+                        current_chain_bits=current_chain_bits,
+                        current_data_term_bits=current_data_term_bits,
+                        log_odds_data=log_odds_data,
+                        rng=rng,
+                        zero_syndrome_move_data=zero_syndrome_move_data,
+                        kernel_basis=kernel_basis,
+                    )
+                    total_attempted_count += num_zero_syndrome_proposals
 
         accumulate_logical_observables(
             current_chain_bits=current_chain_bits,
@@ -585,7 +772,7 @@ def run_disorder_average_simulation(
         linear_section_data=linear_section_data,
     )
     kernel_basis = None
-    if syndrome_error_probability == 0.0 and zero_syndrome_move_data is None:
+    if zero_syndrome_move_data is None:
         kernel_basis = _build_kernel_basis_from_linear_section(
             parity_check_matrix=parity_check_matrix,
             linear_section_data=linear_section_data,
@@ -958,12 +1145,10 @@ def _run_single_scan_point_task(task_data):
         code_family=code_family,
         lattice_size=lattice_size,
     )
-    zero_syndrome_move_data = None
-    if syndrome_error_probability == 0.0:
-        zero_syndrome_move_data = build_zero_syndrome_move_data_by_family(
-            code_family=code_family,
-            lattice_size=lattice_size,
-        )
+    zero_syndrome_move_data = build_zero_syndrome_move_data_by_family(
+        code_family=code_family,
+        lattice_size=lattice_size,
+    )
     simulation_result = run_disorder_average_simulation(
         parity_check_matrix=parity_check_matrix,
         dual_logical_z_basis=dual_logical_z_basis,
