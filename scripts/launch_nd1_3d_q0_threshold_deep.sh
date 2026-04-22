@@ -3,7 +3,9 @@
 set -euo pipefail
 
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-MASTER_RUN_ID="3d_toric_q0_threshold_deep_$(date +%Y%m%d_%H%M%S)"
+RUN_TIMESTAMP="$(date +%Y%m%d_%H%M%S)"
+MASTER_RUN_SUFFIX="${MASTER_RUN_SUFFIX:-}"
+MASTER_RUN_ID="${MASTER_RUN_ID:-3d_toric_q0_threshold_deep_${RUN_TIMESTAMP}${MASTER_RUN_SUFFIX}}"
 REMOTE_BASE='/home/DATA1/users/yuany/.single_shot'
 REMOTE_RUN_ROOT="$REMOTE_BASE/runs/$MASTER_RUN_ID"
 REMOTE_LOG_PATH="$REMOTE_BASE/logs/${MASTER_RUN_ID}.log"
@@ -11,16 +13,17 @@ REMOTE_RUNNER_PATH="$REMOTE_RUN_ROOT/run_3d_toric_q0_threshold_deep.sh"
 REMOTE_SCREEN_NAME="ssprep_${MASTER_RUN_ID}"
 COMMIT_SHA="$(git -C "$PROJECT_ROOT" rev-parse HEAD)"
 
-LATTICE_SIZES='3,4,5'
-NUM_DISORDER_SAMPLES_TOTAL='1024'
-CHUNK_SIZE='32'
-REQUESTED_WORKERS='48'
-NUM_BURN_IN_SWEEPS='1800'
-NUM_SWEEPS_BETWEEN_MEASUREMENTS='8'
-NUM_MEASUREMENTS_PER_DISORDER='480'
-Q0_NUM_START_CHAINS='8'
-SEED_BASE='20260430'
-BURN_IN_SCALING_REFERENCE_NUM_QUBITS='18'
+LATTICE_SIZES="${LATTICE_SIZES:-3,4,5}"
+NUM_DISORDER_SAMPLES_TOTAL="${NUM_DISORDER_SAMPLES_TOTAL:-1024}"
+CHUNK_SIZE="${CHUNK_SIZE:-32}"
+REQUESTED_WORKERS="${REQUESTED_WORKERS:-48}"
+NUM_BURN_IN_SWEEPS="${NUM_BURN_IN_SWEEPS:-1800}"
+NUM_SWEEPS_BETWEEN_MEASUREMENTS="${NUM_SWEEPS_BETWEEN_MEASUREMENTS:-8}"
+NUM_MEASUREMENTS_PER_DISORDER="${NUM_MEASUREMENTS_PER_DISORDER:-480}"
+Q0_NUM_START_CHAINS="${Q0_NUM_START_CHAINS:-8}"
+SEED_BASE="${SEED_BASE:-20260424}"
+BURN_IN_SCALING_REFERENCE_NUM_QUBITS="${BURN_IN_SCALING_REFERENCE_NUM_QUBITS:-18}"
+DRY_RUN="${DRY_RUN:-0}"
 
 
 require_clean_worktree() {
@@ -60,7 +63,19 @@ import sys
 with open(sys.argv[1], "r", encoding="utf-8") as handle:
     summary = json.load(handle)
 
-window = summary["recommended_server_window"]
+window = summary.get("interior_crossing_window")
+if window is None:
+    window = summary.get("interior_near_crossing_window")
+if window is None:
+    if summary.get("boundary_saturation_artifact"):
+        raise SystemExit(
+            "Refusing to launch deep run: summary only shows a left-edge "
+            "boundary saturation artifact and no interior crossing window."
+        )
+    raise SystemExit(
+        "Refusing to launch deep run: no interior_crossing_window or "
+        "interior_near_crossing_window found in summary."
+    )
 center = 0.5 * (float(window["p_min"]) + float(window["p_max"]))
 step = 0.005
 half_width = 0.015
@@ -140,11 +155,17 @@ launch_remote_runner() {
 
 
 main() {
-  require_clean_worktree
   local scout_summary_path
   local data_error_probabilities
   scout_summary_path="$(resolve_scout_summary_path "$@")"
   data_error_probabilities="$(build_p_csv_from_summary "$scout_summary_path")"
+  if [[ "$DRY_RUN" == "1" ]]; then
+    printf "MASTER_RUN_ID=%s\nRUN_ROOT=%s\nLOG_PATH=%s\nSCOUT_SUMMARY=%s\nP_VALUES=%s\nSEED_BASE=%s\n" \
+      "$MASTER_RUN_ID" "$REMOTE_RUN_ROOT" "$REMOTE_LOG_PATH" \
+      "$scout_summary_path" "$data_error_probabilities" "$SEED_BASE"
+    exit 0
+  fi
+  require_clean_worktree
   fallback_archive_sync
   verify_remote_env
   launch_remote_runner "$data_error_probabilities"
