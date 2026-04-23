@@ -826,3 +826,251 @@ q=0.0400
   - 先不要直接开 deep
   - 更合理的是先重做一轮更有判别力的 scout，再决定窗口该左移还是右移
   - 否则很容易被平台饱和与边界零 gap 误导
+
+## 2026-04-22 21:16 修复后本地轻量预检复跑与 Stage A broad scout 重开
+
+摘要：
+- 做什么：在修复后的 hybrid `q>0` sampler 上重新跑本地 3D `q>0` 轻量预检，并据此重开远端 Stage A broad scout。
+- 结论：本地 `q=0.0050` 轻量预检已经通过管线校验；但在 `p = 0.16, 0.22, 0.28` 上两条 pairwise gap 仍全为负，没有 interior sign flip，说明 crossing 仍在当前窗口右侧。这与 3D `q=0` 在 `p≈0.218~0.230` 已出现共同 interior crossing 的 calibration 明显不同。
+- 当前状态：Stage A 已在 `nd-1/nd-2/nd-3` 重新挂入 `screen` 后台，等待回收合并。合并后第一优先级只看 pairwise gap 的符号翻转，不先看 `argmin gap`。
+
+### 本地预检参数与产物
+
+- 本地 run root：
+  - `data/3d_toric_code/with_measurement_noise/measurement_noise_threshold_scout_local/precheck_20260422_fixrerun_v2/`
+- 参数：
+  - `code_family = 3d_toric`
+  - `L = [3,4,5]`
+  - `q = 0.0050`
+  - `p = [0.1600, 0.2200, 0.2800]`
+  - `num_disorder_samples_total = 32`
+  - `chunk_size = 16`
+  - `num_chunks_per_point = 2`
+  - `num_burn_in_sweeps = 1200`
+  - `num_sweeps_between_measurements = 6`
+  - `num_measurements_per_disorder = 240`
+  - `workers = 4`
+  - `common_random_disorder_across_p = true`
+- 完成情况：
+  - `completed=18`
+  - `failed=0`
+  - `pending=0`
+
+### 本地预检判读
+
+- 看图：
+  - [修复后本地预检 sem95 图](data/3d_toric_code/with_measurement_noise/measurement_noise_threshold_scout_local/precheck_20260422_fixrerun_v2/q_0p0050/scan_result_multi_L_3d_toric_q0p0050_measurement_noise_threshold_scout_common_random_sem95.png)
+  - [修复后本地预检 gap 图](data/3d_toric_code/with_measurement_noise/measurement_noise_threshold_scout_local/precheck_20260422_fixrerun_v2/q_0p0050/scan_result_multi_L_3d_toric_q0p0050_measurement_noise_threshold_scout_common_random_gap_crossing.png)
+- `threshold_summary.json` 读数：
+
+```text
+boundary_saturation_artifact = false
+primary_crossing_window_hit  = false
+secondary_proximity_hit      = true
+recommended_server_window    = [0.28, 0.28]
+right_edge_gap_signs         = {3-4: -1, 4-5: -1}
+```
+
+- pairwise gap 曲线符号：
+
+```text
+delta_34 sign pattern = [-1, -1, -1]
+delta_45 sign pattern = [-1, -1, -1]
+
+p = 0.16, 0.22, 0.28
+delta_34 = [-0.1124, -0.1620, -0.0188]
+delta_45 = [-0.0678, -0.1447, -0.0028]
+```
+
+- 判读：
+  - 这轮预检不再出现修复前那种接近 `q_top=1` 的假饱和异常。
+  - 但在当前窗口里，两条 pairwise gap 都没有翻正，因此 crossing 仍在窗口右侧。
+  - 和 3D `q=0` 基线相比：
+    - `q=0` 的可信 crossing 窗口仍在 `p≈0.218~0.230`
+    - 且该基线窗口右端的 pairwise gap 已经翻成正号
+    - 现在 `q=0.0050` 到 `p=0.28` 仍保持负号，说明其行为不能按 `q=0` 直接外推，必须继续看更右侧的 broad scout
+
+### Remote Stage A 重开
+
+- 远端 run id：
+  - `nd-1`
+    - `3d_toric_measurement_noise_threshold_search_20260422_211326_stageA_nd1`
+    - `q = [0.0010, 0.0025]`
+    - `workers = 48`
+  - `nd-2`
+    - `3d_toric_measurement_noise_threshold_search_20260422_211326_stageA_nd2`
+    - `q = [0.0050, 0.0100]`
+    - `workers = 48`
+  - `nd-3`
+    - `3d_toric_measurement_noise_threshold_search_20260422_211326_stageA_nd3`
+    - `q = [0.0200, 0.0400]`
+    - `workers = 96`
+- 统一扫描参数：
+  - `L = [3,4,5]`
+  - `p = 0.0400, 0.0600, ..., 0.2800`
+  - `num_disorder_samples_total = 256`
+  - `chunk_size = 16`
+  - `num_burn_in_sweeps = 1200`
+  - `num_sweeps_between_measurements = 6`
+  - `num_measurements_per_disorder = 240`
+  - `burn_in_scaling_reference_num_qubits = 18`
+  - `common_random_disorder_across_p = true`
+- 当前日志开头已确认：
+  - `nd-1` 已启动 `q=0.0010`
+  - `nd-2` 已启动 `q=0.0050`
+  - `nd-3` 已启动 `q=0.0200`
+
+### 合并后的读图规则
+
+- 第一优先级：
+  - 只看 pairwise gap 是否发生 interior sign flip
+  - 特别是 `L=3-4` 与 `L=4-5` 是否在同一 `q` 上共同翻号
+- 第二优先级：
+  - 再看 `secondary_proximity_hit` 与推荐窗口
+- 暂不采用：
+  - 单独用 `argmin |gap|` 做任何 threshold 判读
+- 所有新图都必须和 `q=0` 基线一起解释：
+  - `q=0` calibration 仍以 `p≈0.218~0.230` 的共同 interior crossing 为准
+  - 若 `q>0` 新图与这条 calibration 不一致，应先解释 pairwise gap 符号结构，再讨论任何“threshold 位置”
+
+## 2026-04-22 21:4x 远端 Stage A 主动停止与产物清理
+
+摘要：
+- 做什么：在新一轮 3D `q>0` Stage A broad scout 启动后，主动停止 `nd-1/nd-2/nd-3` 的远端任务并清理中止产物。
+- 原因：当前重新怀疑程序逻辑仍有错误，需要先回到本地继续排查，暂不继续消耗远端算力。
+- 结论：本轮远端 Stage A 不再继续，也不保留任何 partial run 作为分析依据；仅保留修复后完整跑完的本地轻量预检 `precheck_20260422_fixrerun_v2`。
+
+### 主动停止的 run
+
+- `nd-1`
+  - `3d_toric_measurement_noise_threshold_search_20260422_211326_stageA_nd1`
+- `nd-2`
+  - `3d_toric_measurement_noise_threshold_search_20260422_211326_stageA_nd2`
+- `nd-3`
+  - `3d_toric_measurement_noise_threshold_search_20260422_211326_stageA_nd3`
+
+### 清理情况
+
+- 已停止：
+  - 三台机器对应的 `screen`/采样进程
+- 已删除：
+  - `nd-1/nd-2/nd-3` 上这三轮 run 的远端 `runs/` 目录
+  - 对应的远端 `repos/` 部署目录
+  - 对应的远端日志文件
+- 本地同步清理：
+  - 删除第一次误参数启动后留下的半截预检目录
+    - `data/3d_toric_code/with_measurement_noise/measurement_noise_threshold_scout_local/precheck_20260422_fixrerun/`
+  - 删除用于发远端任务的临时 clone
+    - `/tmp/projectD_stageA_launcher`
+
+### 保留产物
+
+- 继续保留并作为后续排错依据：
+  - `data/3d_toric_code/with_measurement_noise/measurement_noise_threshold_scout_local/precheck_20260422_fixrerun_v2/`
+- 保留原因：
+  - 它是完整完成的本地轻量预检
+  - `q=0.0050` 在 `p=0.16/0.22/0.28` 上给出了稳定的 pairwise gap 负号结构
+  - 这份结果仍然对排查“为什么 `q>0` 行为和 `q=0` calibration 不一致”有直接价值
+
+### 当前状态
+
+- 暂停一切新的远端 broad scout / Stage B / deep 扫描。
+- 后续优先级切换为：
+  - 先做程序逻辑排查
+  - 排查通过后，再决定是否重开 3D `q>0` Stage A
+
+## 2026-04-23 10:4x `q>0` PT 生产基线冻结
+
+摘要：
+- 做什么：把已经接入的 multi-start + PT `q>0` 生产路径做一次完整本地基线冻结，覆盖 exact regression、混合诊断、production smoke，以及远端 launcher 参数透传。
+- 结论：这版 `q>0` 生产管线已经满足“可以重开正式 broad scan”的最低条件；接下来不再使用旧 Stage A 记录做物理解读，而是只重开 `q=0.0050` 的可信 broad scan。
+- 本节只记录代码冻结与本地验证，不把远端 broad scan 尚未完成的结果写成物理结论。
+
+### 本地回归与诊断
+
+- `conda run -n 12 python src/exact_enumeration.py`
+  - 完整通过。
+  - 关键锚点：
+    - `3D q>0 exact-vs-MCMC regression` 通过
+    - `3D q>0 exact-vs-PT regression` 通过
+    - `3D q>0 production-path regression` 通过
+  - 生产路径锚点误差：
+    - `multistart |Δm_u|max = 0.0059`
+    - `multistart |Δq_top| = 0.0007`
+    - `multistart+pt |Δm_u|max = 0.0043`
+    - `multistart+pt |Δq_top| = 0.0004`
+
+- `conda run -n 12 python src/diagnose_3d_q_positive_mixing.py --suite c2`
+  - 本地使用轻量 smoke 参数复核 `L=5, q=0.0050, p_cold=0.22`。
+  - 关键诊断读数：
+    - `num_chains_that_never_flipped_sector = 0`
+    - `max_r_hat_across_disorders = 1.0056846205413785`
+    - `mean_q_top_spread_per_disorder = 0.04775892857142857`
+    - `winding_acceptance_rate_mean = 2.0942622950819675e-04`
+  - 判读：
+    - sector 互通已恢复，没有再出现“完全不翻 sector”的冻结。
+    - 这组轻量参数下 `q_top spread` 仍偏大，因此它只能说明 PT 路径在动，不能替代正式生产预算。
+
+### Production smoke
+
+- 本地 `production_chunked_scan.py submit` 小预算 smoke 已完成：
+  - `code_family = 3d_toric`
+  - `L = [3,4,5]`
+  - `p = [0.22, 0.26]`
+  - `q = 0.0050`
+  - `num_disorder_samples_total = 2`
+  - `num_start_chains = 4`
+  - `num_replicas_per_start = 2`
+  - `pt_p_hot = 0.44`
+  - `pt_num_temperatures = 5`
+  - `num_measurements_per_disorder = 32`
+- 产物：
+  - merged NPZ 已生成
+  - PNG 已生成
+  - convergence sidecar JSON 已生成
+  - merged NPZ 内已含 `converged_mask_matrix`
+- convergence gate 结果：
+  - `6 / 6` 点均未通过 gate
+  - 失败主因是低预算下
+    - `min_effective_sample_size <= 200`
+    - `mean_q_top_spread >= 0.03`
+- 判读：
+  - 这正是 smoke 预算应有的行为，说明 gate 已真正接进 merge 产物，而不是只在单独脚本里做人读诊断。
+
+### 远端 launcher 冻结
+
+- 已更新 `scripts/launch_3d_measurement_noise_threshold_search.sh`，远端正式提交现在会显式透传：
+  - `--num-start-chains`
+  - `--num-replicas-per-start`
+  - `--pt-p-hot`
+  - `--pt-num-temperatures`
+  - `--pt-swap-attempt-every-num-sweeps`
+- 本地 `DRY_RUN=1` 已核对：
+  - `NUM_START_CHAINS = 8`
+  - `NUM_REPLICAS_PER_START = 2`
+  - `PT_P_HOT = 0.44`
+  - `PT_NUM_TEMPERATURES = 9`
+  - `PT_SWAP_ATTEMPT_EVERY_NUM_SWEEPS = 1`
+- 这一步修复后，远端 broad scan 不会再 silently 掉回旧单链模板。
+
+### 下一步固定动作
+
+- 第一轮正式 run 只做：
+  - `q = 0.0050`
+  - `L = [3,4,5]`
+  - `p = [0.20, 0.22, 0.24, 0.26, 0.28, 0.30]`
+- 正式预算固定为：
+  - `num_disorder_samples_total = 4`
+  - `chunk_size = 4`
+  - `num_start_chains = 8`
+  - `num_replicas_per_start = 2`
+  - `num_burn_in_sweeps = 1200`
+  - `num_sweeps_between_measurements = 6`
+  - `num_measurements_per_disorder = 4096`
+  - `pt_p_hot = 0.44`
+  - `pt_num_temperatures = 9`
+  - `common_random_disorder_across_p = true`
+- 合并后判读顺序固定为：
+  - 先看 `*_convergence.json` / `converged_mask_matrix`
+  - 再看 pairwise gap 符号结构
+  - 未通过 gate 的点只保留数值，不作为可信物理解读依据

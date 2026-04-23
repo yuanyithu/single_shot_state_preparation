@@ -22,6 +22,10 @@ DEFAULT_LATTICE_SIZES_BY_CODE_FAMILY = {
 DEFAULT_Q_VALUES = [0.0025, 0.0050, 0.0075, 0.0100, 0.0150, 0.0200]
 DEFAULT_P_VALUES = np.arange(0.0300, 0.1000 + 0.0001, 0.0050)
 DEFAULT_COMMON_RANDOM_DISORDER_ACROSS_P = True
+DEFAULT_3D_NUM_START_CHAINS = 8
+DEFAULT_3D_NUM_REPLICAS_PER_START = 2
+DEFAULT_3D_PT_P_HOT = 0.44
+DEFAULT_3D_PT_NUM_TEMPERATURES = 9
 
 
 def _timestamp_tag():
@@ -113,6 +117,15 @@ def _build_parser():
         default=320,
     )
     parser.add_argument("--q0-num-start-chains", type=int, default=4)
+    parser.add_argument("--num-start-chains", type=int, default=None)
+    parser.add_argument("--num-replicas-per-start", type=int, default=None)
+    parser.add_argument("--pt-p-hot", type=float, default=None)
+    parser.add_argument("--pt-num-temperatures", type=int, default=None)
+    parser.add_argument(
+        "--pt-swap-attempt-every-num-sweeps",
+        type=int,
+        default=1,
+    )
     parser.add_argument("--seed-base", type=int, default=20260425)
     parser.add_argument(
         "--burn-in-scaling-reference-num-qubits",
@@ -150,6 +163,24 @@ def main():
         for value in args.q_values.split(",")
         if value.strip()
     ]
+    num_start_chains = args.num_start_chains
+    num_replicas_per_start = args.num_replicas_per_start
+    pt_p_hot = args.pt_p_hot
+    pt_num_temperatures = args.pt_num_temperatures
+    if code_family == "3d_toric":
+        if num_start_chains is None:
+            num_start_chains = DEFAULT_3D_NUM_START_CHAINS
+        if num_replicas_per_start is None:
+            num_replicas_per_start = DEFAULT_3D_NUM_REPLICAS_PER_START
+        if pt_p_hot is None:
+            pt_p_hot = DEFAULT_3D_PT_P_HOT
+        if pt_num_temperatures is None:
+            pt_num_temperatures = DEFAULT_3D_PT_NUM_TEMPERATURES
+    else:
+        if num_start_chains is None:
+            num_start_chains = 1
+        if num_replicas_per_start is None:
+            num_replicas_per_start = 1
     data_error_probabilities_csv = args.data_error_probabilities
 
     scout_index = {
@@ -161,6 +192,10 @@ def main():
         "common_random_disorder_across_p": (
             DEFAULT_COMMON_RANDOM_DISORDER_ACROSS_P
         ),
+        "num_start_chains": int(num_start_chains),
+        "num_replicas_per_start": int(num_replicas_per_start),
+        "pt_p_hot": pt_p_hot,
+        "pt_num_temperatures": pt_num_temperatures,
         "outputs": [],
     }
 
@@ -199,6 +234,10 @@ def main():
             str(args.num_measurements_per_disorder),
             "--q0-num-start-chains",
             str(args.q0_num_start_chains),
+            "--num-start-chains",
+            str(num_start_chains),
+            "--num-replicas-per-start",
+            str(num_replicas_per_start),
             "--seed-base",
             str(args.seed_base + q_index * 1000000000),
             "--burn-in-scaling-reference-num-qubits",
@@ -206,6 +245,17 @@ def main():
             "--output-stem",
             output_stem,
         ]
+        if pt_p_hot is not None:
+            submit_command.extend(["--pt-p-hot", f"{pt_p_hot:0.4f}"])
+        if pt_num_temperatures is not None:
+            submit_command.extend([
+                "--pt-num-temperatures",
+                str(pt_num_temperatures),
+            ])
+        submit_command.extend([
+            "--pt-swap-attempt-every-num-sweeps",
+            str(args.pt_swap_attempt_every_num_sweeps),
+        ])
         if DEFAULT_COMMON_RANDOM_DISORDER_ACROSS_P:
             submit_command.append("--common-random-disorder-across-p")
         if args.git_commit_sha is not None:
@@ -233,6 +283,9 @@ def main():
             "sem95_plot_path": summary["sem95_plot_path"],
             "gap_plot_path": summary["gap_plot_path"],
             "summary_path": summary["summary_path"],
+            "convergence_summary_path": str(
+                q_run_root / f"{output_stem}_convergence.json"
+            ),
             "boundary_saturation_artifact": (
                 summary["boundary_saturation_artifact"]
             ),
