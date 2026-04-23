@@ -17,6 +17,10 @@ from build_toric_code_examples import (
     build_zero_syndrome_move_data_by_family,
 )
 from main import run_disorder_average_simulation
+from mcmc_convergence_gate import (
+    build_convergence_summary,
+    write_convergence_summary_json,
+)
 from plot_scan_results import plot_scan_result
 
 
@@ -197,6 +201,19 @@ def _build_submit_config_from_args(args):
             int(args.num_measurements_per_disorder)
         ),
         "q0_num_start_chains": int(args.q0_num_start_chains),
+        "num_start_chains": int(args.num_start_chains),
+        "num_replicas_per_start": int(args.num_replicas_per_start),
+        "pt_p_hot": (
+            None if args.pt_p_hot is None else float(args.pt_p_hot)
+        ),
+        "pt_num_temperatures": (
+            None
+            if args.pt_num_temperatures is None
+            else int(args.pt_num_temperatures)
+        ),
+        "pt_swap_attempt_every_num_sweeps": int(
+            args.pt_swap_attempt_every_num_sweeps
+        ),
         "seed_base": int(args.seed_base),
         "burn_in_scaling_reference_num_qubits": int(
             args.burn_in_scaling_reference_num_qubits
@@ -262,6 +279,15 @@ def _build_chunk_tasks(config):
                     "chunk_index": int(chunk_index),
                     "q0_num_start_chains": int(
                         config["q0_num_start_chains"]
+                    ),
+                    "num_start_chains": int(config["num_start_chains"]),
+                    "num_replicas_per_start": int(
+                        config["num_replicas_per_start"]
+                    ),
+                    "pt_p_hot": config["pt_p_hot"],
+                    "pt_num_temperatures": config["pt_num_temperatures"],
+                    "pt_swap_attempt_every_num_sweeps": int(
+                        config["pt_swap_attempt_every_num_sweeps"]
                     ),
                     "code_family": str(config["code_family"]),
                     "common_random_disorder_across_p": bool(
@@ -368,6 +394,13 @@ def _build_manifest(
                 config["num_measurements_per_disorder"]
             ),
             "q0_num_start_chains": config["q0_num_start_chains"],
+            "num_start_chains": config["num_start_chains"],
+            "num_replicas_per_start": config["num_replicas_per_start"],
+            "pt_p_hot": config["pt_p_hot"],
+            "pt_num_temperatures": config["pt_num_temperatures"],
+            "pt_swap_attempt_every_num_sweeps": (
+                config["pt_swap_attempt_every_num_sweeps"]
+            ),
             "seed_base": config["seed_base"],
             "burn_in_scaling_reference_num_qubits": (
                 config["burn_in_scaling_reference_num_qubits"]
@@ -397,6 +430,10 @@ def _build_manifest(
         "final_outputs": {
             "npz_path": config["final_output_path"],
             "png_path": config["final_plot_path"],
+            "convergence_json_path": str(
+                Path(config["run_root"])
+                / f"{config['output_stem']}_convergence.json"
+            ),
             "completed_at": None,
             "status": "pending",
         },
@@ -449,12 +486,10 @@ def _run_chunk_task(task_data):
             code_family=task_data["code_family"],
             lattice_size=task_data["lattice_size"],
         )
-        zero_syndrome_move_data = None
-        if task_data["syndrome_error_probability"] == 0.0:
-            zero_syndrome_move_data = build_zero_syndrome_move_data_by_family(
-                code_family=task_data["code_family"],
-                lattice_size=task_data["lattice_size"],
-            )
+        zero_syndrome_move_data = build_zero_syndrome_move_data_by_family(
+            code_family=task_data["code_family"],
+            lattice_size=task_data["lattice_size"],
+        )
         precomputed_syndrome_uniform_values_per_disorder = None
         precomputed_data_uniform_values_per_disorder = None
         if task_data["common_random_disorder_across_p"]:
@@ -486,6 +521,13 @@ def _run_chunk_task(task_data):
             seed=task_data["seed"],
             zero_syndrome_move_data=zero_syndrome_move_data,
             q0_num_start_chains=task_data["q0_num_start_chains"],
+            num_start_chains=task_data["num_start_chains"],
+            num_replicas_per_start=task_data["num_replicas_per_start"],
+            pt_p_hot=task_data["pt_p_hot"],
+            pt_num_temperatures=task_data["pt_num_temperatures"],
+            pt_swap_attempt_every_num_sweeps=(
+                task_data["pt_swap_attempt_every_num_sweeps"]
+            ),
             precomputed_syndrome_uniform_values_per_disorder=(
                 precomputed_syndrome_uniform_values_per_disorder
             ),
@@ -626,6 +668,13 @@ def _merge_outputs(
     num_disorder_samples_total = config["num_disorder_samples_total"]
     q0_num_start_chains = config["q0_num_start_chains"]
     has_q0_diagnostics = config["syndrome_error_probability"] == 0.0
+    has_q_positive_diagnostics = config["syndrome_error_probability"] > 0.0
+    num_start_chains = int(config["num_start_chains"])
+    num_replicas_per_start = int(config["num_replicas_per_start"])
+    pt_enabled = (
+        config["pt_p_hot"] is not None
+        and config["pt_num_temperatures"] is not None
+    )
     num_qubits_list = np.empty(num_sizes, dtype=np.int64)
     num_logical_qubits_list = np.empty(num_sizes, dtype=np.int64)
     effective_num_burn_in_sweeps_list = np.empty(num_sizes, dtype=np.int64)
@@ -638,6 +687,14 @@ def _merge_outputs(
     )
     q0_mean_m_u_spread_linf_curve_matrix = None
     q0_mean_q_top_spread_curve_matrix = None
+    mean_q_top_spread_curve_matrix = None
+    mean_m_u_spread_linf_curve_matrix = None
+    max_r_hat_curve_matrix = None
+    min_effective_sample_size_curve_matrix = None
+    mean_num_chains_that_never_flipped_sector_curve_matrix = None
+    mean_cold_winding_acceptance_rate_curve_matrix = None
+    mean_pt_min_swap_acceptance_rate_curve_matrix = None
+    mean_pt_mean_swap_acceptance_rate_curve_matrix = None
     if has_q0_diagnostics:
         q0_mean_m_u_spread_linf_curve_matrix = np.empty(
             (num_sizes, num_points),
@@ -647,9 +704,44 @@ def _merge_outputs(
             (num_sizes, num_points),
             dtype=np.float64,
         )
+    if has_q_positive_diagnostics:
+        mean_q_top_spread_curve_matrix = np.empty(
+            (num_sizes, num_points),
+            dtype=np.float64,
+        )
+        mean_m_u_spread_linf_curve_matrix = np.empty(
+            (num_sizes, num_points),
+            dtype=np.float64,
+        )
+        max_r_hat_curve_matrix = np.empty(
+            (num_sizes, num_points),
+            dtype=np.float64,
+        )
+        min_effective_sample_size_curve_matrix = np.empty(
+            (num_sizes, num_points),
+            dtype=np.float64,
+        )
+        mean_num_chains_that_never_flipped_sector_curve_matrix = np.empty(
+            (num_sizes, num_points),
+            dtype=np.float64,
+        )
+        mean_cold_winding_acceptance_rate_curve_matrix = np.empty(
+            (num_sizes, num_points),
+            dtype=np.float64,
+        )
+        if pt_enabled:
+            mean_pt_min_swap_acceptance_rate_curve_matrix = np.empty(
+                (num_sizes, num_points),
+                dtype=np.float64,
+            )
+            mean_pt_mean_swap_acceptance_rate_curve_matrix = np.empty(
+                (num_sizes, num_points),
+                dtype=np.float64,
+            )
 
     num_masks = None
     q0_start_sector_labels = None
+    q_positive_start_sector_labels = None
     disorder_q_top_values_tensor = None
     average_acceptance_rate_per_disorder_tensor = None
     logical_observable_mean_values_per_disorder_tensor = None
@@ -657,6 +749,18 @@ def _merge_outputs(
     q0_q_top_values_per_disorder_per_start_tensor = None
     q0_m_u_spread_linf_per_disorder_tensor = None
     q0_q_top_spread_per_disorder_tensor = None
+    chain_logical_observable_mean_values_per_disorder_per_start_replica_tensor = None
+    chain_q_top_values_per_disorder_per_start_replica_tensor = None
+    chain_average_acceptance_rate_per_disorder_per_start_replica_tensor = None
+    chain_contractible_acceptance_rate_per_disorder_per_start_replica_tensor = None
+    chain_winding_acceptance_rate_per_disorder_per_start_replica_tensor = None
+    q_top_spread_per_disorder_tensor = None
+    m_u_spread_linf_per_disorder_tensor = None
+    max_r_hat_per_disorder_tensor = None
+    min_effective_sample_size_per_disorder_tensor = None
+    num_chains_that_never_flipped_sector_per_disorder_tensor = None
+    pt_min_swap_acceptance_rate_per_disorder_tensor = None
+    pt_mean_swap_acceptance_rate_per_disorder_tensor = None
 
     grouped_tasks = {}
     for task_data in task_data_list:
@@ -731,6 +835,99 @@ def _merge_outputs(
                     (num_sizes, num_points, num_disorder_samples_total),
                     dtype=np.float64,
                 )
+            if has_q_positive_diagnostics:
+                chain_logical_observable_mean_values_per_disorder_per_start_replica_tensor = (
+                    np.empty(
+                        (
+                            num_sizes,
+                            num_points,
+                            num_disorder_samples_total,
+                            num_start_chains,
+                            num_replicas_per_start,
+                            num_masks,
+                        ),
+                        dtype=np.float64,
+                    )
+                )
+                chain_q_top_values_per_disorder_per_start_replica_tensor = (
+                    np.empty(
+                        (
+                            num_sizes,
+                            num_points,
+                            num_disorder_samples_total,
+                            num_start_chains,
+                            num_replicas_per_start,
+                        ),
+                        dtype=np.float64,
+                    )
+                )
+                chain_average_acceptance_rate_per_disorder_per_start_replica_tensor = (
+                    np.empty(
+                        (
+                            num_sizes,
+                            num_points,
+                            num_disorder_samples_total,
+                            num_start_chains,
+                            num_replicas_per_start,
+                        ),
+                        dtype=np.float64,
+                    )
+                )
+                chain_contractible_acceptance_rate_per_disorder_per_start_replica_tensor = (
+                    np.empty(
+                        (
+                            num_sizes,
+                            num_points,
+                            num_disorder_samples_total,
+                            num_start_chains,
+                            num_replicas_per_start,
+                        ),
+                        dtype=np.float64,
+                    )
+                )
+                chain_winding_acceptance_rate_per_disorder_per_start_replica_tensor = (
+                    np.empty(
+                        (
+                            num_sizes,
+                            num_points,
+                            num_disorder_samples_total,
+                            num_start_chains,
+                            num_replicas_per_start,
+                        ),
+                        dtype=np.float64,
+                    )
+                )
+                q_top_spread_per_disorder_tensor = np.empty(
+                    (num_sizes, num_points, num_disorder_samples_total),
+                    dtype=np.float64,
+                )
+                m_u_spread_linf_per_disorder_tensor = np.empty(
+                    (num_sizes, num_points, num_disorder_samples_total),
+                    dtype=np.float64,
+                )
+                max_r_hat_per_disorder_tensor = np.empty(
+                    (num_sizes, num_points, num_disorder_samples_total),
+                    dtype=np.float64,
+                )
+                min_effective_sample_size_per_disorder_tensor = np.empty(
+                    (num_sizes, num_points, num_disorder_samples_total),
+                    dtype=np.float64,
+                )
+                num_chains_that_never_flipped_sector_per_disorder_tensor = (
+                    np.empty(
+                        (num_sizes, num_points, num_disorder_samples_total),
+                        dtype=np.int64,
+                    )
+                )
+                if pt_enabled:
+                    pt_min_swap_acceptance_rate_per_disorder_tensor = np.empty(
+                        (num_sizes, num_points, num_disorder_samples_total),
+                        dtype=np.float64,
+                    )
+                    pt_mean_swap_acceptance_rate_per_disorder_tensor = np.empty(
+                        (num_sizes, num_points, num_disorder_samples_total),
+                        dtype=np.float64,
+                    )
         elif current_num_masks != num_masks:
             raise ValueError("num_masks must be consistent across sizes")
 
@@ -760,6 +957,15 @@ def _merge_outputs(
                             q0_start_sector_labels,
                             loaded_chunk_result["q0_start_sector_labels"]):
                         raise ValueError("q0_start_sector_labels mismatch")
+                if has_q_positive_diagnostics:
+                    if q_positive_start_sector_labels is None:
+                        q_positive_start_sector_labels = loaded_chunk_result[
+                            "start_sector_labels"
+                        ]
+                    elif not np.array_equal(
+                            q_positive_start_sector_labels,
+                            loaded_chunk_result["start_sector_labels"]):
+                        raise ValueError("start_sector_labels mismatch")
 
                 disorder_q_top_values_tensor[
                     lattice_index,
@@ -807,6 +1013,97 @@ def _merge_outputs(
                         point_index,
                         start_index:stop_index,
                     ] = loaded_chunk_result["q0_q_top_spread_per_disorder"]
+                if has_q_positive_diagnostics:
+                    chain_logical_observable_mean_values_per_disorder_per_start_replica_tensor[
+                        lattice_index,
+                        point_index,
+                        start_index:stop_index,
+                        :,
+                        :,
+                        :,
+                    ] = loaded_chunk_result[
+                        "chain_logical_observable_mean_values_per_disorder_per_start_replica"
+                    ]
+                    chain_q_top_values_per_disorder_per_start_replica_tensor[
+                        lattice_index,
+                        point_index,
+                        start_index:stop_index,
+                        :,
+                        :,
+                    ] = loaded_chunk_result[
+                        "chain_q_top_values_per_disorder_per_start_replica"
+                    ]
+                    chain_average_acceptance_rate_per_disorder_per_start_replica_tensor[
+                        lattice_index,
+                        point_index,
+                        start_index:stop_index,
+                        :,
+                        :,
+                    ] = loaded_chunk_result[
+                        "chain_average_acceptance_rate_per_disorder_per_start_replica"
+                    ]
+                    chain_contractible_acceptance_rate_per_disorder_per_start_replica_tensor[
+                        lattice_index,
+                        point_index,
+                        start_index:stop_index,
+                        :,
+                        :,
+                    ] = loaded_chunk_result[
+                        "chain_contractible_acceptance_rate_per_disorder_per_start_replica"
+                    ]
+                    chain_winding_acceptance_rate_per_disorder_per_start_replica_tensor[
+                        lattice_index,
+                        point_index,
+                        start_index:stop_index,
+                        :,
+                        :,
+                    ] = loaded_chunk_result[
+                        "chain_winding_acceptance_rate_per_disorder_per_start_replica"
+                    ]
+                    q_top_spread_per_disorder_tensor[
+                        lattice_index,
+                        point_index,
+                        start_index:stop_index,
+                    ] = loaded_chunk_result["q_top_spread_per_disorder"]
+                    m_u_spread_linf_per_disorder_tensor[
+                        lattice_index,
+                        point_index,
+                        start_index:stop_index,
+                    ] = loaded_chunk_result["m_u_spread_linf_per_disorder"]
+                    max_r_hat_per_disorder_tensor[
+                        lattice_index,
+                        point_index,
+                        start_index:stop_index,
+                    ] = loaded_chunk_result["max_r_hat_per_disorder"]
+                    min_effective_sample_size_per_disorder_tensor[
+                        lattice_index,
+                        point_index,
+                        start_index:stop_index,
+                    ] = loaded_chunk_result[
+                        "min_effective_sample_size_per_disorder"
+                    ]
+                    num_chains_that_never_flipped_sector_per_disorder_tensor[
+                        lattice_index,
+                        point_index,
+                        start_index:stop_index,
+                    ] = loaded_chunk_result[
+                        "num_chains_that_never_flipped_sector_per_disorder"
+                    ]
+                    if pt_enabled:
+                        pt_min_swap_acceptance_rate_per_disorder_tensor[
+                            lattice_index,
+                            point_index,
+                            start_index:stop_index,
+                        ] = loaded_chunk_result[
+                            "pt_min_swap_acceptance_rate_per_disorder"
+                        ]
+                        pt_mean_swap_acceptance_rate_per_disorder_tensor[
+                            lattice_index,
+                            point_index,
+                            start_index:stop_index,
+                        ] = loaded_chunk_result[
+                            "pt_mean_swap_acceptance_rate_per_disorder"
+                        ]
 
         if total_loaded_num_disorders != num_disorder_samples_total:
             raise ValueError(
@@ -854,6 +1151,86 @@ def _merge_outputs(
                     lattice_index,
                     point_index,
                 ] = float(np.mean(q0_q_top_spread_values))
+            if has_q_positive_diagnostics:
+                mean_q_top_spread_curve_matrix[
+                    lattice_index,
+                    point_index,
+                ] = float(np.mean(
+                    q_top_spread_per_disorder_tensor[
+                        lattice_index,
+                        point_index,
+                    ]
+                ))
+                mean_m_u_spread_linf_curve_matrix[
+                    lattice_index,
+                    point_index,
+                ] = float(np.mean(
+                    m_u_spread_linf_per_disorder_tensor[
+                        lattice_index,
+                        point_index,
+                    ]
+                ))
+                finite_r_hat_values = max_r_hat_per_disorder_tensor[
+                    lattice_index,
+                    point_index,
+                ]
+                finite_r_hat_values = finite_r_hat_values[
+                    np.isfinite(finite_r_hat_values)
+                ]
+                if finite_r_hat_values.size == 0:
+                    max_r_hat_curve_matrix[lattice_index, point_index] = (
+                        np.nan
+                    )
+                else:
+                    max_r_hat_curve_matrix[lattice_index, point_index] = (
+                        float(np.max(finite_r_hat_values))
+                    )
+                min_effective_sample_size_curve_matrix[
+                    lattice_index,
+                    point_index,
+                ] = float(np.min(
+                    min_effective_sample_size_per_disorder_tensor[
+                        lattice_index,
+                        point_index,
+                    ]
+                ))
+                mean_num_chains_that_never_flipped_sector_curve_matrix[
+                    lattice_index,
+                    point_index,
+                ] = float(np.mean(
+                    num_chains_that_never_flipped_sector_per_disorder_tensor[
+                        lattice_index,
+                        point_index,
+                    ]
+                ))
+                mean_cold_winding_acceptance_rate_curve_matrix[
+                    lattice_index,
+                    point_index,
+                ] = float(np.mean(
+                    chain_winding_acceptance_rate_per_disorder_per_start_replica_tensor[
+                        lattice_index,
+                        point_index,
+                    ]
+                ))
+                if pt_enabled:
+                    mean_pt_min_swap_acceptance_rate_curve_matrix[
+                        lattice_index,
+                        point_index,
+                    ] = float(np.mean(
+                        pt_min_swap_acceptance_rate_per_disorder_tensor[
+                            lattice_index,
+                            point_index,
+                        ]
+                    ))
+                    mean_pt_mean_swap_acceptance_rate_curve_matrix[
+                        lattice_index,
+                        point_index,
+                    ] = float(np.mean(
+                        pt_mean_swap_acceptance_rate_per_disorder_tensor[
+                            lattice_index,
+                            point_index,
+                        ]
+                    ))
 
     merged_result = {
         "lattice_size_list": np.asarray(
@@ -902,6 +1279,95 @@ def _merge_outputs(
         merged_result["q0_q_top_spread_per_disorder_tensor"] = (
             q0_q_top_spread_per_disorder_tensor
         )
+    if has_q_positive_diagnostics:
+        merged_result["start_sector_labels"] = q_positive_start_sector_labels
+        merged_result["num_start_chains"] = np.int64(num_start_chains)
+        merged_result["num_replicas_per_start"] = np.int64(
+            num_replicas_per_start
+        )
+        merged_result[
+            "chain_logical_observable_mean_values_per_disorder_per_start_replica_tensor"
+        ] = chain_logical_observable_mean_values_per_disorder_per_start_replica_tensor
+        merged_result[
+            "chain_q_top_values_per_disorder_per_start_replica_tensor"
+        ] = chain_q_top_values_per_disorder_per_start_replica_tensor
+        merged_result[
+            "chain_average_acceptance_rate_per_disorder_per_start_replica_tensor"
+        ] = chain_average_acceptance_rate_per_disorder_per_start_replica_tensor
+        merged_result[
+            "chain_contractible_acceptance_rate_per_disorder_per_start_replica_tensor"
+        ] = chain_contractible_acceptance_rate_per_disorder_per_start_replica_tensor
+        merged_result[
+            "chain_winding_acceptance_rate_per_disorder_per_start_replica_tensor"
+        ] = chain_winding_acceptance_rate_per_disorder_per_start_replica_tensor
+        merged_result["q_top_spread_per_disorder_tensor"] = (
+            q_top_spread_per_disorder_tensor
+        )
+        merged_result["m_u_spread_linf_per_disorder_tensor"] = (
+            m_u_spread_linf_per_disorder_tensor
+        )
+        merged_result["max_r_hat_per_disorder_tensor"] = (
+            max_r_hat_per_disorder_tensor
+        )
+        merged_result["min_effective_sample_size_per_disorder_tensor"] = (
+            min_effective_sample_size_per_disorder_tensor
+        )
+        merged_result[
+            "num_chains_that_never_flipped_sector_per_disorder_tensor"
+        ] = num_chains_that_never_flipped_sector_per_disorder_tensor
+        merged_result["mean_q_top_spread_curve_matrix"] = (
+            mean_q_top_spread_curve_matrix
+        )
+        merged_result["mean_m_u_spread_linf_curve_matrix"] = (
+            mean_m_u_spread_linf_curve_matrix
+        )
+        merged_result["max_r_hat_curve_matrix"] = max_r_hat_curve_matrix
+        merged_result["min_effective_sample_size_curve_matrix"] = (
+            min_effective_sample_size_curve_matrix
+        )
+        merged_result[
+            "mean_num_chains_that_never_flipped_sector_curve_matrix"
+        ] = mean_num_chains_that_never_flipped_sector_curve_matrix
+        merged_result["mean_cold_winding_acceptance_rate_curve_matrix"] = (
+            mean_cold_winding_acceptance_rate_curve_matrix
+        )
+        merged_result["pt_enabled"] = np.bool_(pt_enabled)
+        if pt_enabled:
+            merged_result["pt_p_hot"] = np.float64(config["pt_p_hot"])
+            merged_result["pt_num_temperatures"] = np.int64(
+                config["pt_num_temperatures"]
+            )
+            merged_result["pt_min_swap_acceptance_rate_per_disorder_tensor"] = (
+                pt_min_swap_acceptance_rate_per_disorder_tensor
+            )
+            merged_result["pt_mean_swap_acceptance_rate_per_disorder_tensor"] = (
+                pt_mean_swap_acceptance_rate_per_disorder_tensor
+            )
+            merged_result[
+                "mean_pt_min_swap_acceptance_rate_curve_matrix"
+            ] = mean_pt_min_swap_acceptance_rate_curve_matrix
+            merged_result[
+                "mean_pt_mean_swap_acceptance_rate_curve_matrix"
+            ] = mean_pt_mean_swap_acceptance_rate_curve_matrix
+
+    convergence_summary = None
+    convergence_summary_path = None
+    if has_q_positive_diagnostics:
+        convergence_summary = build_convergence_summary(
+            merged_result=merged_result,
+            lattice_size_list=config["lattice_size_list"],
+            data_error_probability_list=config["data_error_probability_list"],
+            syndrome_error_probability=config["syndrome_error_probability"],
+        )
+        merged_result["converged_mask_matrix"] = (
+            convergence_summary["converged_mask_matrix"]
+        )
+        convergence_summary_path = output_path.with_name(
+            output_path.stem + "_convergence.json"
+        )
+        merged_result["convergence_summary_path"] = np.array(
+            str(convergence_summary_path)
+        )
 
     np.savez(
         output_path,
@@ -932,6 +1398,11 @@ def _merge_outputs(
         git_commit_sha=np.array(config["git_commit_sha"]),
         source_chunks_dir=np.array(str(chunks_dir)),
     )
+    if convergence_summary is not None:
+        write_convergence_summary_json(
+            output_path=convergence_summary_path,
+            convergence_summary=convergence_summary,
+        )
 
     if include_plot:
         if plot_output_path is None:
@@ -1173,6 +1644,19 @@ def _run_chunk_command(args):
         "disorder_offset": int(args.disorder_offset),
         "chunk_index": int(args.chunk_index),
         "q0_num_start_chains": int(args.q0_num_start_chains),
+        "num_start_chains": int(args.num_start_chains),
+        "num_replicas_per_start": int(args.num_replicas_per_start),
+        "pt_p_hot": (
+            None if args.pt_p_hot is None else float(args.pt_p_hot)
+        ),
+        "pt_num_temperatures": (
+            None
+            if args.pt_num_temperatures is None
+            else int(args.pt_num_temperatures)
+        ),
+        "pt_swap_attempt_every_num_sweeps": int(
+            args.pt_swap_attempt_every_num_sweeps
+        ),
         "common_random_disorder_across_p": bool(
             args.common_random_disorder_across_p
         ),
@@ -1276,6 +1760,31 @@ def _build_parser():
         default=4,
     )
     common_submit_parser.add_argument(
+        "--num-start-chains",
+        type=int,
+        default=1,
+    )
+    common_submit_parser.add_argument(
+        "--num-replicas-per-start",
+        type=int,
+        default=1,
+    )
+    common_submit_parser.add_argument(
+        "--pt-p-hot",
+        type=float,
+        default=None,
+    )
+    common_submit_parser.add_argument(
+        "--pt-num-temperatures",
+        type=int,
+        default=None,
+    )
+    common_submit_parser.add_argument(
+        "--pt-swap-attempt-every-num-sweeps",
+        type=int,
+        default=1,
+    )
+    common_submit_parser.add_argument(
         "--seed-base",
         type=int,
         required=True,
@@ -1367,6 +1876,31 @@ def _build_parser():
         "--q0-num-start-chains",
         type=int,
         default=4,
+    )
+    run_chunk_parser.add_argument(
+        "--num-start-chains",
+        type=int,
+        default=1,
+    )
+    run_chunk_parser.add_argument(
+        "--num-replicas-per-start",
+        type=int,
+        default=1,
+    )
+    run_chunk_parser.add_argument(
+        "--pt-p-hot",
+        type=float,
+        default=None,
+    )
+    run_chunk_parser.add_argument(
+        "--pt-num-temperatures",
+        type=int,
+        default=None,
+    )
+    run_chunk_parser.add_argument(
+        "--pt-swap-attempt-every-num-sweeps",
+        type=int,
+        default=1,
     )
     run_chunk_parser.add_argument(
         "--common-random-disorder-across-p",
