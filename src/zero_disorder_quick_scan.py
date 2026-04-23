@@ -699,34 +699,49 @@ def main():
         (num_sizes, num_points),
         dtype=np.int64,
     )
+    q_values_in_scan = np.asarray(
+        [
+            task_data["syndrome_error_probability"]
+            for task_data in task_data_list
+        ],
+        dtype=np.float64,
+    )
+    has_q_positive_points = bool(np.any(q_values_in_scan > 0.0))
+    has_q0_points = bool(np.any(q_values_in_scan == 0.0))
+
     q_top_spread_curve_matrix = None
     max_r_hat_curve_matrix = None
     min_effective_sample_size_curve_matrix = None
     q0_q_top_spread_curve_matrix = None
     q0_m_u_spread_linf_curve_matrix = None
 
-    if args.scan_kind == "fixed-q-scan":
+    if has_q_positive_points:
         q_top_spread_curve_matrix = np.empty(
             (num_sizes, num_points),
             dtype=np.float64,
         )
+        q_top_spread_curve_matrix.fill(np.nan)
         max_r_hat_curve_matrix = np.empty(
             (num_sizes, num_points),
             dtype=np.float64,
         )
+        max_r_hat_curve_matrix.fill(np.nan)
         min_effective_sample_size_curve_matrix = np.empty(
             (num_sizes, num_points),
             dtype=np.float64,
         )
-    else:
+        min_effective_sample_size_curve_matrix.fill(np.nan)
+    if has_q0_points:
         q0_q_top_spread_curve_matrix = np.empty(
             (num_sizes, num_points),
             dtype=np.float64,
         )
+        q0_q_top_spread_curve_matrix.fill(np.nan)
         q0_m_u_spread_linf_curve_matrix = np.empty(
             (num_sizes, num_points),
             dtype=np.float64,
         )
+        q0_m_u_spread_linf_curve_matrix.fill(np.nan)
 
     worker_count = _compute_worker_count(workers, len(task_data_list))
     multiprocessing_context = _build_multiprocessing_context()
@@ -759,7 +774,7 @@ def main():
             disorder_data_weight_matrix[lattice_index, point_index] = (
                 task_result["disorder_data_weight"]
             )
-            if q_top_spread_curve_matrix is not None:
+            if "q_top_spread" in task_result:
                 q_top_spread_curve_matrix[lattice_index, point_index] = (
                     task_result["q_top_spread"]
                 )
@@ -770,7 +785,7 @@ def main():
                     lattice_index,
                     point_index,
                 ] = task_result["min_effective_sample_size"]
-            if q0_q_top_spread_curve_matrix is not None:
+            if "q0_q_top_spread" in task_result:
                 q0_q_top_spread_curve_matrix[lattice_index, point_index] = (
                     task_result["q0_q_top_spread"]
                 )
