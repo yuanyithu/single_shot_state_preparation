@@ -1074,3 +1074,85 @@ delta_45 = [-0.0678, -0.1447, -0.0028]
   - 先看 `*_convergence.json` / `converged_mask_matrix`
   - 再看 pairwise gap 符号结构
   - 未通过 gate 的点只保留数值，不作为可信物理解读依据
+
+## 2026-04-24 3D zero-disorder single-sample quick scan
+
+摘要：
+- 做什么：按“快速测试技巧”只取全零 disorder 构型，不做 disorder average，快速扫描两条 3D `q_top` 截面。
+- 结论：两条截面都没有出现稳定三尺寸 crossing。`q_top` 在绝大多数点等于或非常接近 `1`，只能说明全零 disorder 分支在这组快速预算下保持强拓扑有序，不能替代 disorder-averaged 物理结论。
+- 注意：本节所有结果都是 `all-zero disorder / num_disorder_samples=1 / no disorder averaging`，不用于估计正式阈值。
+
+### 运行与产物
+
+- 远端运行：
+  - `nd-3`
+  - `conda run -n 11`
+  - `workers = 24`
+  - `num_measurements_per_point = 128`
+  - `num_burn_in_sweeps = 600`
+  - `num_sweeps_between_measurements = 4`
+  - `num_start_chains = 8`
+  - `num_replicas_per_start = 1`
+  - `pt_p_hot = 0.44`
+  - `pt_num_temperatures = 7`
+- 两条扫描：
+  - fixed-q：`q = 0.0050`，`p = 0.10, 0.12, ..., 0.30`，`L = 3,4,5`
+  - fixed-p：`p = 0.0050`，`q = 0.00, 0.02, ..., 0.20`，`L = 3,4,5`
+- 运行时间：
+  - fixed-q：`2026-04-23 17:08` 到 `18:21 CST`
+  - fixed-p rerun：`2026-04-23 21:50` 到 `23:02 CST`
+- 本地同步目录：
+  - `data/3d_toric_code/with_measurement_noise/zero_disorder_quick_scan_20260423_1712/`
+- 关键产物：
+  - `zero_disorder_combined_analysis.png`
+  - `zero_disorder_combined_summary.json`
+  - `fixed_q/fixed_q_q0p0050.npz`
+  - `fixed_p/fixed_p_p0p0050.npz`
+
+### 数值摘要
+
+- 数据完整性：
+  - `observed_syndrome_weight_matrix` 全为 `0`
+  - `disorder_data_weight_matrix` 全为 `0`
+  - 因此确实是全零 disorder 分支
+- fixed-q (`q=0.0050`)：
+  - `q_top_min = 0.98444693`
+  - `max(1 - q_top) = 0.01555307`
+  - 最大偏离出现在 `L=3, p=0.30`
+  - `L=4` 与 `L=5` 在整条 `p=0.10~0.30` 上保持 `q_top=1`
+  - `max |L3-L4 gap| = 0.01555307`
+  - `max |L4-L5 gap| = 0`
+  - 没有 `L3-L4` 或 `L4-L5` 的 sign-change crossing
+- fixed-p (`p=0.0050`)：
+  - `q_top_min = 0.99777004`
+  - `max(1 - q_top) = 0.00222996`
+  - 只有 `L=3, q=0.16` 与 `L=5, q=0.20` 出现单点轻微下降
+  - `max |L3-L4 gap| = 0.00222996`
+  - `max |L4-L5 gap| = 0.00222996`
+  - 没有稳定 sign-change crossing
+- 诊断：
+  - fixed-q 最大 finite `R-hat = 1.00463498`
+  - fixed-p 最大 finite `R-hat = 1.0`
+  - 最小 effective sample size 为 `128`，等于本轮轻量测量数
+  - fixed-q 在 `L=3, p=0.30` 的 `q_top_spread` 达到 `0.05231585`，提示该点的轻量预算仍有 multi-start spread
+
+### 判读
+
+- 这轮全零 disorder 结果没有支持“在扫描窗口内有清晰 finite-size crossing”。
+- fixed-q 中较小尺寸 `L=3` 在高 `p` 端先下降，而 `L=4/5` 仍保持 `q_top=1`，更像有限采样/小尺寸先动，而不是可靠阈值信号。
+- fixed-p 中 `q` 增大到 `0.20` 也没有造成系统性塌缩，说明在 `p=0.0050` 的全零 disorder 分支上，syndrome-noise 参数本身没有在这组预算内打破拓扑有序。
+- 后续正式物理解读仍必须回到 disorder-averaged PT 生产扫描；本轮的价值是提供一个快速 sanity check：全零分支没有显示导致先前疑问的明显异常相变结构。
+
+### 脚本修复记录
+
+- 新增 `src/zero_disorder_quick_scan.py`：
+  - 用全 `1` 的 precomputed uniform 数组强制生成全零 disorder
+  - 每点调用现有 `run_disorder_average_simulation(...)`
+  - 输出 NPZ/JSON/PNG
+- 新增 `src/analyze_zero_disorder_quick_scan.py`：
+  - 合并 fixed-q 与 fixed-p 结果
+  - 生成 combined analysis plot 与 summary JSON
+- fixed-p 首次运行暴露混合 `q=0/q>0` 诊断矩阵处理 bug：
+  - 原脚本把整条 fixed-p scan 当成同一种诊断分支
+  - 已修复为 `q=0` 点填 `q0_*` 诊断，`q>0` 点填 `q_top_spread/R-hat/ESS` 诊断，另一侧用 `NaN`
+  - 本地 mixed-q smoke 通过后，远端 fixed-p rerun 成功
