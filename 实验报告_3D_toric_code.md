@@ -1156,3 +1156,105 @@ delta_45 = [-0.0678, -0.1447, -0.0028]
   - 原脚本把整条 fixed-p scan 当成同一种诊断分支
   - 已修复为 `q=0` 点填 `q0_*` 诊断，`q>0` 点填 `q_top_spread/R-hat/ESS` 诊断，另一侧用 `NaN`
   - 本地 mixed-q smoke 通过后，远端 fixed-p rerun 成功
+
+## 2026-04-24 3D `q=0.0050` disorder-averaged PT broad scan 回收
+
+摘要：
+- 做什么：回收并本地重绘 `nd-2` 上的正式 3D toric `q=0.0050` disorder-averaged broad scan。
+- 结论：pairwise gaps 给出一个共同 interior crossing 指示，线性估计窗口为 `p≈0.2067~0.2086`，代表值 `p≈0.20765`。但本轮只有 `4` disorder，低 `p` 端 CI 很宽，且 `L=5,p=0.20` 未通过 convergence gate，因此还不能作为最终 threshold，只能作为 deep scan 的窗口定位。
+- 下一步：围绕 `p=0.19~0.24` 做 `16` disorder deep run，步长建议 `0.005`。
+
+### 运行与产物
+
+- 远端 run：
+  - `MASTER_RUN_ID = 3d_toric_measurement_noise_threshold_search_20260423_104417`
+  - host：`nd-2`
+  - remote root：`/home/DATA1/users/yuany/.single_shot/runs/3d_toric_measurement_noise_threshold_search_20260423_104417/q_0p0050`
+- 本地同步目录：
+  - `data/3d_toric_code/with_measurement_noise/measurement_noise_threshold_search_nd2_20260423_104417/q_0p0050/`
+- 关键产物：
+  - `scan_result_multi_L_3d_toric_q0p0050_measurement_noise_threshold_search_common_random.npz`
+  - `scan_result_multi_L_3d_toric_q0p0050_measurement_noise_threshold_search_common_random_sem95.png`
+  - `scan_result_multi_L_3d_toric_q0p0050_measurement_noise_threshold_search_common_random_gap_crossing.png`
+  - `scan_result_multi_L_3d_toric_q0p0050_measurement_noise_threshold_search_common_random_convergence.json`
+  - `threshold_summary.json`
+
+### 参数
+
+- `L = [3,4,5]`
+- `p = [0.20,0.22,0.24,0.26,0.28,0.30]`
+- `q = 0.0050`
+- `num_disorder_samples_total = 4`
+- `chunk_size = 4`
+- `num_start_chains = 8`
+- `num_replicas_per_start = 2`
+- `num_measurements_per_disorder = 4096`
+- `num_sweeps_between_measurements = 6`
+- `pt_p_hot = 0.44`
+- `pt_num_temperatures = 9`
+- `common_random_disorder_across_p = true`
+
+### 数值摘要
+
+`q_top` 矩阵：
+
+```text
+L=3: [0.55388, 0.40799, 0.16907, 0.08846, 0.04046, 0.01831]
+L=4: [0.64430, 0.28805, 0.17657, 0.04186, 0.01811, 0.00564]
+L=5: [0.65252, 0.27178, 0.16328, 0.02594, 0.00694, 0.00434]
+```
+
+Pairwise gaps：
+
+```text
+L3-L4: [-0.09043,  0.11994, -0.00751, 0.04660, 0.02235, 0.01267]
+L4-L5: [-0.00821,  0.01627,  0.01330, 0.01593, 0.01117, 0.00131]
+```
+
+- `threshold_summary.json`：
+  - `primary_crossing_window_hit = true`
+  - common crossing window：`p_min = 0.2067082609839296`, `p_max = 0.20859685913546228`
+  - representative：`p = 0.20765256005969596`
+  - raw crossing window：`0.2067082609839296~0.2427754024873967`
+- pairwise crossing estimates：
+  - `L3-L4`: `0.20860`, `0.23882`, `0.24278`
+  - `L4-L5`: `0.20671`
+- convergence gate：
+  - `17 / 18` 点通过
+  - 唯一失败点：`L=5, p=0.20`
+  - 失败原因：`mean_q_top_spread >= 0.030`
+  - 该点 metrics：`mean_q_top_spread = 0.03281944`, `max_r_hat = 1.00099135`, `min_ESS = 715.079`, `mean_pt_min_swap_acceptance_rate = 0.29018`
+- 诊断范围：
+  - `max_r_hat <= 1.00099`
+  - `min_ESS >= 665.56`
+  - PT swap transport 正常，所有点 `mean_pt_min_swap_acceptance_rate > 0`
+
+### 判读
+
+- 这轮 broad scan 第一次给出 `q=0.0050` 下的可用 crossing 窗口：`p≈0.2077`。
+- 低 `p` 端的 `q_top` 误差条很宽，尤其 `p=0.20/0.22`；因此 crossing 的存在更像“需要 deep 验证的候选”，不是最终阈值估计。
+- `L3-L4` gap 在 `0.22~0.26` 间还有额外 sign flips，说明 `4` disorder 下曲线仍有统计波动；deep run 应用更多 disorder 收紧这个区域。
+- 与 zero-disorder scan 对照：
+  - zero-disorder 分支在相同或更宽窗口内几乎保持 `q_top≈1`
+  - disorder-averaged 曲线显著下降并出现 crossing 候选
+  - 这说明正式物理信号来自 disorder average，不应由全零 disorder 分支外推
+
+### 下一步参数
+
+推荐 deep run：
+
+```text
+L = 3,4,5
+q = 0.0050
+p = 0.190,0.195,0.200,0.205,0.210,0.215,0.220,0.225,0.230,0.235,0.240
+num_disorder_samples_total = 16
+chunk_size = 4
+num_start_chains = 8
+num_replicas_per_start = 2
+num_measurements_per_disorder = 4096
+num_sweeps_between_measurements = 6
+pt_p_hot = 0.44
+pt_num_temperatures = 9
+```
+
+若先压预算，可先跑 `p=0.200~0.230`、步长 `0.005`，保持其余参数不变。
