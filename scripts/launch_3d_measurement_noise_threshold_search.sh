@@ -31,6 +31,7 @@ PT_NUM_TEMPERATURES="${PT_NUM_TEMPERATURES:-9}"
 PT_SWAP_ATTEMPT_EVERY_NUM_SWEEPS="${PT_SWAP_ATTEMPT_EVERY_NUM_SWEEPS:-1}"
 SEED_BASE="${SEED_BASE:-20260423}"
 BURN_IN_SCALING_REFERENCE_NUM_QUBITS="${BURN_IN_SCALING_REFERENCE_NUM_QUBITS:-18}"
+MAX_EFFECTIVE_NUM_BURN_IN_SWEEPS="${MAX_EFFECTIVE_NUM_BURN_IN_SWEEPS:-}"
 DRY_RUN="${DRY_RUN:-0}"
 
 
@@ -156,6 +157,12 @@ while IFS='|' read -r syndrome_error_probability data_error_probabilities; do
       --pt-swap-attempt-every-num-sweeps $(quote_arg "$PT_SWAP_ATTEMPT_EVERY_NUM_SWEEPS")
     )
   fi
+  burn_in_cap_args=()
+  if [[ -n $(quote_arg "$MAX_EFFECTIVE_NUM_BURN_IN_SWEEPS") ]]; then
+    burn_in_cap_args+=(
+      --max-effective-num-burn-in-sweeps $(quote_arg "$MAX_EFFECTIVE_NUM_BURN_IN_SWEEPS")
+    )
+  fi
   echo "[launcher] starting q=\$syndrome_error_probability host=$(quote_arg "$REMOTE_COMPUTE_HOST") run_root=\$run_root seed_base=\$current_seed_base workers=\$workers"
   conda run -n 11 python src/production_chunked_scan.py submit \
     --run-root "\$run_root" \
@@ -172,6 +179,7 @@ while IFS='|' read -r syndrome_error_probability data_error_probabilities; do
     "\${submit_extra_args[@]}" \
     --seed-base "\$current_seed_base" \
     --burn-in-scaling-reference-num-qubits $(quote_arg "$BURN_IN_SCALING_REFERENCE_NUM_QUBITS") \
+    "\${burn_in_cap_args[@]}" \
     --output-stem "\$output_stem" \
     --common-random-disorder-across-p \
     --git-commit-sha $(quote_arg "$COMMIT_SHA")
@@ -250,12 +258,14 @@ main() {
   q_and_p_windows_base64="$(printf '%s' "$q_and_p_windows" | base64 | tr -d '\n')"
 
   if [[ "$DRY_RUN" == "1" ]]; then
-    printf "MASTER_RUN_ID=%s\nREMOTE_COMPUTE_HOST=%s\nRUN_ROOT=%s\nLOG_PATH=%s\nLATTICE_SIZES=%s\nQ_AND_P_WINDOWS=%s\nNUM_DISORDER_SAMPLES_TOTAL=%s\nCHUNK_SIZE=%s\nREQUESTED_WORKERS=%s\nNUM_BURN_IN_SWEEPS=%s\nNUM_SWEEPS_BETWEEN_MEASUREMENTS=%s\nNUM_MEASUREMENTS_PER_DISORDER=%s\nNUM_START_CHAINS=%s\nNUM_REPLICAS_PER_START=%s\nPT_P_HOT=%s\nPT_NUM_TEMPERATURES=%s\nPT_SWAP_ATTEMPT_EVERY_NUM_SWEEPS=%s\nSEED_BASE=%s\n" \
+    printf "MASTER_RUN_ID=%s\nREMOTE_COMPUTE_HOST=%s\nRUN_ROOT=%s\nLOG_PATH=%s\nLATTICE_SIZES=%s\nQ_AND_P_WINDOWS=%s\nNUM_DISORDER_SAMPLES_TOTAL=%s\nCHUNK_SIZE=%s\nREQUESTED_WORKERS=%s\nNUM_BURN_IN_SWEEPS=%s\nNUM_SWEEPS_BETWEEN_MEASUREMENTS=%s\nNUM_MEASUREMENTS_PER_DISORDER=%s\nNUM_START_CHAINS=%s\nNUM_REPLICAS_PER_START=%s\nPT_P_HOT=%s\nPT_NUM_TEMPERATURES=%s\nPT_SWAP_ATTEMPT_EVERY_NUM_SWEEPS=%s\nBURN_IN_SCALING_REFERENCE_NUM_QUBITS=%s\nMAX_EFFECTIVE_NUM_BURN_IN_SWEEPS=%s\nSEED_BASE=%s\n" \
       "$MASTER_RUN_ID" "$REMOTE_COMPUTE_HOST" "$REMOTE_RUN_ROOT" "$REMOTE_LOG_PATH" \
       "$LATTICE_SIZES" "$q_and_p_windows" "$NUM_DISORDER_SAMPLES_TOTAL" "$CHUNK_SIZE" \
       "$REQUESTED_WORKERS" "$NUM_BURN_IN_SWEEPS" "$NUM_SWEEPS_BETWEEN_MEASUREMENTS" \
       "$NUM_MEASUREMENTS_PER_DISORDER" "$NUM_START_CHAINS" "$NUM_REPLICAS_PER_START" \
-      "$PT_P_HOT" "$PT_NUM_TEMPERATURES" "$PT_SWAP_ATTEMPT_EVERY_NUM_SWEEPS" "$SEED_BASE"
+      "$PT_P_HOT" "$PT_NUM_TEMPERATURES" "$PT_SWAP_ATTEMPT_EVERY_NUM_SWEEPS" \
+      "$BURN_IN_SCALING_REFERENCE_NUM_QUBITS" "$MAX_EFFECTIVE_NUM_BURN_IN_SWEEPS" \
+      "$SEED_BASE"
     exit 0
   fi
 
