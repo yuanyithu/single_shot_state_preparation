@@ -273,28 +273,57 @@ def _run_one_sweep_safe(
         checks_touching_each_qubit,
         log_odds_data,
         log_odds_syndrome,
-        rng):
+        rng,
+        qubit_order_buffer=None):
     """
     边界安全版本的 sweep。
     """
     num_qubits = current_chain_bits.shape[0]
     accepted_count = 0
+    data_weight_delta = 0
 
-    for qubit_index in rng.permutation(num_qubits):
-        accepted_count += int(
-            _attempt_single_bit_metropolis_update_safe(
-                current_chain_bits=current_chain_bits,
-                current_data_term_bits=current_data_term_bits,
-                current_syndrome_term_bits=current_syndrome_term_bits,
-                qubit_index=int(qubit_index),
-                checks_touching_each_qubit=checks_touching_each_qubit,
-                log_odds_data=log_odds_data,
-                log_odds_syndrome=log_odds_syndrome,
-                rng=rng,
-            )
-        )
+    if qubit_order_buffer is None:
+        qubit_order = rng.permutation(num_qubits)
+    else:
+        rng.shuffle(qubit_order_buffer)
+        qubit_order = qubit_order_buffer
 
-    return accepted_count
+    for qubit_index in qubit_order:
+        qubit_index = int(qubit_index)
+        touched_checks = checks_touching_each_qubit[qubit_index]
+
+        if current_data_term_bits[qubit_index]:
+            delta_data_weight = -1
+        else:
+            delta_data_weight = +1
+
+        delta_syndrome_weight = 0
+        for check_index in touched_checks:
+            if current_syndrome_term_bits[check_index]:
+                delta_syndrome_weight -= 1
+            else:
+                delta_syndrome_weight += 1
+
+        log_acceptance = 0.0
+        log_acceptance += delta_data_weight * log_odds_data
+        if delta_syndrome_weight != 0:
+            log_acceptance += delta_syndrome_weight * log_odds_syndrome
+
+        if log_acceptance >= 0.0:
+            accepted = True
+        else:
+            accepted = bool(rng.random() < np.exp(log_acceptance))
+
+        if not accepted:
+            continue
+
+        current_chain_bits[qubit_index] ^= True
+        current_data_term_bits[qubit_index] ^= True
+        current_syndrome_term_bits[touched_checks] ^= True
+        accepted_count += 1
+        data_weight_delta += delta_data_weight
+
+    return accepted_count, int(data_weight_delta)
 
 
 def _build_kernel_basis_from_linear_section(
@@ -374,23 +403,130 @@ def _sample_random_kernel_move_bits(
     return generator_bits
 
 
+def _dense_moves_to_supports(dense_moves):
+    dense_moves = np.asarray(dense_moves, dtype=bool)
+    move_weights = np.count_nonzero(dense_moves, axis=1)
+    if move_weights.size == 0:
+        return np.empty((0, 0), dtype=np.int32)
+    if not np.all(move_weights == move_weights[0]):
+        return [
+            np.flatnonzero(dense_moves[move_index]).astype(np.int32)
+            for move_index in range(dense_moves.shape[0])
+        ]
+    move_weight = int(move_weights[0])
+    move_supports = np.empty(
+        (dense_moves.shape[0], move_weight),
+        dtype=np.int32,
+    )
+    for move_index in range(dense_moves.shape[0]):
+        move_supports[move_index] = np.flatnonzero(
+            dense_moves[move_index]
+        ).astype(np.int32)
+    return move_supports
+
+
+def _get_zero_syndrome_move_supports(zero_syndrome_move_data):
+    """
+    返回 zero-syndrome moves 的 support-index 表。
+
+    新构造器会直接提供 support 表；旧 dict 仍可由 dense mask 懒转换，
+    这样已有诊断代码和历史产物不会被接口变化打断。
+    """
+    if "contractible_move_supports" not in zero_syndrome_move_data:
+        zero_syndrome_move_data["contractible_move_supports"] = (
+            _dense_moves_to_supports(
+                zero_syndrome_move_data["contractible_moves"]
+            )
+        )
+    if "winding_move_supports" not in zero_syndrome_move_data:
+        zero_syndrome_move_data["winding_move_supports"] = (
+            _dense_moves_to_supports(zero_syndrome_move_data["winding_moves"])
+        )
+    return (
+        zero_syndrome_move_data["contractible_move_supports"],
+        zero_syndrome_move_data["winding_move_supports"],
+    )
+
+
 def _attempt_zero_syndrome_move_update(
         current_chain_bits,
         current_data_term_bits,
-        move_bits,
+        move_support_indices,
         log_odds_data,
         rng):
     """
     在 q == 0 且 syndrome 固定时，沿 ker(H_Z) 方向做 Metropolis 更新。
     """
-    move_support = move_bits
-    support_size = int(np.count_nonzero(move_support))
+    move_support_indices = np.asarray(move_support_indices)
+    if move_support_indices.dtype == np.bool_:
+        support_size = int(np.count_nonzero(move_support_indices))
+        if support_size == 0:
+            return False, 0
+
+        current_ones_on_support = int(
+            np.count_nonzero(current_data_term_bits[move_support_indices])
+        )
+        delta_data_weight = support_size - 2 * current_ones_on_support
+        log_acceptance = delta_data_weight * log_odds_data
+
+        if log_acceptance >= 0.0:
+            accepted = True
+        else:
+            accepted = bool(rng.random() < np.exp(log_acceptance))
+
+        if not accepted:
+            return False, 0
+
+        current_chain_bits[move_support_indices] ^= True
+        current_data_term_bits[move_support_indices] ^= True
+        return True, int(delta_data_weight)
+
+    support_size = int(move_support_indices.shape[0])
     if support_size == 0:
-        return False
+        return False, 0
 
     current_ones_on_support = int(
-        np.count_nonzero(current_data_term_bits[move_support])
+        np.count_nonzero(current_data_term_bits[move_support_indices])
     )
+    delta_data_weight = support_size - 2 * current_ones_on_support
+    log_acceptance = delta_data_weight * log_odds_data
+
+    if log_acceptance >= 0.0:
+        accepted = True
+    else:
+        accepted = bool(rng.random() < np.exp(log_acceptance))
+
+    if not accepted:
+        return False, 0
+
+    current_chain_bits[move_support_indices] ^= True
+    current_data_term_bits[move_support_indices] ^= True
+    return True, int(delta_data_weight)
+
+
+def _attempt_zero_syndrome_move_update_no_delta(
+        current_chain_bits,
+        current_data_term_bits,
+        move_support_indices,
+        log_odds_data,
+        rng):
+    """
+    Fast path for single-chain measurements that do not maintain data-weight cache.
+    """
+    if move_support_indices.dtype == np.bool_:
+        support_size = int(np.count_nonzero(move_support_indices))
+        if support_size == 0:
+            return False
+        current_ones_on_support = int(
+            np.count_nonzero(current_data_term_bits[move_support_indices])
+        )
+    else:
+        support_size = int(move_support_indices.shape[0])
+        if support_size == 0:
+            return False
+        current_ones_on_support = int(
+            np.count_nonzero(current_data_term_bits[move_support_indices])
+        )
     delta_data_weight = support_size - 2 * current_ones_on_support
     log_acceptance = delta_data_weight * log_odds_data
 
@@ -402,8 +538,8 @@ def _attempt_zero_syndrome_move_update(
     if not accepted:
         return False
 
-    current_chain_bits[move_support] ^= True
-    current_data_term_bits[move_support] ^= True
+    current_chain_bits[move_support_indices] ^= True
+    current_data_term_bits[move_support_indices] ^= True
     return True
 
 
@@ -418,9 +554,14 @@ def _run_one_kernel_sweep_zero_syndrome(
     kernel 路径不区分 contractible 与 winding，统一归入 contractible 字段。
     """
     accepted_count = 0
+    data_weight_delta = 0
     num_proposals = kernel_basis.shape[0]
     if num_proposals == 0:
-        return {"contractible_accepted": 0, "winding_accepted": 0}
+        return {
+            "contractible_accepted": 0,
+            "winding_accepted": 0,
+            "data_weight_delta": 0,
+        }
 
     for _ in range(num_proposals):
         generator_bits = _sample_random_kernel_move_bits(
@@ -428,17 +569,23 @@ def _run_one_kernel_sweep_zero_syndrome(
             rng=rng,
             max_subset_size=3,
         )
-        accepted_count += int(
+        accepted, accepted_data_weight_delta = (
             _attempt_zero_syndrome_move_update(
                 current_chain_bits=current_chain_bits,
                 current_data_term_bits=current_data_term_bits,
-                move_bits=generator_bits,
+                move_support_indices=generator_bits,
                 log_odds_data=log_odds_data,
                 rng=rng,
             )
         )
+        accepted_count += int(accepted)
+        data_weight_delta += accepted_data_weight_delta
 
-    return {"contractible_accepted": accepted_count, "winding_accepted": 0}
+    return {
+        "contractible_accepted": accepted_count,
+        "winding_accepted": 0,
+        "data_weight_delta": int(data_weight_delta),
+    }
 
 
 def _run_one_geometric_sweep_zero_syndrome(
@@ -447,7 +594,8 @@ def _run_one_geometric_sweep_zero_syndrome(
         zero_syndrome_move_data,
         log_odds_data,
         rng,
-        winding_repeat_factor=1):
+        winding_repeat_factor=1,
+        track_data_weight_delta=True):
     """
     对预计算的局部闭环和 winding loop 各做一次随机顺序 sweep。
     返回按 contractible / winding 拆分的接受计数。
@@ -456,35 +604,69 @@ def _run_one_geometric_sweep_zero_syndrome(
         raise ValueError("winding_repeat_factor must be >= 1")
     contractible_accepted_count = 0
     winding_accepted_count = 0
+    data_weight_delta = 0
     contractible_moves = zero_syndrome_move_data["contractible_moves"]
     winding_moves = zero_syndrome_move_data["winding_moves"]
 
-    for move_index in rng.permutation(contractible_moves.shape[0]):
-        contractible_accepted_count += int(
-            _attempt_zero_syndrome_move_update(
-                current_chain_bits=current_chain_bits,
-                current_data_term_bits=current_data_term_bits,
-                move_bits=contractible_moves[int(move_index)],
-                log_odds_data=log_odds_data,
-                rng=rng,
-            )
-        )
-
-    for _ in range(winding_repeat_factor):
-        for move_index in rng.permutation(winding_moves.shape[0]):
-            winding_accepted_count += int(
-                _attempt_zero_syndrome_move_update(
+    if not track_data_weight_delta:
+        for move_index in rng.permutation(contractible_moves.shape[0]):
+            contractible_accepted_count += int(
+                _attempt_zero_syndrome_move_update_no_delta(
                     current_chain_bits=current_chain_bits,
                     current_data_term_bits=current_data_term_bits,
-                    move_bits=winding_moves[int(move_index)],
+                    move_support_indices=contractible_moves[int(move_index)],
                     log_odds_data=log_odds_data,
                     rng=rng,
                 )
             )
+        for _ in range(winding_repeat_factor):
+            for move_index in rng.permutation(winding_moves.shape[0]):
+                winding_accepted_count += int(
+                    _attempt_zero_syndrome_move_update_no_delta(
+                        current_chain_bits=current_chain_bits,
+                        current_data_term_bits=current_data_term_bits,
+                        move_support_indices=winding_moves[int(move_index)],
+                        log_odds_data=log_odds_data,
+                        rng=rng,
+                    )
+                )
+        return {
+            "contractible_accepted": contractible_accepted_count,
+            "winding_accepted": winding_accepted_count,
+            "data_weight_delta": 0,
+        }
+
+    for move_index in rng.permutation(contractible_moves.shape[0]):
+        accepted, accepted_data_weight_delta = (
+            _attempt_zero_syndrome_move_update(
+                current_chain_bits=current_chain_bits,
+                current_data_term_bits=current_data_term_bits,
+                move_support_indices=contractible_moves[int(move_index)],
+                log_odds_data=log_odds_data,
+                rng=rng,
+            )
+        )
+        contractible_accepted_count += int(accepted)
+        data_weight_delta += accepted_data_weight_delta
+
+    for _ in range(winding_repeat_factor):
+        for move_index in rng.permutation(winding_moves.shape[0]):
+            accepted, accepted_data_weight_delta = (
+                _attempt_zero_syndrome_move_update(
+                    current_chain_bits=current_chain_bits,
+                    current_data_term_bits=current_data_term_bits,
+                    move_support_indices=winding_moves[int(move_index)],
+                    log_odds_data=log_odds_data,
+                    rng=rng,
+                )
+            )
+            winding_accepted_count += int(accepted)
+            data_weight_delta += accepted_data_weight_delta
 
     return {
         "contractible_accepted": contractible_accepted_count,
         "winding_accepted": winding_accepted_count,
+        "data_weight_delta": int(data_weight_delta),
     }
 
 
@@ -542,7 +724,8 @@ def _run_one_zero_syndrome_sweep(
         rng,
         zero_syndrome_move_data=None,
         kernel_basis=None,
-        winding_repeat_factor=1):
+        winding_repeat_factor=1,
+        track_data_weight_delta=True):
     if zero_syndrome_move_data is not None:
         return _run_one_geometric_sweep_zero_syndrome(
             current_chain_bits=current_chain_bits,
@@ -551,6 +734,7 @@ def _run_one_zero_syndrome_sweep(
             log_odds_data=log_odds_data,
             rng=rng,
             winding_repeat_factor=winding_repeat_factor,
+            track_data_weight_delta=track_data_weight_delta,
         )
     return _run_one_kernel_sweep_zero_syndrome(
         current_chain_bits=current_chain_bits,
@@ -606,13 +790,16 @@ def _run_measurement_update_cycle(
         zero_syndrome_move_data=None,
         kernel_basis=None,
         num_zero_syndrome_sweeps_per_cycle=1,
-        winding_repeat_factor=1):
+        winding_repeat_factor=1,
+        qubit_order_buffer=None,
+        track_data_weight_delta=True):
     single_bit_accepted_count = 0
     single_bit_attempted_count = 0
     contractible_accepted_count = 0
     winding_accepted_count = 0
     contractible_attempted_count = 0
     winding_attempted_count = 0
+    data_weight_delta = 0
 
     (
         contractible_per_sweep,
@@ -628,6 +815,7 @@ def _run_measurement_update_cycle(
         nonlocal winding_accepted_count
         nonlocal contractible_attempted_count
         nonlocal winding_attempted_count
+        nonlocal data_weight_delta
         for _ in range(num_zero_syndrome_sweeps_per_cycle):
             sweep_result = _run_one_zero_syndrome_sweep(
                 current_chain_bits=current_chain_bits,
@@ -637,11 +825,14 @@ def _run_measurement_update_cycle(
                 zero_syndrome_move_data=zero_syndrome_move_data,
                 kernel_basis=kernel_basis,
                 winding_repeat_factor=winding_repeat_factor,
+                track_data_weight_delta=track_data_weight_delta,
             )
             contractible_accepted_count += sweep_result["contractible_accepted"]
             winding_accepted_count += sweep_result["winding_accepted"]
             contractible_attempted_count += contractible_per_sweep
             winding_attempted_count += winding_per_sweep
+            if track_data_weight_delta:
+                data_weight_delta += sweep_result["data_weight_delta"]
 
     if syndrome_error_probability == 0.0:
         _apply_zero_syndrome_sweeps()
@@ -652,9 +843,13 @@ def _run_measurement_update_cycle(
             "winding_accepted_count": winding_accepted_count,
             "contractible_attempted_count": contractible_attempted_count,
             "winding_attempted_count": winding_attempted_count,
+            "data_weight_delta": int(data_weight_delta),
         }
 
-    single_bit_accepted_count += _run_one_sweep_safe(
+    (
+        single_bit_sweep_accepted_count,
+        single_bit_data_weight_delta,
+    ) = _run_one_sweep_safe(
         current_chain_bits=current_chain_bits,
         current_data_term_bits=current_data_term_bits,
         current_syndrome_term_bits=current_syndrome_term_bits,
@@ -662,8 +857,11 @@ def _run_measurement_update_cycle(
         log_odds_data=log_odds_data,
         log_odds_syndrome=log_odds_syndrome,
         rng=rng,
+        qubit_order_buffer=qubit_order_buffer,
     )
+    single_bit_accepted_count += single_bit_sweep_accepted_count
     single_bit_attempted_count += num_qubits
+    data_weight_delta += single_bit_data_weight_delta
 
     if use_hybrid_zero_syndrome_sweeps:
         _apply_zero_syndrome_sweeps()
@@ -675,6 +873,7 @@ def _run_measurement_update_cycle(
         "winding_accepted_count": winding_accepted_count,
         "contractible_attempted_count": contractible_attempted_count,
         "winding_attempted_count": winding_attempted_count,
+        "data_weight_delta": int(data_weight_delta),
     }
 
 
@@ -981,6 +1180,7 @@ def _run_single_disorder_measurement(
         rng=rng,
         initial_chain_bits=initial_chain_bits,
     )
+    qubit_order_buffer = np.arange(num_qubits, dtype=np.int32)
     num_zero_syndrome_proposals = _count_zero_syndrome_proposals(
         zero_syndrome_move_data=zero_syndrome_move_data,
         kernel_basis=kernel_basis,
@@ -1015,6 +1215,8 @@ def _run_single_disorder_measurement(
             winding_repeat_factor=diagnostic_config[
                 "winding_repeat_factor"
             ],
+            qubit_order_buffer=qubit_order_buffer,
+            track_data_weight_delta=False,
         )
 
     num_masks = logical_observable_masks.shape[0]
@@ -1085,6 +1287,8 @@ def _run_single_disorder_measurement(
                 winding_repeat_factor=diagnostic_config[
                     "winding_repeat_factor"
                 ],
+                qubit_order_buffer=qubit_order_buffer,
+                track_data_weight_delta=False,
             )
             measurement_single_bit_accepted_count += cycle_result[
                 "single_bit_accepted_count"
@@ -1308,6 +1512,8 @@ def run_disorder_average_simulation(
         pt_p_hot=None,
         pt_num_temperatures=None,
         pt_swap_attempt_every_num_sweeps=1,
+        num_zero_syndrome_sweeps_per_cycle=1,
+        winding_repeat_factor=1,
         precomputed_syndrome_uniform_values_per_disorder=None,
         precomputed_data_uniform_values_per_disorder=None):
     rng = np.random.default_rng(seed)
@@ -1321,6 +1527,13 @@ def run_disorder_average_simulation(
     num_replicas_per_start = int(num_replicas_per_start)
     if num_replicas_per_start < 1:
         raise ValueError("num_replicas_per_start must be >= 1")
+    diagnostic_config = _build_measurement_diagnostic_config(
+        num_zero_syndrome_sweeps_per_cycle=(
+            num_zero_syndrome_sweeps_per_cycle
+        ),
+        winding_repeat_factor=winding_repeat_factor,
+        record_measurement_trajectories=False,
+    )
     use_parallel_tempering = (
         pt_p_hot is not None or pt_num_temperatures is not None
     )
@@ -1605,6 +1818,12 @@ def run_disorder_average_simulation(
                     initial_chain_bits=initial_chain_bits_per_start[
                         start_index
                     ],
+                    num_zero_syndrome_sweeps_per_cycle=diagnostic_config[
+                        "num_zero_syndrome_sweeps_per_cycle"
+                    ],
+                    winding_repeat_factor=diagnostic_config[
+                        "winding_repeat_factor"
+                    ],
                 )
                 q0_q_top_values_per_start[start_index] = float(
                     np.mean(q0_m_u_values_per_start[start_index] ** 2)
@@ -1748,6 +1967,14 @@ def run_disorder_average_simulation(
                                 pt_swap_attempt_every_num_sweeps=(
                                     pt_swap_attempt_every_num_sweeps
                                 ),
+                                num_zero_syndrome_sweeps_per_cycle=(
+                                    diagnostic_config[
+                                        "num_zero_syndrome_sweeps_per_cycle"
+                                    ]
+                                ),
+                                winding_repeat_factor=diagnostic_config[
+                                    "winding_repeat_factor"
+                                ],
                             )
                         )
                         pt_swap_acceptance_rates = np.asarray(
@@ -1806,6 +2033,14 @@ def run_disorder_average_simulation(
                             initial_chain_bits=(
                                 initial_chain_bits_per_start[start_index]
                             ),
+                            num_zero_syndrome_sweeps_per_cycle=(
+                                diagnostic_config[
+                                    "num_zero_syndrome_sweeps_per_cycle"
+                                ]
+                            ),
+                            winding_repeat_factor=diagnostic_config[
+                                "winding_repeat_factor"
+                            ],
                             return_diagnostics=True,
                         )
                     chain_analysis = analyze_chain_diagnostics(
@@ -1957,6 +2192,12 @@ def run_disorder_average_simulation(
             "average_acceptance_rate_per_disorder": (
                 average_acceptance_rate_per_disorder
             ),
+            "num_zero_syndrome_sweeps_per_cycle": np.int64(
+                diagnostic_config["num_zero_syndrome_sweeps_per_cycle"]
+            ),
+            "winding_repeat_factor": np.int64(
+                diagnostic_config["winding_repeat_factor"]
+            ),
             "q0_start_sector_labels": q0_start_sector_labels,
             "q0_logical_observable_mean_values_per_disorder_per_start": (
                 q0_logical_observable_mean_values_per_disorder_per_start
@@ -1978,6 +2219,12 @@ def run_disorder_average_simulation(
         ),
         "average_acceptance_rate_per_disorder": (
             average_acceptance_rate_per_disorder
+        ),
+        "num_zero_syndrome_sweeps_per_cycle": np.int64(
+            diagnostic_config["num_zero_syndrome_sweeps_per_cycle"]
+        ),
+        "winding_repeat_factor": np.int64(
+            diagnostic_config["winding_repeat_factor"]
         ),
     }
     if q_positive_start_sector_labels is not None:
@@ -2041,7 +2288,9 @@ def scan_data_error_probability(
         num_replicas_per_start=1,
         pt_p_hot=None,
         pt_num_temperatures=None,
-        pt_swap_attempt_every_num_sweeps=1):
+        pt_swap_attempt_every_num_sweeps=1,
+        num_zero_syndrome_sweeps_per_cycle=1,
+        winding_repeat_factor=1):
     data_error_probability_array = np.asarray(
         data_error_probability_list,
         dtype=np.float64,
@@ -2087,6 +2336,10 @@ def scan_data_error_probability(
             pt_swap_attempt_every_num_sweeps=(
                 pt_swap_attempt_every_num_sweeps
             ),
+            num_zero_syndrome_sweeps_per_cycle=(
+                num_zero_syndrome_sweeps_per_cycle
+            ),
+            winding_repeat_factor=winding_repeat_factor,
         )
 
         disorder_q_top_values = result["disorder_q_top_values"]
@@ -2114,6 +2367,10 @@ def scan_data_error_probability(
         "q_top_curve": q_top_curve,
         "q_top_std_curve": q_top_std_curve,
         "average_acceptance_rate_curve": average_acceptance_rate_curve,
+        "num_zero_syndrome_sweeps_per_cycle": np.int64(
+            num_zero_syndrome_sweeps_per_cycle
+        ),
+        "winding_repeat_factor": np.int64(winding_repeat_factor),
     }
     if q0_mean_m_u_spread_linf_curve is not None:
         scan_result["q0_start_sector_labels"] = result[
@@ -2154,6 +2411,11 @@ def _run_single_scan_point_task(task_data):
         "pt_swap_attempt_every_num_sweeps",
         1,
     )
+    num_zero_syndrome_sweeps_per_cycle = task_data.get(
+        "num_zero_syndrome_sweeps_per_cycle",
+        1,
+    )
+    winding_repeat_factor = task_data.get("winding_repeat_factor", 1)
     seed = task_data["seed"]
     code_family = task_data["code_family"]
 
@@ -2184,6 +2446,10 @@ def _run_single_scan_point_task(task_data):
         pt_swap_attempt_every_num_sweeps=(
             pt_swap_attempt_every_num_sweeps
         ),
+        num_zero_syndrome_sweeps_per_cycle=(
+            num_zero_syndrome_sweeps_per_cycle
+        ),
+        winding_repeat_factor=winding_repeat_factor,
     )
 
     disorder_q_top_values = simulation_result["disorder_q_top_values"]
@@ -2309,6 +2575,8 @@ def scan_multiple_code_sizes(
         pt_p_hot=None,
         pt_num_temperatures=None,
         pt_swap_attempt_every_num_sweeps=1,
+        num_zero_syndrome_sweeps_per_cycle=1,
+        winding_repeat_factor=1,
         code_family="2d_toric"):
     """
     扫描多个 toric code 尺寸，并在内部对 burn-in 做线性放大。
@@ -2383,6 +2651,10 @@ def scan_multiple_code_sizes(
                 "pt_swap_attempt_every_num_sweeps": (
                     pt_swap_attempt_every_num_sweeps
                 ),
+                "num_zero_syndrome_sweeps_per_cycle": (
+                    num_zero_syndrome_sweeps_per_cycle
+                ),
+                "winding_repeat_factor": winding_repeat_factor,
                 "code_family": code_family,
                 "seed": (
                     seed_base + lattice_index * num_points + point_index
@@ -2557,6 +2829,10 @@ def scan_multiple_code_sizes(
         "average_acceptance_rate_curve_matrix": (
             average_acceptance_rate_curve_matrix
         ),
+        "num_zero_syndrome_sweeps_per_cycle": np.int64(
+            num_zero_syndrome_sweeps_per_cycle
+        ),
+        "winding_repeat_factor": np.int64(winding_repeat_factor),
     }
     if q0_start_sector_labels is not None:
         scan_result["q0_start_sector_labels"] = q0_start_sector_labels

@@ -23,7 +23,7 @@ DEFAULT_RUN_ROOT = (
     / "data"
     / "3d_toric_code"
     / "with_measurement_noise"
-    / "zero_disorder_quick_scan_20260423_1712"
+    / "exp06_zero_disorder_quick_scan"
 )
 
 

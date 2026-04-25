@@ -36,6 +36,7 @@ def _attempt_replica_swaps(
         chain_bits_list,
         data_term_bits_list,
         syndrome_term_bits_list,
+        data_weight_per_temperature,
         log_odds_data_per_temperature,
         rng,
         parity_index,
@@ -55,8 +56,8 @@ def _attempt_replica_swaps(
     offset = parity_index % 2
     for i in range(offset, num_temperatures - 1, 2):
         j = i + 1
-        data_weight_i = int(np.count_nonzero(data_term_bits_list[i]))
-        data_weight_j = int(np.count_nonzero(data_term_bits_list[j]))
+        data_weight_i = int(data_weight_per_temperature[i])
+        data_weight_j = int(data_weight_per_temperature[j])
         log_ratio = (
             (log_odds_data_per_temperature[j] - log_odds_data_per_temperature[i])
             * (data_weight_i - data_weight_j)
@@ -80,6 +81,10 @@ def _attempt_replica_swaps(
                 syndrome_term_bits_list[j],
                 syndrome_term_bits_list[i],
             )
+            data_weight_per_temperature[i], data_weight_per_temperature[j] = (
+                data_weight_per_temperature[j],
+                data_weight_per_temperature[i],
+            )
 
 
 def run_parallel_tempering_measurement(
@@ -100,7 +105,8 @@ def run_parallel_tempering_measurement(
         num_zero_syndrome_sweeps_per_cycle=1,
         winding_repeat_factor=1,
         swap_attempt_every_num_sweeps=1,
-        return_diagnostics=False):
+        return_diagnostics=False,
+        record_all_temperature_trajectories=False):
     """
     在 p 温度 ladder 上做 parallel tempering 采样。
 
@@ -167,6 +173,7 @@ def run_parallel_tempering_measurement(
     chain_bits_list = []
     data_term_bits_list = []
     syndrome_term_bits_list = []
+    data_weight_per_temperature = np.empty(num_temperatures, dtype=np.int64)
     for temperature_index in range(num_temperatures):
         if initial_chain_bits_per_temperature is None:
             initial_chain_bits = None
@@ -189,6 +196,9 @@ def run_parallel_tempering_measurement(
         chain_bits_list.append(current_chain_bits)
         data_term_bits_list.append(current_data_term_bits)
         syndrome_term_bits_list.append(current_syndrome_term_bits)
+        data_weight_per_temperature[temperature_index] = np.count_nonzero(
+            current_data_term_bits
+        )
 
     single_bit_accepted_per_temperature = np.zeros(
         num_temperatures, dtype=np.int64,
@@ -214,6 +224,7 @@ def run_parallel_tempering_measurement(
     swap_attempt_counts = np.zeros(
         max(num_temperatures - 1, 0), dtype=np.int64,
     )
+    qubit_order_buffer = np.arange(num_qubits, dtype=np.int32)
 
     def _run_one_sweep_for_all_temperatures():
         for temperature_index in range(num_temperatures):
@@ -245,6 +256,10 @@ def run_parallel_tempering_measurement(
                 winding_repeat_factor=diagnostic_config[
                     "winding_repeat_factor"
                 ],
+                qubit_order_buffer=qubit_order_buffer,
+            )
+            data_weight_per_temperature[temperature_index] += (
+                cycle_result["data_weight_delta"]
             )
             single_bit_accepted_per_temperature[temperature_index] += (
                 cycle_result["single_bit_accepted_count"]
@@ -279,6 +294,7 @@ def run_parallel_tempering_measurement(
             chain_bits_list=chain_bits_list,
             data_term_bits_list=data_term_bits_list,
             syndrome_term_bits_list=syndrome_term_bits_list,
+            data_weight_per_temperature=data_weight_per_temperature,
             log_odds_data_per_temperature=log_odds_data_per_temperature,
             rng=rng,
             parity_index=swap_parity_counter,
@@ -298,11 +314,23 @@ def run_parallel_tempering_measurement(
         (num_temperatures, num_masks), dtype=np.int64,
     )
     if diagnostic_config["record_measurement_trajectories"]:
+        if record_all_temperature_trajectories:
+            diagnostic_temperature_indices = np.arange(
+                num_temperatures,
+                dtype=np.int64,
+            )
+        else:
+            diagnostic_temperature_indices = np.array([0], dtype=np.int64)
         logical_observable_values_per_measurement = np.empty(
-            (num_temperatures, num_measurements, num_masks),
+            (
+                diagnostic_temperature_indices.shape[0],
+                num_measurements,
+                num_masks,
+            ),
             dtype=np.int8,
         )
     else:
+        diagnostic_temperature_indices = None
         logical_observable_values_per_measurement = None
 
     for measurement_index in range(num_measurements):
@@ -318,9 +346,11 @@ def run_parallel_tempering_measurement(
                     logical_observable_sum_per_temperature[temperature_index]
                 ),
             )
-            if diagnostic_config["record_measurement_trajectories"]:
+        if diagnostic_config["record_measurement_trajectories"]:
+            for diagnostic_slot, temperature_index in enumerate(
+                    diagnostic_temperature_indices):
                 logical_observable_values_per_measurement[
-                    temperature_index,
+                    diagnostic_slot,
                     measurement_index,
                 ] = _compute_logical_observable_values(
                     current_chain_bits=chain_bits_list[temperature_index],
@@ -400,4 +430,5 @@ def run_parallel_tempering_measurement(
         result["logical_observable_values_per_measurement_per_temperature"] = (
             logical_observable_values_per_measurement
         )
+        result["diagnostic_temperature_indices"] = diagnostic_temperature_indices
     return result

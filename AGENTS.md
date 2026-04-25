@@ -24,3 +24,8 @@
     - 当登录到nd-0之后进一步使用命令`ssh nd-3`或`ssh nd-1`或`ssh nd-2`可以登录到计算节点，计算节点与存储节点共享存储，计算应在这个节点开展
     - 运行python请使用名为`11`的conda环境，运行请开启`screen`后台运行
 - 快速测试技巧：可以不做disorder sample，只看一个disorder固定为0的内部有没有相变
+
+实验参数陷阱：
+- `q=0` 生产扫描不能传 `--pt-*` 参数；parallel tempering 只支持 `q>0`，否则会在 preflight 阶段报 `parallel tempering is only supported for q>0`。
+- `q=0` 多起点扫描必须确认实际使用 `q0_num_start_chains=8` 或等价 `num_start_chains=8`；若误传 `--num-start-chains 1`，会覆盖 `q0_num_start_chains`，导致只跑单 start，`q0_mean_q_top_spread_curve_matrix` 全为 0，结果不能与 8-start 基线比较。
+- 对比历史 `q=0` threshold 时，优先参考 `exp04_q0_crossing_window_scout`；新 run 若曲线明显偏离，应先检查 manifest 中的 `common_random_disorder_across_p`、`num_start_chains`、`q0_num_start_chains`、`pt_num_temperatures` 和 commit SHA。

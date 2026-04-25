@@ -19,13 +19,17 @@
 
 ## 3D / No Measurement Noise
 
-- `q0_smoke_local_20260421_234202`：3D `q=0` 生产路径 smoke，只验证管线与张量 shape；看 [scan_result_multi_L_3d_toric_q0_smoke.png](data/3d_toric_code/without_measurement_noise/q0_smoke_local_20260421_234202/scan_result_multi_L_3d_toric_q0_smoke.png)。
-- `q0_threshold_scout_nd1_20260421_235447`：首轮 scout 证明 `p≤0.12` 只包含饱和平台伪 crossing；看 [scan_result_multi_L_3d_toric_q0_threshold_scout_local_gap_crossing.png](data/3d_toric_code/without_measurement_noise/q0_threshold_scout_nd1_20260421_235447/scan_result_multi_L_3d_toric_q0_threshold_scout_local_gap_crossing.png)。
-- `q0_threshold_scout_stageA_nd1_20260422_100557`：窗口右移到 `0.10~0.20` 仍未见 crossing；看 [scan_result_multi_L_3d_toric_q0_threshold_scout_local_gap_crossing.png](data/3d_toric_code/without_measurement_noise/q0_threshold_scout_stageA_nd1_20260422_100557/local_reanalysis/scan_result_multi_L_3d_toric_q0_threshold_scout_local_gap_crossing.png)。
-- `q0_threshold_scout_stageB_nd3_20260422_101018`：在 `p≈0.218~0.230` 首次看到可信 interior crossing；看 [scan_result_multi_L_3d_toric_q0_threshold_scout_local_gap_crossing.png](data/3d_toric_code/without_measurement_noise/q0_threshold_scout_stageB_nd3_20260422_101018/local_reanalysis/scan_result_multi_L_3d_toric_q0_threshold_scout_local_gap_crossing.png)。
+- `exp01_q0_pipeline_smoke`：3D `q=0` 生产路径 smoke，只验证管线与张量 shape；看 [scan_result_multi_L_3d_toric_q0_smoke.png](data/3d_toric_code/without_measurement_noise/exp01_q0_pipeline_smoke/scan_result_multi_L_3d_toric_q0_smoke.png)。
+- `exp02_q0_low_p_scout`：首轮 scout 证明 `p≤0.12` 只包含饱和平台伪 crossing；看 [scan_result_multi_L_3d_toric_q0_threshold_scout_local_gap_crossing.png](data/3d_toric_code/without_measurement_noise/exp02_q0_low_p_scout/scan_result_multi_L_3d_toric_q0_threshold_scout_local_gap_crossing.png)。
+- `exp03_q0_right_shift_scout`：窗口右移到 `0.10~0.20` 仍未见 crossing；看 [scan_result_multi_L_3d_toric_q0_threshold_scout_local_gap_crossing.png](data/3d_toric_code/without_measurement_noise/exp03_q0_right_shift_scout/local_reanalysis/scan_result_multi_L_3d_toric_q0_threshold_scout_local_gap_crossing.png)。
+- `exp04_q0_crossing_window_scout`：在 `p≈0.218~0.230` 首次看到可信 interior crossing；看 [scan_result_multi_L_3d_toric_q0_threshold_scout_local_gap_crossing.png](data/3d_toric_code/without_measurement_noise/exp04_q0_crossing_window_scout/local_reanalysis/scan_result_multi_L_3d_toric_q0_threshold_scout_local_gap_crossing.png)。
+- `exp09_q0_oneday_deep_fixed`：一天内快速 deep 的 `q=0` 修正版；优先作为 one-day 对照，正式 baseline 仍优先看 `exp04`；看 [gap_crossing.png](data/3d_toric_code/without_measurement_noise/exp09_q0_oneday_deep_fixed/q_0p0000/scan_result_multi_L_3d_toric_q0_oneday_deep_common_random_gap_crossing.png)。
 
 ## 3D / With Measurement Noise
 
-- 暂无实验。
+- `exp05_q005_local_precheck_after_fix`：修复后本地轻量预检，只验证 `q>0` PT/multi-start 生产路径和诊断落盘。
+- `exp06_zero_disorder_quick_scan`：全零 disorder 单样本快速摸底；不能作为 disorder-averaged threshold 结论。
+- `exp07_q005_broad_scan`：正式 `q=0.005` broad scan；给出 `p≈0.2077` deep-window 线索，但 `4` disorder CI 较宽。
+- `exp08_q005_oneday_deep_scan`：一天内快速 deep；`primary_crossing_window_hit=false` 且 convergence 仅 `3/21` 通过，不宣称 threshold。
 
 更细的数据索引见 [data/README.md](data/README.md)。

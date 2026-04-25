@@ -1,3 +1,5 @@
+import argparse
+
 import numpy as np
 
 from build_toric_code_examples import (
@@ -10,13 +12,18 @@ from linear_section import build_linear_section
 from main import (
     _build_kernel_basis_from_linear_section,
     _build_q0_initial_chain_bits_per_start,
+    _compute_log_odds,
+    _run_measurement_update_cycle,
     _run_single_disorder_measurement,
     run_disorder_average_simulation,
     run_q_positive_single_bit_acceptance_bruteforce_test,
 )
 from mcmc_diagnostics import equal_log_odds_ladder
 from mcmc import draw_disorder_sample
-from mcmc_parallel_tempering import run_parallel_tempering_measurement
+from mcmc_parallel_tempering import (
+    _attempt_replica_swaps,
+    run_parallel_tempering_measurement,
+)
 from preprocessing import (
     build_checks_touching_each_qubit,
     build_logical_observable_masks,
@@ -417,6 +424,40 @@ def _run_zero_syndrome_move_structure_test(
         "q=0 move structure test failed: winding moves must have weight "
         f"{expected_winding_weight}"
     )
+    if "contractible_move_supports" in zero_syndrome_move_data:
+        contractible_supports = zero_syndrome_move_data[
+            "contractible_move_supports"
+        ]
+        assert contractible_supports.shape == (
+            zero_syndrome_move_data["contractible_moves"].shape[0],
+            expected_contractible_weight,
+        ), "q=0 support table shape mismatch for contractible moves"
+        for move_index, support in enumerate(contractible_supports):
+            reconstructed_move = np.zeros(
+                zero_syndrome_move_data["contractible_moves"].shape[1],
+                dtype=bool,
+            )
+            reconstructed_move[support] = True
+            assert np.array_equal(
+                reconstructed_move,
+                zero_syndrome_move_data["contractible_moves"][move_index],
+            ), "q=0 contractible support table differs from dense move"
+    if "winding_move_supports" in zero_syndrome_move_data:
+        winding_supports = zero_syndrome_move_data["winding_move_supports"]
+        assert winding_supports.shape == (
+            zero_syndrome_move_data["winding_moves"].shape[0],
+            expected_winding_weight,
+        ), "q=0 support table shape mismatch for winding moves"
+        for move_index, support in enumerate(winding_supports):
+            reconstructed_move = np.zeros(
+                zero_syndrome_move_data["winding_moves"].shape[1],
+                dtype=bool,
+            )
+            reconstructed_move[support] = True
+            assert np.array_equal(
+                reconstructed_move,
+                zero_syndrome_move_data["winding_moves"][move_index],
+            ), "q=0 winding support table differs from dense move"
 
 
 def _run_3d_q0_sector_distinguishability_test():
@@ -998,7 +1039,288 @@ def _run_q_to_zero_continuity_diagnostic():
         )
 
 
+def _unnormalized_log_weight_for_swap_regression(
+        parity_check_matrix,
+        chain_bits,
+        disorder_data_error_bits,
+        observed_syndrome_bits,
+        data_log_odds,
+        syndrome_log_odds):
+    data_weight = int(np.count_nonzero(chain_bits ^ disorder_data_error_bits))
+    syndrome_bits = (
+        parity_check_matrix.astype(np.uint8)
+        @ chain_bits.astype(np.uint8)
+    ) % 2
+    syndrome_weight = int(np.count_nonzero(
+        syndrome_bits.astype(bool) ^ observed_syndrome_bits
+    ))
+    return float(data_weight * data_log_odds + syndrome_weight * syndrome_log_odds)
+
+
+def _run_pt_swap_weight_regression():
+    parity_check_matrix, _ = build_3d_toric_code(lattice_size=2)
+    rng = np.random.default_rng(2026042501)
+    num_checks, num_qubits = parity_check_matrix.shape
+    observed_syndrome_bits = rng.random(num_checks) < 0.005
+    disorder_data_error_bits = rng.random(num_qubits) < 0.21
+    p_i = 0.21
+    p_j = 0.32
+    log_odds_i = float(np.log(p_i / (1.0 - p_i)))
+    log_odds_j = float(np.log(p_j / (1.0 - p_j)))
+    log_odds_syndrome = float(np.log(0.005 / (1.0 - 0.005)))
+
+    print("\nPT swap full-weight regression")
+    for case_index in range(128):
+        chain_i = rng.integers(0, 2, size=num_qubits).astype(bool)
+        chain_j = rng.integers(0, 2, size=num_qubits).astype(bool)
+        data_weight_i = int(np.count_nonzero(chain_i ^ disorder_data_error_bits))
+        data_weight_j = int(np.count_nonzero(chain_j ^ disorder_data_error_bits))
+        cached_formula_log_ratio = (
+            (log_odds_j - log_odds_i) * (data_weight_i - data_weight_j)
+        )
+        full_before = (
+            _unnormalized_log_weight_for_swap_regression(
+                parity_check_matrix=parity_check_matrix,
+                chain_bits=chain_i,
+                disorder_data_error_bits=disorder_data_error_bits,
+                observed_syndrome_bits=observed_syndrome_bits,
+                data_log_odds=log_odds_i,
+                syndrome_log_odds=log_odds_syndrome,
+            )
+            + _unnormalized_log_weight_for_swap_regression(
+                parity_check_matrix=parity_check_matrix,
+                chain_bits=chain_j,
+                disorder_data_error_bits=disorder_data_error_bits,
+                observed_syndrome_bits=observed_syndrome_bits,
+                data_log_odds=log_odds_j,
+                syndrome_log_odds=log_odds_syndrome,
+            )
+        )
+        full_after = (
+            _unnormalized_log_weight_for_swap_regression(
+                parity_check_matrix=parity_check_matrix,
+                chain_bits=chain_i,
+                disorder_data_error_bits=disorder_data_error_bits,
+                observed_syndrome_bits=observed_syndrome_bits,
+                data_log_odds=log_odds_j,
+                syndrome_log_odds=log_odds_syndrome,
+            )
+            + _unnormalized_log_weight_for_swap_regression(
+                parity_check_matrix=parity_check_matrix,
+                chain_bits=chain_j,
+                disorder_data_error_bits=disorder_data_error_bits,
+                observed_syndrome_bits=observed_syndrome_bits,
+                data_log_odds=log_odds_i,
+                syndrome_log_odds=log_odds_syndrome,
+            )
+        )
+        if not np.isclose(
+                cached_formula_log_ratio,
+                full_after - full_before,
+                atol=1e-12,
+                rtol=0.0):
+            raise AssertionError(
+                "PT swap log ratio mismatch: "
+                f"case_index={case_index}, "
+                f"cached={cached_formula_log_ratio:.16e}, "
+                f"full={full_after - full_before:.16e}"
+            )
+    print("PT swap full-weight regression passed")
+
+
+def _run_data_weight_cache_consistency_regression():
+    parity_check_matrix, _ = build_3d_toric_code(lattice_size=2)
+    zero_syndrome_move_data = build_3d_toric_zero_syndrome_move_data(
+        lattice_size=2
+    )
+    checks_touching_each_qubit = build_checks_touching_each_qubit(
+        parity_check_matrix
+    )
+    rng = np.random.default_rng(2026042503)
+    num_checks, num_qubits = parity_check_matrix.shape
+    observed_syndrome_bits = rng.random(num_checks) < 0.005
+    disorder_data_error_bits = rng.random(num_qubits) < 0.21
+    current_chain_bits = rng.integers(0, 2, size=num_qubits).astype(bool)
+    current_data_term_bits = current_chain_bits ^ disorder_data_error_bits
+    current_syndrome_term_bits = (
+        (
+            parity_check_matrix.astype(np.uint8)
+            @ current_chain_bits.astype(np.uint8)
+        ) % 2
+    ).astype(bool)
+    current_syndrome_term_bits ^= observed_syndrome_bits
+
+    cached_data_weight = int(np.count_nonzero(current_data_term_bits))
+    log_odds_data = _compute_log_odds(0.21)
+    log_odds_syndrome = _compute_log_odds(0.005)
+    qubit_order_buffer = np.arange(num_qubits, dtype=np.int32)
+
+    print("\nData-weight cache consistency regression")
+    for cycle_index in range(64):
+        cycle_result = _run_measurement_update_cycle(
+            current_chain_bits=current_chain_bits,
+            current_data_term_bits=current_data_term_bits,
+            current_syndrome_term_bits=current_syndrome_term_bits,
+            syndrome_error_probability=0.005,
+            checks_touching_each_qubit=checks_touching_each_qubit,
+            log_odds_data=log_odds_data,
+            log_odds_syndrome=log_odds_syndrome,
+            rng=rng,
+            num_qubits=num_qubits,
+            num_zero_syndrome_proposals=0,
+            use_hybrid_zero_syndrome_sweeps=True,
+            zero_syndrome_move_data=zero_syndrome_move_data,
+            num_zero_syndrome_sweeps_per_cycle=2,
+            winding_repeat_factor=2,
+            qubit_order_buffer=qubit_order_buffer,
+        )
+        cached_data_weight += int(cycle_result["data_weight_delta"])
+        true_data_weight = int(np.count_nonzero(current_data_term_bits))
+        if cached_data_weight != true_data_weight:
+            raise AssertionError(
+                "data-weight cache mismatch after update cycle: "
+                f"cycle_index={cycle_index}, "
+                f"cached={cached_data_weight}, true={true_data_weight}"
+            )
+        true_syndrome_term_bits = (
+            (
+                parity_check_matrix.astype(np.uint8)
+                @ current_chain_bits.astype(np.uint8)
+            ) % 2
+        ).astype(bool)
+        true_syndrome_term_bits ^= observed_syndrome_bits
+        if not np.array_equal(
+                current_syndrome_term_bits,
+                true_syndrome_term_bits):
+            raise AssertionError(
+                "syndrome-term cache mismatch after update cycle: "
+                f"cycle_index={cycle_index}"
+            )
+
+    num_temperatures = 4
+    chain_bits_list = [
+        rng.integers(0, 2, size=num_qubits).astype(bool)
+        for _ in range(num_temperatures)
+    ]
+    data_term_bits_list = [
+        chain_bits ^ disorder_data_error_bits
+        for chain_bits in chain_bits_list
+    ]
+    syndrome_term_bits_list = []
+    for chain_bits in chain_bits_list:
+        syndrome_term_bits = (
+            (
+                parity_check_matrix.astype(np.uint8)
+                @ chain_bits.astype(np.uint8)
+            ) % 2
+        ).astype(bool)
+        syndrome_term_bits ^= observed_syndrome_bits
+        syndrome_term_bits_list.append(syndrome_term_bits)
+    data_weight_per_temperature = np.asarray(
+        [
+            np.count_nonzero(data_term_bits)
+            for data_term_bits in data_term_bits_list
+        ],
+        dtype=np.int64,
+    )
+    log_odds_data_per_temperature = np.asarray(
+        [_compute_log_odds(p) for p in (0.21, 0.25, 0.30, 0.36)],
+        dtype=np.float64,
+    )
+    swap_accept_counts = np.zeros(num_temperatures - 1, dtype=np.int64)
+    swap_attempt_counts = np.zeros(num_temperatures - 1, dtype=np.int64)
+
+    for swap_index in range(32):
+        _attempt_replica_swaps(
+            chain_bits_list=chain_bits_list,
+            data_term_bits_list=data_term_bits_list,
+            syndrome_term_bits_list=syndrome_term_bits_list,
+            data_weight_per_temperature=data_weight_per_temperature,
+            log_odds_data_per_temperature=log_odds_data_per_temperature,
+            rng=rng,
+            parity_index=swap_index,
+            swap_accept_counts=swap_accept_counts,
+            swap_attempt_counts=swap_attempt_counts,
+        )
+        for temperature_index, data_term_bits in enumerate(data_term_bits_list):
+            true_data_weight = int(np.count_nonzero(data_term_bits))
+            cached_data_weight = int(
+                data_weight_per_temperature[temperature_index]
+            )
+            if cached_data_weight != true_data_weight:
+                raise AssertionError(
+                    "PT data-weight cache mismatch after swap: "
+                    f"swap_index={swap_index}, "
+                    f"temperature_index={temperature_index}, "
+                    f"cached={cached_data_weight}, true={true_data_weight}"
+                )
+    print("Data-weight cache consistency regression passed")
+
+
+def _run_quick_validations():
+    parity_check_matrix_2d, dual_logical_z_basis_2d = build_2d_toric_code(
+        lattice_size=2
+    )
+    linear_section_data_2d = build_linear_section(parity_check_matrix_2d)
+    logical_observable_masks_2d = build_logical_observable_masks(
+        parity_check_matrix=parity_check_matrix_2d,
+        dual_logical_z_basis=dual_logical_z_basis_2d,
+        linear_section_data=linear_section_data_2d,
+    )
+    checks_touching_each_qubit_2d = build_checks_touching_each_qubit(
+        parity_check_matrix_2d
+    )
+    zero_syndrome_move_data_2d = build_2d_toric_zero_syndrome_move_data(
+        lattice_size=2
+    )
+    _run_zero_syndrome_move_structure_test(
+        parity_check_matrix=parity_check_matrix_2d,
+        zero_syndrome_move_data=zero_syndrome_move_data_2d,
+        expected_contractible_weight=4,
+        expected_winding_weight=2,
+    )
+    _run_validation_case(
+        test_name="Quick exact",
+        parity_check_matrix=parity_check_matrix_2d,
+        logical_observable_masks=logical_observable_masks_2d,
+        checks_touching_each_qubit=checks_touching_each_qubit_2d,
+        kernel_basis=None,
+        zero_syndrome_move_data=zero_syndrome_move_data_2d,
+        syndrome_error_probability=0.0,
+        data_error_probability=0.08,
+        seed=2026042502,
+        num_burn_in_sweeps=200,
+        num_measurements_per_disorder=1200,
+        num_sweeps_between_measurements=2,
+        tolerance=6.0 / np.sqrt(1200),
+    )
+
+    parity_check_matrix_3d, _ = build_3d_toric_code(lattice_size=2)
+    zero_syndrome_move_data_3d = build_3d_toric_zero_syndrome_move_data(
+        lattice_size=2
+    )
+    _run_zero_syndrome_move_structure_test(
+        parity_check_matrix=parity_check_matrix_3d,
+        zero_syndrome_move_data=zero_syndrome_move_data_3d,
+        expected_contractible_weight=6,
+        expected_winding_weight=4,
+    )
+    _run_q_positive_single_bit_bruteforce_regression()
+    _run_data_weight_cache_consistency_regression()
+    _run_pt_swap_weight_regression()
+    print("Quick exact-enumeration validations passed.")
+
+
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(
+        description="Exact enumeration and MCMC validation checks."
+    )
+    parser.add_argument("--quick", action="store_true")
+    args = parser.parse_args()
+    if args.quick:
+        _run_quick_validations()
+        raise SystemExit(0)
+
     lattice_size = 3
     num_burn_in_sweeps = 1000
     num_measurements_per_disorder = 5000
