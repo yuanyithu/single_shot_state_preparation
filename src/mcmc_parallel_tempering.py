@@ -22,6 +22,7 @@ from mcmc import (
 from main import (
     _build_kernel_basis_from_linear_section,
     _build_measurement_diagnostic_config,
+    _build_numba_update_kernel_data,
     _compute_log_odds,
     _compute_logical_observable_values,
     _count_zero_syndrome_proposals,
@@ -160,6 +161,11 @@ def run_parallel_tempering_measurement(
         kernel_basis=kernel_basis,
         winding_repeat_factor=winding_repeat_factor,
     )
+    numba_update_kernel_data = _build_numba_update_kernel_data(
+        checks_touching_each_qubit=checks_touching_each_qubit,
+        zero_syndrome_move_data=zero_syndrome_move_data,
+        num_qubits=num_qubits,
+    )
 
     log_odds_data_per_temperature = np.array(
         [
@@ -257,6 +263,7 @@ def run_parallel_tempering_measurement(
                     "winding_repeat_factor"
                 ],
                 qubit_order_buffer=qubit_order_buffer,
+                numba_update_kernel_data=numba_update_kernel_data,
             )
             data_weight_per_temperature[temperature_index] += (
                 cycle_result["data_weight_delta"]
