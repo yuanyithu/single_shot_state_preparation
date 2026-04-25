@@ -103,11 +103,33 @@ def _load_json(input_path):
 def _effective_num_burn_in_sweeps(
         num_burn_in_sweeps,
         num_qubits,
-        burn_in_scaling_reference_num_qubits):
-    return int(np.ceil(
+        burn_in_scaling_reference_num_qubits,
+        max_effective_num_burn_in_sweeps=None):
+    effective_num_burn_in_sweeps = int(np.ceil(
         num_burn_in_sweeps
         * (num_qubits / burn_in_scaling_reference_num_qubits)
     ))
+    if max_effective_num_burn_in_sweeps is None:
+        return effective_num_burn_in_sweeps
+    return min(
+        effective_num_burn_in_sweeps,
+        int(max_effective_num_burn_in_sweeps),
+    )
+
+
+def _sort_tasks_for_execution(task_data_list):
+    """
+    Run larger lattice sizes first to avoid long L-tail chunks at the end.
+    Seeds and output paths are assigned before this sort, so results are unchanged.
+    """
+    return sorted(
+        task_data_list,
+        key=lambda task_data: (
+            -int(task_data["lattice_size"]),
+            int(task_data["point_index"]),
+            int(task_data["chunk_index"]),
+        ),
+    )
 
 
 def _resolve_cli_num_start_chains(
@@ -168,6 +190,10 @@ def _build_submit_config_from_args(args):
         raise ValueError(
             "num_disorder_samples_total must be divisible by chunk_size"
         )
+    if (
+            args.max_effective_num_burn_in_sweeps is not None
+            and args.max_effective_num_burn_in_sweeps < 1):
+        raise ValueError("max_effective_num_burn_in_sweeps must be >= 1")
 
     run_root = Path(args.run_root).expanduser().resolve()
     chunks_dir = run_root / "chunks"
@@ -237,6 +263,11 @@ def _build_submit_config_from_args(args):
         "burn_in_scaling_reference_num_qubits": int(
             args.burn_in_scaling_reference_num_qubits
         ),
+        "max_effective_num_burn_in_sweeps": (
+            None
+            if args.max_effective_num_burn_in_sweeps is None
+            else int(args.max_effective_num_burn_in_sweeps)
+        ),
         "workers": int(args.workers),
         "git_commit_sha": git_commit_sha,
         "hostname": socket.gethostname(),
@@ -266,6 +297,9 @@ def _build_chunk_tasks(config):
             num_qubits=num_qubits,
             burn_in_scaling_reference_num_qubits=(
                 config["burn_in_scaling_reference_num_qubits"]
+            ),
+            max_effective_num_burn_in_sweeps=(
+                config["max_effective_num_burn_in_sweeps"]
             ),
         )
         num_qubits_list.append(int(num_qubits))
@@ -433,6 +467,9 @@ def _build_manifest(
             "seed_base": config["seed_base"],
             "burn_in_scaling_reference_num_qubits": (
                 config["burn_in_scaling_reference_num_qubits"]
+            ),
+            "max_effective_num_burn_in_sweeps": (
+                config["max_effective_num_burn_in_sweeps"]
             ),
             "workers": config["workers"],
             "output_stem": config["output_stem"],
@@ -827,6 +864,9 @@ def _merge_outputs(
                 num_qubits=num_qubits,
                 burn_in_scaling_reference_num_qubits=(
                     config["burn_in_scaling_reference_num_qubits"]
+                ),
+                max_effective_num_burn_in_sweeps=(
+                    config.get("max_effective_num_burn_in_sweeps")
                 ),
             )
         )
@@ -1578,6 +1618,7 @@ def _submit_run(args):
         chunk_entry["status"] = "pending"
         chunk_entry["error"] = None
         pending_task_data_list.append(task_data)
+    pending_task_data_list = _sort_tasks_for_execution(pending_task_data_list)
 
     _update_manifest_summary(manifest)
     _write_json_atomic(manifest_path, manifest)
@@ -1860,6 +1901,15 @@ def _build_parser():
         "--burn-in-scaling-reference-num-qubits",
         type=int,
         default=DEFAULT_BURN_IN_SCALING_REFERENCE_NUM_QUBITS,
+    )
+    common_submit_parser.add_argument(
+        "--max-effective-num-burn-in-sweeps",
+        type=int,
+        default=None,
+        help=(
+            "Optional cap applied after lattice-size burn-in scaling. "
+            "Leave unset to preserve the historical scaling rule."
+        ),
     )
     common_submit_parser.add_argument(
         "--git-commit-sha",
