@@ -1593,3 +1593,120 @@ max_effective_num_burn_in_sweeps = 3000
 ```
 
 若 convergence 诊断显示 `mean_q_top_spread` 仍系统性偏高，再考虑只在 `L=5` 或关键 `p` 点提高 `num_measurements_per_disorder` / `replicas`，不要先扩大 `p` 范围。
+
+## 2026-04-25 3D `q=0.0500` 快扫修正与 `p=0.18~0.22` 高力度检查
+
+摘要：
+- 做什么：先完成 `exp19_q050_quick_p010_020_20260425_nd1` 快速扫描，然后按正确 threshold 方向重新判读，并在三台节点上跑 `exp20a/b/c` 高力度复本；最后生成池化综合目录 `exp21_q050_heavy_p018_022_combined_summary`。
+- 关键修正：threshold 方向应为 `p<threshold` 时大码逻辑错误更小、`q_top` 更大；`p>threshold` 时大码更差、`q_top` 更小。因此 pairwise gap `q_top(L_small)-q_top(L_large)` 在 threshold 以下应为负，在 threshold 以上应为正。
+- 结论：`q=0.0500` 的三尺寸 threshold 不应放在先前误读的 `p≈0.11~0.13`。池化 `288` disorder 后，`L3-L4` crossing 约 `p≈0.193`，但 `L4-L5` 到 `p=0.22` 仍未 crossing；当前最稳妥表述是三尺寸共同 threshold 可能在 `p>0.22` 附近，需要下一轮向右扩展窄窗口。
+
+### 运行与产物
+
+本地目录：
+
+```text
+data/3d_toric_code/with_measurement_noise/exp19_q050_quick_p010_020_20260425_nd1
+data/3d_toric_code/with_measurement_noise/exp20a_q050_heavy_p018_022_20260425_nd1
+data/3d_toric_code/with_measurement_noise/exp20b_q050_heavy_p018_022_20260425_nd2
+data/3d_toric_code/with_measurement_noise/exp20c_q050_heavy_p018_022_20260425_nd3
+data/3d_toric_code/with_measurement_noise/exp21_q050_heavy_p018_022_combined_summary
+```
+
+完成状态：
+
+```text
+exp19 quick scout: 360/360 chunks, failed=0
+exp20a nd-1:       720/720 chunks, failed=0
+exp20b nd-2:       720/720 chunks, failed=0
+exp20c nd-3:       720/720 chunks, failed=0
+```
+
+主看图：
+
+- [q=0.0500 pooled q_top](data/3d_toric_code/with_measurement_noise/exp21_q050_heavy_p018_022_combined_summary/q050_heavy_pooled_sem95.png)
+- [q=0.0500 pooled gap](data/3d_toric_code/with_measurement_noise/exp21_q050_heavy_p018_022_combined_summary/q050_heavy_pooled_gap_crossing.png)
+- [machine-readable interpretation](data/3d_toric_code/with_measurement_noise/exp21_q050_heavy_p018_022_combined_summary/q050_heavy_pooled_interpretation.json)
+
+### 参数摘要
+
+`exp19` 快扫：
+
+```text
+q = 0.0500
+p = 0.1000,0.1111,...,0.2000
+L = 3,4,5
+num_disorder_samples_total = 24
+num_measurements_per_disorder = 768
+num_sweeps_between_measurements = 4
+pt_num_temperatures = 7
+max_effective_num_burn_in_sweeps = 2000
+```
+
+`exp20a/b/c` 高力度复本：
+
+```text
+q = 0.0500
+p = 0.180,0.190,0.200,0.210,0.220
+L = 3,4,5
+num_disorder_samples_total = 96 per node, pooled 288
+chunk_size = 2
+num_measurements_per_disorder = 2048
+num_sweeps_between_measurements = 6
+num_start_chains = 8
+num_replicas_per_start = 1
+pt_num_temperatures = 7
+max_effective_num_burn_in_sweeps = 3000
+```
+
+### 数值摘要
+
+`exp21` pooled `288` disorder：
+
+```text
+p      q_top(L3)       q_top(L4)       q_top(L5)       L3-L4 gap       L4-L5 gap
+0.18   0.4326±0.0338   0.4740±0.0342   0.5682±0.0349   -0.0414±0.0481  -0.0942±0.0488
+0.19   0.3684±0.0307   0.3736±0.0322   0.4563±0.0356   -0.0052±0.0445  -0.0827±0.0480
+0.20   0.2993±0.0268   0.2865±0.0294   0.3437±0.0328   +0.0128±0.0398  -0.0572±0.0441
+0.21   0.2320±0.0231   0.2141±0.0239   0.2497±0.0273   +0.0179±0.0332  -0.0356±0.0363
+0.22   0.1861±0.0199   0.1540±0.0188   0.1632±0.0213   +0.0321±0.0274  -0.0092±0.0284
+```
+
+线性 crossing：
+
+```text
+L3-L4 crossing ≈ 0.1929
+L4-L5 crossing: not observed by p=0.220
+```
+
+诊断：
+
+```text
+convergence passed points = 4/15
+mean_q_top_spread max     ≈ 0.0655
+min ESS                   ≈ 7.7
+min PT swap acceptance    ≈ 0.1006
+```
+
+### 判读
+
+- `exp19` 快扫中的 `p≈0.11~0.13` 自动 crossing 不能按 threshold 候选解释；那是我之前把 gap 方向讲反后造成的误读。
+- 正确方向下，`p=0.18` 和 `0.19` 仍表现为 `L3<L4<L5`，即大码更好，更像 threshold 以下。
+- 到 `p=0.20~0.22`，`L3-L4` 已经变为正，但 `L4-L5` 仍为负或接近零，说明有限尺寸 crossing 尚未三尺寸统一。
+- 当前数据支持：`q=0.0500` 的三尺寸共同 crossing 很可能在 `p=0.22` 右侧不远处；下一轮应扫 `p=0.22~0.26` 的窄窗口，而不是回到 `0.10~0.16`。
+- convergence 仍只有 `4/15` 通过，主要问题是 chain 间 `q_top` spread 和 ESS；不过 PT swap acceptance 不低，下一轮优先增加 disorder 和适度 measurement，而不是盲目增加温度数。
+
+### 下一步建议
+
+```text
+q = 0.0500
+L = 3,4,5
+p = 0.220,0.225,0.230,0.235,0.240,0.245,0.250,0.255,0.260
+num_disorder_samples_total = 96 或 128 per node，可三节点独立 seed 后池化
+chunk_size = 2
+num_measurements_per_disorder = 2048 或 3072
+num_start_chains = 8
+num_replicas_per_start = 1
+pt_num_temperatures = 7
+max_effective_num_burn_in_sweeps = 3000
+```

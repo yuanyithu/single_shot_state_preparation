@@ -24,3 +24,6 @@
 - [`exp15_q001_left_denseA_20260425_nd1`](with_measurement_noise/exp15_q001_left_denseA_20260425_nd1/) / [`exp16_q001_left_denseB_20260425_nd2`](with_measurement_noise/exp16_q001_left_denseB_20260425_nd2/)：`q=0.0100` 左侧 dense 独立复本，各 `64` disorder。
 - [`exp17_q001_left_fine_20260425_nd3`](with_measurement_noise/exp17_q001_left_fine_20260425_nd3/)：`q=0.0100` 左侧 `0.0025` fine grid。
 - [`exp18_q001_left_combined_summary`](with_measurement_noise/exp18_q001_left_combined_summary/)：`q=0.0100` 左侧综合分析；池化 `exp15+exp16` 后 `L3-L4` crossing 约 `p≈0.2233`，`L4-L5` 到 `p=0.230` 仍略负。
+- [`exp19_q050_quick_p010_020_20260425_nd1`](with_measurement_noise/exp19_q050_quick_p010_020_20260425_nd1/)：`q=0.0500` 快速摸底；只作方向修正前后的侦察对照，不作为最终 threshold。
+- [`exp20a_q050_heavy_p018_022_20260425_nd1`](with_measurement_noise/exp20a_q050_heavy_p018_022_20260425_nd1/) / [`exp20b_q050_heavy_p018_022_20260425_nd2`](with_measurement_noise/exp20b_q050_heavy_p018_022_20260425_nd2/) / [`exp20c_q050_heavy_p018_022_20260425_nd3`](with_measurement_noise/exp20c_q050_heavy_p018_022_20260425_nd3/)：`q=0.0500` 在 `p=0.18~0.22` 的三节点独立 seed 高力度复本，各 `96` disorder。
+- [`exp21_q050_heavy_p018_022_combined_summary`](with_measurement_noise/exp21_q050_heavy_p018_022_combined_summary/)：`q=0.0500` 池化综合分析；`288` disorder 后 `L3-L4` crossing 约 `p≈0.193`，`L4-L5` 到 `p=0.22` 仍未 crossing，提示三尺寸共同 threshold 可能在 `p>0.22` 附近。

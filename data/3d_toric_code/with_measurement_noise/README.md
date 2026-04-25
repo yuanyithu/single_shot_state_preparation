@@ -11,3 +11,6 @@
 - [`exp15_q001_left_denseA_20260425_nd1`](exp15_q001_left_denseA_20260425_nd1/) / [`exp16_q001_left_denseB_20260425_nd2`](exp16_q001_left_denseB_20260425_nd2/)：`q=0.0100` 左侧 dense 独立复本，各 `64` disorder，用于池化。
 - [`exp17_q001_left_fine_20260425_nd3`](exp17_q001_left_fine_20260425_nd3/)：`q=0.0100` 左侧 `0.0025` fine grid，作为 dense 池化的局部对照。
 - [`exp18_q001_left_combined_summary`](exp18_q001_left_combined_summary/)：`q=0.0100` 左侧综合图和 JSON；当前最重要结论是窗口约 `p≈0.22~0.235`，不应继续向 `p>0.24` 扩展。
+- [`exp19_q050_quick_p010_020_20260425_nd1`](exp19_q050_quick_p010_020_20260425_nd1/)：`q=0.0500` 快速摸底；用于确认曲线形状和修正 threshold 方向判读。
+- [`exp20a_q050_heavy_p018_022_20260425_nd1`](exp20a_q050_heavy_p018_022_20260425_nd1/) / [`exp20b_q050_heavy_p018_022_20260425_nd2`](exp20b_q050_heavy_p018_022_20260425_nd2/) / [`exp20c_q050_heavy_p018_022_20260425_nd3`](exp20c_q050_heavy_p018_022_20260425_nd3/)：`q=0.0500` 在 `p=0.18~0.22` 的高力度独立 seed 复本，各 `96` disorder。
+- [`exp21_q050_heavy_p018_022_combined_summary`](exp21_q050_heavy_p018_022_combined_summary/)：`q=0.0500` 三节点池化综合图和 JSON；当前结论是 `L3-L4` crossing 约 `p≈0.193`，`L4-L5` 到 `p=0.22` 仍未 crossing，下一轮应向 `0.22~0.26` 扩展。

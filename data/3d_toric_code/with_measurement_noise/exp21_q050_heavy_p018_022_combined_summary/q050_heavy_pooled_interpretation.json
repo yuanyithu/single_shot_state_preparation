@@ -1,0 +1,153 @@
+{
+  "automatic_summary": {
+    "primary_crossing_window_hit": false,
+    "recommended_server_window": {
+      "p_max": 0.22,
+      "p_min": 0.19288108586182065,
+      "reason": "one_pair_crosses_zero_other_within_pooled_ci95_interior",
+      "representative_p": 0.20644054293091033,
+      "step_reference": 0.010000000000000009
+    },
+    "right_edge_gap_signs": {
+      "3-4": 1,
+      "4-5": -1
+    }
+  },
+  "convergence": {
+    "mean_q_top_spread_max": 0.06552755075787742,
+    "min_effective_sample_size_min": 7.7038665659649155,
+    "num_passed_points": 4,
+    "num_total_points": 15,
+    "pt_min_swap_acceptance_min": 0.10056089743589744
+  },
+  "crossings": {
+    "L3_minus_L4": [
+      0.19288108586182065
+    ],
+    "L4_minus_L5": []
+  },
+  "data_error_probability_list": [
+    0.18,
+    0.19,
+    0.2,
+    0.21,
+    0.22
+  ],
+  "gap_sign_convention": "gap_L3_minus_L4=q_top(L=3)-q_top(L=4); below threshold it should be negative, above threshold positive.",
+  "lattice_size_list": [
+    3,
+    4,
+    5
+  ],
+  "paths": {
+    "convergence_json": "data/3d_toric_code/with_measurement_noise/exp21_q050_heavy_p018_022_combined_summary/q050_heavy_pooled_convergence.json",
+    "gap_plot": "data/3d_toric_code/with_measurement_noise/exp21_q050_heavy_p018_022_combined_summary/q050_heavy_pooled_gap_crossing.png",
+    "pooled_npz": "data/3d_toric_code/with_measurement_noise/exp21_q050_heavy_p018_022_combined_summary/q050_heavy_pooled_scan_result.npz",
+    "sem95_plot": "data/3d_toric_code/with_measurement_noise/exp21_q050_heavy_p018_022_combined_summary/q050_heavy_pooled_sem95.png",
+    "threshold_summary": "data/3d_toric_code/with_measurement_noise/exp21_q050_heavy_p018_022_combined_summary/threshold_summary.json"
+  },
+  "physical_direction_rule": "For p<threshold, larger L should have smaller logical error and therefore larger q_top; for p>threshold the ordering reverses and larger L has smaller q_top.",
+  "pooled_num_disorder_samples": 288,
+  "right_edge_gap_signs_physical": {
+    "L3_minus_L4": 1,
+    "L4_minus_L5": -1,
+    "meaning": "+ means right-edge point is on the high-p side for that size pair; - means still low-p side for that pair."
+  },
+  "rows": [
+    {
+      "gap_L3_minus_L4": -0.04143100601458366,
+      "gap_L3_minus_L4_ci95": 0.048072887444653135,
+      "gap_L4_minus_L5": -0.09416858860779365,
+      "gap_L4_minus_L5_ci95": 0.048841377879257346,
+      "ordering": "L3<L4<L5",
+      "p": 0.18,
+      "q_top": {
+        "L3": 0.43258937176257845,
+        "L4": 0.4740203777771621,
+        "L5": 0.5681889663849558
+      },
+      "q_top_ci95": {
+        "L3": 0.03383173476717374,
+        "L4": 0.03415283633770256,
+        "L5": 0.034915096494704305
+      }
+    },
+    {
+      "gap_L3_minus_L4": -0.005162209804568996,
+      "gap_L3_minus_L4_ci95": 0.044462116797082354,
+      "gap_L4_minus_L5": -0.0827326514122505,
+      "gap_L4_minus_L5_ci95": 0.04795448543394402,
+      "ordering": "L3<L4<L5",
+      "p": 0.19,
+      "q_top": {
+        "L3": 0.3684383372051848,
+        "L4": 0.3736005470097538,
+        "L5": 0.4563331984220043
+      },
+      "q_top_ci95": {
+        "L3": 0.03068053915572041,
+        "L4": 0.03218049637888919,
+        "L5": 0.03555345730083995
+      }
+    },
+    {
+      "gap_L3_minus_L4": 0.012755374231981809,
+      "gap_L3_minus_L4_ci95": 0.0398002943715621,
+      "gap_L4_minus_L5": -0.057192654807179666,
+      "gap_L4_minus_L5_ci95": 0.04409366765497378,
+      "ordering": "mixed",
+      "p": 0.2,
+      "q_top": {
+        "L3": 0.29927945479987156,
+        "L4": 0.28652408056788975,
+        "L5": 0.3437167353750694
+      },
+      "q_top_ci95": {
+        "L3": 0.026798361838698676,
+        "L4": 0.029426369718760354,
+        "L5": 0.032838092095036596
+      }
+    },
+    {
+      "gap_L3_minus_L4": 0.017881116253279483,
+      "gap_L3_minus_L4_ci95": 0.03322587764185941,
+      "gap_L4_minus_L5": -0.03561319990290532,
+      "gap_L4_minus_L5_ci95": 0.0362583001716474,
+      "ordering": "mixed",
+      "p": 0.21,
+      "q_top": {
+        "L3": 0.2319790230738738,
+        "L4": 0.21409790682059432,
+        "L5": 0.24971110672349964
+      },
+      "q_top_ci95": {
+        "L3": 0.023109011849624488,
+        "L4": 0.023873259442433247,
+        "L5": 0.027289774915369998
+      }
+    },
+    {
+      "gap_L3_minus_L4": 0.03210902861541229,
+      "gap_L3_minus_L4_ci95": 0.027400661635230115,
+      "gap_L4_minus_L5": -0.009231042619498947,
+      "gap_L4_minus_L5_ci95": 0.028433227396652064,
+      "ordering": "mixed",
+      "p": 0.22,
+      "q_top": {
+        "L3": 0.186075420606704,
+        "L4": 0.15396639199129172,
+        "L5": 0.16319743461079067
+      },
+      "q_top_ci95": {
+        "L3": 0.019939247323148383,
+        "L4": 0.018794219170657003,
+        "L5": 0.021336019918322027
+      }
+    }
+  ],
+  "source_npz": [
+    "data/3d_toric_code/with_measurement_noise/exp20a_q050_heavy_p018_022_20260425_nd1/q_0p0500/scan_result_multi_L_3d_toric_q0p0500_measurement_noise_threshold_search_common_random.npz",
+    "data/3d_toric_code/with_measurement_noise/exp20b_q050_heavy_p018_022_20260425_nd2/q_0p0500/scan_result_multi_L_3d_toric_q0p0500_measurement_noise_threshold_search_common_random.npz",
+    "data/3d_toric_code/with_measurement_noise/exp20c_q050_heavy_p018_022_20260425_nd3/q_0p0500/scan_result_multi_L_3d_toric_q0p0500_measurement_noise_threshold_search_common_random.npz"
+  ]
+}

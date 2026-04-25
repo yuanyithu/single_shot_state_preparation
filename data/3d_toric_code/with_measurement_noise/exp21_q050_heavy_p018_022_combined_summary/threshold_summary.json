@@ -1,0 +1,294 @@
+{
+  "boundary_saturation_artifact": false,
+  "code_family": "3d_toric",
+  "common_random_disorder_across_p": true,
+  "crossing_window": null,
+  "data_error_probability_list": [
+    0.18,
+    0.19,
+    0.2,
+    0.21,
+    0.22
+  ],
+  "gap_plot_path": "data/3d_toric_code/with_measurement_noise/exp21_q050_heavy_p018_022_combined_summary/q050_heavy_pooled_gap_crossing.png",
+  "input_path": "/Users/yuan/Desktop/Desktop/workspace/projects/project D/data/3d_toric_code/with_measurement_noise/exp21_q050_heavy_p018_022_combined_summary/q050_heavy_pooled_scan_result.npz",
+  "interior_crossing_window": null,
+  "interior_near_crossing_window": {
+    "p_max": 0.22,
+    "p_min": 0.19288108586182065,
+    "reason": "one_pair_crosses_zero_other_within_pooled_ci95_interior",
+    "representative_p": 0.20644054293091033
+  },
+  "lattice_size_list": [
+    3,
+    4,
+    5
+  ],
+  "left_edge_saturated_point_flags": [
+    false,
+    false,
+    false,
+    false,
+    false
+  ],
+  "left_edge_saturation_end_index": -1,
+  "left_edge_saturation_end_p": null,
+  "num_disorder_samples": 288,
+  "pair_labels": [
+    "3-4",
+    "4-5"
+  ],
+  "pairwise_gap_analysis": {
+    "delta_35": {
+      "boundary_artifact_crossing_detected": false,
+      "boundary_crossing_intervals": [],
+      "crossing_intervals": [
+        {
+          "crossing_estimate_p": 0.19288108586182065,
+          "left_index": 1,
+          "left_p": 0.19,
+          "right_index": 2,
+          "right_p": 0.2
+        }
+      ],
+      "crossing_location_classification": "inside_or_touching_window",
+      "delta_curve": [
+        -0.04143100601458366,
+        -0.005162209804568996,
+        0.012755374231981809,
+        0.017881116253279483,
+        0.03210902861541229
+      ],
+      "interior_crossing_intervals": [
+        {
+          "crossing_estimate_p": 0.19288108586182065,
+          "left_index": 1,
+          "left_p": 0.19,
+          "right_index": 2,
+          "right_p": 0.2
+        }
+      ],
+      "interior_near_crossing_hit": true,
+      "interior_near_crossing_windows": [
+        {
+          "index_max": 3,
+          "index_min": 0,
+          "p_max": 0.21,
+          "p_min": 0.18,
+          "reason": "abs_gap_within_pooled_ci95_interior",
+          "representative_index": 1,
+          "representative_p": 0.19
+        }
+      ],
+      "interior_sign_flip_detected": true,
+      "min_abs_delta_index": 1,
+      "min_abs_delta_p": 0.19,
+      "min_abs_delta_value": -0.005162209804568996,
+      "non_saturated_min_abs_delta_index": 1,
+      "non_saturated_min_abs_delta_p": 0.19,
+      "non_saturated_min_abs_delta_value": -0.005162209804568996,
+      "pair_label": "3-4",
+      "pooled_ci95_curve": [
+        0.048072887444653135,
+        0.044462116797082354,
+        0.0398002943715621,
+        0.03322587764185941,
+        0.027400661635230115
+      ],
+      "pooled_sem_at_min_abs": 0.022684753467899162,
+      "pooled_sem_curve": [
+        0.02452698339012915,
+        0.022684753467899162,
+        0.020306272638552093,
+        0.01695197838870378,
+        0.01397992940572965
+      ],
+      "raw_crossing_intervals": [
+        {
+          "crossing_estimate_p": 0.19288108586182065,
+          "left_index": 1,
+          "left_p": 0.19,
+          "right_index": 2,
+          "right_p": 0.2
+        }
+      ],
+      "right_edge_delta": 0.03210902861541229,
+      "right_edge_near_hit": false,
+      "right_edge_pooled_ci95": 0.027400661635230115,
+      "right_edge_pooled_sem": 0.01397992940572965,
+      "right_edge_sign": 1,
+      "secondary_proximity_hit": true,
+      "sign_flip_detected": true,
+      "sign_pattern": [
+        -1,
+        -1,
+        1,
+        1,
+        1
+      ]
+    },
+    "delta_57": {
+      "boundary_artifact_crossing_detected": false,
+      "boundary_crossing_intervals": [],
+      "crossing_intervals": [],
+      "crossing_location_classification": "right_of_window",
+      "delta_curve": [
+        -0.09416858860779365,
+        -0.0827326514122505,
+        -0.057192654807179666,
+        -0.03561319990290532,
+        -0.009231042619498947
+      ],
+      "interior_crossing_intervals": [],
+      "interior_near_crossing_hit": true,
+      "interior_near_crossing_windows": [
+        {
+          "index_max": 4,
+          "index_min": 3,
+          "p_max": 0.22,
+          "p_min": 0.21,
+          "reason": "abs_gap_within_pooled_ci95_interior",
+          "representative_index": 4,
+          "representative_p": 0.22
+        }
+      ],
+      "interior_sign_flip_detected": false,
+      "min_abs_delta_index": 4,
+      "min_abs_delta_p": 0.22,
+      "min_abs_delta_value": -0.009231042619498947,
+      "non_saturated_min_abs_delta_index": 4,
+      "non_saturated_min_abs_delta_p": 0.22,
+      "non_saturated_min_abs_delta_value": -0.009231042619498947,
+      "pair_label": "4-5",
+      "pooled_ci95_curve": [
+        0.048841377879257346,
+        0.04795448543394402,
+        0.04409366765497378,
+        0.0362583001716474,
+        0.028433227396652064
+      ],
+      "pooled_sem_at_min_abs": 0.014506748671761258,
+      "pooled_sem_curve": [
+        0.02491907034655987,
+        0.024466574200991846,
+        0.022496769211721317,
+        0.01849913274063643,
+        0.014506748671761258
+      ],
+      "raw_crossing_intervals": [],
+      "right_edge_delta": -0.009231042619498947,
+      "right_edge_near_hit": true,
+      "right_edge_pooled_ci95": 0.028433227396652064,
+      "right_edge_pooled_sem": 0.014506748671761258,
+      "right_edge_sign": -1,
+      "secondary_proximity_hit": true,
+      "sign_flip_detected": false,
+      "sign_pattern": [
+        -1,
+        -1,
+        -1,
+        -1,
+        -1
+      ]
+    }
+  },
+  "primary_crossing_window_hit": false,
+  "q_top_ci95_curve_matrix": [
+    [
+      0.03383173476717374,
+      0.030680539155720412,
+      0.026798361838698676,
+      0.023109011849624488,
+      0.019939247323148383
+    ],
+    [
+      0.03415283633770256,
+      0.03218049637888919,
+      0.029426369718760354,
+      0.023873259442433244,
+      0.018794219170657007
+    ],
+    [
+      0.0349150964947043,
+      0.03555345730083995,
+      0.03283809209503659,
+      0.027289774915369998,
+      0.021336019918322024
+    ]
+  ],
+  "q_top_curve_matrix": [
+    [
+      0.43258937176257845,
+      0.3684383372051848,
+      0.29927945479987156,
+      0.2319790230738738,
+      0.186075420606704
+    ],
+    [
+      0.4740203777771621,
+      0.3736005470097538,
+      0.28652408056788975,
+      0.21409790682059432,
+      0.15396639199129172
+    ],
+    [
+      0.5681889663849558,
+      0.4563331984220043,
+      0.3437167353750694,
+      0.24971110672349964,
+      0.16319743461079067
+    ]
+  ],
+  "q_top_sem_curve_matrix": [
+    [
+      0.01726108916692538,
+      0.015653336303938985,
+      0.013672633591172795,
+      0.011790312168175759,
+      0.010173085368953257
+    ],
+    [
+      0.017424916498827835,
+      0.016418620601474074,
+      0.015013453938143038,
+      0.012180234409404717,
+      0.00958888733196786
+    ],
+    [
+      0.01781382474219607,
+      0.01813951903104079,
+      0.01675412861991663,
+      0.013923354548658163,
+      0.010885724448123482
+    ]
+  ],
+  "raw_crossing_window": {
+    "p_max": 0.19288108586182065,
+    "p_min": 0.19288108586182065
+  },
+  "recommended_server_window": {
+    "p_max": 0.22,
+    "p_min": 0.19288108586182065,
+    "reason": "one_pair_crosses_zero_other_within_pooled_ci95_interior",
+    "representative_p": 0.20644054293091033,
+    "step_reference": 0.010000000000000009
+  },
+  "right_edge_gap_signs": {
+    "3-4": 1,
+    "4-5": -1
+  },
+  "right_edge_gap_values": {
+    "3-4": {
+      "delta": 0.03210902861541229,
+      "pooled_ci95": 0.027400661635230115
+    },
+    "4-5": {
+      "delta": -0.009231042619498947,
+      "pooled_ci95": 0.028433227396652064
+    }
+  },
+  "secondary_proximity_hit": true,
+  "sem95_plot_path": "data/3d_toric_code/with_measurement_noise/exp21_q050_heavy_p018_022_combined_summary/q050_heavy_pooled_sem95.png",
+  "summary_path": "data/3d_toric_code/with_measurement_noise/exp21_q050_heavy_p018_022_combined_summary/threshold_summary.json",
+  "syndrome_error_probability": 0.05
+}
