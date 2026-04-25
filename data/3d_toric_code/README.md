@@ -18,3 +18,9 @@
 - [`exp07_q005_broad_scan`](with_measurement_noise/exp07_q005_broad_scan/)：`q=0.005` disorder-averaged PT broad scan。结论是 `17/18` convergence gate 通过，gap 指示 `p≈0.2077`，但只有 `4` disorder，CI 较宽。
 - [`exp08_q005_oneday_deep_scan`](with_measurement_noise/exp08_q005_oneday_deep_scan/)：一天内快速 deep 的 `q=0.005` run。结论是 `primary_crossing_window_hit=false`，convergence 仅 `3/21` 通过；不能宣称 threshold，只能作为失败诊断和补样本依据。
 - [`exp11_q001_oneday_deep_partial`](with_measurement_noise/exp11_q001_oneday_deep_partial/)：停止过慢 `q=0.0100` one-day deep 后回收的 partial 数据。只有 `L=3,4` 完成，`L=5` 缺失；已生成 L3-L4 partial 图，但不能作为三尺寸 threshold。
+- [`exp12_q005_fine_20260425_nd1`](with_measurement_noise/exp12_q005_fine_20260425_nd1/)：Numba 后的 `q=0.0050` fine run；`528/528` chunks 完成，自动推荐窗口 `p≈0.2164~0.2200`。
+- [`exp13_q001_coarse_20260425_nd2`](with_measurement_noise/exp13_q001_coarse_20260425_nd2/)：`q=0.0100` coarse right-side check。结论是右侧大 `p` 已经偏过 crossing 区域。
+- [`exp14_q001_fine_20260425_nd3`](with_measurement_noise/exp14_q001_fine_20260425_nd3/)：`q=0.0100` `0.225~0.270` fine scan。支持把后续算力移回 `p≈0.20~0.23`。
+- [`exp15_q001_left_denseA_20260425_nd1`](with_measurement_noise/exp15_q001_left_denseA_20260425_nd1/) / [`exp16_q001_left_denseB_20260425_nd2`](with_measurement_noise/exp16_q001_left_denseB_20260425_nd2/)：`q=0.0100` 左侧 dense 独立复本，各 `64` disorder。
+- [`exp17_q001_left_fine_20260425_nd3`](with_measurement_noise/exp17_q001_left_fine_20260425_nd3/)：`q=0.0100` 左侧 `0.0025` fine grid。
+- [`exp18_q001_left_combined_summary`](with_measurement_noise/exp18_q001_left_combined_summary/)：`q=0.0100` 左侧综合分析；池化 `exp15+exp16` 后 `L3-L4` crossing 约 `p≈0.2233`，`L4-L5` 到 `p=0.230` 仍略负。
