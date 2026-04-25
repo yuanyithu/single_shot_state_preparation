@@ -105,6 +105,8 @@ def build_2d_toric_zero_syndrome_move_data(lattice_size):
         "start_sector_generators":
             np.ndarray，shape (2, 2L^2)，dtype=bool
             两条独立的非平凡 kernel loop，用于生成 4 个 q=0 合法初态
+        "contractible_move_supports" / "winding_move_supports":
+            与 dense move 等价的 int32 support-index 表，供热循环避免全长 mask 扫描
     """
     parity_check_matrix, _ = build_2d_toric_code(lattice_size)
 
@@ -119,47 +121,53 @@ def build_2d_toric_zero_syndrome_move_data(lattice_size):
         return num_horizontal_edges + row_index * lattice_size + column_index
 
     contractible_moves = np.zeros((num_vertices, num_qubits), dtype=bool)
+    contractible_move_supports = np.empty((num_vertices, 4), dtype=np.int32)
     for row_index in range(lattice_size):
         for column_index in range(lattice_size):
             vertex_index = row_index * lattice_size + column_index
             row_prev = (row_index - 1) % lattice_size
             column_prev = (column_index - 1) % lattice_size
+            support = np.array(
+                (
+                    horizontal_edge_qubit(row_index, column_index),
+                    horizontal_edge_qubit(row_index, column_prev),
+                    vertical_edge_qubit(row_index, column_index),
+                    vertical_edge_qubit(row_prev, column_index),
+                ),
+                dtype=np.int32,
+            )
+            contractible_move_supports[vertex_index] = support
 
-            contractible_moves[
-                vertex_index,
-                horizontal_edge_qubit(row_index, column_index),
-            ] = True
-            contractible_moves[
-                vertex_index,
-                horizontal_edge_qubit(row_index, column_prev),
-            ] = True
-            contractible_moves[
-                vertex_index,
-                vertical_edge_qubit(row_index, column_index),
-            ] = True
-            contractible_moves[
-                vertex_index,
-                vertical_edge_qubit(row_prev, column_index),
-            ] = True
+            contractible_moves[vertex_index, support] = True
 
     winding_moves = np.zeros(
         (2 * lattice_size, num_qubits),
         dtype=bool,
     )
+    winding_move_supports = np.empty(
+        (2 * lattice_size, lattice_size),
+        dtype=np.int32,
+    )
     for column_index in range(lattice_size):
+        support = np.empty(lattice_size, dtype=np.int32)
         for row_index in range(lattice_size):
-            winding_moves[
+            support[row_index] = horizontal_edge_qubit(
+                row_index,
                 column_index,
-                horizontal_edge_qubit(row_index, column_index),
-            ] = True
+            )
+        winding_move_supports[column_index] = support
+        winding_moves[column_index, support] = True
 
     for row_index in range(lattice_size):
         winding_row_index = lattice_size + row_index
+        support = np.empty(lattice_size, dtype=np.int32)
         for column_index in range(lattice_size):
-            winding_moves[
-                winding_row_index,
-                vertical_edge_qubit(row_index, column_index),
-            ] = True
+            support[column_index] = vertical_edge_qubit(
+                row_index,
+                column_index,
+            )
+        winding_move_supports[winding_row_index] = support
+        winding_moves[winding_row_index, support] = True
 
     start_sector_generators = np.stack(
         (winding_moves[0], winding_moves[lattice_size]),
@@ -190,6 +198,8 @@ def build_2d_toric_zero_syndrome_move_data(lattice_size):
         "contractible_moves": contractible_moves,
         "winding_moves": winding_moves,
         "start_sector_generators": start_sector_generators,
+        "contractible_move_supports": contractible_move_supports,
+        "winding_move_supports": winding_move_supports,
     }
 
 
@@ -303,6 +313,8 @@ def build_3d_toric_zero_syndrome_move_data(lattice_size):
         "start_sector_generators":
             np.ndarray，shape (3, 3L^3)，dtype=bool
             三条独立的非平凡 kernel loop，用于生成 8 个 q=0 合法初态
+        "contractible_move_supports" / "winding_move_supports":
+            与 dense move 等价的 int32 support-index 表，供热循环避免全长 mask 扫描
     """
     parity_check_matrix, _ = build_3d_toric_code(lattice_size)
 
@@ -315,6 +327,7 @@ def build_3d_toric_zero_syndrome_move_data(lattice_size):
         return edge_type_index * L_cubed + (i * L + j) * L + k
 
     contractible_moves = np.zeros((num_vertices, num_qubits), dtype=bool)
+    contractible_move_supports = np.empty((num_vertices, 6), dtype=np.int32)
     for i in range(L):
         for j in range(L):
             for k in range(L):
@@ -322,34 +335,57 @@ def build_3d_toric_zero_syndrome_move_data(lattice_size):
                 i_prev = (i - 1) % L
                 j_prev = (j - 1) % L
                 k_prev = (k - 1) % L
+                support = np.array(
+                    (
+                        edge_qubit(0, i, j, k),
+                        edge_qubit(0, i_prev, j, k),
+                        edge_qubit(1, i, j, k),
+                        edge_qubit(1, i, j_prev, k),
+                        edge_qubit(2, i, j, k),
+                        edge_qubit(2, i, j, k_prev),
+                    ),
+                    dtype=np.int32,
+                )
+                contractible_move_supports[vertex_index] = support
 
-                contractible_moves[vertex_index, edge_qubit(0, i, j, k)] = True
-                contractible_moves[vertex_index, edge_qubit(0, i_prev, j, k)] = True
-                contractible_moves[vertex_index, edge_qubit(1, i, j, k)] = True
-                contractible_moves[vertex_index, edge_qubit(1, i, j_prev, k)] = True
-                contractible_moves[vertex_index, edge_qubit(2, i, j, k)] = True
-                contractible_moves[vertex_index, edge_qubit(2, i, j, k_prev)] = True
+                contractible_moves[vertex_index, support] = True
 
     winding_moves = np.zeros((3 * L, num_qubits), dtype=bool)
+    winding_move_supports = np.empty((3 * L, L * L), dtype=np.int32)
 
     for i in range(L):
+        support = np.empty(L * L, dtype=np.int32)
+        support_index = 0
         for j in range(L):
             for k in range(L):
-                winding_moves[i, edge_qubit(0, i, j, k)] = True
+                support[support_index] = edge_qubit(0, i, j, k)
+                support_index += 1
+        winding_move_supports[i] = support
+        winding_moves[i, support] = True
 
     y_offset = L
     for j in range(L):
         winding_index = y_offset + j
+        support = np.empty(L * L, dtype=np.int32)
+        support_index = 0
         for i in range(L):
             for k in range(L):
-                winding_moves[winding_index, edge_qubit(1, i, j, k)] = True
+                support[support_index] = edge_qubit(1, i, j, k)
+                support_index += 1
+        winding_move_supports[winding_index] = support
+        winding_moves[winding_index, support] = True
 
     z_offset = 2 * L
     for k in range(L):
         winding_index = z_offset + k
+        support = np.empty(L * L, dtype=np.int32)
+        support_index = 0
         for i in range(L):
             for j in range(L):
-                winding_moves[winding_index, edge_qubit(2, i, j, k)] = True
+                support[support_index] = edge_qubit(2, i, j, k)
+                support_index += 1
+        winding_move_supports[winding_index] = support
+        winding_moves[winding_index, support] = True
 
     start_sector_generators = np.stack(
         (
@@ -384,6 +420,8 @@ def build_3d_toric_zero_syndrome_move_data(lattice_size):
         "contractible_moves": contractible_moves,
         "winding_moves": winding_moves,
         "start_sector_generators": start_sector_generators,
+        "contractible_move_supports": contractible_move_supports,
+        "winding_move_supports": winding_move_supports,
     }
 
 

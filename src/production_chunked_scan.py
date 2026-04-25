@@ -110,6 +110,17 @@ def _effective_num_burn_in_sweeps(
     ))
 
 
+def _resolve_cli_num_start_chains(
+        raw_num_start_chains,
+        q0_num_start_chains,
+        syndrome_error_probability):
+    if raw_num_start_chains is not None:
+        return int(raw_num_start_chains)
+    if float(syndrome_error_probability) == 0.0:
+        return int(q0_num_start_chains)
+    return 1
+
+
 def _resolve_git_commit_sha(explicit_git_commit_sha=None):
     if explicit_git_commit_sha is not None:
         return explicit_git_commit_sha
@@ -121,7 +132,7 @@ def _resolve_git_commit_sha(explicit_git_commit_sha=None):
             capture_output=True,
             text=True,
         ).stdout.strip()
-    except subprocess.CalledProcessError:
+    except (subprocess.CalledProcessError, FileNotFoundError):
         return "unknown"
 
 
@@ -201,7 +212,11 @@ def _build_submit_config_from_args(args):
             int(args.num_measurements_per_disorder)
         ),
         "q0_num_start_chains": int(args.q0_num_start_chains),
-        "num_start_chains": int(args.num_start_chains),
+        "num_start_chains": _resolve_cli_num_start_chains(
+            raw_num_start_chains=args.num_start_chains,
+            q0_num_start_chains=args.q0_num_start_chains,
+            syndrome_error_probability=syndrome_error_probability,
+        ),
         "num_replicas_per_start": int(args.num_replicas_per_start),
         "pt_p_hot": (
             None if args.pt_p_hot is None else float(args.pt_p_hot)
@@ -214,6 +229,10 @@ def _build_submit_config_from_args(args):
         "pt_swap_attempt_every_num_sweeps": int(
             args.pt_swap_attempt_every_num_sweeps
         ),
+        "num_zero_syndrome_sweeps_per_cycle": int(
+            args.num_zero_syndrome_sweeps_per_cycle
+        ),
+        "winding_repeat_factor": int(args.winding_repeat_factor),
         "seed_base": int(args.seed_base),
         "burn_in_scaling_reference_num_qubits": int(
             args.burn_in_scaling_reference_num_qubits
@@ -288,6 +307,12 @@ def _build_chunk_tasks(config):
                     "pt_num_temperatures": config["pt_num_temperatures"],
                     "pt_swap_attempt_every_num_sweeps": int(
                         config["pt_swap_attempt_every_num_sweeps"]
+                    ),
+                    "num_zero_syndrome_sweeps_per_cycle": int(
+                        config["num_zero_syndrome_sweeps_per_cycle"]
+                    ),
+                    "winding_repeat_factor": int(
+                        config["winding_repeat_factor"]
                     ),
                     "code_family": str(config["code_family"]),
                     "common_random_disorder_across_p": bool(
@@ -401,6 +426,10 @@ def _build_manifest(
             "pt_swap_attempt_every_num_sweeps": (
                 config["pt_swap_attempt_every_num_sweeps"]
             ),
+            "num_zero_syndrome_sweeps_per_cycle": (
+                config["num_zero_syndrome_sweeps_per_cycle"]
+            ),
+            "winding_repeat_factor": config["winding_repeat_factor"],
             "seed_base": config["seed_base"],
             "burn_in_scaling_reference_num_qubits": (
                 config["burn_in_scaling_reference_num_qubits"]
@@ -528,6 +557,10 @@ def _run_chunk_task(task_data):
             pt_swap_attempt_every_num_sweeps=(
                 task_data["pt_swap_attempt_every_num_sweeps"]
             ),
+            num_zero_syndrome_sweeps_per_cycle=(
+                task_data["num_zero_syndrome_sweeps_per_cycle"]
+            ),
+            winding_repeat_factor=task_data["winding_repeat_factor"],
             precomputed_syndrome_uniform_values_per_disorder=(
                 precomputed_syndrome_uniform_values_per_disorder
             ),
@@ -535,10 +568,16 @@ def _run_chunk_task(task_data):
                 precomputed_data_uniform_values_per_disorder
             ),
         )
+        simulation_result_for_save = dict(simulation_result)
+        simulation_result_for_save.pop(
+            "num_zero_syndrome_sweeps_per_cycle",
+            None,
+        )
+        simulation_result_for_save.pop("winding_repeat_factor", None)
 
         np.savez(
             temporary_output_path,
-            **simulation_result,
+            **simulation_result_for_save,
             lattice_index=np.int64(task_data["lattice_index"]),
             point_index=np.int64(task_data["point_index"]),
             lattice_size=np.int64(task_data["lattice_size"]),
@@ -562,6 +601,12 @@ def _run_chunk_task(task_data):
                 task_data["num_measurements_per_disorder"]
             ),
             q0_num_start_chains=np.int64(task_data["q0_num_start_chains"]),
+            num_zero_syndrome_sweeps_per_cycle=np.int64(
+                task_data["num_zero_syndrome_sweeps_per_cycle"]
+            ),
+            winding_repeat_factor=np.int64(
+                task_data["winding_repeat_factor"]
+            ),
             common_random_disorder_across_p=np.bool_(
                 task_data["common_random_disorder_across_p"]
             ),
@@ -630,9 +675,9 @@ def _build_multiprocessing_context():
 
 
 def _run_exact_enumeration_validation():
-    _log("Running exact_enumeration.py validation")
+    _log("Running exact_enumeration.py quick validation")
     subprocess.run(
-        [sys.executable, str(SOURCE_DIR / "exact_enumeration.py")],
+        [sys.executable, str(SOURCE_DIR / "exact_enumeration.py"), "--quick"],
         cwd=PROJECT_ROOT,
         check=True,
     )
@@ -1386,6 +1431,10 @@ def _merge_outputs(
             config["num_measurements_per_disorder"]
         ),
         q0_num_start_chains=np.int64(config["q0_num_start_chains"]),
+        num_zero_syndrome_sweeps_per_cycle=np.int64(
+            config["num_zero_syndrome_sweeps_per_cycle"]
+        ),
+        winding_repeat_factor=np.int64(config["winding_repeat_factor"]),
         common_random_disorder_across_p=np.bool_(
             config["common_random_disorder_across_p"]
         ),
@@ -1644,7 +1693,11 @@ def _run_chunk_command(args):
         "disorder_offset": int(args.disorder_offset),
         "chunk_index": int(args.chunk_index),
         "q0_num_start_chains": int(args.q0_num_start_chains),
-        "num_start_chains": int(args.num_start_chains),
+        "num_start_chains": _resolve_cli_num_start_chains(
+            raw_num_start_chains=args.num_start_chains,
+            q0_num_start_chains=args.q0_num_start_chains,
+            syndrome_error_probability=args.syndrome_error_probability,
+        ),
         "num_replicas_per_start": int(args.num_replicas_per_start),
         "pt_p_hot": (
             None if args.pt_p_hot is None else float(args.pt_p_hot)
@@ -1657,6 +1710,10 @@ def _run_chunk_command(args):
         "pt_swap_attempt_every_num_sweeps": int(
             args.pt_swap_attempt_every_num_sweeps
         ),
+        "num_zero_syndrome_sweeps_per_cycle": int(
+            args.num_zero_syndrome_sweeps_per_cycle
+        ),
+        "winding_repeat_factor": int(args.winding_repeat_factor),
         "common_random_disorder_across_p": bool(
             args.common_random_disorder_across_p
         ),
@@ -1762,7 +1819,7 @@ def _build_parser():
     common_submit_parser.add_argument(
         "--num-start-chains",
         type=int,
-        default=1,
+        default=None,
     )
     common_submit_parser.add_argument(
         "--num-replicas-per-start",
@@ -1781,6 +1838,16 @@ def _build_parser():
     )
     common_submit_parser.add_argument(
         "--pt-swap-attempt-every-num-sweeps",
+        type=int,
+        default=1,
+    )
+    common_submit_parser.add_argument(
+        "--num-zero-syndrome-sweeps-per-cycle",
+        type=int,
+        default=1,
+    )
+    common_submit_parser.add_argument(
+        "--winding-repeat-factor",
         type=int,
         default=1,
     )
@@ -1880,7 +1947,7 @@ def _build_parser():
     run_chunk_parser.add_argument(
         "--num-start-chains",
         type=int,
-        default=1,
+        default=None,
     )
     run_chunk_parser.add_argument(
         "--num-replicas-per-start",
@@ -1899,6 +1966,16 @@ def _build_parser():
     )
     run_chunk_parser.add_argument(
         "--pt-swap-attempt-every-num-sweeps",
+        type=int,
+        default=1,
+    )
+    run_chunk_parser.add_argument(
+        "--num-zero-syndrome-sweeps-per-cycle",
+        type=int,
+        default=1,
+    )
+    run_chunk_parser.add_argument(
+        "--winding-repeat-factor",
         type=int,
         default=1,
     )

@@ -143,6 +143,19 @@ while IFS='|' read -r syndrome_error_probability data_error_probabilities; do
   current_seed_base=\$(( $(quote_arg "$SEED_BASE") + q_index * 1000000000 ))
   output_stem="scan_result_multi_L_3d_toric_q\${q_tag}_measurement_noise_threshold_search_common_random"
   final_npz="\$run_root/\${output_stem}.npz"
+  q_is_zero="\$(python3 -c 'import sys; print("1" if float(sys.argv[1]) == 0.0 else "0")' "\$syndrome_error_probability")"
+  submit_extra_args=(
+    --q0-num-start-chains $(quote_arg "$Q0_NUM_START_CHAINS")
+    --num-start-chains $(quote_arg "$NUM_START_CHAINS")
+    --num-replicas-per-start $(quote_arg "$NUM_REPLICAS_PER_START")
+  )
+  if [[ "\$q_is_zero" != "1" ]]; then
+    submit_extra_args+=(
+      --pt-p-hot $(quote_arg "$PT_P_HOT")
+      --pt-num-temperatures $(quote_arg "$PT_NUM_TEMPERATURES")
+      --pt-swap-attempt-every-num-sweeps $(quote_arg "$PT_SWAP_ATTEMPT_EVERY_NUM_SWEEPS")
+    )
+  fi
   echo "[launcher] starting q=\$syndrome_error_probability host=$(quote_arg "$REMOTE_COMPUTE_HOST") run_root=\$run_root seed_base=\$current_seed_base workers=\$workers"
   conda run -n 11 python src/production_chunked_scan.py submit \
     --run-root "\$run_root" \
@@ -156,12 +169,7 @@ while IFS='|' read -r syndrome_error_probability data_error_probabilities; do
     --num-burn-in-sweeps $(quote_arg "$NUM_BURN_IN_SWEEPS") \
     --num-sweeps-between-measurements $(quote_arg "$NUM_SWEEPS_BETWEEN_MEASUREMENTS") \
     --num-measurements-per-disorder $(quote_arg "$NUM_MEASUREMENTS_PER_DISORDER") \
-    --q0-num-start-chains $(quote_arg "$Q0_NUM_START_CHAINS") \
-    --num-start-chains $(quote_arg "$NUM_START_CHAINS") \
-    --num-replicas-per-start $(quote_arg "$NUM_REPLICAS_PER_START") \
-    --pt-p-hot $(quote_arg "$PT_P_HOT") \
-    --pt-num-temperatures $(quote_arg "$PT_NUM_TEMPERATURES") \
-    --pt-swap-attempt-every-num-sweeps $(quote_arg "$PT_SWAP_ATTEMPT_EVERY_NUM_SWEEPS") \
+    "\${submit_extra_args[@]}" \
     --seed-base "\$current_seed_base" \
     --burn-in-scaling-reference-num-qubits $(quote_arg "$BURN_IN_SCALING_REFERENCE_NUM_QUBITS") \
     --output-stem "\$output_stem" \

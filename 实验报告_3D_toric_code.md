@@ -9,7 +9,7 @@
 摘要：
 - 做什么：把 3D toric `q=0` 接入统一生产扫描管线，并做本地 smoke。
 - 结论：3D 路径已能稳定产出 merged `npz` 与图，但 smoke 不足以判读 threshold。
-- 看图：[scan_result_multi_L_3d_toric_q0_smoke.png](data/3d_toric_code/without_measurement_noise/q0_smoke_local_20260421_234202/scan_result_multi_L_3d_toric_q0_smoke.png)
+- 看图：[scan_result_multi_L_3d_toric_q0_smoke.png](data/3d_toric_code/without_measurement_noise/exp01_q0_pipeline_smoke/scan_result_multi_L_3d_toric_q0_smoke.png)
 
 ### 实现目标
 
@@ -59,7 +59,7 @@
 - 运行命令：
   - `scripts/run_local_3d_q0_smoke.sh`
 - 输出目录：
-  - `data/3d_toric_code/without_measurement_noise/q0_smoke_local_20260421_234202/`
+  - `data/3d_toric_code/without_measurement_noise/exp01_q0_pipeline_smoke/`
 - 运行参数：
   - `code_family = 3d_toric`
   - `L = [2, 3]`
@@ -102,30 +102,30 @@ L=3: mean_m_u_spread = [0.0000, 0.0000, 0.0766]
 摘要：
 - 做什么：3D `q=0` 首轮 scout，确定 threshold 窗口是否落在 `p≤0.12`。
 - 结论：未见可信 crossing，左端命中只是饱和平台伪信号，窗口需要整体右移。
-- 看图：[scan_result_multi_L_3d_toric_q0_threshold_scout_local_gap_crossing.png](data/3d_toric_code/without_measurement_noise/q0_threshold_scout_nd1_20260421_235447/scan_result_multi_L_3d_toric_q0_threshold_scout_local_gap_crossing.png)
+- 看图：[scan_result_multi_L_3d_toric_q0_threshold_scout_local_gap_crossing.png](data/3d_toric_code/without_measurement_noise/exp02_q0_low_p_scout/scan_result_multi_L_3d_toric_q0_threshold_scout_local_gap_crossing.png)
 
 ### 运行与回收信息
 
 - 远端运行目录：
   - `/home/DATA1/users/yuany/.single_shot/runs/3d_toric_q0_threshold_scout_20260421_235447/`
 - 本地归档目录：
-  - `data/3d_toric_code/without_measurement_noise/q0_threshold_scout_nd1_20260421_235447/`
+  - `data/3d_toric_code/without_measurement_noise/exp02_q0_low_p_scout/`
 - 主要文件：
   - 结果：
-    `data/3d_toric_code/without_measurement_noise/q0_threshold_scout_nd1_20260421_235447/scan_result_multi_L_3d_toric_q0_threshold_scout.npz`
+    `data/3d_toric_code/without_measurement_noise/exp02_q0_low_p_scout/scan_result_multi_L_3d_toric_q0_threshold_scout.npz`
   - 默认图：
-    `data/3d_toric_code/without_measurement_noise/q0_threshold_scout_nd1_20260421_235447/scan_result_multi_L_3d_toric_q0_threshold_scout.png`
+    `data/3d_toric_code/without_measurement_noise/exp02_q0_low_p_scout/scan_result_multi_L_3d_toric_q0_threshold_scout.png`
   - 95% CI 图：
-    `data/3d_toric_code/without_measurement_noise/q0_threshold_scout_nd1_20260421_235447/scan_result_multi_L_3d_toric_q0_threshold_scout_sem95.png`
+    `data/3d_toric_code/without_measurement_noise/exp02_q0_low_p_scout/scan_result_multi_L_3d_toric_q0_threshold_scout_sem95.png`
   - gap 图：
-    `data/3d_toric_code/without_measurement_noise/q0_threshold_scout_nd1_20260421_235447/scan_result_multi_L_3d_toric_q0_threshold_scout_gap_crossing.png`
+    `data/3d_toric_code/without_measurement_noise/exp02_q0_low_p_scout/scan_result_multi_L_3d_toric_q0_threshold_scout_gap_crossing.png`
   - 本地重跑分析图：
-    `data/3d_toric_code/without_measurement_noise/q0_threshold_scout_nd1_20260421_235447/scan_result_multi_L_3d_toric_q0_threshold_scout_local_sem95.png`
-    `data/3d_toric_code/without_measurement_noise/q0_threshold_scout_nd1_20260421_235447/scan_result_multi_L_3d_toric_q0_threshold_scout_local_gap_crossing.png`
+    `data/3d_toric_code/without_measurement_noise/exp02_q0_low_p_scout/scan_result_multi_L_3d_toric_q0_threshold_scout_local_sem95.png`
+    `data/3d_toric_code/without_measurement_noise/exp02_q0_low_p_scout/scan_result_multi_L_3d_toric_q0_threshold_scout_local_gap_crossing.png`
   - manifest：
-    `data/3d_toric_code/without_measurement_noise/q0_threshold_scout_nd1_20260421_235447/manifest.json`
+    `data/3d_toric_code/without_measurement_noise/exp02_q0_low_p_scout/manifest.json`
   - summary：
-    `data/3d_toric_code/without_measurement_noise/q0_threshold_scout_nd1_20260421_235447/threshold_summary.json`
+    `data/3d_toric_code/without_measurement_noise/exp02_q0_low_p_scout/threshold_summary.json`
 
 ### 运行参数
 
@@ -273,7 +273,7 @@ p = 0.10, 0.11, ..., 0.20
 摘要：
 - 做什么：3D `q=0` 连续做右移 Stage A / Stage B 搜索，定位真实 threshold 窗口。
 - 结论：Stage A 仍未 crossing，Stage B 在 `p≈0.218~0.230` 首次出现可信 interior crossing。
-- 看图：[scan_result_multi_L_3d_toric_q0_threshold_scout_local_gap_crossing.png](data/3d_toric_code/without_measurement_noise/q0_threshold_scout_stageB_nd3_20260422_101018/local_reanalysis/scan_result_multi_L_3d_toric_q0_threshold_scout_local_gap_crossing.png)
+- 看图：[scan_result_multi_L_3d_toric_q0_threshold_scout_local_gap_crossing.png](data/3d_toric_code/without_measurement_noise/exp04_q0_crossing_window_scout/local_reanalysis/scan_result_multi_L_3d_toric_q0_threshold_scout_local_gap_crossing.png)
 
 ### 运行与归档
 
@@ -281,12 +281,12 @@ p = 0.10, 0.11, ..., 0.20
   - 远端目录：
     `/home/DATA1/users/yuany/.single_shot/runs/3d_toric_q0_threshold_scout_20260422_100557_rightshift_stageA/`
   - 本地归档：
-    `data/3d_toric_code/without_measurement_noise/q0_threshold_scout_stageA_nd1_20260422_100557/`
+    `data/3d_toric_code/without_measurement_noise/exp03_q0_right_shift_scout/`
 - `Stage B`：`nd-3` extension scout
   - 远端目录：
     `/home/DATA1/users/yuany/.single_shot/runs/3d_toric_q0_threshold_scout_20260422_101018_extension_stageB_nd3/`
   - 本地归档：
-    `data/3d_toric_code/without_measurement_noise/q0_threshold_scout_stageB_nd3_20260422_101018/`
+    `data/3d_toric_code/without_measurement_noise/exp04_q0_crossing_window_scout/`
 - 两轮都另外在本地用最新的 `analyze_threshold_crossing.py` 重跑了一次分析，输出放在：
   - `.../local_reanalysis/scan_result_multi_L_3d_toric_q0_threshold_scout_local_sem95.png`
   - `.../local_reanalysis/scan_result_multi_L_3d_toric_q0_threshold_scout_local_gap_crossing.png`
@@ -449,9 +449,9 @@ num_disorder_samples_total = 1024
 > 根因不是 plotting，而是旧 `q>0` sampler 只做单比特更新、没有混入 zero-syndrome move，
 > 导致低 `q` 时链冻结在局部 sector，`q_top` 被假性顶到接近 `1`。
 > 对应本地目录
-> `data/3d_toric_code/with_measurement_noise/measurement_noise_threshold_scout_local/precheck_20260422/`
+> `data/3d_toric_code/with_measurement_noise/exp05_q005_local_precheck_after_fix/`
 > 与
-> `data/3d_toric_code/with_measurement_noise/measurement_noise_threshold_search_stageA_20260422_165518/`
+> `（旧 Stage A broad scout 本地目录已清理，不作为结果保留）`
 > 已删除，不再作为任何物理结论的依据。
 
 ## 2026-04-22 3D toric `q>0` 回归排查、sampler 修复与失效数据清理
@@ -536,8 +536,8 @@ q=1e-3   -> q_top = 0.386342
 ### 失效数据清理
 
 - 已删除：
-  - `data/3d_toric_code/with_measurement_noise/measurement_noise_threshold_scout_local/precheck_20260422/`
-  - `data/3d_toric_code/with_measurement_noise/measurement_noise_threshold_search_stageA_20260422_165518/`
+  - `data/3d_toric_code/with_measurement_noise/exp05_q005_local_precheck_after_fix/`
+  - `（旧 Stage A broad scout 本地目录已清理，不作为结果保留）`
 - 删除原因：
   - 它们全部来自修复前的旧 `q>0` sampler
   - 已被 exact regression 证明会在低 `q` 区域产生系统性假性高 `q_top`
@@ -555,7 +555,7 @@ q=1e-3   -> q_top = 0.386342
 摘要：
 - 做什么：把 3D `q>0` threshold-search 编排层接入现有生产扫描管线，并完成本地轻量预检。
 - 结论：3D measurement-noise 路径已能稳定跑通 `submit -> merge -> analyze`，输出目录、命名和 `threshold_summary.json` 全部落到 3D 专属路径。
-- 看图：[scan_result_multi_L_3d_toric_q0p0050_measurement_noise_threshold_scout_common_random_sem95.png](data/3d_toric_code/with_measurement_noise/measurement_noise_threshold_scout_local/precheck_20260422/q_0p0050/scan_result_multi_L_3d_toric_q0p0050_measurement_noise_threshold_scout_common_random_sem95.png)
+- 看图：[scan_result_multi_L_3d_toric_q0p0050_measurement_noise_threshold_scout_common_random_sem95.png](data/3d_toric_code/with_measurement_noise/exp05_q005_local_precheck_after_fix/q_0p0050/scan_result_multi_L_3d_toric_q0p0050_measurement_noise_threshold_scout_common_random_sem95.png)
 
 ### 代码变更
 
@@ -598,7 +598,7 @@ q=1e-3   -> q_top = 0.386342
 ### 预检输出
 
 - 归档目录：
-  - `data/3d_toric_code/with_measurement_noise/measurement_noise_threshold_scout_local/precheck_20260422/`
+  - `data/3d_toric_code/with_measurement_noise/exp05_q005_local_precheck_after_fix/`
 - 主要文件：
   - `q_0p0050/manifest.json`
   - `q_0p0050/scan_result_multi_L_3d_toric_q0p0050_measurement_noise_threshold_scout_common_random.npz`
@@ -656,7 +656,7 @@ L=5 chunk 约 154~164s
 摘要：
 - 做什么：回收 `nd-1/nd-2/nd-3` 的 3D measurement-noise Stage A broad scout，全量下载数据与日志，在本地统一重绘 overview 并汇总判据。
 - 结论：这轮 `q = 0.0010 ~ 0.0400` 没有任何一个点出现可信的三尺寸共同 interior crossing；`q=0.0200` 和 `q=0.0400` 只出现 secondary proximity，仍不足以宣称 finite threshold。
-- 看图：[measurement_noise_threshold_search_gap_summary.png](data/3d_toric_code/with_measurement_noise/measurement_noise_threshold_search_stageA_20260422_165518/measurement_noise_threshold_search_gap_summary.png)
+- 看图：旧 Stage A broad scout 本地目录已清理，不再保留图作为当前结果；本节仅保留历史结论。
 
 ### 运行与回收信息
 
@@ -667,16 +667,8 @@ L=5 chunk 约 154~164s
     - `/home/DATA1/users/yuany/.single_shot/runs/3d_toric_measurement_noise_threshold_search_20260422_165518_stageA_nd2/`
   - `nd-3`
     - `/home/DATA1/users/yuany/.single_shot/runs/3d_toric_measurement_noise_threshold_search_20260422_165518_stageA_nd3/`
-- 本地统一归档目录：
-  - `data/3d_toric_code/with_measurement_noise/measurement_noise_threshold_search_stageA_20260422_165518/`
-- 本地归档包含：
-  - 六个 `q_*` 子目录
-  - `measurement_noise_threshold_search_sem95_overview.png`
-  - `measurement_noise_threshold_search_gap_summary.png`
-  - `measurement_noise_threshold_search_summary.json`
-  - `nd1_stageA.log`
-  - `nd2_stageA.log`
-  - `nd3_stageA.log`
+- 本地统一归档目录：旧 Stage A broad scout 本地目录已清理，不作为当前结果保留。
+- 原本地归档包含六个 `q_*` 子目录、overview 图、gap summary 图、summary JSON 和三台节点日志；当前不再把这些旧产物作为物理解读依据。
 
 ### 统一参数
 
@@ -712,11 +704,7 @@ L=5 chunk 约 154~164s
 
 ### 本地重绘与汇总产物
 
-- 总览图：
-  - `data/3d_toric_code/with_measurement_noise/measurement_noise_threshold_search_stageA_20260422_165518/measurement_noise_threshold_search_sem95_overview.png`
-  - `data/3d_toric_code/with_measurement_noise/measurement_noise_threshold_search_stageA_20260422_165518/measurement_noise_threshold_search_gap_summary.png`
-- 汇总表：
-  - `data/3d_toric_code/with_measurement_noise/measurement_noise_threshold_search_stageA_20260422_165518/measurement_noise_threshold_search_summary.json`
+- 总览图与汇总表：旧 Stage A 本地重绘产物已清理，不作为当前结果保留；本节只记录当时得到的判据。
 
 ### 各 `q` 的核心判据
 
@@ -837,7 +825,7 @@ q=0.0400
 ### 本地预检参数与产物
 
 - 本地 run root：
-  - `data/3d_toric_code/with_measurement_noise/measurement_noise_threshold_scout_local/precheck_20260422_fixrerun_v2/`
+  - `data/3d_toric_code/with_measurement_noise/exp05_q005_local_precheck_after_fix/`
 - 参数：
   - `code_family = 3d_toric`
   - `L = [3,4,5]`
@@ -859,8 +847,8 @@ q=0.0400
 ### 本地预检判读
 
 - 看图：
-  - [修复后本地预检 sem95 图](data/3d_toric_code/with_measurement_noise/measurement_noise_threshold_scout_local/precheck_20260422_fixrerun_v2/q_0p0050/scan_result_multi_L_3d_toric_q0p0050_measurement_noise_threshold_scout_common_random_sem95.png)
-  - [修复后本地预检 gap 图](data/3d_toric_code/with_measurement_noise/measurement_noise_threshold_scout_local/precheck_20260422_fixrerun_v2/q_0p0050/scan_result_multi_L_3d_toric_q0p0050_measurement_noise_threshold_scout_common_random_gap_crossing.png)
+  - [修复后本地预检 sem95 图](data/3d_toric_code/with_measurement_noise/exp05_q005_local_precheck_after_fix/q_0p0050/scan_result_multi_L_3d_toric_q0p0050_measurement_noise_threshold_scout_common_random_sem95.png)
+  - [修复后本地预检 gap 图](data/3d_toric_code/with_measurement_noise/exp05_q005_local_precheck_after_fix/q_0p0050/scan_result_multi_L_3d_toric_q0p0050_measurement_noise_threshold_scout_common_random_gap_crossing.png)
 - `threshold_summary.json` 读数：
 
 ```text
@@ -938,7 +926,7 @@ delta_45 = [-0.0678, -0.1447, -0.0028]
 摘要：
 - 做什么：在新一轮 3D `q>0` Stage A broad scout 启动后，主动停止 `nd-1/nd-2/nd-3` 的远端任务并清理中止产物。
 - 原因：当前重新怀疑程序逻辑仍有错误，需要先回到本地继续排查，暂不继续消耗远端算力。
-- 结论：本轮远端 Stage A 不再继续，也不保留任何 partial run 作为分析依据；仅保留修复后完整跑完的本地轻量预检 `precheck_20260422_fixrerun_v2`。
+- 结论：本轮远端 Stage A 不再继续，也不保留任何 partial run 作为分析依据；仅保留修复后完整跑完的本地轻量预检 `exp05_q005_local_precheck_after_fix`。
 
 ### 主动停止的 run
 
@@ -959,14 +947,14 @@ delta_45 = [-0.0678, -0.1447, -0.0028]
   - 对应的远端日志文件
 - 本地同步清理：
   - 删除第一次误参数启动后留下的半截预检目录
-    - `data/3d_toric_code/with_measurement_noise/measurement_noise_threshold_scout_local/precheck_20260422_fixrerun/`
+    - `data/3d_toric_code/with_measurement_noise/exp05_q005_local_precheck_after_fix/（旧 fixrerun 目录已清理，最终保留此目录）`
   - 删除用于发远端任务的临时 clone
     - `/tmp/projectD_stageA_launcher`
 
 ### 保留产物
 
 - 继续保留并作为后续排错依据：
-  - `data/3d_toric_code/with_measurement_noise/measurement_noise_threshold_scout_local/precheck_20260422_fixrerun_v2/`
+  - `data/3d_toric_code/with_measurement_noise/exp05_q005_local_precheck_after_fix/`
 - 保留原因：
   - 它是完整完成的本地轻量预检
   - `q=0.0050` 在 `p=0.16/0.22/0.28` 上给出了稳定的 pairwise gap 负号结构
@@ -1102,7 +1090,7 @@ delta_45 = [-0.0678, -0.1447, -0.0028]
   - fixed-q：`2026-04-23 17:08` 到 `18:21 CST`
   - fixed-p rerun：`2026-04-23 21:50` 到 `23:02 CST`
 - 本地同步目录：
-  - `data/3d_toric_code/with_measurement_noise/zero_disorder_quick_scan_20260423_1712/`
+  - `data/3d_toric_code/with_measurement_noise/exp06_zero_disorder_quick_scan/`
 - 关键产物：
   - `zero_disorder_combined_analysis.png`
   - `zero_disorder_combined_summary.json`
@@ -1171,7 +1159,7 @@ delta_45 = [-0.0678, -0.1447, -0.0028]
   - host：`nd-2`
   - remote root：`/home/DATA1/users/yuany/.single_shot/runs/3d_toric_measurement_noise_threshold_search_20260423_104417/q_0p0050`
 - 本地同步目录：
-  - `data/3d_toric_code/with_measurement_noise/measurement_noise_threshold_search_nd2_20260423_104417/q_0p0050/`
+  - `data/3d_toric_code/with_measurement_noise/exp07_q005_broad_scan/q_0p0050/`
 - 关键产物：
   - `scan_result_multi_L_3d_toric_q0p0050_measurement_noise_threshold_search_common_random.npz`
   - `scan_result_multi_L_3d_toric_q0p0050_measurement_noise_threshold_search_common_random_sem95.png`
@@ -1258,3 +1246,204 @@ pt_num_temperatures = 9
 ```
 
 若先压预算，可先跑 `p=0.200~0.230`、步长 `0.005`，保持其余参数不变。
+
+## 2026-04-25 3D 实验目录统一重命名
+
+摘要：
+- 做什么：把 `data/3d_toric_code/` 下所有实验结果目录统一改为 `expNN_做什么` 命名，并补全目录级 `README.md`。
+- 为什么做：此前目录名混合了 host、timestamp、stage 和临时修复名，难以判断先后顺序和每次重跑原因。
+- 当前结论：后续查 3D 数据优先读 [3D 数据索引](data/3d_toric_code/README.md)，再进入具体 `expNN` 目录。
+
+重命名后的主索引：
+
+```text
+without_measurement_noise/
+  exp01_q0_pipeline_smoke
+  exp02_q0_low_p_scout
+  exp03_q0_right_shift_scout
+  exp04_q0_crossing_window_scout
+  exp09_q0_oneday_deep_fixed
+
+with_measurement_noise/
+  exp05_q005_local_precheck_after_fix
+  exp06_zero_disorder_quick_scan
+  exp07_q005_broad_scan
+  exp08_q005_oneday_deep_scan
+```
+
+每个目录的 `README.md` 固定包含：
+- 实验目的
+- 为什么做
+- 当前结论
+- 主看图或 summary 入口
+
+## 2026-04-25 3D `q=0` one-day deep 重跑完成
+
+摘要：
+- 做什么：停掉此前错误的 `q=0` run 后，在 `nd-1` 重新启动一天内快速 deep 的 `q=0` 基线实验。
+- 结论：`384/384` chunks 全部完成；本地重跑 threshold 分析后得到共同 interior crossing window `p≈0.2146~0.2391`，代表点 `p≈0.2268`。
+- 用途：作为当前 one-day deep 系列的 `q=0` calibration 基线，可与 `q=0.0050` / `q=0.0100` 结果对照。
+
+### 运行与产物
+
+- 远端 host：`nd-1`
+- 远端 run root：
+  - `/home/DATA1/users/yuany/.single_shot/runs/3d_toric_exp10_q0_oneday_deep_relaunch_20260425/q_0p0000`
+- 本地目录：
+  - `data/3d_toric_code/without_measurement_noise/exp10_q0_oneday_deep_relaunch/`
+- 主产物：
+  - `scan_result_multi_L_3d_toric_q0_oneday_deep_relaunch.npz`
+  - `scan_result_multi_L_3d_toric_q0_oneday_deep_relaunch.png`
+  - `scan_result_multi_L_3d_toric_q0_oneday_deep_relaunch_sem95.png`
+  - `scan_result_multi_L_3d_toric_q0_oneday_deep_relaunch_gap_crossing.png`
+  - `threshold_summary.json`
+
+### 参数
+
+```text
+L = 3,4,5
+p = 0.205,0.210,0.215,0.220,0.225,0.230,0.235,0.240
+q = 0
+num_disorder_samples_total = 256
+chunk_size = 16
+q0_num_start_chains = 8
+num_start_chains = 8
+num_replicas_per_start = 1
+num_burn_in_sweeps = 1000
+num_sweeps_between_measurements = 6
+num_measurements_per_disorder = 240
+common_random_disorder_across_p = true
+```
+
+注意：本轮 q=0 命令不包含任何 `--pt-*` 参数，避免触发 `q=0` 与 PT 的不兼容路径。
+
+### 数值摘要
+
+`q_top` 矩阵：
+
+```text
+L=3: [0.35583, 0.32534, 0.29850, 0.26304, 0.23165, 0.20454, 0.17466, 0.14830]
+L=4: [0.40401, 0.34686, 0.29650, 0.25029, 0.21387, 0.17733, 0.14954, 0.12750]
+L=5: [0.51275, 0.43556, 0.37493, 0.31023, 0.24699, 0.19645, 0.15577, 0.12615]
+```
+
+`threshold_summary.json`：
+
+- `primary_crossing_window_hit = true`
+- common crossing window：
+  - `p_min = 0.21457655911521925`
+  - `p_max = 0.23910998018700172`
+  - representative `p = 0.22684326965111049`
+- pairwise gap crossing:
+  - `L3-L4` crossing near `p≈0.21458`
+  - `L4-L5` crossing near `p≈0.23911`
+
+Pairwise gaps：
+
+```text
+L3-L4: [-0.04818, -0.02152,  0.00199,  0.01275,  0.01778,  0.02721,  0.02513,  0.02081]
+L4-L5: [-0.10874, -0.08871, -0.07843, -0.05994, -0.03311, -0.01911, -0.00623,  0.00135]
+```
+
+### 判读
+
+- 这轮重跑恢复了合理的 `q=0` calibration：`L3-L4` 与 `L4-L5` 两条 gap 都在窗口内部出现 sign flip。
+- representative `p≈0.2268` 与此前 `exp04_q0_crossing_window_scout` 的 `p≈0.218~0.230` calibration 一致，说明当前 one-day q=0 基线没有明显漂移。
+- 窗口宽度仍较大，主要来自 `L4-L5` crossing 落在右端 `p≈0.239` 附近；若要精化 q=0 阈值，可在 `p=0.215~0.240` 内继续加密，但当前已经足够作为 q>0 对照。
+
+## 2026-04-25 3D `q=0.0100` one-day deep 停止与 partial 分析
+
+摘要：
+- 做什么：停止 `nd-3` 上过慢的 `q=0.0100` one-day deep run，下载已有数据并做 partial L3-L4 分析。
+- 结论：只有 `28/42` chunks 完成；`L=3,4` 完成，`L=5` 的 `14` 个正式 chunks 全部缺失。因此本轮不能给出三尺寸 threshold，只能作为失败诊断。
+- 当前信号：L3-L4 gap 在 `p=0.17~0.23` 全部为负，没有 crossing；但 CI 很宽，且 `L=4` 高 `p` 端 convergence 多数失败。
+
+### 运行与产物
+
+- 远端 host：`nd-3`
+- 停止前 screen：
+  - `533858.ssprep_3d_toric_oneday_deep_q0p010_20260424`
+- 远端 run root：
+  - `/home/DATA1/users/yuany/.single_shot/runs/3d_toric_oneday_deep_q0p010_20260424/q_0p0100`
+- 本地目录：
+  - `data/3d_toric_code/with_measurement_noise/exp11_q001_oneday_deep_partial/`
+- 主产物：
+  - `scan_result_multi_L_3d_toric_q0p0100_partial_L3_L4.npz`
+  - `scan_result_multi_L_3d_toric_q0p0100_partial_L3_L4.png`
+  - `scan_result_multi_L_3d_toric_q0p0100_partial_L3_L4_sem95.png`
+  - `scan_result_multi_L_3d_toric_q0p0100_partial_L3_L4_gap.png`
+  - `partial_L3_L4_analysis_summary.json`
+
+### 参数
+
+原计划：
+
+```text
+L = 3,4,5
+p = 0.170,0.180,0.190,0.200,0.210,0.220,0.230
+q = 0.0100
+num_disorder_samples_total = 6
+chunk_size = 3
+num_start_chains = 8
+num_replicas_per_start = 2
+pt_p_hot = 0.44
+pt_num_temperatures = 9
+pt_swap_attempt_every_num_sweeps = 1
+num_burn_in_sweeps = 1000
+num_sweeps_between_measurements = 6
+num_measurements_per_disorder = 3072
+common_random_disorder_across_p = true
+```
+
+实际完成：
+
+```text
+completed chunks = 28
+pending chunks = 14
+完成尺寸 = L=3,4
+缺失尺寸 = L=5
+```
+
+### Partial L3-L4 数值摘要
+
+`q_top`：
+
+```text
+L=3: [0.61762, 0.52301, 0.42590, 0.39006, 0.38174, 0.28764, 0.26255]
+L=4: [0.81496, 0.75833, 0.76402, 0.69565, 0.58911, 0.34212, 0.26602]
+```
+
+L3-L4 gap：
+
+```text
+[-0.19734, -0.23532, -0.33812, -0.30559, -0.20737, -0.05449, -0.00347]
+```
+
+L3-L4 pooled CI95：
+
+```text
+[0.37237, 0.39610, 0.38140, 0.35676, 0.35435, 0.32553, 0.28483]
+```
+
+Convergence gate：
+
+```text
+L=3: [pass, fail, pass, pass, pass, pass, pass]
+L=4: [pass, pass, pass, fail, fail, fail, fail]
+```
+
+诊断范围：
+
+- `max_r_hat <= 1.00047`
+- `min_ESS >= 1127`
+- `mean_q_top_spread` 在 `L=4,p>=0.20` 达到 `0.0318~0.0418`，是主要失败原因之一
+
+### 判读
+
+- 本轮 `q=0.0100` 不能用于 threshold 宣称，因为三尺寸分析的关键 `L=5` 完全缺失。
+- 已有 L3-L4 数据没有 sign flip，gap 到 `p=0.23` 仍为负；但 CI95 远大于 gap，说明 `6` disorder 的统计方差仍然太大。
+- `L=4` 高 `p` 端 convergence gate 系统性失败，提示当前参数即使只看 `L=4` 也不足够稳。
+- 下一轮若继续 `q=0.0100`，不建议照搬本轮 `L=5` 参数硬跑；更实际的方案是先缩小窗口并降低单 chunk 尾部风险，例如：
+  - 先跑 `p=0.22,0.24,0.26` 的 `L=5` smoke，确认耗时和 convergence
+  - 或把 `num_measurements_per_disorder` 降到 `1536`，先用更多 disorder 控制 disorder 方差
+  - 若目标是一天内完成，优先保证 `L=3,4,5` 都有数据，而不是让 `L=5` 尾部吞掉整轮预算
