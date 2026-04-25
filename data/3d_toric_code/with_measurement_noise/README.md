@@ -14,3 +14,5 @@
 - [`exp19_q050_quick_p010_020_20260425_nd1`](exp19_q050_quick_p010_020_20260425_nd1/)：`q=0.0500` 快速摸底；用于确认曲线形状和修正 threshold 方向判读。
 - [`exp20a_q050_heavy_p018_022_20260425_nd1`](exp20a_q050_heavy_p018_022_20260425_nd1/) / [`exp20b_q050_heavy_p018_022_20260425_nd2`](exp20b_q050_heavy_p018_022_20260425_nd2/) / [`exp20c_q050_heavy_p018_022_20260425_nd3`](exp20c_q050_heavy_p018_022_20260425_nd3/)：`q=0.0500` 在 `p=0.18~0.22` 的高力度独立 seed 复本，各 `96` disorder。
 - [`exp21_q050_heavy_p018_022_combined_summary`](exp21_q050_heavy_p018_022_combined_summary/)：`q=0.0500` 三节点池化综合图和 JSON；当前结论是 `L3-L4` crossing 约 `p≈0.193`，`L4-L5` 到 `p=0.22` 仍未 crossing，下一轮应向 `0.22~0.26` 扩展。
+- [`exp22a_q050_L6_p018_022_20260425_nd1`](exp22a_q050_L6_p018_022_20260425_nd1/) / [`exp22b_q050_L6_p018_022_20260425_nd2`](exp22b_q050_L6_p018_022_20260425_nd2/) / [`exp22c_q050_L6_p018_022_20260425_nd3`](exp22c_q050_L6_p018_022_20260425_nd3/)：`q=0.0500` `L=6` extension，各 `96` disorder。
+- [`exp23_q050_L3456_p018_022_combined_summary`](exp23_q050_L3456_p018_022_combined_summary/)：`q=0.0500` L=3/4/5/6 综合图；L=6 低于 L=5 但诊断较差，暂不作最终 threshold。
