@@ -1,8 +1,14 @@
 import multiprocessing
+import math
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from pathlib import Path
 
 import numpy as np
+
+try:
+    from numba import njit
+except ImportError:  # pragma: no cover - optional acceleration dependency
+    njit = None
 
 from build_toric_code_examples import (
     build_toric_code_by_family,
@@ -326,6 +332,202 @@ def _run_one_sweep_safe(
     return accepted_count, int(data_weight_delta)
 
 
+if njit is not None:
+    @njit(cache=True)
+    def _numba_shuffle_int32_inplace(values):
+        num_values = values.shape[0]
+        for index in range(num_values - 1, 0, -1):
+            swap_index = np.random.randint(0, index + 1)
+            temporary_value = values[index]
+            values[index] = values[swap_index]
+            values[swap_index] = temporary_value
+
+
+    @njit(cache=True)
+    def _numba_run_measurement_update_cycle_3d(
+            current_chain_bits,
+            current_data_term_bits,
+            current_syndrome_term_bits,
+            checks_touching_each_qubit_array,
+            qubit_order_buffer,
+            contractible_move_supports,
+            winding_move_supports,
+            contractible_order_buffer,
+            winding_order_buffer,
+            log_odds_data,
+            log_odds_syndrome,
+            syndrome_error_is_positive,
+            num_zero_syndrome_sweeps_per_cycle,
+            winding_repeat_factor,
+            random_seed):
+        """
+        Numba hot path for 3D toric code update cycles.
+
+        This covers the production geometry where every qubit touches four
+        checks, contractible zero-syndrome moves have fixed support arrays,
+        and winding moves have fixed support arrays.
+        """
+        np.random.seed(random_seed)
+        single_bit_accepted_count = 0
+        contractible_accepted_count = 0
+        winding_accepted_count = 0
+        single_bit_data_weight_delta = 0
+        zero_syndrome_data_weight_delta = 0
+
+        if syndrome_error_is_positive:
+            _numba_shuffle_int32_inplace(qubit_order_buffer)
+            num_qubits = qubit_order_buffer.shape[0]
+            for order_position in range(num_qubits):
+                qubit_index = qubit_order_buffer[order_position]
+                if current_data_term_bits[qubit_index]:
+                    delta_data_weight = -1
+                else:
+                    delta_data_weight = 1
+
+                delta_syndrome_weight = 0
+                check_index_0 = checks_touching_each_qubit_array[
+                    qubit_index, 0
+                ]
+                check_index_1 = checks_touching_each_qubit_array[
+                    qubit_index, 1
+                ]
+                check_index_2 = checks_touching_each_qubit_array[
+                    qubit_index, 2
+                ]
+                check_index_3 = checks_touching_each_qubit_array[
+                    qubit_index, 3
+                ]
+                if current_syndrome_term_bits[check_index_0]:
+                    delta_syndrome_weight -= 1
+                else:
+                    delta_syndrome_weight += 1
+                if current_syndrome_term_bits[check_index_1]:
+                    delta_syndrome_weight -= 1
+                else:
+                    delta_syndrome_weight += 1
+                if current_syndrome_term_bits[check_index_2]:
+                    delta_syndrome_weight -= 1
+                else:
+                    delta_syndrome_weight += 1
+                if current_syndrome_term_bits[check_index_3]:
+                    delta_syndrome_weight -= 1
+                else:
+                    delta_syndrome_weight += 1
+
+                log_acceptance = (
+                    delta_data_weight * log_odds_data
+                    + delta_syndrome_weight * log_odds_syndrome
+                )
+                accepted = False
+                if log_acceptance >= 0.0:
+                    accepted = True
+                elif np.random.random() < math.exp(log_acceptance):
+                    accepted = True
+                if accepted:
+                    current_chain_bits[qubit_index] = (
+                        not current_chain_bits[qubit_index]
+                    )
+                    current_data_term_bits[qubit_index] = (
+                        not current_data_term_bits[qubit_index]
+                    )
+                    current_syndrome_term_bits[check_index_0] = (
+                        not current_syndrome_term_bits[check_index_0]
+                    )
+                    current_syndrome_term_bits[check_index_1] = (
+                        not current_syndrome_term_bits[check_index_1]
+                    )
+                    current_syndrome_term_bits[check_index_2] = (
+                        not current_syndrome_term_bits[check_index_2]
+                    )
+                    current_syndrome_term_bits[check_index_3] = (
+                        not current_syndrome_term_bits[check_index_3]
+                    )
+                    single_bit_accepted_count += 1
+                    single_bit_data_weight_delta += delta_data_weight
+
+        contractible_support_size = contractible_move_supports.shape[1]
+        winding_support_size = winding_move_supports.shape[1]
+        for _zero_sweep_index in range(num_zero_syndrome_sweeps_per_cycle):
+            _numba_shuffle_int32_inplace(contractible_order_buffer)
+            for order_position in range(contractible_order_buffer.shape[0]):
+                move_index = contractible_order_buffer[order_position]
+                current_ones_on_support = 0
+                for support_position in range(contractible_support_size):
+                    support_qubit = contractible_move_supports[
+                        move_index, support_position
+                    ]
+                    if current_data_term_bits[support_qubit]:
+                        current_ones_on_support += 1
+                delta_data_weight = (
+                    contractible_support_size
+                    - 2 * current_ones_on_support
+                )
+                log_acceptance = delta_data_weight * log_odds_data
+                accepted = False
+                if log_acceptance >= 0.0:
+                    accepted = True
+                elif np.random.random() < math.exp(log_acceptance):
+                    accepted = True
+                if accepted:
+                    for support_position in range(contractible_support_size):
+                        support_qubit = contractible_move_supports[
+                            move_index, support_position
+                        ]
+                        current_chain_bits[support_qubit] = (
+                            not current_chain_bits[support_qubit]
+                        )
+                        current_data_term_bits[support_qubit] = (
+                            not current_data_term_bits[support_qubit]
+                        )
+                    contractible_accepted_count += 1
+                    zero_syndrome_data_weight_delta += delta_data_weight
+
+            for _winding_repeat_index in range(winding_repeat_factor):
+                _numba_shuffle_int32_inplace(winding_order_buffer)
+                for order_position in range(winding_order_buffer.shape[0]):
+                    move_index = winding_order_buffer[order_position]
+                    current_ones_on_support = 0
+                    for support_position in range(winding_support_size):
+                        support_qubit = winding_move_supports[
+                            move_index, support_position
+                        ]
+                        if current_data_term_bits[support_qubit]:
+                            current_ones_on_support += 1
+                    delta_data_weight = (
+                        winding_support_size
+                        - 2 * current_ones_on_support
+                    )
+                    log_acceptance = delta_data_weight * log_odds_data
+                    accepted = False
+                    if log_acceptance >= 0.0:
+                        accepted = True
+                    elif np.random.random() < math.exp(log_acceptance):
+                        accepted = True
+                    if accepted:
+                        for support_position in range(winding_support_size):
+                            support_qubit = winding_move_supports[
+                                move_index, support_position
+                            ]
+                            current_chain_bits[support_qubit] = (
+                                not current_chain_bits[support_qubit]
+                            )
+                            current_data_term_bits[support_qubit] = (
+                                not current_data_term_bits[support_qubit]
+                            )
+                        winding_accepted_count += 1
+                        zero_syndrome_data_weight_delta += delta_data_weight
+
+        return (
+            single_bit_accepted_count,
+            contractible_accepted_count,
+            winding_accepted_count,
+            single_bit_data_weight_delta,
+            zero_syndrome_data_weight_delta,
+        )
+else:
+    _numba_run_measurement_update_cycle_3d = None
+
+
 def _build_kernel_basis_from_linear_section(
         parity_check_matrix,
         linear_section_data):
@@ -446,6 +648,66 @@ def _get_zero_syndrome_move_supports(zero_syndrome_move_data):
         zero_syndrome_move_data["contractible_move_supports"],
         zero_syndrome_move_data["winding_move_supports"],
     )
+
+
+def _build_numba_update_kernel_data(
+        checks_touching_each_qubit,
+        zero_syndrome_move_data,
+        num_qubits):
+    if _numba_run_measurement_update_cycle_3d is None:
+        return None
+    if zero_syndrome_move_data is None:
+        return None
+
+    try:
+        checks_touching_each_qubit_array = np.asarray(
+            checks_touching_each_qubit,
+            dtype=np.int32,
+        )
+    except ValueError:
+        return None
+    if checks_touching_each_qubit_array.shape != (num_qubits, 4):
+        return None
+
+    (
+        contractible_move_supports,
+        winding_move_supports,
+    ) = _get_zero_syndrome_move_supports(zero_syndrome_move_data)
+    if (
+            not isinstance(contractible_move_supports, np.ndarray)
+            or not isinstance(winding_move_supports, np.ndarray)):
+        return None
+    if (
+            contractible_move_supports.ndim != 2
+            or winding_move_supports.ndim != 2):
+        return None
+    if (
+            contractible_move_supports.shape[0] == 0
+            or winding_move_supports.shape[0] == 0):
+        return None
+
+    return {
+        "checks_touching_each_qubit_array": (
+            checks_touching_each_qubit_array
+        ),
+        "contractible_move_supports": np.asarray(
+            contractible_move_supports,
+            dtype=np.int32,
+        ),
+        "winding_move_supports": np.asarray(
+            winding_move_supports,
+            dtype=np.int32,
+        ),
+        "qubit_order_buffer": np.arange(num_qubits, dtype=np.int32),
+        "contractible_order_buffer": np.arange(
+            contractible_move_supports.shape[0],
+            dtype=np.int32,
+        ),
+        "winding_order_buffer": np.arange(
+            winding_move_supports.shape[0],
+            dtype=np.int32,
+        ),
+    }
 
 
 def _attempt_zero_syndrome_move_update(
@@ -792,7 +1054,8 @@ def _run_measurement_update_cycle(
         num_zero_syndrome_sweeps_per_cycle=1,
         winding_repeat_factor=1,
         qubit_order_buffer=None,
-        track_data_weight_delta=True):
+        track_data_weight_delta=True,
+        numba_update_kernel_data=None):
     single_bit_accepted_count = 0
     single_bit_attempted_count = 0
     contractible_accepted_count = 0
@@ -809,6 +1072,84 @@ def _run_measurement_update_cycle(
         kernel_basis=kernel_basis,
         winding_repeat_factor=winding_repeat_factor,
     )
+
+    if (
+            numba_update_kernel_data is not None
+            and kernel_basis is None
+            and zero_syndrome_move_data is not None
+            and use_hybrid_zero_syndrome_sweeps
+            and np.isfinite(log_odds_data)
+            and (
+                syndrome_error_probability == 0.0
+                or np.isfinite(log_odds_syndrome)
+            )):
+        random_seed = int(
+            rng.integers(0, np.iinfo(np.int32).max, dtype=np.int32)
+        )
+        (
+            single_bit_accepted_count,
+            contractible_accepted_count,
+            winding_accepted_count,
+            single_bit_data_weight_delta,
+            zero_syndrome_data_weight_delta,
+        ) = _numba_run_measurement_update_cycle_3d(
+            current_chain_bits=current_chain_bits,
+            current_data_term_bits=current_data_term_bits,
+            current_syndrome_term_bits=current_syndrome_term_bits,
+            checks_touching_each_qubit_array=(
+                numba_update_kernel_data[
+                    "checks_touching_each_qubit_array"
+                ]
+            ),
+            qubit_order_buffer=(
+                numba_update_kernel_data["qubit_order_buffer"]
+            ),
+            contractible_move_supports=(
+                numba_update_kernel_data["contractible_move_supports"]
+            ),
+            winding_move_supports=(
+                numba_update_kernel_data["winding_move_supports"]
+            ),
+            contractible_order_buffer=(
+                numba_update_kernel_data["contractible_order_buffer"]
+            ),
+            winding_order_buffer=(
+                numba_update_kernel_data["winding_order_buffer"]
+            ),
+            log_odds_data=log_odds_data,
+            log_odds_syndrome=log_odds_syndrome,
+            syndrome_error_is_positive=(
+                syndrome_error_probability > 0.0
+            ),
+            num_zero_syndrome_sweeps_per_cycle=(
+                num_zero_syndrome_sweeps_per_cycle
+            ),
+            winding_repeat_factor=winding_repeat_factor,
+            random_seed=random_seed,
+        )
+        single_bit_attempted_count = (
+            num_qubits if syndrome_error_probability > 0.0 else 0
+        )
+        contractible_attempted_count = (
+            num_zero_syndrome_sweeps_per_cycle * contractible_per_sweep
+        )
+        winding_attempted_count = (
+            num_zero_syndrome_sweeps_per_cycle * winding_per_sweep
+        )
+        data_weight_delta = int(single_bit_data_weight_delta)
+        if track_data_weight_delta:
+            data_weight_delta += int(zero_syndrome_data_weight_delta)
+        return {
+            "single_bit_accepted_count": int(single_bit_accepted_count),
+            "single_bit_attempted_count": int(single_bit_attempted_count),
+            "contractible_accepted_count": int(contractible_accepted_count),
+            "winding_accepted_count": int(winding_accepted_count),
+            "contractible_attempted_count": int(
+                contractible_attempted_count
+            ),
+            "winding_attempted_count": int(winding_attempted_count),
+            "data_weight_delta": int(data_weight_delta),
+        }
 
     def _apply_zero_syndrome_sweeps():
         nonlocal contractible_accepted_count
@@ -1191,6 +1532,11 @@ def _run_single_disorder_measurement(
         kernel_basis=kernel_basis,
         winding_repeat_factor=diagnostic_config["winding_repeat_factor"],
     )
+    numba_update_kernel_data = _build_numba_update_kernel_data(
+        checks_touching_each_qubit=checks_touching_each_qubit,
+        zero_syndrome_move_data=zero_syndrome_move_data,
+        num_qubits=num_qubits,
+    )
 
     for _ in range(num_burn_in_sweeps):
         _run_measurement_update_cycle(
@@ -1217,6 +1563,7 @@ def _run_single_disorder_measurement(
             ],
             qubit_order_buffer=qubit_order_buffer,
             track_data_weight_delta=False,
+            numba_update_kernel_data=numba_update_kernel_data,
         )
 
     num_masks = logical_observable_masks.shape[0]
@@ -1289,6 +1636,7 @@ def _run_single_disorder_measurement(
                 ],
                 qubit_order_buffer=qubit_order_buffer,
                 track_data_weight_delta=False,
+                numba_update_kernel_data=numba_update_kernel_data,
             )
             measurement_single_bit_accepted_count += cycle_result[
                 "single_bit_accepted_count"
