@@ -1447,3 +1447,149 @@ L=4: [pass, pass, pass, fail, fail, fail, fail]
   - 先跑 `p=0.22,0.24,0.26` 的 `L=5` smoke，确认耗时和 convergence
   - 或把 `num_measurements_per_disorder` 降到 `1536`，先用更多 disorder 控制 disorder 方差
   - 若目标是一天内完成，优先保证 `L=3,4,5` 都有数据，而不是让 `L=5` 尾部吞掉整轮预算
+
+## 2026-04-25 3D `q=0.0050/0.0100` Numba 后 overnight runs 与左侧综合分析
+
+摘要：
+- 做什么：回收 Numba fast path 后的三节点正式结果 `exp12~exp17`，并对 `q=0.0100` 左侧窗口生成综合分析 `exp18_q001_left_combined_summary`。
+- 结论：`q=0.0100` 不应继续往 `p>0.24` 扫。右侧 coarse/fine 结果显示大 `p` 已经偏过 crossing 区域；左侧补样本池化后把重点窗口收缩到 `p≈0.22~0.235`。
+- 当前不能宣称最终 threshold：池化 dense 数据中 `L3-L4` crossing 约 `p≈0.2233`，但 `L4-L5` 到 `p=0.230` 仍略负；还需要在 `0.225~0.235` 继续加 disorder 或做更窄窗口复本。
+
+### 运行与产物
+
+本地目录：
+
+```text
+data/3d_toric_code/with_measurement_noise/exp12_q005_fine_20260425_nd1
+data/3d_toric_code/with_measurement_noise/exp13_q001_coarse_20260425_nd2
+data/3d_toric_code/with_measurement_noise/exp14_q001_fine_20260425_nd3
+data/3d_toric_code/with_measurement_noise/exp15_q001_left_denseA_20260425_nd1
+data/3d_toric_code/with_measurement_noise/exp16_q001_left_denseB_20260425_nd2
+data/3d_toric_code/with_measurement_noise/exp17_q001_left_fine_20260425_nd3
+data/3d_toric_code/with_measurement_noise/exp18_q001_left_combined_summary
+```
+
+完成状态：
+
+```text
+exp12 q=0.0050 fine:        528/528 chunks, failed=0
+exp13 q=0.0100 coarse:      528/528 chunks, failed=0
+exp14 q=0.0100 fine-right:  480/480 chunks, failed=0
+exp15 q=0.0100 denseA:      768/768 chunks, failed=0
+exp16 q=0.0100 denseB:      768/768 chunks, failed=0
+exp17 q=0.0100 fine-left:   792/792 chunks, failed=0
+```
+
+主看图：
+
+- [q=0.0100 pooled dense q_top](data/3d_toric_code/with_measurement_noise/exp18_q001_left_combined_summary/q001_left_dense_pooled_sem95.png)
+- [q=0.0100 pooled dense gap](data/3d_toric_code/with_measurement_noise/exp18_q001_left_combined_summary/q001_left_dense_pooled_gap_ci95.png)
+- [q=0.0100 all-run gap comparison](data/3d_toric_code/with_measurement_noise/exp18_q001_left_combined_summary/q001_left_gap_comparison_all_runs.png)
+- [q=0.0100 dense-vs-fine gap detail](data/3d_toric_code/with_measurement_noise/exp18_q001_left_combined_summary/q001_left_gap_detail_dense_vs_fine.png)
+- [machine-readable summary](data/3d_toric_code/with_measurement_noise/exp18_q001_left_combined_summary/q001_left_combined_summary.json)
+
+### 参数摘要
+
+`exp12`:
+
+```text
+q = 0.0050
+p = 0.200,0.205,...,0.250
+num_disorder_samples_total = 32
+chunk_size = 2
+num_measurements_per_disorder = 2048
+num_start_chains = 8
+num_replicas_per_start = 1
+pt_num_temperatures = 7
+max_effective_num_burn_in_sweeps = 4000
+```
+
+`exp13/14`:
+
+```text
+q = 0.0100
+exp13 p = 0.220,0.230,...,0.320, 16 disorder
+exp14 p = 0.225,0.230,...,0.270, 16 disorder
+num_measurements_per_disorder = 1536
+pt_num_temperatures = 7
+max_effective_num_burn_in_sweeps = 3000
+```
+
+`exp15/16/17`:
+
+```text
+q = 0.0100
+exp15/16 p = 0.195,0.200,...,0.230, 64 disorder each
+exp17 p = 0.205,0.2075,...,0.230, 48 disorder
+num_measurements_per_disorder = 1536
+pt_num_temperatures = 7
+max_effective_num_burn_in_sweeps = 3000
+```
+
+### 数值摘要
+
+`q=0.0050 exp12`:
+
+```text
+primary_crossing_window_hit = false
+recommended window          = p≈0.2164~0.2200
+right_edge_gap_signs        = {L3-L4: +, L4-L5: +}
+```
+
+`q=0.0100 exp13/14` 右侧检查：
+
+```text
+exp13 recommended window = p≈0.2400~0.2900
+exp14 recommended window = p≈0.2250~0.2700
+right_edge_gap_signs     = {L3-L4: +, L4-L5: +}
+```
+
+这两轮的关键作用不是给 threshold，而是说明 `p>0.24` 已经太靠右；继续往更大 `p` 扫会浪费时间。
+
+`q=0.0100 exp15+exp16` 池化 dense 结果，`128` disorder：
+
+```text
+p:      [0.195, 0.200, 0.205, 0.210, 0.215, 0.220, 0.225, 0.230]
+L3-L4: [-0.16096, -0.13740, -0.10564, -0.07481, -0.03588, -0.01341,  0.00666,  0.01536]
+L4-L5: [-0.08052, -0.05088, -0.04156, -0.04969, -0.06047, -0.05669, -0.04128, -0.02143]
+```
+
+线性 crossing：
+
+```text
+L3-L4 crossing ≈ 0.22334
+L4-L5 crossing: not observed by p=0.230
+```
+
+`q=0.0100 exp17` 左侧 fine grid：
+
+```text
+L3-L4 stays negative from p=0.205 to 0.230
+L4-L5 only crosses near the right edge, around p≈0.2294
+```
+
+### 判读
+
+- `q=0.0100` 的旧失败不是因为 threshold 必然在更右侧，而是因为 `0.20~0.23` 左侧窗口 disorder 方差太大。
+- `exp13/14` 已足够说明 `p>0.24` 不值得优先继续扩展；那里两条 gap 多数已为正，物理上更像已过 crossing 区。
+- `exp15+16` 池化后明显压低了 error bar，并把 `L3-L4` crossing 稳定到 `p≈0.223` 附近。
+- 但 `L4-L5` 仍未在 `p<=0.230` 明确翻号，所以目前最合理的下一轮不是大范围扫描，而是在 `p=0.225~0.240` 做窄窗口高 disorder 复本。
+- 当前结论应表述为：`q=0.0100` threshold 候选窗口在 `p≈0.22~0.235`，尚未完成三尺寸共同 crossing 的最终确认。
+
+### 下一步建议
+
+若继续 `q=0.0100`：
+
+```text
+L = 3,4,5
+p = 0.2225,0.2250,0.2275,0.2300,0.2325,0.2350,0.2375,0.2400
+num_disorder_samples_total = 96 或 128
+chunk_size = 2
+num_measurements_per_disorder = 1536
+num_start_chains = 8
+num_replicas_per_start = 1
+pt_num_temperatures = 7
+max_effective_num_burn_in_sweeps = 3000
+```
+
+若 convergence 诊断显示 `mean_q_top_spread` 仍系统性偏高，再考虑只在 `L=5` 或关键 `p` 点提高 `num_measurements_per_disorder` / `replicas`，不要先扩大 `p` 范围。
