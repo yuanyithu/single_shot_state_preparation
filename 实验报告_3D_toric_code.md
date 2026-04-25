@@ -1710,3 +1710,86 @@ num_replicas_per_start = 1
 pt_num_temperatures = 7
 max_effective_num_burn_in_sweeps = 3000
 ```
+
+## 2026-04-26 3D `q=0.0500` L=6 extension 与四尺寸综合图
+
+摘要：
+- 做什么：在三台节点上只补 `L=6`，沿用 `exp21` 的 `q=0.0500, p=0.18~0.22`、`2048` measurements/disorder、`PT7` 参数；每台 `96` disorder，池化后 L=6 也是 `288` disorder。
+- 产物：`exp22a/b/c` 为三份 L=6 原始 run，`exp23_q050_L3456_p018_022_combined_summary` 把 L=6 和 `exp21` 的 L=3/4/5 pooled 曲线画在一起。
+- 结论：L=6 曲线在全窗口低于 L=5，表面上像更大尺寸已经进入 high-p side；但 L=6 的 mixing 诊断明显差，不能把它作为最终 threshold。当前更合理的说法是：四尺寸图支持 `q=0.05` 的关键区域确实在 `p=0.19~0.22` 附近，但需要更强 L=6 mixing 才能定量确认。
+
+### 运行与产物
+
+本地目录：
+
+```text
+data/3d_toric_code/with_measurement_noise/exp22a_q050_L6_p018_022_20260425_nd1
+data/3d_toric_code/with_measurement_noise/exp22b_q050_L6_p018_022_20260425_nd2
+data/3d_toric_code/with_measurement_noise/exp22c_q050_L6_p018_022_20260425_nd3
+data/3d_toric_code/with_measurement_noise/exp23_q050_L3456_p018_022_combined_summary
+```
+
+完成状态：
+
+```text
+exp22a nd-1: 240/240 chunks, failed=0
+exp22b nd-2: 240/240 chunks, failed=0
+exp22c nd-3: 240/240 chunks, failed=0
+```
+
+主看图：
+
+- [q=0.0500 L=3/4/5/6 pooled q_top](data/3d_toric_code/with_measurement_noise/exp23_q050_L3456_p018_022_combined_summary/q050_L3456_pooled_sem95.png)
+- [q=0.0500 L=3/4/5/6 pooled gap](data/3d_toric_code/with_measurement_noise/exp23_q050_L3456_p018_022_combined_summary/q050_L3456_pooled_gap_ci95.png)
+- [machine-readable summary](data/3d_toric_code/with_measurement_noise/exp23_q050_L3456_p018_022_combined_summary/q050_L3456_pooled_summary.json)
+
+### 数值摘要
+
+`exp23` pooled 曲线：
+
+```text
+p      L3              L4              L5              L6
+0.18   0.4326±0.0338   0.4740±0.0342   0.5682±0.0349   0.5240±0.0356
+0.19   0.3684±0.0307   0.3736±0.0322   0.4563±0.0356   0.4313±0.0344
+0.20   0.2993±0.0268   0.2865±0.0294   0.3437±0.0328   0.3394±0.0317
+0.21   0.2320±0.0231   0.2141±0.0239   0.2497±0.0273   0.2215±0.0254
+0.22   0.1861±0.0199   0.1540±0.0188   0.1632±0.0213   0.1354±0.0183
+```
+
+Pairwise gap `Lsmall-Llarge`：
+
+```text
+L3-L4 crossing ≈ 0.1929
+L4-L5 crossing: not observed by p=0.220
+L5-L6 crossing: not observed; L5-L6 gap stays positive
+```
+
+L=6 诊断：
+
+```text
+mean_q_top_spread curve ≈ [0.0982, 0.1082, 0.0999, 0.0855, 0.0621]
+max_r_hat max           ≈ 1.348
+min ESS                 ≈ 4.54
+mean PT min swap        ≈ [0.0317, 0.0483, 0.0677, 0.0894, 0.1125]
+```
+
+### 判读
+
+- 图形直观上支持用户判断：`q=0.05` 的关键区域不是低 p，而是在 `p≈0.19~0.22` 一带。
+- 但 `L=6` 并没有给出更干净的 finite-size crossing：它在全窗口都低于 `L=5`，与 `L4-L5` 尚未 crossing 的事实并列，形成非单调有限尺寸行为。
+- L=6 convergence 很差，尤其 `mean_q_top_spread` 和 R-hat；这说明当前 L=6 可能还没有充分混合，不能把 L5-L6 的顺序直接当作最终物理结论。
+- 下一步如果要用 L=6 定 threshold，应减少 p 点、集中在 `0.19~0.22`，提高 mixing 预算或 replicas，而不是继续扩大范围。
+
+### 下一步建议
+
+```text
+q = 0.0500
+L = 5,6 作为重点，保留 L=3,4 只作对照
+p = 0.190,0.195,0.200,0.205,0.210,0.215,0.220
+num_disorder_samples_total = 96 或 128 per node
+num_measurements_per_disorder = 4096
+num_start_chains = 8
+num_replicas_per_start = 2
+pt_num_temperatures = 9 或先保留 7 但检查 swap
+max_effective_num_burn_in_sweeps = 5000
+```
