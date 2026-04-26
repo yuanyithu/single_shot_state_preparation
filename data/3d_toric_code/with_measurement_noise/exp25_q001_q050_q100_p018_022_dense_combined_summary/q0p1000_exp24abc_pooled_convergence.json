@@ -1,0 +1,509 @@
+{
+  "converged_mask_matrix": [
+    [
+      true,
+      true,
+      false,
+      false,
+      true,
+      true,
+      true,
+      true,
+      true
+    ],
+    [
+      false,
+      false,
+      true,
+      false,
+      true,
+      true,
+      true,
+      true,
+      true
+    ],
+    [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  ],
+  "num_passed_points": 13,
+  "num_total_points": 27,
+  "points": [
+    {
+      "data_error_probability": 0.18,
+      "failed_checks": [],
+      "lattice_index": 0,
+      "lattice_size": 3,
+      "metrics": {
+        "max_r_hat": 1.0017154879845078,
+        "mean_cold_winding_acceptance_rate": 0.024887155048985407,
+        "mean_pt_min_swap_acceptance_rate": 0.46735797684458397,
+        "mean_q_top_spread": 0.024279163943396673,
+        "min_effective_sample_size": 386.8902963993015
+      },
+      "passed": true,
+      "point_index": 0,
+      "syndrome_error_probability": 0.1
+    },
+    {
+      "data_error_probability": 0.185,
+      "failed_checks": [],
+      "lattice_index": 0,
+      "lattice_size": 3,
+      "metrics": {
+        "max_r_hat": 1.0015492180374357,
+        "mean_cold_winding_acceptance_rate": 0.02786963077684184,
+        "mean_pt_min_swap_acceptance_rate": 0.48104892998866217,
+        "mean_q_top_spread": 0.023775259180674475,
+        "min_effective_sample_size": 326.2548062958842
+      },
+      "passed": true,
+      "point_index": 1,
+      "syndrome_error_probability": 0.1
+    },
+    {
+      "data_error_probability": 0.19,
+      "failed_checks": [
+        "min_effective_sample_size<=200"
+      ],
+      "lattice_index": 0,
+      "lattice_size": 3,
+      "metrics": {
+        "max_r_hat": 1.002892683215968,
+        "mean_cold_winding_acceptance_rate": 0.031213681181904145,
+        "mean_pt_min_swap_acceptance_rate": 0.49510554756090475,
+        "mean_q_top_spread": 0.022210949943179174,
+        "min_effective_sample_size": 165.69595281092495
+      },
+      "passed": false,
+      "point_index": 2,
+      "syndrome_error_probability": 0.1
+    },
+    {
+      "data_error_probability": 0.195,
+      "failed_checks": [
+        "min_effective_sample_size<=200"
+      ],
+      "lattice_index": 0,
+      "lattice_size": 3,
+      "metrics": {
+        "max_r_hat": 1.0019632612292426,
+        "mean_cold_winding_acceptance_rate": 0.03507989168408935,
+        "mean_pt_min_swap_acceptance_rate": 0.5085824393860108,
+        "mean_q_top_spread": 0.021233438026337394,
+        "min_effective_sample_size": 174.299578358759
+      },
+      "passed": false,
+      "point_index": 3,
+      "syndrome_error_probability": 0.1
+    },
+    {
+      "data_error_probability": 0.2,
+      "failed_checks": [],
+      "lattice_index": 0,
+      "lattice_size": 3,
+      "metrics": {
+        "max_r_hat": 1.0018973545470826,
+        "mean_cold_winding_acceptance_rate": 0.03918297494686383,
+        "mean_pt_min_swap_acceptance_rate": 0.5217682759535438,
+        "mean_q_top_spread": 0.01974809973958939,
+        "min_effective_sample_size": 344.695419523494
+      },
+      "passed": true,
+      "point_index": 4,
+      "syndrome_error_probability": 0.1
+    },
+    {
+      "data_error_probability": 0.205,
+      "failed_checks": [],
+      "lattice_index": 0,
+      "lattice_size": 3,
+      "metrics": {
+        "max_r_hat": 1.001912618116587,
+        "mean_cold_winding_acceptance_rate": 0.043411622869708184,
+        "mean_pt_min_swap_acceptance_rate": 0.5350439387827781,
+        "mean_q_top_spread": 0.017976565493477717,
+        "min_effective_sample_size": 283.2186048342252
+      },
+      "passed": true,
+      "point_index": 5,
+      "syndrome_error_probability": 0.1
+    },
+    {
+      "data_error_probability": 0.21,
+      "failed_checks": [],
+      "lattice_index": 0,
+      "lattice_size": 3,
+      "metrics": {
+        "max_r_hat": 1.0016604543541194,
+        "mean_cold_winding_acceptance_rate": 0.04807561397808173,
+        "mean_pt_min_swap_acceptance_rate": 0.5474032828943542,
+        "mean_q_top_spread": 0.016661820903656976,
+        "min_effective_sample_size": 505.099082288458
+      },
+      "passed": true,
+      "point_index": 6,
+      "syndrome_error_probability": 0.1
+    },
+    {
+      "data_error_probability": 0.215,
+      "failed_checks": [],
+      "lattice_index": 0,
+      "lattice_size": 3,
+      "metrics": {
+        "max_r_hat": 1.0011675766341437,
+        "mean_cold_winding_acceptance_rate": 0.053085062864251235,
+        "mean_pt_min_swap_acceptance_rate": 0.5597609236002093,
+        "mean_q_top_spread": 0.016259765814221092,
+        "min_effective_sample_size": 485.5182512102515
+      },
+      "passed": true,
+      "point_index": 7,
+      "syndrome_error_probability": 0.1
+    },
+    {
+      "data_error_probability": 0.22,
+      "failed_checks": [],
+      "lattice_index": 0,
+      "lattice_size": 3,
+      "metrics": {
+        "max_r_hat": 1.0010438717097798,
+        "mean_cold_winding_acceptance_rate": 0.05796728548115886,
+        "mean_pt_min_swap_acceptance_rate": 0.5715012500726786,
+        "mean_q_top_spread": 0.015118998667550466,
+        "min_effective_sample_size": 623.7067400125794
+      },
+      "passed": true,
+      "point_index": 8,
+      "syndrome_error_probability": 0.1
+    },
+    {
+      "data_error_probability": 0.18,
+      "failed_checks": [
+        "min_effective_sample_size<=200"
+      ],
+      "lattice_index": 1,
+      "lattice_size": 4,
+      "metrics": {
+        "max_r_hat": 1.0054001679378197,
+        "mean_cold_winding_acceptance_rate": 0.004137422857486566,
+        "mean_pt_min_swap_acceptance_rate": 0.26925802372230945,
+        "mean_q_top_spread": 0.026347155608828107,
+        "min_effective_sample_size": 168.0740398312428
+      },
+      "passed": false,
+      "point_index": 0,
+      "syndrome_error_probability": 0.1
+    },
+    {
+      "data_error_probability": 0.185,
+      "failed_checks": [
+        "min_effective_sample_size<=200"
+      ],
+      "lattice_index": 1,
+      "lattice_size": 4,
+      "metrics": {
+        "max_r_hat": 1.003750404832544,
+        "mean_cold_winding_acceptance_rate": 0.005036503464121582,
+        "mean_pt_min_swap_acceptance_rate": 0.2855794895415431,
+        "mean_q_top_spread": 0.023829838586232017,
+        "min_effective_sample_size": 143.56933593537062
+      },
+      "passed": false,
+      "point_index": 1,
+      "syndrome_error_probability": 0.1
+    },
+    {
+      "data_error_probability": 0.19,
+      "failed_checks": [],
+      "lattice_index": 1,
+      "lattice_size": 4,
+      "metrics": {
+        "max_r_hat": 1.0034547803655034,
+        "mean_cold_winding_acceptance_rate": 0.006009988004616911,
+        "mean_pt_min_swap_acceptance_rate": 0.30111682092708875,
+        "mean_q_top_spread": 0.022325989745912097,
+        "min_effective_sample_size": 232.87569785930802
+      },
+      "passed": true,
+      "point_index": 2,
+      "syndrome_error_probability": 0.1
+    },
+    {
+      "data_error_probability": 0.195,
+      "failed_checks": [
+        "min_effective_sample_size<=200"
+      ],
+      "lattice_index": 1,
+      "lattice_size": 4,
+      "metrics": {
+        "max_r_hat": 1.0032627351384047,
+        "mean_cold_winding_acceptance_rate": 0.007095223649411243,
+        "mean_pt_min_swap_acceptance_rate": 0.3166856085382871,
+        "mean_q_top_spread": 0.020148852987894938,
+        "min_effective_sample_size": 174.54013190114918
+      },
+      "passed": false,
+      "point_index": 3,
+      "syndrome_error_probability": 0.1
+    },
+    {
+      "data_error_probability": 0.2,
+      "failed_checks": [],
+      "lattice_index": 1,
+      "lattice_size": 4,
+      "metrics": {
+        "max_r_hat": 1.0034343853354493,
+        "mean_cold_winding_acceptance_rate": 0.008392364740311634,
+        "mean_pt_min_swap_acceptance_rate": 0.3316353785103785,
+        "mean_q_top_spread": 0.018185687443566703,
+        "min_effective_sample_size": 221.11327696397493
+      },
+      "passed": true,
+      "point_index": 4,
+      "syndrome_error_probability": 0.1
+    },
+    {
+      "data_error_probability": 0.205,
+      "failed_checks": [],
+      "lattice_index": 1,
+      "lattice_size": 4,
+      "metrics": {
+        "max_r_hat": 1.002414911972783,
+        "mean_cold_winding_acceptance_rate": 0.009891451676991576,
+        "mean_pt_min_swap_acceptance_rate": 0.3468815410779696,
+        "mean_q_top_spread": 0.016344215188707625,
+        "min_effective_sample_size": 258.9816542626075
+      },
+      "passed": true,
+      "point_index": 5,
+      "syndrome_error_probability": 0.1
+    },
+    {
+      "data_error_probability": 0.21,
+      "failed_checks": [],
+      "lattice_index": 1,
+      "lattice_size": 4,
+      "metrics": {
+        "max_r_hat": 1.00236779286294,
+        "mean_cold_winding_acceptance_rate": 0.011519463359818643,
+        "mean_pt_min_swap_acceptance_rate": 0.36190137780539566,
+        "mean_q_top_spread": 0.014551174072992236,
+        "min_effective_sample_size": 251.01601310823452
+      },
+      "passed": true,
+      "point_index": 6,
+      "syndrome_error_probability": 0.1
+    },
+    {
+      "data_error_probability": 0.215,
+      "failed_checks": [],
+      "lattice_index": 1,
+      "lattice_size": 4,
+      "metrics": {
+        "max_r_hat": 1.002423666004013,
+        "mean_cold_winding_acceptance_rate": 0.013441405388833772,
+        "mean_pt_min_swap_acceptance_rate": 0.3765116022370487,
+        "mean_q_top_spread": 0.012786781504040674,
+        "min_effective_sample_size": 295.4738857144075
+      },
+      "passed": true,
+      "point_index": 7,
+      "syndrome_error_probability": 0.1
+    },
+    {
+      "data_error_probability": 0.22,
+      "failed_checks": [],
+      "lattice_index": 1,
+      "lattice_size": 4,
+      "metrics": {
+        "max_r_hat": 1.0022828771764414,
+        "mean_cold_winding_acceptance_rate": 0.015558680145791846,
+        "mean_pt_min_swap_acceptance_rate": 0.3909140111707076,
+        "mean_q_top_spread": 0.011309785029244802,
+        "min_effective_sample_size": 333.39358675832773
+      },
+      "passed": true,
+      "point_index": 8,
+      "syndrome_error_probability": 0.1
+    },
+    {
+      "data_error_probability": 0.18,
+      "failed_checks": [
+        "min_effective_sample_size<=200"
+      ],
+      "lattice_index": 2,
+      "lattice_size": 5,
+      "metrics": {
+        "max_r_hat": 1.0120962151222028,
+        "mean_cold_winding_acceptance_rate": 0.00024872136688542935,
+        "mean_pt_min_swap_acceptance_rate": 0.12698957788243503,
+        "mean_q_top_spread": 0.028315503918935378,
+        "min_effective_sample_size": 24.323998957291167
+      },
+      "passed": false,
+      "point_index": 0,
+      "syndrome_error_probability": 0.1
+    },
+    {
+      "data_error_probability": 0.185,
+      "failed_checks": [
+        "min_effective_sample_size<=200"
+      ],
+      "lattice_index": 2,
+      "lattice_size": 5,
+      "metrics": {
+        "max_r_hat": 1.0198431845988618,
+        "mean_cold_winding_acceptance_rate": 0.000330544933874547,
+        "mean_pt_min_swap_acceptance_rate": 0.13958546826850396,
+        "mean_q_top_spread": 0.02453089611870902,
+        "min_effective_sample_size": 48.18439161331659
+      },
+      "passed": false,
+      "point_index": 1,
+      "syndrome_error_probability": 0.1
+    },
+    {
+      "data_error_probability": 0.19,
+      "failed_checks": [
+        "min_effective_sample_size<=200"
+      ],
+      "lattice_index": 2,
+      "lattice_size": 5,
+      "metrics": {
+        "max_r_hat": 1.0102961422943462,
+        "mean_cold_winding_acceptance_rate": 0.00043597865049687973,
+        "mean_pt_min_swap_acceptance_rate": 0.1526378713878714,
+        "mean_q_top_spread": 0.022022075123257108,
+        "min_effective_sample_size": 63.58371558297335
+      },
+      "passed": false,
+      "point_index": 2,
+      "syndrome_error_probability": 0.1
+    },
+    {
+      "data_error_probability": 0.195,
+      "failed_checks": [
+        "min_effective_sample_size<=200"
+      ],
+      "lattice_index": 2,
+      "lattice_size": 5,
+      "metrics": {
+        "max_r_hat": 1.00832029762335,
+        "mean_cold_winding_acceptance_rate": 0.0005704133226919686,
+        "mean_pt_min_swap_acceptance_rate": 0.16541863807488807,
+        "mean_q_top_spread": 0.01940379398209708,
+        "min_effective_sample_size": 65.36064155322433
+      },
+      "passed": false,
+      "point_index": 3,
+      "syndrome_error_probability": 0.1
+    },
+    {
+      "data_error_probability": 0.2,
+      "failed_checks": [
+        "min_effective_sample_size<=200"
+      ],
+      "lattice_index": 2,
+      "lattice_size": 5,
+      "metrics": {
+        "max_r_hat": 1.0090503337223695,
+        "mean_cold_winding_acceptance_rate": 0.000743107906891389,
+        "mean_pt_min_swap_acceptance_rate": 0.1786940737833595,
+        "mean_q_top_spread": 0.017366829845640395,
+        "min_effective_sample_size": 72.36921304241086
+      },
+      "passed": false,
+      "point_index": 4,
+      "syndrome_error_probability": 0.1
+    },
+    {
+      "data_error_probability": 0.205,
+      "failed_checks": [
+        "min_effective_sample_size<=200"
+      ],
+      "lattice_index": 2,
+      "lattice_size": 5,
+      "metrics": {
+        "max_r_hat": 1.0154101043348502,
+        "mean_cold_winding_acceptance_rate": 0.0009541083004159641,
+        "mean_pt_min_swap_acceptance_rate": 0.19216278926100352,
+        "mean_q_top_spread": 0.015132280569227916,
+        "min_effective_sample_size": 82.12689713170909
+      },
+      "passed": false,
+      "point_index": 5,
+      "syndrome_error_probability": 0.1
+    },
+    {
+      "data_error_probability": 0.21,
+      "failed_checks": [
+        "min_effective_sample_size<=200"
+      ],
+      "lattice_index": 2,
+      "lattice_size": 5,
+      "metrics": {
+        "max_r_hat": 1.0103857884848082,
+        "mean_cold_winding_acceptance_rate": 0.0012206089645170745,
+        "mean_pt_min_swap_acceptance_rate": 0.205595165416594,
+        "mean_q_top_spread": 0.01331557830174764,
+        "min_effective_sample_size": 74.47898092791863
+      },
+      "passed": false,
+      "point_index": 6,
+      "syndrome_error_probability": 0.1
+    },
+    {
+      "data_error_probability": 0.215,
+      "failed_checks": [
+        "min_effective_sample_size<=200"
+      ],
+      "lattice_index": 2,
+      "lattice_size": 5,
+      "metrics": {
+        "max_r_hat": 1.0059768559705748,
+        "mean_cold_winding_acceptance_rate": 0.0015479197933625016,
+        "mean_pt_min_swap_acceptance_rate": 0.21957899078434792,
+        "mean_q_top_spread": 0.011447434387509786,
+        "min_effective_sample_size": 94.52981305696039
+      },
+      "passed": false,
+      "point_index": 7,
+      "syndrome_error_probability": 0.1
+    },
+    {
+      "data_error_probability": 0.22,
+      "failed_checks": [
+        "min_effective_sample_size<=200"
+      ],
+      "lattice_index": 2,
+      "lattice_size": 5,
+      "metrics": {
+        "max_r_hat": 1.0047507802701552,
+        "mean_cold_winding_acceptance_rate": 0.0019468796521902919,
+        "mean_pt_min_swap_acceptance_rate": 0.2336188014201407,
+        "mean_q_top_spread": 0.009914612486248925,
+        "min_effective_sample_size": 162.08085850252536
+      },
+      "passed": false,
+      "point_index": 8,
+      "syndrome_error_probability": 0.1
+    }
+  ],
+  "pt_enabled": true,
+  "syndrome_error_probability": 0.1,
+  "thresholds": {
+    "max_r_hat": 1.05,
+    "mean_q_top_spread": 0.03,
+    "min_cold_winding_acceptance_rate": 0.0001,
+    "min_effective_sample_size": 200.0
+  }
+}

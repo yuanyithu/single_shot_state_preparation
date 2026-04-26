@@ -1,0 +1,312 @@
+{
+  "boundary_saturation_artifact": false,
+  "code_family": "3d_toric",
+  "common_random_disorder_across_p": true,
+  "crossing_window": null,
+  "data_error_probability_list": [
+    0.18,
+    0.185,
+    0.19,
+    0.195,
+    0.2,
+    0.205,
+    0.21,
+    0.215,
+    0.22
+  ],
+  "gap_plot_path": "/Users/yuan/Desktop/Desktop/workspace/projects/project D/data/3d_toric_code/with_measurement_noise/exp25_q001_q050_q100_p018_022_dense_combined_summary/q0p1000_exp24abc_pooled_gap_crossing.png",
+  "input_path": "/Users/yuan/Desktop/Desktop/workspace/projects/project D/data/3d_toric_code/with_measurement_noise/exp25_q001_q050_q100_p018_022_dense_combined_summary/q0p1000_exp24abc_pooled.npz",
+  "interior_crossing_window": null,
+  "interior_near_crossing_window": null,
+  "lattice_size_list": [
+    3,
+    4,
+    5
+  ],
+  "left_edge_saturated_point_flags": [
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false
+  ],
+  "left_edge_saturation_end_index": -1,
+  "left_edge_saturation_end_p": null,
+  "num_disorder_samples": 1152,
+  "pair_labels": [
+    "3-4",
+    "4-5"
+  ],
+  "pairwise_gap_analysis": {
+    "delta_35": {
+      "boundary_artifact_crossing_detected": false,
+      "boundary_crossing_intervals": [],
+      "crossing_intervals": [],
+      "crossing_location_classification": "left_of_window",
+      "delta_curve": [
+        0.0798887214327734,
+        0.08152338486933519,
+        0.0793145435330059,
+        0.0726273478718386,
+        0.06763910826679971,
+        0.06538225931396323,
+        0.06209817213848943,
+        0.05969239627232863,
+        0.057402898653572995
+      ],
+      "interior_crossing_intervals": [],
+      "interior_near_crossing_hit": false,
+      "interior_near_crossing_windows": [],
+      "interior_sign_flip_detected": false,
+      "min_abs_delta_index": 8,
+      "min_abs_delta_p": 0.22,
+      "min_abs_delta_value": 0.057402898653572995,
+      "non_saturated_min_abs_delta_index": 8,
+      "non_saturated_min_abs_delta_p": 0.22,
+      "non_saturated_min_abs_delta_value": 0.057402898653572995,
+      "pair_label": "3-4",
+      "pooled_ci95_curve": [
+        0.01630058598541146,
+        0.015262438096531973,
+        0.014157271806289812,
+        0.012989653231122092,
+        0.011890925852023046,
+        0.010841667054515482,
+        0.009758058412072628,
+        0.008757827551167514,
+        0.008085401501114808
+      ],
+      "pooled_sem_at_min_abs": 0.004125204847507555,
+      "pooled_sem_curve": [
+        0.008316625502760949,
+        0.007786958212516313,
+        0.007223097860351945,
+        0.006627374097511272,
+        0.006066798904093391,
+        0.005531462782916062,
+        0.0049786012306493,
+        0.004468279362840569,
+        0.004125204847507555
+      ],
+      "raw_crossing_intervals": [],
+      "right_edge_delta": 0.057402898653572995,
+      "right_edge_near_hit": false,
+      "right_edge_pooled_ci95": 0.008085401501114808,
+      "right_edge_pooled_sem": 0.004125204847507555,
+      "right_edge_sign": 1,
+      "secondary_proximity_hit": false,
+      "sign_flip_detected": false,
+      "sign_pattern": [
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1
+      ]
+    },
+    "delta_57": {
+      "boundary_artifact_crossing_detected": false,
+      "boundary_crossing_intervals": [],
+      "crossing_intervals": [],
+      "crossing_location_classification": "left_of_window",
+      "delta_curve": [
+        0.06452101355211602,
+        0.057369747871739984,
+        0.050744941347234285,
+        0.0476382071048849,
+        0.0415925736361671,
+        0.034474923127582144,
+        0.03134636532899642,
+        0.02725912688211316,
+        0.024148275373533135
+      ],
+      "interior_crossing_intervals": [],
+      "interior_near_crossing_hit": false,
+      "interior_near_crossing_windows": [],
+      "interior_sign_flip_detected": false,
+      "min_abs_delta_index": 8,
+      "min_abs_delta_p": 0.22,
+      "min_abs_delta_value": 0.024148275373533135,
+      "non_saturated_min_abs_delta_index": 8,
+      "non_saturated_min_abs_delta_p": 0.22,
+      "non_saturated_min_abs_delta_value": 0.024148275373533135,
+      "pair_label": "4-5",
+      "pooled_ci95_curve": [
+        0.011747157566960917,
+        0.010697291048093034,
+        0.009744751730389035,
+        0.008773749656504118,
+        0.007798609080975566,
+        0.0068224178511568905,
+        0.005645063663148822,
+        0.004784966892133692,
+        0.004147427888085681
+      ],
+      "pooled_sem_at_min_abs": 0.002116034636778409,
+      "pooled_sem_curve": [
+        0.005993447738245366,
+        0.005457801555149507,
+        0.004971812107341345,
+        0.004476402885971489,
+        0.003978882184171207,
+        0.00348082543426372,
+        0.0028801345220147052,
+        0.0024413096388437206,
+        0.002116034636778409
+      ],
+      "raw_crossing_intervals": [],
+      "right_edge_delta": 0.024148275373533135,
+      "right_edge_near_hit": false,
+      "right_edge_pooled_ci95": 0.004147427888085681,
+      "right_edge_pooled_sem": 0.002116034636778409,
+      "right_edge_sign": 1,
+      "secondary_proximity_hit": false,
+      "sign_flip_detected": false,
+      "sign_pattern": [
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1
+      ]
+    }
+  },
+  "primary_crossing_window_hit": false,
+  "q_top_ci95_curve_matrix": [
+    [
+      0.013031908499831229,
+      0.012330179176511734,
+      0.01150418110693245,
+      0.010662645779997587,
+      0.009836516530724282,
+      0.009153808378150547,
+      0.008432038713449124,
+      0.007660004037513062,
+      0.007177625663663218
+    ],
+    [
+      0.009791754915224288,
+      0.00899492624347676,
+      0.008251191553713127,
+      0.007418832525074298,
+      0.006681097227184913,
+      0.005809435144406664,
+      0.004911255145919078,
+      0.0042454542231983115,
+      0.00372228522101044
+    ],
+    [
+      0.006489780164473069,
+      0.00578993416560365,
+      0.005184402012850976,
+      0.004683973420068248,
+      0.004022591632116867,
+      0.003577128546574324,
+      0.0027832205540859645,
+      0.002207266770814797,
+      0.0018291393660183775
+    ]
+  ],
+  "q_top_curve_matrix": [
+    [
+      0.23659086130589013,
+      0.2164403261055076,
+      0.19576143294513698,
+      0.1747097357930172,
+      0.15455703284325345,
+      0.1378950575987498,
+      0.12327270682102867,
+      0.1109212433978442,
+      0.10046874386598431
+    ],
+    [
+      0.15670213987311674,
+      0.1349169412361724,
+      0.11644688941213108,
+      0.10208238792117862,
+      0.08691792457645374,
+      0.07251279828478656,
+      0.06117453468253924,
+      0.05122884712551558,
+      0.043065845212411316
+    ],
+    [
+      0.09218112632100071,
+      0.07754719336443242,
+      0.06570194806489679,
+      0.054444180816293715,
+      0.04532535094028664,
+      0.038037875157204415,
+      0.02982816935354282,
+      0.02396972024340242,
+      0.01891756983887818
+    ]
+  ],
+  "q_top_sem_curve_matrix": [
+    [
+      0.0066489329080771575,
+      0.006290907743118232,
+      0.005869480156598188,
+      0.005440125397957953,
+      0.005018630883022593,
+      0.004670310397015585,
+      0.004302060568086288,
+      0.003908165325261766,
+      0.003662053910032254
+    ],
+    [
+      0.004995793324094025,
+      0.004589248083406511,
+      0.00420979160903731,
+      0.0037851186352419884,
+      0.0034087230750943433,
+      0.002963997522656461,
+      0.0025057424213872845,
+      0.002166048073060363,
+      0.0018991251127604286
+    ],
+    [
+      0.0033111123288127905,
+      0.0029540480436753315,
+      0.00264510306778111,
+      0.0023897823571776776,
+      0.002052342669447381,
+      0.0018250655849869001,
+      0.0014200104867785534,
+      0.0011261565157218351,
+      0.0009332343704175395
+    ]
+  ],
+  "raw_crossing_window": null,
+  "recommended_server_window": null,
+  "right_edge_gap_signs": {
+    "3-4": 1,
+    "4-5": 1
+  },
+  "right_edge_gap_values": {
+    "3-4": {
+      "delta": 0.057402898653572995,
+      "pooled_ci95": 0.008085401501114808
+    },
+    "4-5": {
+      "delta": 0.024148275373533135,
+      "pooled_ci95": 0.004147427888085681
+    }
+  },
+  "secondary_proximity_hit": false,
+  "sem95_plot_path": "/Users/yuan/Desktop/Desktop/workspace/projects/project D/data/3d_toric_code/with_measurement_noise/exp25_q001_q050_q100_p018_022_dense_combined_summary/q0p1000_exp24abc_pooled_sem95.png",
+  "summary_path": "/Users/yuan/Desktop/Desktop/workspace/projects/project D/data/3d_toric_code/with_measurement_noise/exp25_q001_q050_q100_p018_022_dense_combined_summary/q0p1000_exp24abc_pooled_threshold_summary.json",
+  "syndrome_error_probability": 0.1
+}
