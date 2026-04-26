@@ -25,6 +25,9 @@ CONCATENATED_FIELD_SUFFIXES = (
     "_per_disorder_per_start_replica_tensor",
     "_per_disorder_per_start_tensor",
 )
+EXPLICIT_CONCATENATED_FIELDS = {
+    "disorder_q_top_values_tensor",
+}
 
 
 def _load_npz_as_dict(path):
@@ -50,7 +53,10 @@ def _require_same_scalar(name, first, current, path):
 
 
 def _is_disorder_tensor(name, value, num_sizes, num_points, num_disorder):
-    if not name.endswith(CONCATENATED_FIELD_SUFFIXES):
+    if (
+        name not in EXPLICIT_CONCATENATED_FIELDS
+        and not name.endswith(CONCATENATED_FIELD_SUFFIXES)
+    ):
         return False
     array = np.asarray(value)
     return (
