@@ -13,6 +13,7 @@ import numpy as np
 
 from analyze_threshold_crossing import analyze_threshold_crossing
 from mcmc_convergence_gate import (
+    DEFAULT_MEAN_Q_TOP_SPREAD,
     build_convergence_summary,
     write_convergence_summary_json,
 )
@@ -143,6 +144,81 @@ def _recompute_curve_fields(pooled):
             axis=DISORDER_AXIS,
         )
 
+    if "q0_q_top_spread_per_disorder_tensor" in pooled:
+        pooled["q0_mean_q_top_spread_curve_matrix"] = np.mean(
+            pooled["q0_q_top_spread_per_disorder_tensor"],
+            axis=DISORDER_AXIS,
+        )
+        pooled["q0_mean_m_u_spread_linf_curve_matrix"] = np.mean(
+            pooled["q0_m_u_spread_linf_per_disorder_tensor"],
+            axis=DISORDER_AXIS,
+        )
+
+
+def _build_q0_convergence_summary(pooled):
+    lattice_size_list = np.asarray(pooled["lattice_size_list"], dtype=np.int64)
+    data_error_probability_list = np.asarray(
+        pooled["data_error_probability_list"],
+        dtype=np.float64,
+    )
+    q_top_spread_tensor = np.asarray(
+        pooled["q0_q_top_spread_per_disorder_tensor"],
+        dtype=np.float64,
+    )
+    m_u_spread_tensor = np.asarray(
+        pooled["q0_m_u_spread_linf_per_disorder_tensor"],
+        dtype=np.float64,
+    )
+    converged_mask_matrix = np.zeros(
+        (lattice_size_list.size, data_error_probability_list.size),
+        dtype=bool,
+    )
+    point_summaries = []
+    for lattice_index, lattice_size in enumerate(lattice_size_list):
+        for point_index, data_error_probability in enumerate(
+            data_error_probability_list
+        ):
+            mean_q_top_spread = float(
+                np.mean(q_top_spread_tensor[lattice_index, point_index])
+            )
+            mean_m_u_spread_linf = float(
+                np.mean(m_u_spread_tensor[lattice_index, point_index])
+            )
+            failed_checks = []
+            if mean_q_top_spread >= DEFAULT_MEAN_Q_TOP_SPREAD:
+                failed_checks.append(
+                    f"mean_q_top_spread>={DEFAULT_MEAN_Q_TOP_SPREAD:0.3f}"
+                )
+            passed = len(failed_checks) == 0
+            converged_mask_matrix[lattice_index, point_index] = passed
+            point_summaries.append(
+                {
+                    "lattice_index": int(lattice_index),
+                    "point_index": int(point_index),
+                    "lattice_size": int(lattice_size),
+                    "data_error_probability": float(data_error_probability),
+                    "syndrome_error_probability": 0.0,
+                    "passed": bool(passed),
+                    "failed_checks": failed_checks,
+                    "metrics": {
+                        "mean_q_top_spread": mean_q_top_spread,
+                        "mean_m_u_spread_linf": mean_m_u_spread_linf,
+                    },
+                }
+            )
+    return {
+        "diagnostic_type": "q0_multistart_spread",
+        "thresholds": {
+            "mean_q_top_spread": DEFAULT_MEAN_Q_TOP_SPREAD,
+        },
+        "pt_enabled": False,
+        "syndrome_error_probability": 0.0,
+        "converged_mask_matrix": converged_mask_matrix,
+        "num_passed_points": int(np.count_nonzero(converged_mask_matrix)),
+        "num_total_points": int(converged_mask_matrix.size),
+        "points": point_summaries,
+    }
+
 
 def _build_pooled_result(input_paths):
     if len(input_paths) == 0:
@@ -259,15 +335,20 @@ def pool_independent_runs(input_paths, output_dir, output_stem):
 
     pooled = _build_pooled_result(input_paths)
     convergence_summary_path = output_dir / f"{output_stem}_convergence.json"
-    convergence_summary = build_convergence_summary(
-        merged_result=pooled,
-        lattice_size_list=np.asarray(pooled["lattice_size_list"], dtype=np.int64),
-        data_error_probability_list=np.asarray(
-            pooled["data_error_probability_list"],
-            dtype=np.float64,
-        ),
-        syndrome_error_probability=float(pooled["syndrome_error_probability"]),
-    )
+    if "q_top_spread_per_disorder_tensor" in pooled:
+        convergence_summary = build_convergence_summary(
+            merged_result=pooled,
+            lattice_size_list=np.asarray(pooled["lattice_size_list"], dtype=np.int64),
+            data_error_probability_list=np.asarray(
+                pooled["data_error_probability_list"],
+                dtype=np.float64,
+            ),
+            syndrome_error_probability=float(pooled["syndrome_error_probability"]),
+        )
+    elif "q0_q_top_spread_per_disorder_tensor" in pooled:
+        convergence_summary = _build_q0_convergence_summary(pooled)
+    else:
+        raise ValueError("pooled result is missing convergence diagnostic tensors")
     pooled["converged_mask_matrix"] = convergence_summary["converged_mask_matrix"]
     pooled["convergence_summary_path"] = np.array(str(convergence_summary_path))
     np.savez(output_path, **pooled)
