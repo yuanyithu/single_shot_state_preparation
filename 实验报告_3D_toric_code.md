@@ -1917,3 +1917,83 @@ q = 0.1000:
   重点窗口应左移到 p = 0.120~0.180
   本轮 0.18~0.22 已经全部在 high-p side。
 ```
+
+## 2026-04-26 3D 固定 `p=0.1000` 的 q 方向扫描
+
+摘要：
+- 做什么：三台节点并行跑固定 `p=0.1000`，扫描 `q=0.0000,0.0100,...,0.1000`，`L=3,4,5`；每个节点每个 q `512` disorder。
+- 产物：`exp26a/b/c` 为三份独立远端 run，`exp27_fixed_p010_q000_100_combined_summary` 为池化分析目录。
+- 结论：q 方向上 `L4-L5` gap 约在 `q≈0.0247` 翻号，而 `L3-L4` gap 约在 `q≈0.0608` 翻号；两者不形成共同 crossing。因此固定 `p=0.1` 下暂不应宣称一个干净三尺寸 q-threshold，更像较宽的有限尺寸 crossover。
+- 诊断：`q=0` 的 multi-start spread 通过；`q>0` 的严格 convergence gate 全部未通过，主要受 ESS/R-hat 影响，但 PT swap acceptance 约 `0.05~0.077`，没有塌陷。
+
+### 运行与产物
+
+本地目录：
+
+```text
+data/3d_toric_code/with_measurement_noise/exp26a_fixed_p010_q000_100_20260426_nd1
+data/3d_toric_code/with_measurement_noise/exp26b_fixed_p010_q000_100_20260426_nd2
+data/3d_toric_code/with_measurement_noise/exp26c_fixed_p010_q000_100_20260426_nd3
+data/3d_toric_code/with_measurement_noise/exp27_fixed_p010_q000_100_combined_summary
+```
+
+完成状态：
+
+```text
+exp26a nd-1: q=0.0000~0.1000 均 384/384 chunks, failed=0
+exp26b nd-2: q=0.0000~0.1000 均 384/384 chunks, failed=0
+exp26c nd-3: q=0.0000~0.1000 均 384/384 chunks, failed=0
+```
+
+主看图：
+
+- [fixed p=0.1000 q scan q_top](data/3d_toric_code/with_measurement_noise/exp27_fixed_p010_q000_100_combined_summary/fixed_p010_q000_100_exp26abc_pooled_sem95.png)
+- [fixed p=0.1000 q scan gap](data/3d_toric_code/with_measurement_noise/exp27_fixed_p010_q000_100_combined_summary/fixed_p010_q000_100_exp26abc_pooled_gap_ci95.png)
+- [machine-readable summary](data/3d_toric_code/with_measurement_noise/exp27_fixed_p010_q000_100_combined_summary/fixed_p010_q000_100_exp26abc_pooled_summary.json)
+
+### 数值摘要
+
+`p=0.1000`，每个 q 池化 `1536` disorder：
+
+```text
+q     L3        L4        L5        L3-L4    L4-L5
+0.00  0.9620    0.9971    0.9995   -0.0351  -0.0023
+0.01  0.9582    0.9935    0.9963   -0.0353  -0.0028
+0.02  0.9533    0.9853    0.9888   -0.0320  -0.0035
+0.03  0.9440    0.9711    0.9671   -0.0271  +0.0040
+0.04  0.9154    0.9467    0.9362   -0.0313  +0.0105
+0.05  0.8836    0.8945    0.8772   -0.0109  +0.0173
+0.06  0.8459    0.8481    0.8171   -0.0022  +0.0310
+0.07  0.8039    0.7797    0.7416   +0.0242  +0.0382
+0.08  0.7565    0.7068    0.6418   +0.0497  +0.0650
+0.09  0.6898    0.6358    0.5669   +0.0540  +0.0689
+0.10  0.6436    0.5691    0.4707   +0.0744  +0.0984
+```
+
+线性插值的 gap 翻号估计：
+
+```text
+L4-L5: q≈0.0247
+L3-L4: q≈0.0608
+```
+
+### 判读
+
+- 小 q 端：`q=0` 到 `0.02` 基本是 `L5>L4>L3`，即大码 `q_top` 更高，仍像 below-threshold side。
+- 中间段：`q≈0.03~0.06` 出现尺寸顺序交错，`L5` 已低于 `L4`，但 `L4` 仍高于或接近 `L3`；这是本轮最像 crossover 的区域。
+- 大 q 端：`q≥0.07` 两条 gap 都为正，即大码 `q_top` 更低，已经在 high-q side。
+- 由于两条 pairwise crossing 相距约 `0.036`，当前不能把某一个 q 值称为三尺寸共同 threshold。若要进一步确认 fixed-`p` q-threshold，应重点扫 `q=0.02~0.07`，但同时提高 L4/L5 mixing 预算。
+
+### 后续建议
+
+```text
+fixed p = 0.1000
+q = 0.020,0.025,0.030,0.035,0.040,0.045,0.050,0.055,0.060,0.065,0.070
+L = 3,4,5
+num_replicas_per_start = 2
+pt_num_temperatures = 9
+num_measurements_per_disorder = 4096
+max_effective_num_burn_in_sweeps = 5000
+```
+
+这轮主要价值是确定 q 方向 crossover 大致落在 `0.02~0.07`，但最终判定需要先改善 mixing，而不是只继续堆 disorder。

@@ -1,0 +1,62 @@
+{
+  "converged_mask_matrix": [
+    [
+      true
+    ],
+    [
+      true
+    ],
+    [
+      true
+    ]
+  ],
+  "diagnostic_type": "q0_multistart_spread",
+  "num_passed_points": 3,
+  "num_total_points": 3,
+  "points": [
+    {
+      "data_error_probability": 0.1,
+      "failed_checks": [],
+      "lattice_index": 0,
+      "lattice_size": 3,
+      "metrics": {
+        "mean_m_u_spread_linf": 0.011320749918619791,
+        "mean_q_top_spread": 0.009386160543986733
+      },
+      "passed": true,
+      "point_index": 0,
+      "syndrome_error_probability": 0.0
+    },
+    {
+      "data_error_probability": 0.1,
+      "failed_checks": [],
+      "lattice_index": 1,
+      "lattice_size": 4,
+      "metrics": {
+        "mean_m_u_spread_linf": 0.003475824991861979,
+        "mean_q_top_spread": 0.002094264186563947
+      },
+      "passed": true,
+      "point_index": 0,
+      "syndrome_error_probability": 0.0
+    },
+    {
+      "data_error_probability": 0.1,
+      "failed_checks": [],
+      "lattice_index": 2,
+      "lattice_size": 5,
+      "metrics": {
+        "mean_m_u_spread_linf": 0.003788630167643229,
+        "mean_q_top_spread": 0.0005693740787960235
+      },
+      "passed": true,
+      "point_index": 0,
+      "syndrome_error_probability": 0.0
+    }
+  ],
+  "pt_enabled": false,
+  "syndrome_error_probability": 0.0,
+  "thresholds": {
+    "mean_q_top_spread": 0.03
+  }
+}

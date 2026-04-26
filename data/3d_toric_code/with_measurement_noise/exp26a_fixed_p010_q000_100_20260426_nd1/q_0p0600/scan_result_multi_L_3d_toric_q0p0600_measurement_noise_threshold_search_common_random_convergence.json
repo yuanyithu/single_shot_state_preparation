@@ -1,0 +1,79 @@
+{
+  "converged_mask_matrix": [
+    [
+      false
+    ],
+    [
+      false
+    ],
+    [
+      false
+    ]
+  ],
+  "num_passed_points": 0,
+  "num_total_points": 3,
+  "points": [
+    {
+      "data_error_probability": 0.1,
+      "failed_checks": [
+        "min_effective_sample_size<=200"
+      ],
+      "lattice_index": 0,
+      "lattice_size": 3,
+      "metrics": {
+        "max_r_hat": 1.0122963303853372,
+        "mean_cold_winding_acceptance_rate": 0.0022212428349077345,
+        "mean_pt_min_swap_acceptance_rate": 0.14857394279827316,
+        "mean_q_top_spread": 0.020637551588671546,
+        "min_effective_sample_size": 68.48391016137
+      },
+      "passed": false,
+      "point_index": 0,
+      "syndrome_error_probability": 0.06
+    },
+    {
+      "data_error_probability": 0.1,
+      "failed_checks": [
+        "min_effective_sample_size<=200"
+      ],
+      "lattice_index": 1,
+      "lattice_size": 4,
+      "metrics": {
+        "max_r_hat": 1.012719388755517,
+        "mean_cold_winding_acceptance_rate": 5.473920900992608e-05,
+        "mean_pt_min_swap_acceptance_rate": 0.019063409618655155,
+        "mean_q_top_spread": 0.0236389051590647,
+        "min_effective_sample_size": 51.4315665417697
+      },
+      "passed": false,
+      "point_index": 0,
+      "syndrome_error_probability": 0.06
+    },
+    {
+      "data_error_probability": 0.1,
+      "failed_checks": [
+        "min_effective_sample_size<=200"
+      ],
+      "lattice_index": 2,
+      "lattice_size": 5,
+      "metrics": {
+        "max_r_hat": 1.0299596717381048,
+        "mean_cold_winding_acceptance_rate": 2.4135129813143206e-06,
+        "mean_pt_min_swap_acceptance_rate": 0.0005746439200680273,
+        "mean_q_top_spread": 0.029542607920510427,
+        "min_effective_sample_size": 28.52990535784084
+      },
+      "passed": false,
+      "point_index": 0,
+      "syndrome_error_probability": 0.06
+    }
+  ],
+  "pt_enabled": true,
+  "syndrome_error_probability": 0.06,
+  "thresholds": {
+    "max_r_hat": 1.05,
+    "mean_q_top_spread": 0.03,
+    "min_cold_winding_acceptance_rate": 0.0001,
+    "min_effective_sample_size": 200.0
+  }
+}

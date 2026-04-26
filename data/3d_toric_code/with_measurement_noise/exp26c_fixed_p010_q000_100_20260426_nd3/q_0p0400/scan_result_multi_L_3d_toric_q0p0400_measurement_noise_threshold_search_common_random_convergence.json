@@ -1,0 +1,81 @@
+{
+  "converged_mask_matrix": [
+    [
+      false
+    ],
+    [
+      false
+    ],
+    [
+      false
+    ]
+  ],
+  "num_passed_points": 0,
+  "num_total_points": 3,
+  "points": [
+    {
+      "data_error_probability": 0.1,
+      "failed_checks": [
+        "min_effective_sample_size<=200"
+      ],
+      "lattice_index": 0,
+      "lattice_size": 3,
+      "metrics": {
+        "max_r_hat": 1.0141637436463793,
+        "mean_cold_winding_acceptance_rate": 0.0016691690406464405,
+        "mean_pt_min_swap_acceptance_rate": 0.13874214048600209,
+        "mean_q_top_spread": 0.014376425317355567,
+        "min_effective_sample_size": 45.648341601122745
+      },
+      "passed": false,
+      "point_index": 0,
+      "syndrome_error_probability": 0.04
+    },
+    {
+      "data_error_probability": 0.1,
+      "failed_checks": [
+        "max_r_hat>=1.05",
+        "min_effective_sample_size<=200"
+      ],
+      "lattice_index": 1,
+      "lattice_size": 4,
+      "metrics": {
+        "max_r_hat": 1.0605273909142068,
+        "mean_cold_winding_acceptance_rate": 3.3193788207390326e-05,
+        "mean_pt_min_swap_acceptance_rate": 0.014364820447409735,
+        "mean_q_top_spread": 0.012253322771617349,
+        "min_effective_sample_size": 11.989692670257403
+      },
+      "passed": false,
+      "point_index": 0,
+      "syndrome_error_probability": 0.04
+    },
+    {
+      "data_error_probability": 0.1,
+      "failed_checks": [
+        "max_r_hat>=1.05",
+        "min_effective_sample_size<=200"
+      ],
+      "lattice_index": 2,
+      "lattice_size": 5,
+      "metrics": {
+        "max_r_hat": 1.1126912884053235,
+        "mean_cold_winding_acceptance_rate": 3.145977441457352e-06,
+        "mean_pt_min_swap_acceptance_rate": 0.0003582262231815803,
+        "mean_q_top_spread": 0.013652453465121134,
+        "min_effective_sample_size": 10.262439504971558
+      },
+      "passed": false,
+      "point_index": 0,
+      "syndrome_error_probability": 0.04
+    }
+  ],
+  "pt_enabled": true,
+  "syndrome_error_probability": 0.04,
+  "thresholds": {
+    "max_r_hat": 1.05,
+    "mean_q_top_spread": 0.03,
+    "min_cold_winding_acceptance_rate": 0.0001,
+    "min_effective_sample_size": 200.0
+  }
+}

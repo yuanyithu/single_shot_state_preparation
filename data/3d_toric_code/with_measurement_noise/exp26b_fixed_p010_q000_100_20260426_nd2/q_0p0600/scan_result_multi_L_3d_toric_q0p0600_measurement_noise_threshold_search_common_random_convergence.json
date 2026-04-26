@@ -1,0 +1,79 @@
+{
+  "converged_mask_matrix": [
+    [
+      false
+    ],
+    [
+      false
+    ],
+    [
+      false
+    ]
+  ],
+  "num_passed_points": 0,
+  "num_total_points": 3,
+  "points": [
+    {
+      "data_error_probability": 0.1,
+      "failed_checks": [
+        "min_effective_sample_size<=200"
+      ],
+      "lattice_index": 0,
+      "lattice_size": 3,
+      "metrics": {
+        "max_r_hat": 1.0056515149702752,
+        "mean_cold_winding_acceptance_rate": 0.0018774387801661796,
+        "mean_pt_min_swap_acceptance_rate": 0.15137970753205127,
+        "mean_q_top_spread": 0.022288379924637926,
+        "min_effective_sample_size": 98.09569893066659
+      },
+      "passed": false,
+      "point_index": 0,
+      "syndrome_error_probability": 0.06
+    },
+    {
+      "data_error_probability": 0.1,
+      "failed_checks": [
+        "min_effective_sample_size<=200"
+      ],
+      "lattice_index": 1,
+      "lattice_size": 4,
+      "metrics": {
+        "max_r_hat": 1.0378207734079075,
+        "mean_cold_winding_acceptance_rate": 0.00010442808621345174,
+        "mean_pt_min_swap_acceptance_rate": 0.018437408016091054,
+        "mean_q_top_spread": 0.024588846734591892,
+        "min_effective_sample_size": 20.013012211707814
+      },
+      "passed": false,
+      "point_index": 0,
+      "syndrome_error_probability": 0.06
+    },
+    {
+      "data_error_probability": 0.1,
+      "failed_checks": [
+        "min_effective_sample_size<=200"
+      ],
+      "lattice_index": 2,
+      "lattice_size": 5,
+      "metrics": {
+        "max_r_hat": 1.04021165365527,
+        "mean_cold_winding_acceptance_rate": 3.198144241671027e-06,
+        "mean_pt_min_swap_acceptance_rate": 0.0005184315312663527,
+        "mean_q_top_spread": 0.027211120086056848,
+        "min_effective_sample_size": 9.169712575353449
+      },
+      "passed": false,
+      "point_index": 0,
+      "syndrome_error_probability": 0.06
+    }
+  ],
+  "pt_enabled": true,
+  "syndrome_error_probability": 0.06,
+  "thresholds": {
+    "max_r_hat": 1.05,
+    "mean_q_top_spread": 0.03,
+    "min_cold_winding_acceptance_rate": 0.0001,
+    "min_effective_sample_size": 200.0
+  }
+}

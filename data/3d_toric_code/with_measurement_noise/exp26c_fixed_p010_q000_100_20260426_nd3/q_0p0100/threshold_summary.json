@@ -1,0 +1,160 @@
+{
+  "boundary_saturation_artifact": false,
+  "code_family": "3d_toric",
+  "common_random_disorder_across_p": true,
+  "crossing_window": null,
+  "data_error_probability_list": [
+    0.1
+  ],
+  "gap_plot_path": "/home/DATA1/users/yuany/.single_shot/runs/3d_toric_exp26c_fixed_p010_q000_100_20260426_nd3/q_0p0100/scan_result_multi_L_3d_toric_q0p0100_measurement_noise_threshold_search_common_random_gap_crossing.png",
+  "input_path": "/home/DATA1/users/yuany/.single_shot/runs/3d_toric_exp26c_fixed_p010_q000_100_20260426_nd3/q_0p0100/scan_result_multi_L_3d_toric_q0p0100_measurement_noise_threshold_search_common_random.npz",
+  "interior_crossing_window": null,
+  "interior_near_crossing_window": null,
+  "lattice_size_list": [
+    3,
+    4,
+    5
+  ],
+  "left_edge_saturated_point_flags": [
+    false
+  ],
+  "left_edge_saturation_end_index": -1,
+  "left_edge_saturation_end_p": null,
+  "num_disorder_samples": 512,
+  "pair_labels": [
+    "3-4",
+    "4-5"
+  ],
+  "pairwise_gap_analysis": {
+    "delta_35": {
+      "boundary_artifact_crossing_detected": false,
+      "boundary_crossing_intervals": [],
+      "crossing_intervals": [],
+      "crossing_location_classification": "right_of_window",
+      "delta_curve": [
+        -0.03442708090213786
+      ],
+      "interior_crossing_intervals": [],
+      "interior_near_crossing_hit": false,
+      "interior_near_crossing_windows": [],
+      "interior_sign_flip_detected": false,
+      "min_abs_delta_index": 0,
+      "min_abs_delta_p": 0.1,
+      "min_abs_delta_value": -0.03442708090213786,
+      "non_saturated_min_abs_delta_index": 0,
+      "non_saturated_min_abs_delta_p": 0.1,
+      "non_saturated_min_abs_delta_value": -0.03442708090213786,
+      "pair_label": "3-4",
+      "pooled_ci95_curve": [
+        0.010242602505822916
+      ],
+      "pooled_sem_at_min_abs": 0.0052258176050116924,
+      "pooled_sem_curve": [
+        0.0052258176050116924
+      ],
+      "raw_crossing_intervals": [],
+      "right_edge_delta": -0.03442708090213786,
+      "right_edge_near_hit": false,
+      "right_edge_pooled_ci95": 0.010242602505822916,
+      "right_edge_pooled_sem": 0.0052258176050116924,
+      "right_edge_sign": -1,
+      "secondary_proximity_hit": false,
+      "sign_flip_detected": false,
+      "sign_pattern": [
+        -1
+      ]
+    },
+    "delta_57": {
+      "boundary_artifact_crossing_detected": false,
+      "boundary_crossing_intervals": [],
+      "crossing_intervals": [],
+      "crossing_location_classification": "right_of_window",
+      "delta_curve": [
+        -0.004621512838639319
+      ],
+      "interior_crossing_intervals": [],
+      "interior_near_crossing_hit": false,
+      "interior_near_crossing_windows": [],
+      "interior_sign_flip_detected": false,
+      "min_abs_delta_index": 0,
+      "min_abs_delta_p": 0.1,
+      "min_abs_delta_value": -0.004621512838639319,
+      "non_saturated_min_abs_delta_index": 0,
+      "non_saturated_min_abs_delta_p": 0.1,
+      "non_saturated_min_abs_delta_value": -0.004621512838639319,
+      "pair_label": "4-5",
+      "pooled_ci95_curve": [
+        0.004480461359873215
+      ],
+      "pooled_sem_at_min_abs": 0.0022859496734047016,
+      "pooled_sem_curve": [
+        0.0022859496734047016
+      ],
+      "raw_crossing_intervals": [],
+      "right_edge_delta": -0.004621512838639319,
+      "right_edge_near_hit": false,
+      "right_edge_pooled_ci95": 0.004480461359873215,
+      "right_edge_pooled_sem": 0.0022859496734047016,
+      "right_edge_sign": -1,
+      "secondary_proximity_hit": false,
+      "sign_flip_detected": false,
+      "sign_pattern": [
+        -1
+      ]
+    }
+  },
+  "primary_crossing_window_hit": false,
+  "q_top_ci95_curve_matrix": [
+    [
+      0.009360712500874828
+    ],
+    [
+      0.0041578801772364235
+    ],
+    [
+      0.0016693011798538176
+    ]
+  ],
+  "q_top_curve_matrix": [
+    [
+      0.9589716444024816
+    ],
+    [
+      0.9933987253046195
+    ],
+    [
+      0.9980202381432588
+    ]
+  ],
+  "q_top_sem_curve_matrix": [
+    [
+      0.004775873724936137
+    ],
+    [
+      0.002121367437365522
+    ],
+    [
+      0.0008516842754356213
+    ]
+  ],
+  "raw_crossing_window": null,
+  "recommended_server_window": null,
+  "right_edge_gap_signs": {
+    "3-4": -1,
+    "4-5": -1
+  },
+  "right_edge_gap_values": {
+    "3-4": {
+      "delta": -0.03442708090213786,
+      "pooled_ci95": 0.010242602505822916
+    },
+    "4-5": {
+      "delta": -0.004621512838639319,
+      "pooled_ci95": 0.004480461359873215
+    }
+  },
+  "secondary_proximity_hit": false,
+  "sem95_plot_path": "/home/DATA1/users/yuany/.single_shot/runs/3d_toric_exp26c_fixed_p010_q000_100_20260426_nd3/q_0p0100/scan_result_multi_L_3d_toric_q0p0100_measurement_noise_threshold_search_common_random_sem95.png",
+  "summary_path": "/home/DATA1/users/yuany/.single_shot/runs/3d_toric_exp26c_fixed_p010_q000_100_20260426_nd3/q_0p0100/threshold_summary.json",
+  "syndrome_error_probability": 0.01
+}
