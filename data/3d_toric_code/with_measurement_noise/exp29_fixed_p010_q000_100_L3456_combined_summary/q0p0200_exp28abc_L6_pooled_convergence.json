@@ -1,0 +1,38 @@
+{
+  "converged_mask_matrix": [
+    [
+      false
+    ]
+  ],
+  "num_passed_points": 0,
+  "num_total_points": 1,
+  "points": [
+    {
+      "data_error_probability": 0.1,
+      "failed_checks": [
+        "max_r_hat>=1.05",
+        "min_effective_sample_size<=200"
+      ],
+      "lattice_index": 0,
+      "lattice_size": 6,
+      "metrics": {
+        "max_r_hat": 1.3565074314947345,
+        "mean_cold_winding_acceptance_rate": 3.320162505662878e-06,
+        "mean_pt_min_swap_acceptance_rate": 1.7034057212628643e-07,
+        "mean_q_top_spread": 0.004958894281160273,
+        "min_effective_sample_size": 5.181993945942261
+      },
+      "passed": false,
+      "point_index": 0,
+      "syndrome_error_probability": 0.02
+    }
+  ],
+  "pt_enabled": true,
+  "syndrome_error_probability": 0.02,
+  "thresholds": {
+    "max_r_hat": 1.05,
+    "mean_q_top_spread": 0.03,
+    "min_cold_winding_acceptance_rate": 0.0001,
+    "min_effective_sample_size": 200.0
+  }
+}
