@@ -1997,3 +1997,90 @@ max_effective_num_burn_in_sweeps = 5000
 ```
 
 这轮主要价值是确定 q 方向 crossover 大致落在 `0.02~0.07`，但最终判定需要先改善 mixing，而不是只继续堆 disorder。
+
+## 2026-04-27 固定 `p=0.1000` 的 `L=6` q 方向 extension
+
+摘要：
+- 做什么：补跑固定 `p=0.1000`、扫描 `q=0.0000,0.0100,...,0.1000` 的 `L=6` 数据；三台节点独立 seed，每个节点每个 q `512` disorder。
+- 产物：`exp28a/b/c` 为三份独立 L6 run，`exp29_fixed_p010_q000_100_L3456_combined_summary` 为 L6 池化并与 `exp27` 的 L=3/4/5 合成的四尺寸图。
+- 结论：L6 曲线在 `q>0` 下整体低于 L5，`L5-L6` gap 全窗口为正；但 L6 的 q>0 convergence gate 全部失败，PT min swap acceptance 近似为 0。因此这不能作为“L6 已确认 threshold”的证据，更合理的结论是当前 `PT7, p_hot=0.44, 2048 measurements` 对 L6 混合不足。
+- 对 fixed `p=0.1` q-threshold 的判断没有被根本改变：`L3-L4` 与 `L4-L5` crossing 仍分别在约 `q≈0.0608` 和 `q≈0.0247`，不构成共同 crossing；L6 结果提示若要用更大尺寸，必须先提高 PT/mixing 预算。
+
+### 运行与产物
+
+本地目录：
+
+```text
+data/3d_toric_code/with_measurement_noise/exp28a_fixed_p010_q000_100_L6_20260427_nd1
+data/3d_toric_code/with_measurement_noise/exp28b_fixed_p010_q000_100_L6_20260427_nd2
+data/3d_toric_code/with_measurement_noise/exp28c_fixed_p010_q000_100_L6_20260427_nd3
+data/3d_toric_code/with_measurement_noise/exp29_fixed_p010_q000_100_L3456_combined_summary
+```
+
+完成状态：
+
+```text
+exp28a nd-1: q=0.0000~0.1000 均 128/128 chunks, failed=0
+exp28b nd-2: q=0.0000~0.1000 均 128/128 chunks, failed=0
+exp28c nd-3: q=0.0000~0.1000 均 128/128 chunks, failed=0
+```
+
+主看图：
+
+- [fixed p=0.1000 q scan L=3/4/5/6 q_top](data/3d_toric_code/with_measurement_noise/exp29_fixed_p010_q000_100_L3456_combined_summary/fixed_p010_q000_100_exp26abc_L345_exp28abc_L6_pooled_sem95.png)
+- [fixed p=0.1000 q scan L=3/4/5/6 gap](data/3d_toric_code/with_measurement_noise/exp29_fixed_p010_q000_100_L3456_combined_summary/fixed_p010_q000_100_exp26abc_L345_exp28abc_L6_pooled_gap_ci95.png)
+- [machine-readable summary](data/3d_toric_code/with_measurement_noise/exp29_fixed_p010_q000_100_L3456_combined_summary/fixed_p010_q000_100_exp26abc_L345_exp28abc_L6_pooled_summary.json)
+
+### 数值摘要
+
+`p=0.1000`，每个 q 的 L6 池化 `1536` disorder；L=3/4/5 使用 `exp27` 的 `1536` disorder：
+
+```text
+q     L3        L4        L5        L6        L3-L4    L4-L5    L5-L6
+0.00  0.9620    0.9971    0.9995    0.9966   -0.0351  -0.0023  +0.0029
+0.01  0.9582    0.9935    0.9963    0.9948   -0.0353  -0.0028  +0.0014
+0.02  0.9533    0.9853    0.9888    0.9842   -0.0320  -0.0035  +0.0046
+0.03  0.9440    0.9711    0.9671    0.9589   -0.0271  +0.0040  +0.0082
+0.04  0.9154    0.9467    0.9362    0.9187   -0.0313  +0.0105  +0.0175
+0.05  0.8836    0.8945    0.8772    0.8568   -0.0109  +0.0173  +0.0204
+0.06  0.8459    0.8481    0.8171    0.7815   -0.0022  +0.0310  +0.0356
+0.07  0.8039    0.7797    0.7416    0.6848   +0.0242  +0.0382  +0.0568
+0.08  0.7565    0.7068    0.6418    0.5919   +0.0497  +0.0650  +0.0499
+0.09  0.6898    0.6358    0.5669    0.4874   +0.0540  +0.0689  +0.0794
+0.10  0.6436    0.5691    0.4707    0.4074   +0.0744  +0.0984  +0.0633
+```
+
+gap 翻号：
+
+```text
+L4-L5: q≈0.0247
+L3-L4: q≈0.0608
+L5-L6: no sign change; positive over the full scanned window
+```
+
+`L5-L6` 的 CI 使用独立 disorder 误差传播，因为 L6 是后补独立 seed，不与 `exp27` 的 L=5 disorder 成对；`L3-L4` 和 `L4-L5` 仍使用 paired disorder gap。
+
+### 诊断与判读
+
+L6 诊断：
+
+```text
+q=0.0000: q0 multi-start spread passed; mean_q_top_spread≈0.0051
+q>0: all 10 points failed strict convergence gate
+q>0 typical failure: min ESS far below 200; PT min swap acceptance ≈ 0
+mean_q_top_spread grows to ≈0.04 around q=0.08~0.10
+```
+
+因此，L6 这次更像是在告诉我们：当前 q>0 的 L6 PT ladder/预算不够，而不是给出一个可直接用于 threshold 定值的稳定大尺寸曲线。`q=0` 时 L6 也略低于 L5，这和 below-threshold 预期不完全一致，进一步支持谨慎解释。
+
+下一步如果确实要用 L6：
+
+```text
+fixed p = 0.1000, q = 0.020~0.070
+L = 4,5,6
+num_replicas_per_start = 2
+pt_num_temperatures = 9 or 11
+num_measurements_per_disorder = 4096
+max_effective_num_burn_in_sweeps = 5000 or higher
+先做小 disorder smoke，要求 PT min swap acceptance 不再接近 0，再扩大 disorder。
+```

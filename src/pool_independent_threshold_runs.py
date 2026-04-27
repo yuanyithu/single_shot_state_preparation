@@ -327,7 +327,12 @@ def _build_pooled_result(input_paths):
     return pooled
 
 
-def pool_independent_runs(input_paths, output_dir, output_stem):
+def pool_independent_runs(
+    input_paths,
+    output_dir,
+    output_stem,
+    skip_threshold_analysis=False,
+):
     input_paths = [Path(path).resolve() for path in input_paths]
     output_dir = Path(output_dir).resolve()
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -356,25 +361,33 @@ def pool_independent_runs(input_paths, output_dir, output_stem):
 
     plot_path = output_dir / f"{output_stem}.png"
     plot_scan_result(output_path, plot_path)
-    threshold_summary = analyze_threshold_crossing(
-        input_path=output_path,
-        output_dir=output_dir,
-        output_stem=output_stem,
-        summary_path=output_dir / f"{output_stem}_threshold_summary.json",
-    )
-    return {
+    result = {
         "output_path": str(output_path),
         "plot_path": str(plot_path),
         "convergence_summary_path": str(convergence_summary_path),
-        "threshold_summary_path": threshold_summary["summary_path"],
         "num_disorder_samples": int(pooled["num_disorder_samples"]),
-        "primary_crossing_window_hit": threshold_summary[
-            "primary_crossing_window_hit"
-        ],
-        "recommended_server_window": threshold_summary[
-            "recommended_server_window"
-        ],
     }
+    if not skip_threshold_analysis:
+        threshold_summary = analyze_threshold_crossing(
+            input_path=output_path,
+            output_dir=output_dir,
+            output_stem=output_stem,
+            summary_path=output_dir / f"{output_stem}_threshold_summary.json",
+        )
+        result.update(
+            {
+                "threshold_summary_path": threshold_summary["summary_path"],
+                "primary_crossing_window_hit": threshold_summary[
+                    "primary_crossing_window_hit"
+                ],
+                "recommended_server_window": threshold_summary[
+                    "recommended_server_window"
+                ],
+            }
+        )
+    else:
+        result["threshold_summary_path"] = None
+    return result
 
 
 def main():
@@ -389,11 +402,20 @@ def main():
     )
     parser.add_argument("--output-dir", required=True)
     parser.add_argument("--output-stem", required=True)
+    parser.add_argument(
+        "--skip-threshold-analysis",
+        action="store_true",
+        help=(
+            "Write pooled NPZ, convergence JSON, and plot only. Useful for "
+            "single-size extension runs where crossing analysis is not defined."
+        ),
+    )
     args = parser.parse_args()
     summary = pool_independent_runs(
         input_paths=args.input,
         output_dir=args.output_dir,
         output_stem=args.output_stem,
+        skip_threshold_analysis=args.skip_threshold_analysis,
     )
     print(json.dumps(summary, indent=2, sort_keys=True))
 
