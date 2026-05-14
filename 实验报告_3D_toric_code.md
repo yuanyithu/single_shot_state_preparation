@@ -2201,3 +2201,107 @@ num_replicas_per_start = 2
 ```
 
 对于固定 `p=0.1000`，本轮 `L3-L4` 到 `q=0.0500` 仍未 crossing，这和此前 `exp27` 中 `L3-L4` 约在 `q≈0.0608` 才翻号的结论一致；但本轮低样本下 `L4-L5` 更 noisy，不能替代 `exp27/exp29` 的固定 `p=0.1` 判断。
+
+## 2026-05-14 固定 `p=0.0500` 的 q 方向长扫描 `exp32` 启动记录
+
+摘要：
+- 做什么：固定 `p=0.0500`，扫描 `q=0.0000,0.0050,...,0.0750`，尺寸 `L=3,4,5,6,7`。
+- 资源：同时使用 `nd-2` 全部 `80` CPU 与 `nd-3` 全部 `96` CPU；两节点为独立 seed，最终池化。
+- 样本：每节点每个 `(L,q)` `1024` disorder，`chunk_size=4`；池化目标为每点 `2048` disorder。
+- 顺序：launcher 按 `L=3 -> 4 -> 5 -> 6 -> 7` 严格推进；每个 L 内按 q 升序。每个 `(L,q)` 独立 `run_root`/`manifest.json`，中断后同一 run id 加 `RESUME=1` 可续跑。
+- 当前状态：已在 `nd-2` 和 `nd-3` 启动 detached `screen`；本节只记录启动和预检，不给物理结论。
+
+### 启动信息
+
+本地脚本：
+
+```text
+scripts/launch_exp32_fixed_p050_q_scan_nd23.sh
+scripts/collect_exp32_fixed_p050_q_scan_nd23.sh
+src/analyze_exp32_fixed_p_q_scan.py
+```
+
+远端 run：
+
+```text
+nd-2: /home/DATA1/users/yuany/.single_shot/runs/3d_toric_exp32_fixed_p050_q000_075_L34567_20260514_140000_nd2
+nd-3: /home/DATA1/users/yuany/.single_shot/runs/3d_toric_exp32_fixed_p050_q000_075_L34567_20260514_140000_nd3
+```
+
+远端 log：
+
+```text
+nd-2: /home/DATA1/users/yuany/.single_shot/logs/3d_toric_exp32_fixed_p050_q000_075_L34567_20260514_140000_nd2.log
+nd-3: /home/DATA1/users/yuany/.single_shot/logs/3d_toric_exp32_fixed_p050_q000_075_L34567_20260514_140000_nd3.log
+```
+
+screen：
+
+```text
+ssprep_3d_toric_exp32_fixed_p050_q000_075_L34567_20260514_140000_nd2
+ssprep_3d_toric_exp32_fixed_p050_q000_075_L34567_20260514_140000_nd3
+```
+
+本地目标目录：
+
+```text
+data/3d_toric_code/with_measurement_noise/exp32_fixed_p050_q000_075_L34567_20260514_nd23
+```
+
+### 参数
+
+```text
+fixed_p = 0.0500
+q = 0.0000,0.0050,...,0.0750
+L = 3,4,5,6,7
+num_disorder_samples_total = 1024 per node
+chunk_size = 4
+num_burn_in_sweeps = 1000
+max_effective_num_burn_in_sweeps = 3000
+num_sweeps_between_measurements = 6
+num_measurements_per_disorder = 2048
+q0_num_start_chains = 8
+q>0 num_start_chains = 8
+q>0 num_replicas_per_start = 1
+q>0 pt_p_hot = 0.44
+q>0 pt_num_temperatures = 7
+q>0 pt_swap_attempt_every_num_sweeps = 1
+common_random_disorder_across_p = true
+```
+
+q=0 特别检查：首个 `L=3,q=0.0000` manifest 中 `pt_p_hot=null`、`pt_num_temperatures=null`，没有传 PT 参数；`q0_num_start_chains=8`、`num_start_chains=8`。`q=0.0050` manifest 中 PT 参数为 `pt_p_hot=0.44`、`pt_num_temperatures=7`。
+
+### 预检
+
+远端环境：
+
+```text
+nd-2: nproc=80, screen exists, conda env 11 imports numpy/matplotlib, numba_available=True
+nd-3: nproc=96, screen exists, conda env 11 imports numpy/matplotlib, numba_available=True
+```
+
+启动后首点检查：
+
+```text
+nd-2 L=3,q=0.0000: completed=256, failed=0, pending=0
+nd-3 L=3,q=0.0000: completed=256, failed=0, pending=0
+```
+
+`nd-2` 已进入 `L=3,q=0.0050`；`nd-3` 也已进入同一队列。后续监控优先看每个子 manifest 的 `failed_chunks=0` 和 `pending_chunks` 是否下降。
+
+### 续跑与回收
+
+续跑同一远端 run id：
+
+```bash
+RUN_TIMESTAMP=20260514_140000 RESUME=1 SKIP_SYNC=1 scripts/launch_exp32_fixed_p050_q_scan_nd23.sh
+```
+
+回收并做本地池化/画图：
+
+```bash
+HOST_RUN_IDS=3d_toric_exp32_fixed_p050_q000_075_L34567_20260514_140000_nd2,3d_toric_exp32_fixed_p050_q000_075_L34567_20260514_140000_nd3 \
+  scripts/collect_exp32_fixed_p050_q_scan_nd23.sh
+```
+
+允许 partial 回收；分析脚本会把已完成的两节点 `(L,q)` 池化到 `pooled/`，并在某个 L 的 16 个 q 都齐全时更新 fixed-p q 曲线和 gap 图。最终完成后再补充数值摘要、诊断 summary 和结论。
