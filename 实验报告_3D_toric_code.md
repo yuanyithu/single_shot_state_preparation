@@ -2141,6 +2141,7 @@ data/3d_toric_code/with_measurement_noise/exp31_pq_grid_q000_050_p001_120_202605
 主看图：
 
 - [p-q pairwise boundary plot](data/3d_toric_code/with_measurement_noise/exp31_pq_grid_q000_050_p001_120_20260511_nd1/analysis/exp31_pq_grid_pq_boundary.png)
+- [fixed-p q curves](data/3d_toric_code/with_measurement_noise/exp31_pq_grid_q000_050_p001_120_20260511_nd1/analysis/exp31_pq_grid_fixed_p_q_curves_sem95.png)
 - [fixed-p q scan q_top](data/3d_toric_code/with_measurement_noise/exp31_pq_grid_q000_050_p001_120_20260511_nd1/analysis/exp31_pq_grid_q_scan_sem95.png)
 - [fixed-p q scan gaps](data/3d_toric_code/with_measurement_noise/exp31_pq_grid_q000_050_p001_120_20260511_nd1/analysis/exp31_pq_grid_q_gap_scan.png)
 - [diagnostic heatmaps](data/3d_toric_code/with_measurement_noise/exp31_pq_grid_q000_050_p001_120_20260511_nd1/analysis/exp31_pq_grid_diagnostic_heatmaps.png)

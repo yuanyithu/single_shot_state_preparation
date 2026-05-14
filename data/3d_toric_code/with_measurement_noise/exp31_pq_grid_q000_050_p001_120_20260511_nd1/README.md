@@ -24,6 +24,7 @@ direction.
 - [remote q_top overview](remote_run/measurement_noise_threshold_search_sem95_overview.png)
 - [remote per-q gap summary](remote_run/measurement_noise_threshold_search_gap_summary.png)
 - [p-q pairwise boundary plot](analysis/exp31_pq_grid_pq_boundary.png)
+- [fixed-p q curves](analysis/exp31_pq_grid_fixed_p_q_curves_sem95.png)
 - [fixed-p q scan q_top plot](analysis/exp31_pq_grid_q_scan_sem95.png)
 - [fixed-p q scan gap plot](analysis/exp31_pq_grid_q_gap_scan.png)
 - [diagnostic heatmaps](analysis/exp31_pq_grid_diagnostic_heatmaps.png)
