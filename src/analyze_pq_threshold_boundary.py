@@ -527,6 +527,66 @@ def _plot_q_scan(summary, output_path):
     plt.close(figure)
 
 
+def _plot_fixed_p_q_curves(summary, output_path):
+    p_values = summary["p_values"]
+    q_values = summary["q_values"]
+    lattice_sizes = summary["lattice_sizes"]
+    q_top = summary["q_top"]
+    q_top_ci95 = summary["q_top_ci95"]
+    num_cols = 3
+    num_rows = int(math.ceil(len(p_values) / num_cols))
+    colors = ["C0", "C1", "C2"]
+    y_min = float(np.nanmin(q_top - q_top_ci95))
+    y_max = float(np.nanmax(q_top + q_top_ci95))
+    y_padding = 0.04 * max(1.0e-6, y_max - y_min)
+    figure, axes = plt.subplots(
+        num_rows,
+        num_cols,
+        figsize=(13.2, 4.1 * num_rows),
+        sharex=True,
+        sharey=True,
+        constrained_layout=True,
+    )
+    axes = np.asarray(axes).reshape(-1)
+    for p_index, p_value in enumerate(p_values):
+        axis = axes[p_index]
+        for lattice_index, lattice_size in enumerate(lattice_sizes):
+            values = q_top[lattice_index, p_index, :]
+            ci95 = q_top_ci95[lattice_index, p_index, :]
+            color = colors[lattice_index % len(colors)]
+            axis.plot(
+                q_values,
+                values,
+                marker="o",
+                linewidth=1.35,
+                markersize=4.0,
+                color=color,
+                label=f"L={int(lattice_size)}",
+            )
+            axis.fill_between(
+                q_values,
+                values - ci95,
+                values + ci95,
+                color=color,
+                alpha=0.15,
+                linewidth=0.0,
+            )
+        axis.set_title(f"fixed p={p_value:0.4f}")
+        axis.set_xlabel("measurement error probability q")
+        axis.set_ylabel("q_top")
+        axis.set_ylim(y_min - y_padding, min(1.01, y_max + y_padding))
+        axis.grid(True, alpha=0.28)
+        axis.legend(fontsize=8, loc="lower left")
+    for axis in axes[len(p_values):]:
+        axis.axis("off")
+    figure.suptitle(
+        "3D toric with measurement noise: fixed-p q scans",
+        fontsize=14,
+    )
+    figure.savefig(output_path, dpi=220)
+    plt.close(figure)
+
+
 def _plot_gap_scan(summary, output_path):
     p_values = summary["p_values"]
     q_values = summary["q_values"]
@@ -690,11 +750,15 @@ def _write_summary_outputs(summary, output_dir, output_stem):
     plot_paths = {
         "boundary_plot": output_dir / f"{output_stem}_pq_boundary.png",
         "q_scan_plot": output_dir / f"{output_stem}_q_scan_sem95.png",
+        "fixed_p_q_curves_plot": (
+            output_dir / f"{output_stem}_fixed_p_q_curves_sem95.png"
+        ),
         "gap_scan_plot": output_dir / f"{output_stem}_q_gap_scan.png",
         "diagnostic_plot": output_dir / f"{output_stem}_diagnostic_heatmaps.png",
     }
     _plot_boundary(summary, plot_paths["boundary_plot"])
     _plot_q_scan(summary, plot_paths["q_scan_plot"])
+    _plot_fixed_p_q_curves(summary, plot_paths["fixed_p_q_curves_plot"])
     _plot_gap_scan(summary, plot_paths["gap_scan_plot"])
     _plot_diagnostics(summary, plot_paths["diagnostic_plot"])
 
