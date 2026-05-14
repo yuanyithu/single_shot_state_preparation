@@ -2084,3 +2084,119 @@ num_measurements_per_disorder = 4096
 max_effective_num_burn_in_sweeps = 5000 or higher
 先做小 disorder smoke，要求 PT min swap acceptance 不再接近 0，再扩大 disorder。
 ```
+
+## 2026-04-27 `q=0.0500,p=0.2000` cluster 更新 runtime 对比本地小基准
+
+摘要：
+- 做什么：在当前代码上比较“旧路径”与“新路径”的 wall time；旧路径用 `cluster_update_enabled=False`，新路径用默认自适应 cluster 更新。
+- 参数：3D toric `L=3,4,5`，`q=0.0500,p=0.2000`。非 PT 基准使用 `1` disorder、`256` burn-in、`1024` measurements、每次 measurement 间隔 `4`；PT 基准使用 `pt_p_hot=0.44, pt_num_temperatures=7`、`1` disorder、`64` burn-in、`256` measurements、每次 measurement 间隔 `4`。两组均为本地 warm-up 后计时。
+- 产物：`data/3d_toric_code/with_measurement_noise/exp30_cluster_runtime_compare_q050_p020_L345_local/runtime_compare_summary_warm.json` 与 `runtime_compare_summary_pt_warm.json`。
+- 判读：这是功能与开销基准，不是物理统计结论。默认 `rho=0.05` 下，PT 小基准中 cluster wall fraction 约 `0.13~0.29`；L3/L4 出现少量非零 cluster move，L5 在此短样本未出现非零 move。
+
+PT7 小基准结果：
+
+```text
+L   old_disabled_s   cluster_enabled_s   ratio   attempts   nonzero   cluster_wall_frac   mean_nullity   mean_move_frac
+3   0.0701           0.1307              1.86    34         7         0.288               0.794          0.0312
+4   0.0924           0.1505              1.63    12         2         0.189               0.583          0.0078
+5   0.1348           0.1882              1.40    3          0         0.135               0.000          0.0000
+```
+
+非 PT 小基准结果：
+
+```text
+L   old_disabled_s   cluster_enabled_s   ratio   attempts   nonzero   cluster_wall_frac   mean_nullity   mean_move_frac
+3   0.0434           0.1587              3.66    236        0         0.0476              0.000          0.0000
+4   0.0582           0.1892              3.25    10         0         0.2368              0.100          0.0000
+5   0.0868           0.1884              2.17    5          0         0.1560              0.000          0.0000
+```
+
+注意事项：
+- 最初一次未 warm-up 的结果已保存在 `runtime_compare_summary.json`，但 L3 旧路径包含首次编译/初始化开销，不用于结论。
+- 当前纯 NumPy/packed GF(2) backend 的固定调度/控制开销在短链上很显著；生产长链里应继续看 `cluster_wall_time_fraction`、非零 move 率和 ESS/R-hat 是否真正改善。
+
+## 2026-05-14 3D `(p,q)` 网格 q 方向边界扫描 `exp31`
+
+摘要：
+- 做什么：按固定 `p` 扫 `q` 的方式直接画 `(p,q)` 平面中的 measurement-noise threshold 边界；只使用 `nd-1`。
+- 参数：`L=3,4,5`；`p=0.0100,0.0300,0.0500,0.0700,0.1000,0.1200`；`q=0.0000,0.0050,...,0.0500`；每个 `(L,p,q)` 为 `256` disorder，`chunk_size=16`。
+- q>0 sampler：`num_start_chains=8`、`num_replicas_per_start=2`、`pt_num_temperatures=9`、`pt_p_hot=0.44`。
+- 完成状态：`3168/3168` chunks 完成，`0` failed；nd-1 wall time 约 `59.37` 小时。
+- 结论：本轮没有得到可作为 threshold 定值的稳定共同边界。`L3-L4` 和 `L4-L5` 的 q 方向 crossing 明显不同步，且 q>0 convergence gate 仅 `5/180` 个 lattice-point 通过；因此图应作为有限尺寸 drift 与 mixing 诊断，而不是最终边界曲线。
+
+### 运行与产物
+
+本地目录：
+
+```text
+data/3d_toric_code/with_measurement_noise/exp31_pq_grid_q000_050_p001_120_20260511_nd1
+```
+
+远端 run：
+
+```text
+3d_toric_pq_grid_q000_050_nd1_20260511_175054
+```
+
+主看图：
+
+- [p-q pairwise boundary plot](data/3d_toric_code/with_measurement_noise/exp31_pq_grid_q000_050_p001_120_20260511_nd1/analysis/exp31_pq_grid_pq_boundary.png)
+- [fixed-p q scan q_top](data/3d_toric_code/with_measurement_noise/exp31_pq_grid_q000_050_p001_120_20260511_nd1/analysis/exp31_pq_grid_q_scan_sem95.png)
+- [fixed-p q scan gaps](data/3d_toric_code/with_measurement_noise/exp31_pq_grid_q000_050_p001_120_20260511_nd1/analysis/exp31_pq_grid_q_gap_scan.png)
+- [diagnostic heatmaps](data/3d_toric_code/with_measurement_noise/exp31_pq_grid_q000_050_p001_120_20260511_nd1/analysis/exp31_pq_grid_diagnostic_heatmaps.png)
+- [machine-readable boundary summary](data/3d_toric_code/with_measurement_noise/exp31_pq_grid_q000_050_p001_120_20260511_nd1/analysis/exp31_pq_grid_boundary_summary.json)
+- [boundary point CSV](data/3d_toric_code/with_measurement_noise/exp31_pq_grid_q000_050_p001_120_20260511_nd1/analysis/exp31_pq_grid_boundary_points.csv)
+
+分析脚本：
+
+```text
+src/analyze_pq_threshold_boundary.py
+```
+
+### q 方向 crossing 摘要
+
+判读方向：below threshold 时大尺寸 `q_top` 更高，因此
+`Delta(Lsmall,Llarge)=q_top(Lsmall)-q_top(Llarge)<0`；above threshold 时
+gap 变正。
+
+稳定单 crossing 只出现在少数 pairwise 曲线上：
+
+```text
+p       L3-L4                    L4-L5
+0.0100  nonmonotonic/noisy        nonmonotonic/noisy
+0.0300  q≈0.0196                  nonmonotonic/noisy
+0.0500  q≈0.0222                  nonmonotonic/noisy
+0.0700  nonmonotonic/noisy        nonmonotonic/noisy
+0.1000  no crossing up to 0.0500  nonmonotonic/noisy
+0.1200  no crossing up to 0.0500  q≈0.0376
+```
+
+没有任何一个 `p` 同时给出 `L3-L4` 和 `L4-L5` 的稳定单 crossing。因此这张 `(p,q)` 图不能被读成一条已确定的 threshold 边界；最多只能说 pairwise crossing 云主要落在 `q≈0.02~0.04`，并伴随强 finite-size drift。
+
+### 诊断
+
+q>0 严格 convergence gate：
+
+```text
+passed lattice-points = 5 / 180
+```
+
+主要问题：
+- `mean_q_top_spread` 随 `p`、`q` 增大明显上升，最大约到 `0.08` 量级。
+- 多数 q>0 点的 `min_effective_sample_size` 远低于 `200`。
+- `L4-L5` gap 在多处出现多次翻号，说明当前统计/混合不足以给出稳定 crossing。
+
+### 后续建议
+
+这轮结果不支持继续把同一低预算网格简单加密。若目标是画可用的 `(p,q)` boundary，应优先改善 sampler 与有限尺寸判据：
+
+```text
+L = 3,4,5 first; L=6 only after q>0 diagnostics pass
+num_measurements_per_disorder >= 1024 or 2048
+pt_num_temperatures = 11 or 13
+num_replicas_per_start = 2
+先在 p=0.03,0.05,0.10,0.12 上做 q=0.015~0.070 的 pilot
+要求 L3-L4 与 L4-L5 crossing 都单调且 convergence gate 不再大面积失败
+```
+
+对于固定 `p=0.1000`，本轮 `L3-L4` 到 `q=0.0500` 仍未 crossing，这和此前 `exp27` 中 `L3-L4` 约在 `q≈0.0608` 才翻号的结论一致；但本轮低样本下 `L4-L5` 更 noisy，不能替代 `exp27/exp29` 的固定 `p=0.1` 判断。

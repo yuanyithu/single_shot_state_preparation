@@ -1,0 +1,323 @@
+{
+  "rows": [
+    {
+      "final_outputs": {
+        "cluster_summary": {
+          "cluster_budget_fraction_rho": 0.05,
+          "cluster_controller_frozen": false,
+          "cluster_move_fraction_mean": 0.0,
+          "cluster_nullity_mean": 0.0,
+          "cluster_nullity_median": 0.0,
+          "cluster_num_attempts": 0,
+          "cluster_num_nonzero_moves": 0,
+          "cluster_total_wall_time": 0.0,
+          "cluster_update_adaptive": false,
+          "cluster_update_enabled": false,
+          "cluster_wall_time_fraction": 0.0
+        },
+        "completed_at": "2026-05-11T06:02:22-04:00",
+        "convergence_json_path": "/home/DATA1/users/yuany/.single_shot/runs/3d_toric_pq_grid_q000_050_nd1_20260511_175054/q_0p0000/scan_result_multi_L_3d_toric_q0p0000_pq_grid_common_random_convergence.json",
+        "npz_path": "/home/DATA1/users/yuany/.single_shot/runs/3d_toric_pq_grid_q000_050_nd1_20260511_175054/q_0p0000/scan_result_multi_L_3d_toric_q0p0000_pq_grid_common_random.npz",
+        "png_path": "/home/DATA1/users/yuany/.single_shot/runs/3d_toric_pq_grid_q000_050_nd1_20260511_175054/q_0p0000/scan_result_multi_L_3d_toric_q0p0000_pq_grid_common_random.png",
+        "status": "completed"
+      },
+      "q_dir": "q_0p0000",
+      "summary": {
+        "completed_chunks": 288,
+        "failed_chunks": 0,
+        "pending_chunks": 0,
+        "total_chunks": 288
+      }
+    },
+    {
+      "final_outputs": {
+        "cluster_summary": {
+          "cluster_budget_fraction_rho": 0.05,
+          "cluster_controller_frozen": true,
+          "cluster_move_fraction_mean": 0.01573437132156375,
+          "cluster_nullity_mean": 0.7606179861894368,
+          "cluster_nullity_median": 0.0,
+          "cluster_num_attempts": 16021070,
+          "cluster_num_nonzero_moves": 1232985,
+          "cluster_total_wall_time": 57818.46654332429,
+          "cluster_update_adaptive": true,
+          "cluster_update_enabled": true,
+          "cluster_wall_time_fraction": 0.06144832395311792
+        },
+        "completed_at": "2026-05-11T11:58:14-04:00",
+        "convergence_json_path": "/home/DATA1/users/yuany/.single_shot/runs/3d_toric_pq_grid_q000_050_nd1_20260511_175054/q_0p0050/scan_result_multi_L_3d_toric_q0p0050_pq_grid_common_random_convergence.json",
+        "npz_path": "/home/DATA1/users/yuany/.single_shot/runs/3d_toric_pq_grid_q000_050_nd1_20260511_175054/q_0p0050/scan_result_multi_L_3d_toric_q0p0050_pq_grid_common_random.npz",
+        "png_path": "/home/DATA1/users/yuany/.single_shot/runs/3d_toric_pq_grid_q000_050_nd1_20260511_175054/q_0p0050/scan_result_multi_L_3d_toric_q0p0050_pq_grid_common_random.png",
+        "status": "completed"
+      },
+      "q_dir": "q_0p0050",
+      "summary": {
+        "completed_chunks": 288,
+        "failed_chunks": 0,
+        "pending_chunks": 0,
+        "total_chunks": 288
+      }
+    },
+    {
+      "final_outputs": {
+        "cluster_summary": {
+          "cluster_budget_fraction_rho": 0.05,
+          "cluster_controller_frozen": true,
+          "cluster_move_fraction_mean": 0.015600947346731767,
+          "cluster_nullity_mean": 0.7596346641349291,
+          "cluster_nullity_median": 0.0,
+          "cluster_num_attempts": 16571491,
+          "cluster_num_nonzero_moves": 1259849,
+          "cluster_total_wall_time": 58036.89523909666,
+          "cluster_update_adaptive": true,
+          "cluster_update_enabled": true,
+          "cluster_wall_time_fraction": 0.06146579346601877
+        },
+        "completed_at": "2026-05-11T17:54:38-04:00",
+        "convergence_json_path": "/home/DATA1/users/yuany/.single_shot/runs/3d_toric_pq_grid_q000_050_nd1_20260511_175054/q_0p0100/scan_result_multi_L_3d_toric_q0p0100_pq_grid_common_random_convergence.json",
+        "npz_path": "/home/DATA1/users/yuany/.single_shot/runs/3d_toric_pq_grid_q000_050_nd1_20260511_175054/q_0p0100/scan_result_multi_L_3d_toric_q0p0100_pq_grid_common_random.npz",
+        "png_path": "/home/DATA1/users/yuany/.single_shot/runs/3d_toric_pq_grid_q000_050_nd1_20260511_175054/q_0p0100/scan_result_multi_L_3d_toric_q0p0100_pq_grid_common_random.png",
+        "status": "completed"
+      },
+      "q_dir": "q_0p0100",
+      "summary": {
+        "completed_chunks": 288,
+        "failed_chunks": 0,
+        "pending_chunks": 0,
+        "total_chunks": 288
+      }
+    },
+    {
+      "final_outputs": {
+        "cluster_summary": {
+          "cluster_budget_fraction_rho": 0.05,
+          "cluster_controller_frozen": true,
+          "cluster_move_fraction_mean": 0.014026810211267534,
+          "cluster_nullity_mean": 0.6767846360508282,
+          "cluster_nullity_median": 0.0,
+          "cluster_num_attempts": 18661452,
+          "cluster_num_nonzero_moves": 1290835,
+          "cluster_total_wall_time": 58728.143170725845,
+          "cluster_update_adaptive": true,
+          "cluster_update_enabled": true,
+          "cluster_wall_time_fraction": 0.061633400360024265
+        },
+        "completed_at": "2026-05-11T23:54:42-04:00",
+        "convergence_json_path": "/home/DATA1/users/yuany/.single_shot/runs/3d_toric_pq_grid_q000_050_nd1_20260511_175054/q_0p0150/scan_result_multi_L_3d_toric_q0p0150_pq_grid_common_random_convergence.json",
+        "npz_path": "/home/DATA1/users/yuany/.single_shot/runs/3d_toric_pq_grid_q000_050_nd1_20260511_175054/q_0p0150/scan_result_multi_L_3d_toric_q0p0150_pq_grid_common_random.npz",
+        "png_path": "/home/DATA1/users/yuany/.single_shot/runs/3d_toric_pq_grid_q000_050_nd1_20260511_175054/q_0p0150/scan_result_multi_L_3d_toric_q0p0150_pq_grid_common_random.png",
+        "status": "completed"
+      },
+      "q_dir": "q_0p0150",
+      "summary": {
+        "completed_chunks": 288,
+        "failed_chunks": 0,
+        "pending_chunks": 0,
+        "total_chunks": 288
+      }
+    },
+    {
+      "final_outputs": {
+        "cluster_summary": {
+          "cluster_budget_fraction_rho": 0.05,
+          "cluster_controller_frozen": true,
+          "cluster_move_fraction_mean": 0.015367573661259508,
+          "cluster_nullity_mean": 0.7432505067977946,
+          "cluster_nullity_median": 0.0,
+          "cluster_num_attempts": 17049206,
+          "cluster_num_nonzero_moves": 1280012,
+          "cluster_total_wall_time": 58088.90146196139,
+          "cluster_update_adaptive": true,
+          "cluster_update_enabled": true,
+          "cluster_wall_time_fraction": 0.06133074647350836
+        },
+        "completed_at": "2026-05-12T05:49:56-04:00",
+        "convergence_json_path": "/home/DATA1/users/yuany/.single_shot/runs/3d_toric_pq_grid_q000_050_nd1_20260511_175054/q_0p0200/scan_result_multi_L_3d_toric_q0p0200_pq_grid_common_random_convergence.json",
+        "npz_path": "/home/DATA1/users/yuany/.single_shot/runs/3d_toric_pq_grid_q000_050_nd1_20260511_175054/q_0p0200/scan_result_multi_L_3d_toric_q0p0200_pq_grid_common_random.npz",
+        "png_path": "/home/DATA1/users/yuany/.single_shot/runs/3d_toric_pq_grid_q000_050_nd1_20260511_175054/q_0p0200/scan_result_multi_L_3d_toric_q0p0200_pq_grid_common_random.png",
+        "status": "completed"
+      },
+      "q_dir": "q_0p0200",
+      "summary": {
+        "completed_chunks": 288,
+        "failed_chunks": 0,
+        "pending_chunks": 0,
+        "total_chunks": 288
+      }
+    },
+    {
+      "final_outputs": {
+        "cluster_summary": {
+          "cluster_budget_fraction_rho": 0.05,
+          "cluster_controller_frozen": true,
+          "cluster_move_fraction_mean": 0.015558664820868574,
+          "cluster_nullity_mean": 0.7529003091398063,
+          "cluster_nullity_median": 0.0,
+          "cluster_num_attempts": 16982931,
+          "cluster_num_nonzero_moves": 1297805,
+          "cluster_total_wall_time": 57776.46396173624,
+          "cluster_update_adaptive": true,
+          "cluster_update_enabled": true,
+          "cluster_wall_time_fraction": 0.0613705457349533
+        },
+        "completed_at": "2026-05-12T11:44:28-04:00",
+        "convergence_json_path": "/home/DATA1/users/yuany/.single_shot/runs/3d_toric_pq_grid_q000_050_nd1_20260511_175054/q_0p0250/scan_result_multi_L_3d_toric_q0p0250_pq_grid_common_random_convergence.json",
+        "npz_path": "/home/DATA1/users/yuany/.single_shot/runs/3d_toric_pq_grid_q000_050_nd1_20260511_175054/q_0p0250/scan_result_multi_L_3d_toric_q0p0250_pq_grid_common_random.npz",
+        "png_path": "/home/DATA1/users/yuany/.single_shot/runs/3d_toric_pq_grid_q000_050_nd1_20260511_175054/q_0p0250/scan_result_multi_L_3d_toric_q0p0250_pq_grid_common_random.png",
+        "status": "completed"
+      },
+      "q_dir": "q_0p0250",
+      "summary": {
+        "completed_chunks": 288,
+        "failed_chunks": 0,
+        "pending_chunks": 0,
+        "total_chunks": 288
+      }
+    },
+    {
+      "final_outputs": {
+        "cluster_summary": {
+          "cluster_budget_fraction_rho": 0.05,
+          "cluster_controller_frozen": true,
+          "cluster_move_fraction_mean": 0.015385003971287498,
+          "cluster_nullity_mean": 0.745795361332717,
+          "cluster_nullity_median": 0.0,
+          "cluster_num_attempts": 17300357,
+          "cluster_num_nonzero_moves": 1312003,
+          "cluster_total_wall_time": 57612.6182759878,
+          "cluster_update_adaptive": true,
+          "cluster_update_enabled": true,
+          "cluster_wall_time_fraction": 0.061155742201860167
+        },
+        "completed_at": "2026-05-12T17:38:49-04:00",
+        "convergence_json_path": "/home/DATA1/users/yuany/.single_shot/runs/3d_toric_pq_grid_q000_050_nd1_20260511_175054/q_0p0300/scan_result_multi_L_3d_toric_q0p0300_pq_grid_common_random_convergence.json",
+        "npz_path": "/home/DATA1/users/yuany/.single_shot/runs/3d_toric_pq_grid_q000_050_nd1_20260511_175054/q_0p0300/scan_result_multi_L_3d_toric_q0p0300_pq_grid_common_random.npz",
+        "png_path": "/home/DATA1/users/yuany/.single_shot/runs/3d_toric_pq_grid_q000_050_nd1_20260511_175054/q_0p0300/scan_result_multi_L_3d_toric_q0p0300_pq_grid_common_random.png",
+        "status": "completed"
+      },
+      "q_dir": "q_0p0300",
+      "summary": {
+        "completed_chunks": 288,
+        "failed_chunks": 0,
+        "pending_chunks": 0,
+        "total_chunks": 288
+      }
+    },
+    {
+      "final_outputs": {
+        "cluster_summary": {
+          "cluster_budget_fraction_rho": 0.05,
+          "cluster_controller_frozen": true,
+          "cluster_move_fraction_mean": 0.015255622298506636,
+          "cluster_nullity_mean": 0.7431111999720156,
+          "cluster_nullity_median": 0.0,
+          "cluster_num_attempts": 17695571,
+          "cluster_num_nonzero_moves": 1332327,
+          "cluster_total_wall_time": 57591.13474487048,
+          "cluster_update_adaptive": true,
+          "cluster_update_enabled": true,
+          "cluster_wall_time_fraction": 0.06131314724814468
+        },
+        "completed_at": "2026-05-12T23:33:46-04:00",
+        "convergence_json_path": "/home/DATA1/users/yuany/.single_shot/runs/3d_toric_pq_grid_q000_050_nd1_20260511_175054/q_0p0350/scan_result_multi_L_3d_toric_q0p0350_pq_grid_common_random_convergence.json",
+        "npz_path": "/home/DATA1/users/yuany/.single_shot/runs/3d_toric_pq_grid_q000_050_nd1_20260511_175054/q_0p0350/scan_result_multi_L_3d_toric_q0p0350_pq_grid_common_random.npz",
+        "png_path": "/home/DATA1/users/yuany/.single_shot/runs/3d_toric_pq_grid_q000_050_nd1_20260511_175054/q_0p0350/scan_result_multi_L_3d_toric_q0p0350_pq_grid_common_random.png",
+        "status": "completed"
+      },
+      "q_dir": "q_0p0350",
+      "summary": {
+        "completed_chunks": 288,
+        "failed_chunks": 0,
+        "pending_chunks": 0,
+        "total_chunks": 288
+      }
+    },
+    {
+      "final_outputs": {
+        "cluster_summary": {
+          "cluster_budget_fraction_rho": 0.05,
+          "cluster_controller_frozen": true,
+          "cluster_move_fraction_mean": 0.015865593865129802,
+          "cluster_nullity_mean": 0.7775493086720552,
+          "cluster_nullity_median": 0.0,
+          "cluster_num_attempts": 17033667,
+          "cluster_num_nonzero_moves": 1332927,
+          "cluster_total_wall_time": 57431.75649499637,
+          "cluster_update_adaptive": true,
+          "cluster_update_enabled": true,
+          "cluster_wall_time_fraction": 0.061331408933294064
+        },
+        "completed_at": "2026-05-13T05:28:12-04:00",
+        "convergence_json_path": "/home/DATA1/users/yuany/.single_shot/runs/3d_toric_pq_grid_q000_050_nd1_20260511_175054/q_0p0400/scan_result_multi_L_3d_toric_q0p0400_pq_grid_common_random_convergence.json",
+        "npz_path": "/home/DATA1/users/yuany/.single_shot/runs/3d_toric_pq_grid_q000_050_nd1_20260511_175054/q_0p0400/scan_result_multi_L_3d_toric_q0p0400_pq_grid_common_random.npz",
+        "png_path": "/home/DATA1/users/yuany/.single_shot/runs/3d_toric_pq_grid_q000_050_nd1_20260511_175054/q_0p0400/scan_result_multi_L_3d_toric_q0p0400_pq_grid_common_random.png",
+        "status": "completed"
+      },
+      "q_dir": "q_0p0400",
+      "summary": {
+        "completed_chunks": 288,
+        "failed_chunks": 0,
+        "pending_chunks": 0,
+        "total_chunks": 288
+      }
+    },
+    {
+      "final_outputs": {
+        "cluster_summary": {
+          "cluster_budget_fraction_rho": 0.05,
+          "cluster_controller_frozen": true,
+          "cluster_move_fraction_mean": 0.015418622333027262,
+          "cluster_nullity_mean": 0.7524548094307496,
+          "cluster_nullity_median": 0.0,
+          "cluster_num_attempts": 17938256,
+          "cluster_num_nonzero_moves": 1368084,
+          "cluster_total_wall_time": 57640.37181532435,
+          "cluster_update_adaptive": true,
+          "cluster_update_enabled": true,
+          "cluster_wall_time_fraction": 0.061139817740168266
+        },
+        "completed_at": "2026-05-13T11:23:36-04:00",
+        "convergence_json_path": "/home/DATA1/users/yuany/.single_shot/runs/3d_toric_pq_grid_q000_050_nd1_20260511_175054/q_0p0450/scan_result_multi_L_3d_toric_q0p0450_pq_grid_common_random_convergence.json",
+        "npz_path": "/home/DATA1/users/yuany/.single_shot/runs/3d_toric_pq_grid_q000_050_nd1_20260511_175054/q_0p0450/scan_result_multi_L_3d_toric_q0p0450_pq_grid_common_random.npz",
+        "png_path": "/home/DATA1/users/yuany/.single_shot/runs/3d_toric_pq_grid_q000_050_nd1_20260511_175054/q_0p0450/scan_result_multi_L_3d_toric_q0p0450_pq_grid_common_random.png",
+        "status": "completed"
+      },
+      "q_dir": "q_0p0450",
+      "summary": {
+        "completed_chunks": 288,
+        "failed_chunks": 0,
+        "pending_chunks": 0,
+        "total_chunks": 288
+      }
+    },
+    {
+      "final_outputs": {
+        "cluster_summary": {
+          "cluster_budget_fraction_rho": 0.05,
+          "cluster_controller_frozen": true,
+          "cluster_move_fraction_mean": 0.015596904270694708,
+          "cluster_nullity_mean": 0.7647931706429189,
+          "cluster_nullity_median": 0.0,
+          "cluster_num_attempts": 17932464,
+          "cluster_num_nonzero_moves": 1392951,
+          "cluster_total_wall_time": 57580.86848037463,
+          "cluster_update_adaptive": true,
+          "cluster_update_enabled": true,
+          "cluster_wall_time_fraction": 0.0612618689669282
+        },
+        "completed_at": "2026-05-13T17:17:43-04:00",
+        "convergence_json_path": "/home/DATA1/users/yuany/.single_shot/runs/3d_toric_pq_grid_q000_050_nd1_20260511_175054/q_0p0500/scan_result_multi_L_3d_toric_q0p0500_pq_grid_common_random_convergence.json",
+        "npz_path": "/home/DATA1/users/yuany/.single_shot/runs/3d_toric_pq_grid_q000_050_nd1_20260511_175054/q_0p0500/scan_result_multi_L_3d_toric_q0p0500_pq_grid_common_random.npz",
+        "png_path": "/home/DATA1/users/yuany/.single_shot/runs/3d_toric_pq_grid_q000_050_nd1_20260511_175054/q_0p0500/scan_result_multi_L_3d_toric_q0p0500_pq_grid_common_random.png",
+        "status": "completed"
+      },
+      "q_dir": "q_0p0500",
+      "summary": {
+        "completed_chunks": 288,
+        "failed_chunks": 0,
+        "pending_chunks": 0,
+        "total_chunks": 288
+      }
+    }
+  ]
+}

@@ -13,8 +13,17 @@ Parallel tempering in data-error probability p.
 不变（在所有温度共享同一个 disorder 样本）。
 """
 
+import time
+
 import numpy as np
 
+from cluster_update import (
+    build_cluster_controller,
+    freeze_cluster_controller,
+    make_disabled_cluster_summary,
+    maybe_run_cluster_update,
+    summarize_cluster_controller,
+)
 from mcmc import (
     accumulate_logical_observables,
     initialize_mcmc_state,
@@ -107,7 +116,10 @@ def run_parallel_tempering_measurement(
         winding_repeat_factor=1,
         swap_attempt_every_num_sweeps=1,
         return_diagnostics=False,
-        record_all_temperature_trajectories=False):
+        record_all_temperature_trajectories=False,
+        cluster_update_enabled=True,
+        cluster_budget_fraction_rho=0.05,
+        cluster_update_debug=False):
     """
     在 p 温度 ladder 上做 parallel tempering 采样。
 
@@ -231,9 +243,22 @@ def run_parallel_tempering_measurement(
         max(num_temperatures - 1, 0), dtype=np.int64,
     )
     qubit_order_buffer = np.arange(num_qubits, dtype=np.int32)
+    cluster_controller = build_cluster_controller(
+        parity_check_matrix=parity_check_matrix,
+        syndrome_error_probability=syndrome_error_probability,
+        data_error_probability_ladder=data_error_probability_ladder,
+        enabled=cluster_update_enabled,
+        budget_fraction_rho=cluster_budget_fraction_rho,
+        debug_assertions=cluster_update_debug,
+    )
 
     def _run_one_sweep_for_all_temperatures():
+        ordinary_elapsed_per_temperature = np.empty(
+            num_temperatures,
+            dtype=np.float64,
+        )
         for temperature_index in range(num_temperatures):
+            ordinary_started_at = time.perf_counter()
             cycle_result = _run_measurement_update_cycle(
                 current_chain_bits=chain_bits_list[temperature_index],
                 current_data_term_bits=(
@@ -265,6 +290,9 @@ def run_parallel_tempering_measurement(
                 qubit_order_buffer=qubit_order_buffer,
                 numba_update_kernel_data=numba_update_kernel_data,
             )
+            ordinary_elapsed_per_temperature[temperature_index] = (
+                time.perf_counter() - ordinary_started_at
+            )
             data_weight_per_temperature[temperature_index] += (
                 cycle_result["data_weight_delta"]
             )
@@ -286,6 +314,21 @@ def run_parallel_tempering_measurement(
             winding_attempted_per_temperature[temperature_index] += (
                 cycle_result["winding_attempted_count"]
             )
+        cluster_result = maybe_run_cluster_update(
+            controller=cluster_controller,
+            chain_bits_list=chain_bits_list,
+            data_term_bits_list=data_term_bits_list,
+            syndrome_term_bits_list=syndrome_term_bits_list,
+            observed_syndrome_bits=observed_syndrome_bits,
+            disorder_data_error_bits=disorder_data_error_bits,
+            checks_touching_each_qubit=checks_touching_each_qubit,
+            ordinary_elapsed_per_temperature=ordinary_elapsed_per_temperature,
+            rng=rng,
+        )
+        if cluster_result["attempted"]:
+            data_weight_per_temperature[
+                cluster_result["temperature_index"]
+            ] += cluster_result["data_weight_delta"]
 
     swap_parity_counter = 0
 
@@ -316,6 +359,9 @@ def run_parallel_tempering_measurement(
         sweep_counter += 1
         _maybe_attempt_swap(sweep_counter)
 
+    if cluster_controller is not None and num_burn_in_sweeps > 0:
+        freeze_cluster_controller(cluster_controller)
+
     num_masks = logical_observable_masks.shape[0]
     logical_observable_sum_per_temperature = np.zeros(
         (num_temperatures, num_masks), dtype=np.int64,
@@ -342,6 +388,11 @@ def run_parallel_tempering_measurement(
 
     for measurement_index in range(num_measurements):
         for _ in range(num_sweeps_between_measurements):
+            if (
+                    cluster_controller is not None
+                    and cluster_controller["enabled"]
+                    and num_burn_in_sweeps == 0):
+                cluster_controller["production_used_adaptive"] = True
             _run_one_sweep_for_all_temperatures()
             sweep_counter += 1
             _maybe_attempt_swap(sweep_counter)
@@ -438,4 +489,12 @@ def run_parallel_tempering_measurement(
             logical_observable_values_per_measurement
         )
         result["diagnostic_temperature_indices"] = diagnostic_temperature_indices
+    if cluster_controller is None:
+        result.update(make_disabled_cluster_summary(
+            num_temperatures=num_temperatures,
+            requested_enabled=cluster_update_enabled,
+            budget_fraction_rho=cluster_budget_fraction_rho,
+        ))
+    else:
+        result.update(summarize_cluster_controller(cluster_controller))
     return result
