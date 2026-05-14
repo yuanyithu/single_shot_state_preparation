@@ -2294,7 +2294,9 @@ nd-3 L=3,q=0.0000: completed=256, failed=0, pending=0
 续跑同一远端 run id：
 
 ```bash
-RUN_TIMESTAMP=20260514_140000 RESUME=1 SKIP_SYNC=1 scripts/launch_exp32_fixed_p050_q_scan_nd23.sh
+COMMIT_SHA=e05aabb71a46904f8e9f744506cd819b31592203 \
+  RUN_TIMESTAMP=20260514_140000 RESUME=1 SKIP_SYNC=1 \
+  scripts/launch_exp32_fixed_p050_q_scan_nd23.sh
 ```
 
 回收并做本地池化/画图：
