@@ -1,5 +1,6 @@
 import multiprocessing
 import math
+import time
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from pathlib import Path
 
@@ -10,6 +11,14 @@ try:
 except ImportError:  # pragma: no cover - optional acceleration dependency
     njit = None
 
+from cluster_update import (
+    build_cluster_controller,
+    combine_cluster_summaries,
+    freeze_cluster_controller,
+    make_disabled_cluster_summary,
+    maybe_run_cluster_update,
+    summarize_cluster_controller,
+)
 from build_toric_code_examples import (
     build_toric_code_by_family,
     build_zero_syndrome_move_data_by_family,
@@ -1344,7 +1353,10 @@ def _run_parallel_tempering_single_chain(
         initial_chain_bits=None,
         num_zero_syndrome_sweeps_per_cycle=1,
         winding_repeat_factor=1,
-        pt_swap_attempt_every_num_sweeps=1):
+        pt_swap_attempt_every_num_sweeps=1,
+        cluster_update_enabled=True,
+        cluster_budget_fraction_rho=0.05,
+        cluster_update_debug=False):
     from mcmc_parallel_tempering import run_parallel_tempering_measurement
 
     num_temperatures = int(len(data_error_probability_ladder))
@@ -1376,6 +1388,9 @@ def _run_parallel_tempering_single_chain(
         winding_repeat_factor=winding_repeat_factor,
         swap_attempt_every_num_sweeps=pt_swap_attempt_every_num_sweeps,
         return_diagnostics=True,
+        cluster_update_enabled=cluster_update_enabled,
+        cluster_budget_fraction_rho=cluster_budget_fraction_rho,
+        cluster_update_debug=cluster_update_debug,
     )
     cold_index = 0
     acceptance_rate = _compute_total_acceptance_rate_from_counts(
@@ -1410,7 +1425,7 @@ def _run_parallel_tempering_single_chain(
             ]
         ),
     )
-    return {
+    result = {
         "m_u_values": pt_result["m_u_values_per_temperature"][cold_index],
         "q_top_value": float(
             pt_result["q_top_value_per_temperature"][cold_index]
@@ -1453,6 +1468,28 @@ def _run_parallel_tempering_single_chain(
         ),
         "pt_swap_acceptance_rates": pt_result["swap_acceptance_rates"],
     }
+    for key in (
+            "cluster_update_enabled",
+            "cluster_update_requested_enabled",
+            "cluster_update_adaptive",
+            "cluster_budget_fraction_rho",
+            "cluster_num_attempts",
+            "cluster_num_nonzero_moves",
+            "cluster_total_wall_time",
+            "cluster_wall_time_fraction",
+            "cluster_nullity_mean",
+            "cluster_nullity_median",
+            "cluster_nullity_histogram",
+            "cluster_move_fraction_mean",
+            "cluster_by_temperature_attempts",
+            "cluster_by_temperature_nonzero_rate",
+            "cluster_by_temperature_mean_nullity",
+            "cluster_by_temperature_mean_move_fraction",
+            "cluster_by_temperature_wall_time",
+            "cluster_controller_frozen"):
+        if key in pt_result:
+            result[key] = pt_result[key]
+    return result
 
 
 def _run_single_disorder_measurement(
@@ -1474,11 +1511,20 @@ def _run_single_disorder_measurement(
         initial_chain_bits=None,
         num_zero_syndrome_sweeps_per_cycle=1,
         winding_repeat_factor=1,
-        return_diagnostics=False):
+        return_diagnostics=False,
+        cluster_update_enabled=True,
+        cluster_budget_fraction_rho=0.05,
+        cluster_update_debug=False):
     """
     对固定的 (s, eta) 运行一次 MCMC，返回 (m_u_values, acceptance_rate)。
     """
     num_qubits = parity_check_matrix.shape[1]
+    cluster_requested_enabled = bool(cluster_update_enabled)
+    actual_cluster_enabled = (
+        cluster_requested_enabled
+        and syndrome_error_probability > 0.0
+    )
+    cluster_controller = None
     diagnostic_config = _build_measurement_diagnostic_config(
         num_zero_syndrome_sweeps_per_cycle=(
             num_zero_syndrome_sweeps_per_cycle
@@ -1537,8 +1583,21 @@ def _run_single_disorder_measurement(
         zero_syndrome_move_data=zero_syndrome_move_data,
         num_qubits=num_qubits,
     )
+    if actual_cluster_enabled:
+        cluster_controller = build_cluster_controller(
+            parity_check_matrix=parity_check_matrix,
+            syndrome_error_probability=syndrome_error_probability,
+            data_error_probability_ladder=np.asarray(
+                [data_error_probability],
+                dtype=np.float64,
+            ),
+            enabled=True,
+            budget_fraction_rho=cluster_budget_fraction_rho,
+            debug_assertions=cluster_update_debug,
+        )
 
     for _ in range(num_burn_in_sweeps):
+        ordinary_started_at = time.perf_counter()
         _run_measurement_update_cycle(
             current_chain_bits=current_chain_bits,
             current_data_term_bits=current_data_term_bits,
@@ -1565,6 +1624,24 @@ def _run_single_disorder_measurement(
             track_data_weight_delta=False,
             numba_update_kernel_data=numba_update_kernel_data,
         )
+        ordinary_elapsed = time.perf_counter() - ordinary_started_at
+        maybe_run_cluster_update(
+            controller=cluster_controller,
+            chain_bits_list=[current_chain_bits],
+            data_term_bits_list=[current_data_term_bits],
+            syndrome_term_bits_list=[current_syndrome_term_bits],
+            observed_syndrome_bits=observed_syndrome_bits,
+            disorder_data_error_bits=disorder_data_error_bits,
+            checks_touching_each_qubit=checks_touching_each_qubit,
+            ordinary_elapsed_per_temperature=np.asarray(
+                [ordinary_elapsed],
+                dtype=np.float64,
+            ),
+            rng=rng,
+        )
+
+    if cluster_controller is not None and num_burn_in_sweeps > 0:
+        freeze_cluster_controller(cluster_controller)
 
     num_masks = logical_observable_masks.shape[0]
     logical_observable_sum_values = np.zeros(num_masks, dtype=np.int64)
@@ -1612,6 +1689,7 @@ def _run_single_disorder_measurement(
         measurement_winding_accepted_count = 0
         measurement_winding_attempted_count = 0
         for _ in range(num_sweeps_between_measurements):
+            ordinary_started_at = time.perf_counter()
             cycle_result = _run_measurement_update_cycle(
                 current_chain_bits=current_chain_bits,
                 current_data_term_bits=current_data_term_bits,
@@ -1638,6 +1716,7 @@ def _run_single_disorder_measurement(
                 track_data_weight_delta=False,
                 numba_update_kernel_data=numba_update_kernel_data,
             )
+            ordinary_elapsed = time.perf_counter() - ordinary_started_at
             measurement_single_bit_accepted_count += cycle_result[
                 "single_bit_accepted_count"
             ]
@@ -1656,6 +1735,22 @@ def _run_single_disorder_measurement(
             measurement_winding_attempted_count += cycle_result[
                 "winding_attempted_count"
             ]
+            if cluster_controller is not None and num_burn_in_sweeps == 0:
+                cluster_controller["production_used_adaptive"] = True
+            maybe_run_cluster_update(
+                controller=cluster_controller,
+                chain_bits_list=[current_chain_bits],
+                data_term_bits_list=[current_data_term_bits],
+                syndrome_term_bits_list=[current_syndrome_term_bits],
+                observed_syndrome_bits=observed_syndrome_bits,
+                disorder_data_error_bits=disorder_data_error_bits,
+                checks_touching_each_qubit=checks_touching_each_qubit,
+                ordinary_elapsed_per_temperature=np.asarray(
+                    [ordinary_elapsed],
+                    dtype=np.float64,
+                ),
+                rng=rng,
+            )
 
         accumulate_logical_observables(
             current_chain_bits=current_chain_bits,
@@ -1801,7 +1896,7 @@ def _run_single_disorder_measurement(
             total_winding_accepted_count
             / total_winding_attempted_count
         )
-    return {
+    result = {
         "m_u_values": m_u_values,
         "q_top_value": float(np.mean(m_u_values ** 2)),
         "acceptance_rate": float(acceptance_rate),
@@ -1841,6 +1936,15 @@ def _run_single_disorder_measurement(
             diagnostic_config["winding_repeat_factor"]
         ),
     }
+    if cluster_controller is None:
+        result.update(make_disabled_cluster_summary(
+            num_temperatures=1,
+            requested_enabled=cluster_requested_enabled,
+            budget_fraction_rho=cluster_budget_fraction_rho,
+        ))
+    else:
+        result.update(summarize_cluster_controller(cluster_controller))
+    return result
 
 
 def run_disorder_average_simulation(
@@ -1862,6 +1966,9 @@ def run_disorder_average_simulation(
         pt_swap_attempt_every_num_sweeps=1,
         num_zero_syndrome_sweeps_per_cycle=1,
         winding_repeat_factor=1,
+        cluster_update_enabled=True,
+        cluster_budget_fraction_rho=0.05,
+        cluster_update_debug=False,
         precomputed_syndrome_uniform_values_per_disorder=None,
         precomputed_data_uniform_values_per_disorder=None):
     rng = np.random.default_rng(seed)
@@ -2004,6 +2111,7 @@ def run_disorder_average_simulation(
     num_chains_that_never_flipped_sector_per_disorder = None
     pt_min_swap_acceptance_rate_per_disorder = None
     pt_mean_swap_acceptance_rate_per_disorder = None
+    cluster_summary_list = []
     if syndrome_error_probability > 0.0:
         if zero_syndrome_move_data is None and resolved_num_start_chains > 1:
             raise ValueError(
@@ -2315,6 +2423,11 @@ def run_disorder_average_simulation(
                                 pt_swap_attempt_every_num_sweeps=(
                                     pt_swap_attempt_every_num_sweeps
                                 ),
+                                cluster_update_enabled=cluster_update_enabled,
+                                cluster_budget_fraction_rho=(
+                                    cluster_budget_fraction_rho
+                                ),
+                                cluster_update_debug=cluster_update_debug,
                                 num_zero_syndrome_sweeps_per_cycle=(
                                     diagnostic_config[
                                         "num_zero_syndrome_sweeps_per_cycle"
@@ -2390,7 +2503,35 @@ def run_disorder_average_simulation(
                                 "winding_repeat_factor"
                             ],
                             return_diagnostics=True,
+                            cluster_update_enabled=cluster_update_enabled,
+                            cluster_budget_fraction_rho=(
+                                cluster_budget_fraction_rho
+                            ),
+                            cluster_update_debug=cluster_update_debug,
                         )
+                    cluster_summary_list.append({
+                        key: measurement_result[key]
+                        for key in (
+                            "cluster_update_enabled",
+                            "cluster_update_requested_enabled",
+                            "cluster_update_adaptive",
+                            "cluster_budget_fraction_rho",
+                            "cluster_num_attempts",
+                            "cluster_num_nonzero_moves",
+                            "cluster_total_wall_time",
+                            "cluster_wall_time_fraction",
+                            "cluster_nullity_mean",
+                            "cluster_nullity_median",
+                            "cluster_nullity_histogram",
+                            "cluster_move_fraction_mean",
+                            "cluster_by_temperature_attempts",
+                            "cluster_by_temperature_nonzero_rate",
+                            "cluster_by_temperature_mean_nullity",
+                            "cluster_by_temperature_mean_move_fraction",
+                            "cluster_by_temperature_wall_time",
+                            "cluster_controller_frozen",
+                        )
+                    })
                     chain_analysis = analyze_chain_diagnostics(
                         logical_observable_values_per_measurement=(
                             measurement_result[
@@ -2529,9 +2670,23 @@ def run_disorder_average_simulation(
         average_acceptance_rate_per_disorder[disorder_index] = acceptance_rate
 
     disorder_average_q_top = float(np.mean(disorder_q_top_values))
+    if cluster_summary_list:
+        cluster_summary = combine_cluster_summaries(cluster_summary_list)
+    else:
+        num_temperatures_for_disabled_summary = 1
+        if (
+                syndrome_error_probability > 0.0
+                and pt_p_hot is not None
+                and pt_num_temperatures is not None):
+            num_temperatures_for_disabled_summary = int(pt_num_temperatures)
+        cluster_summary = make_disabled_cluster_summary(
+            num_temperatures=num_temperatures_for_disabled_summary,
+            requested_enabled=cluster_update_enabled,
+            budget_fraction_rho=cluster_budget_fraction_rho,
+        )
 
     if q0_start_sector_labels is not None:
-        return {
+        result = {
             "disorder_q_top_values": disorder_q_top_values,
             "disorder_average_q_top": disorder_average_q_top,
             "logical_observable_mean_values_per_disorder": (
@@ -2558,6 +2713,8 @@ def run_disorder_average_simulation(
             ),
             "q0_q_top_spread_per_disorder": q0_q_top_spread_per_disorder,
         }
+        result.update(cluster_summary)
+        return result
 
     result = {
         "disorder_q_top_values": disorder_q_top_values,
@@ -2575,6 +2732,7 @@ def run_disorder_average_simulation(
             diagnostic_config["winding_repeat_factor"]
         ),
     }
+    result.update(cluster_summary)
     if q_positive_start_sector_labels is not None:
         result["start_sector_labels"] = q_positive_start_sector_labels
         result["num_start_chains"] = np.int64(resolved_num_start_chains)
@@ -2638,7 +2796,10 @@ def scan_data_error_probability(
         pt_num_temperatures=None,
         pt_swap_attempt_every_num_sweeps=1,
         num_zero_syndrome_sweeps_per_cycle=1,
-        winding_repeat_factor=1):
+        winding_repeat_factor=1,
+        cluster_update_enabled=True,
+        cluster_budget_fraction_rho=0.05,
+        cluster_update_debug=False):
     data_error_probability_array = np.asarray(
         data_error_probability_list,
         dtype=np.float64,
@@ -2688,6 +2849,9 @@ def scan_data_error_probability(
                 num_zero_syndrome_sweeps_per_cycle
             ),
             winding_repeat_factor=winding_repeat_factor,
+            cluster_update_enabled=cluster_update_enabled,
+            cluster_budget_fraction_rho=cluster_budget_fraction_rho,
+            cluster_update_debug=cluster_update_debug,
         )
 
         disorder_q_top_values = result["disorder_q_top_values"]
@@ -2764,6 +2928,12 @@ def _run_single_scan_point_task(task_data):
         1,
     )
     winding_repeat_factor = task_data.get("winding_repeat_factor", 1)
+    cluster_update_enabled = task_data.get("cluster_update_enabled", True)
+    cluster_budget_fraction_rho = task_data.get(
+        "cluster_budget_fraction_rho",
+        0.05,
+    )
+    cluster_update_debug = task_data.get("cluster_update_debug", False)
     seed = task_data["seed"]
     code_family = task_data["code_family"]
 
@@ -2798,6 +2968,9 @@ def _run_single_scan_point_task(task_data):
             num_zero_syndrome_sweeps_per_cycle
         ),
         winding_repeat_factor=winding_repeat_factor,
+        cluster_update_enabled=cluster_update_enabled,
+        cluster_budget_fraction_rho=cluster_budget_fraction_rho,
+        cluster_update_debug=cluster_update_debug,
     )
 
     disorder_q_top_values = simulation_result["disorder_q_top_values"]
@@ -2817,6 +2990,27 @@ def _run_single_scan_point_task(task_data):
             np.mean(simulation_result["average_acceptance_rate_per_disorder"])
         ),
     }
+    for key in (
+            "cluster_update_enabled",
+            "cluster_update_requested_enabled",
+            "cluster_update_adaptive",
+            "cluster_budget_fraction_rho",
+            "cluster_num_attempts",
+            "cluster_num_nonzero_moves",
+            "cluster_total_wall_time",
+            "cluster_wall_time_fraction",
+            "cluster_nullity_mean",
+            "cluster_nullity_median",
+            "cluster_nullity_histogram",
+            "cluster_move_fraction_mean",
+            "cluster_by_temperature_attempts",
+            "cluster_by_temperature_nonzero_rate",
+            "cluster_by_temperature_mean_nullity",
+            "cluster_by_temperature_mean_move_fraction",
+            "cluster_by_temperature_wall_time",
+            "cluster_controller_frozen"):
+        if key in simulation_result:
+            task_result[key] = simulation_result[key]
     if "q0_start_sector_labels" in simulation_result:
         task_result["q0_mean_m_u_spread_linf"] = float(
             np.mean(simulation_result["q0_m_u_spread_linf_per_disorder"])
@@ -2925,6 +3119,9 @@ def scan_multiple_code_sizes(
         pt_swap_attempt_every_num_sweeps=1,
         num_zero_syndrome_sweeps_per_cycle=1,
         winding_repeat_factor=1,
+        cluster_update_enabled=True,
+        cluster_budget_fraction_rho=0.05,
+        cluster_update_debug=False,
         code_family="2d_toric"):
     """
     扫描多个 toric code 尺寸，并在内部对 burn-in 做线性放大。
@@ -3003,6 +3200,9 @@ def scan_multiple_code_sizes(
                     num_zero_syndrome_sweeps_per_cycle
                 ),
                 "winding_repeat_factor": winding_repeat_factor,
+                "cluster_update_enabled": cluster_update_enabled,
+                "cluster_budget_fraction_rho": cluster_budget_fraction_rho,
+                "cluster_update_debug": cluster_update_debug,
                 "code_family": code_family,
                 "seed": (
                     seed_base + lattice_index * num_points + point_index

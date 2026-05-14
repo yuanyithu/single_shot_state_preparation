@@ -2,6 +2,11 @@ import argparse
 
 import numpy as np
 
+from cluster_update import (
+    build_cluster_controller,
+    maybe_run_cluster_update,
+    summarize_cluster_controller,
+)
 from build_toric_code_examples import (
     build_2d_toric_code,
     build_2d_toric_zero_syndrome_move_data,
@@ -1257,6 +1262,237 @@ def _run_data_weight_cache_consistency_regression():
     print("Data-weight cache consistency regression passed")
 
 
+def _state_index_from_bits(bits):
+    powers = (1 << np.arange(bits.shape[0], dtype=np.int64))
+    return int(np.dot(bits.astype(np.int64), powers))
+
+
+def _exact_state_probabilities(
+        parity_check_matrix,
+        observed_syndrome_bits,
+        disorder_data_error_bits,
+        syndrome_error_probability,
+        data_error_probability):
+    num_checks, num_qubits = parity_check_matrix.shape
+    probabilities = np.empty(1 << num_qubits, dtype=np.float64)
+    log_odds_syndrome = np.log(
+        syndrome_error_probability / (1.0 - syndrome_error_probability)
+    )
+    log_odds_data = np.log(
+        data_error_probability / (1.0 - data_error_probability)
+    )
+    parity_check_matrix_uint8 = parity_check_matrix.astype(np.uint8)
+    for state_index in range(1 << num_qubits):
+        bits = (
+            (state_index >> np.arange(num_qubits, dtype=np.int64)) & 1
+        ).astype(bool)
+        syndrome_bits = (
+            parity_check_matrix_uint8 @ bits.astype(np.uint8)
+        ) % 2
+        syndrome_weight = int(np.count_nonzero(
+            syndrome_bits.astype(bool) ^ observed_syndrome_bits
+        ))
+        data_weight = int(np.count_nonzero(bits ^ disorder_data_error_bits))
+        probabilities[state_index] = np.exp(
+            syndrome_weight * log_odds_syndrome
+            + data_weight * log_odds_data
+        )
+    probabilities /= float(np.sum(probabilities))
+    return probabilities
+
+
+def _run_cluster_update_regressions():
+    rng = np.random.default_rng(2026042701)
+    num_checks = 4
+    num_qubits = 6
+    parity_check_matrix = rng.integers(
+        0,
+        2,
+        size=(num_checks, num_qubits),
+    ).astype(bool)
+    for check_index in range(num_checks):
+        if not np.any(parity_check_matrix[check_index]):
+            parity_check_matrix[check_index, check_index % num_qubits] = True
+    observed_syndrome_bits = rng.integers(0, 2, size=num_checks).astype(bool)
+    disorder_data_error_bits = rng.integers(0, 2, size=num_qubits).astype(bool)
+    syndrome_error_probability = 0.13
+    data_error_probability = 0.21
+    checks_touching_each_qubit = build_checks_touching_each_qubit(
+        parity_check_matrix
+    )
+
+    current_chain_bits = rng.integers(0, 2, size=num_qubits).astype(bool)
+    current_data_term_bits = current_chain_bits ^ disorder_data_error_bits
+    current_syndrome_term_bits = (
+        (
+            parity_check_matrix.astype(np.uint8)
+            @ current_chain_bits.astype(np.uint8)
+        ) % 2
+    ).astype(bool) ^ observed_syndrome_bits
+    controller = build_cluster_controller(
+        parity_check_matrix=parity_check_matrix,
+        syndrome_error_probability=syndrome_error_probability,
+        data_error_probability_ladder=np.array([data_error_probability]),
+        enabled=True,
+        budget_fraction_rho=100.0,
+        debug_assertions=True,
+    )
+
+    saw_nonzero = False
+    for _ in range(256):
+        previous_chain_bits = current_chain_bits.copy()
+        result = maybe_run_cluster_update(
+            controller=controller,
+            chain_bits_list=[current_chain_bits],
+            data_term_bits_list=[current_data_term_bits],
+            syndrome_term_bits_list=[current_syndrome_term_bits],
+            observed_syndrome_bits=observed_syndrome_bits,
+            disorder_data_error_bits=disorder_data_error_bits,
+            checks_touching_each_qubit=checks_touching_each_qubit,
+            ordinary_elapsed_per_temperature=np.array([1.0]),
+            rng=rng,
+        )
+        true_data_term_bits = current_chain_bits ^ disorder_data_error_bits
+        if not np.array_equal(current_data_term_bits, true_data_term_bits):
+            raise AssertionError("cluster cache test failed for data term")
+        true_syndrome_term_bits = (
+            (
+                parity_check_matrix.astype(np.uint8)
+                @ current_chain_bits.astype(np.uint8)
+            ) % 2
+        ).astype(bool) ^ observed_syndrome_bits
+        if not np.array_equal(
+                current_syndrome_term_bits,
+                true_syndrome_term_bits):
+            raise AssertionError("cluster cache test failed for syndrome term")
+        if not result["nonzero"]:
+            continue
+        saw_nonzero = True
+        z_bits = previous_chain_bits ^ current_chain_bits
+        if np.any(z_bits[result["active_pin_mask"]]):
+            raise AssertionError("cluster constraint test failed: z_B != 0")
+        active_syndrome_delta = (
+            parity_check_matrix[result["active_check_indices"]].astype(np.uint8)
+            @ z_bits.astype(np.uint8)
+        ) % 2
+        if np.any(active_syndrome_delta):
+            raise AssertionError("cluster constraint test failed: H_A z != 0")
+        break
+    if not saw_nonzero:
+        raise AssertionError("cluster constraint test did not see a nonzero move")
+
+    summary = summarize_cluster_controller(controller)
+    if "cluster_acceptance_rate" in summary:
+        raise AssertionError("cluster summary must not report Metropolis acceptance")
+
+    exact_probabilities = _exact_state_probabilities(
+        parity_check_matrix=parity_check_matrix,
+        observed_syndrome_bits=observed_syndrome_bits,
+        disorder_data_error_bits=disorder_data_error_bits,
+        syndrome_error_probability=syndrome_error_probability,
+        data_error_probability=data_error_probability,
+    )
+    empirical_counts = np.zeros_like(exact_probabilities)
+    controller = build_cluster_controller(
+        parity_check_matrix=parity_check_matrix,
+        syndrome_error_probability=syndrome_error_probability,
+        data_error_probability_ladder=np.array([data_error_probability]),
+        enabled=True,
+        budget_fraction_rho=100.0,
+        debug_assertions=False,
+    )
+    num_samples = 30000
+    state_indices = np.arange(1 << num_qubits, dtype=np.int64)
+    for _ in range(num_samples):
+        initial_state_index = int(rng.choice(
+            state_indices,
+            p=exact_probabilities,
+        ))
+        current_chain_bits = (
+            (
+                initial_state_index
+                >> np.arange(num_qubits, dtype=np.int64)
+            ) & 1
+        ).astype(bool)
+        current_data_term_bits = current_chain_bits ^ disorder_data_error_bits
+        current_syndrome_term_bits = (
+            (
+                parity_check_matrix.astype(np.uint8)
+                @ current_chain_bits.astype(np.uint8)
+            ) % 2
+        ).astype(bool) ^ observed_syndrome_bits
+        maybe_run_cluster_update(
+            controller=controller,
+            chain_bits_list=[current_chain_bits],
+            data_term_bits_list=[current_data_term_bits],
+            syndrome_term_bits_list=[current_syndrome_term_bits],
+            observed_syndrome_bits=observed_syndrome_bits,
+            disorder_data_error_bits=disorder_data_error_bits,
+            checks_touching_each_qubit=checks_touching_each_qubit,
+            ordinary_elapsed_per_temperature=np.array([1.0]),
+            rng=rng,
+        )
+        empirical_counts[_state_index_from_bits(current_chain_bits)] += 1.0
+    empirical_probabilities = empirical_counts / float(num_samples)
+    total_variation_distance = 0.5 * float(np.sum(np.abs(
+        empirical_probabilities - exact_probabilities
+    )))
+    print(
+        "\ncluster one-step exact-invariance regression: "
+        f"TV={total_variation_distance:.4f}"
+    )
+    if total_variation_distance >= 0.08:
+        raise AssertionError(
+            "cluster one-step empirical distribution too far from exact: "
+            f"TV={total_variation_distance:.6f}"
+        )
+
+    parity_check_matrix_3d, dual_logical_z_basis_3d = build_3d_toric_code(
+        lattice_size=2
+    )
+    zero_syndrome_move_data_3d = build_3d_toric_zero_syndrome_move_data(
+        lattice_size=2
+    )
+    q0_result = run_disorder_average_simulation(
+        parity_check_matrix=parity_check_matrix_3d,
+        dual_logical_z_basis=dual_logical_z_basis_3d,
+        syndrome_error_probability=0.0,
+        data_error_probability=0.08,
+        num_disorder_samples=1,
+        num_burn_in_sweeps=2,
+        num_sweeps_between_measurements=1,
+        num_measurements_per_disorder=3,
+        seed=2026042702,
+        zero_syndrome_move_data=zero_syndrome_move_data_3d,
+        q0_num_start_chains=1,
+        cluster_update_enabled=True,
+    )
+    if bool(q0_result["cluster_update_enabled"]):
+        raise AssertionError("q=0 should silently disable cluster updates")
+    if int(q0_result["cluster_num_attempts"]) != 0:
+        raise AssertionError("q=0 cluster attempts must stay at zero")
+
+    q_positive_disabled_result = run_disorder_average_simulation(
+        parity_check_matrix=parity_check_matrix_3d,
+        dual_logical_z_basis=dual_logical_z_basis_3d,
+        syndrome_error_probability=0.05,
+        data_error_probability=0.12,
+        num_disorder_samples=1,
+        num_burn_in_sweeps=2,
+        num_sweeps_between_measurements=1,
+        num_measurements_per_disorder=3,
+        seed=2026042703,
+        zero_syndrome_move_data=zero_syndrome_move_data_3d,
+        num_start_chains=1,
+        cluster_update_enabled=False,
+    )
+    if bool(q_positive_disabled_result["cluster_update_enabled"]):
+        raise AssertionError("disabled cluster update reported enabled")
+    if int(q_positive_disabled_result["cluster_num_attempts"]) != 0:
+        raise AssertionError("disabled cluster update attempted a move")
+    print("Cluster update regressions passed")
+
+
 def _run_quick_validations():
     parity_check_matrix_2d, dual_logical_z_basis_2d = build_2d_toric_code(
         lattice_size=2
@@ -1308,6 +1544,7 @@ def _run_quick_validations():
     _run_q_positive_single_bit_bruteforce_regression()
     _run_data_weight_cache_consistency_regression()
     _run_pt_swap_weight_regression()
+    _run_cluster_update_regressions()
     print("Quick exact-enumeration validations passed.")
 
 

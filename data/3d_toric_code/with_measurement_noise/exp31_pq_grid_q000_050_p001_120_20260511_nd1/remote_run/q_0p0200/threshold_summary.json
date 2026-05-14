@@ -1,0 +1,363 @@
+{
+  "boundary_saturation_artifact": false,
+  "code_family": "3d_toric",
+  "common_random_disorder_across_p": true,
+  "crossing_window": {
+    "p_max": 0.11670422965955135,
+    "p_min": 0.013174623927971103,
+    "reason": "both_pairwise_gaps_cross_zero_interior",
+    "representative_p": 0.06493942679376123
+  },
+  "data_error_probability_list": [
+    0.01,
+    0.03,
+    0.05,
+    0.07,
+    0.1,
+    0.12
+  ],
+  "gap_plot_path": "/home/DATA1/users/yuany/.single_shot/runs/3d_toric_pq_grid_q000_050_nd1_20260511_175054/q_0p0200/scan_result_multi_L_3d_toric_q0p0200_pq_grid_common_random_gap_crossing.png",
+  "input_path": "/home/DATA1/users/yuany/.single_shot/runs/3d_toric_pq_grid_q000_050_nd1_20260511_175054/q_0p0200/scan_result_multi_L_3d_toric_q0p0200_pq_grid_common_random.npz",
+  "interior_crossing_window": {
+    "p_max": 0.11670422965955135,
+    "p_min": 0.013174623927971103,
+    "reason": "both_pairwise_gaps_cross_zero_interior",
+    "representative_p": 0.06493942679376123
+  },
+  "interior_near_crossing_window": null,
+  "lattice_size_list": [
+    3,
+    4,
+    5
+  ],
+  "left_edge_saturated_point_flags": [
+    false,
+    false,
+    false,
+    false,
+    false,
+    false
+  ],
+  "left_edge_saturation_end_index": -1,
+  "left_edge_saturation_end_p": null,
+  "num_disorder_samples": 256,
+  "pair_labels": [
+    "3-4",
+    "4-5"
+  ],
+  "pairwise_gap_analysis": {
+    "delta_35": {
+      "boundary_artifact_crossing_detected": false,
+      "boundary_crossing_intervals": [],
+      "crossing_intervals": [
+        {
+          "crossing_estimate_p": 0.013174623927971103,
+          "left_index": 0,
+          "left_p": 0.01,
+          "right_index": 1,
+          "right_p": 0.03
+        },
+        {
+          "crossing_estimate_p": 0.031656564426570374,
+          "left_index": 1,
+          "left_p": 0.03,
+          "right_index": 2,
+          "right_p": 0.05
+        }
+      ],
+      "crossing_location_classification": "inside_or_touching_window",
+      "delta_curve": [
+        -5.439818851538103e-05,
+        0.00028830815875358073,
+        -0.0031924880497038455,
+        -0.016076686798580098,
+        -0.042170962379092236,
+        -0.06402466123066264
+      ],
+      "interior_crossing_intervals": [
+        {
+          "crossing_estimate_p": 0.013174623927971103,
+          "left_index": 0,
+          "left_p": 0.01,
+          "right_index": 1,
+          "right_p": 0.03
+        },
+        {
+          "crossing_estimate_p": 0.031656564426570374,
+          "left_index": 1,
+          "left_p": 0.03,
+          "right_index": 2,
+          "right_p": 0.05
+        }
+      ],
+      "interior_near_crossing_hit": true,
+      "interior_near_crossing_windows": [
+        {
+          "index_max": 2,
+          "index_min": 0,
+          "p_max": 0.05,
+          "p_min": 0.01,
+          "reason": "abs_gap_within_pooled_ci95_interior",
+          "representative_index": 0,
+          "representative_p": 0.01
+        }
+      ],
+      "interior_sign_flip_detected": true,
+      "min_abs_delta_index": 0,
+      "min_abs_delta_p": 0.01,
+      "min_abs_delta_value": -5.439818851538103e-05,
+      "non_saturated_min_abs_delta_index": 0,
+      "non_saturated_min_abs_delta_p": 0.01,
+      "non_saturated_min_abs_delta_value": -5.439818851538103e-05,
+      "pair_label": "3-4",
+      "pooled_ci95_curve": [
+        0.0011114743465863485,
+        0.002075304436764256,
+        0.006834498933595033,
+        0.012182818929717166,
+        0.01786802880825499,
+        0.023758511620866816
+      ],
+      "pooled_sem_at_min_abs": 0.0005670787482583411,
+      "pooled_sem_curve": [
+        0.0005670787482583411,
+        0.0010588287942674775,
+        0.003486989251834201,
+        0.006215723943733248,
+        0.009116341228701525,
+        0.01212168960248307
+      ],
+      "raw_crossing_intervals": [
+        {
+          "crossing_estimate_p": 0.013174623927971103,
+          "left_index": 0,
+          "left_p": 0.01,
+          "right_index": 1,
+          "right_p": 0.03
+        },
+        {
+          "crossing_estimate_p": 0.031656564426570374,
+          "left_index": 1,
+          "left_p": 0.03,
+          "right_index": 2,
+          "right_p": 0.05
+        }
+      ],
+      "right_edge_delta": -0.06402466123066264,
+      "right_edge_near_hit": false,
+      "right_edge_pooled_ci95": 0.023758511620866816,
+      "right_edge_pooled_sem": 0.01212168960248307,
+      "right_edge_sign": -1,
+      "secondary_proximity_hit": true,
+      "sign_flip_detected": true,
+      "sign_pattern": [
+        -1,
+        1,
+        -1,
+        -1,
+        -1,
+        -1
+      ]
+    },
+    "delta_57": {
+      "boundary_artifact_crossing_detected": false,
+      "boundary_crossing_intervals": [],
+      "crossing_intervals": [
+        {
+          "crossing_estimate_p": 0.11670422965955135,
+          "left_index": 4,
+          "left_p": 0.1,
+          "right_index": 5,
+          "right_p": 0.12
+        }
+      ],
+      "crossing_location_classification": "inside_or_touching_window",
+      "delta_curve": [
+        0.0005730244470021351,
+        0.0012730456155444214,
+        0.0047007818070667895,
+        0.008255219837975836,
+        0.00861210898747522,
+        -0.001699182419549805
+      ],
+      "interior_crossing_intervals": [
+        {
+          "crossing_estimate_p": 0.11670422965955135,
+          "left_index": 4,
+          "left_p": 0.1,
+          "right_index": 5,
+          "right_p": 0.12
+        }
+      ],
+      "interior_near_crossing_hit": true,
+      "interior_near_crossing_windows": [
+        {
+          "index_max": 5,
+          "index_min": 0,
+          "p_max": 0.12,
+          "p_min": 0.01,
+          "reason": "abs_gap_within_pooled_ci95_interior",
+          "representative_index": 0,
+          "representative_p": 0.01
+        }
+      ],
+      "interior_sign_flip_detected": true,
+      "min_abs_delta_index": 0,
+      "min_abs_delta_p": 0.01,
+      "min_abs_delta_value": 0.0005730244470021351,
+      "non_saturated_min_abs_delta_index": 0,
+      "non_saturated_min_abs_delta_p": 0.01,
+      "non_saturated_min_abs_delta_value": 0.0005730244470021351,
+      "pair_label": "4-5",
+      "pooled_ci95_curve": [
+        0.0012901963179217304,
+        0.002356471321056126,
+        0.006319601402897598,
+        0.008318275653986703,
+        0.011336533551264625,
+        0.015792945672351993
+      ],
+      "pooled_sem_at_min_abs": 0.0006582634275110869,
+      "pooled_sem_curve": [
+        0.0006582634275110869,
+        0.0012022812862531255,
+        0.003224286430049795,
+        0.004244018190809542,
+        0.0057839456894207275,
+        0.008057625343036732
+      ],
+      "raw_crossing_intervals": [
+        {
+          "crossing_estimate_p": 0.11670422965955135,
+          "left_index": 4,
+          "left_p": 0.1,
+          "right_index": 5,
+          "right_p": 0.12
+        }
+      ],
+      "right_edge_delta": -0.001699182419549805,
+      "right_edge_near_hit": true,
+      "right_edge_pooled_ci95": 0.015792945672351993,
+      "right_edge_pooled_sem": 0.008057625343036732,
+      "right_edge_sign": -1,
+      "secondary_proximity_hit": true,
+      "sign_flip_detected": true,
+      "sign_pattern": [
+        1,
+        1,
+        1,
+        1,
+        1,
+        -1
+      ]
+    }
+  },
+  "primary_crossing_window_hit": true,
+  "q_top_ci95_curve_matrix": [
+    [
+      0.0008208830721364157,
+      0.001434964314091001,
+      0.006429649428821296,
+      0.0117820907297171,
+      0.016845817135589306,
+      0.020757477697108447
+    ],
+    [
+      0.0007493505221186082,
+      0.001499255122565452,
+      0.0023173225705045105,
+      0.0030989377391276015,
+      0.005956920221634319,
+      0.011558286814788297
+    ],
+    [
+      0.00105027631306212,
+      0.0018180184719692083,
+      0.0058794028604727926,
+      0.007719475030383777,
+      0.009645314636238295,
+      0.010762115912633192
+    ]
+  ],
+  "q_top_curve_matrix": [
+    [
+      0.999098283676874,
+      0.9977148201352075,
+      0.9927850941249303,
+      0.9789429861401755,
+      0.9475572767711822,
+      0.9100150577605717
+    ],
+    [
+      0.9991526818653894,
+      0.9974265119764539,
+      0.9959775821746342,
+      0.9950196729387556,
+      0.9897282391502744,
+      0.9740397189912343
+    ],
+    [
+      0.9985796574183873,
+      0.9961534663609095,
+      0.9912768003675674,
+      0.9867644531007798,
+      0.9811161301627992,
+      0.9757389014107841
+    ]
+  ],
+  "q_top_sem_curve_matrix": [
+    [
+      0.0004188178939471509,
+      0.0007321246500464291,
+      0.0032804333820516817,
+      0.006011270780467908,
+      0.008594804661014952,
+      0.010590549845463494
+    ],
+    [
+      0.00038232169495847355,
+      0.0007649260829415571,
+      0.0011823074339308726,
+      0.0015810906832283683,
+      0.003039245011037918,
+      0.005897085109585866
+    ],
+    [
+      0.0005358552617663878,
+      0.0009275604448822491,
+      0.0029996953369759148,
+      0.003938507668563152,
+      0.004921078896039947,
+      0.005490875465629179
+    ]
+  ],
+  "raw_crossing_window": {
+    "p_max": 0.11670422965955135,
+    "p_min": 0.013174623927971103
+  },
+  "recommended_server_window": {
+    "p_max": 0.11670422965955135,
+    "p_min": 0.013174623927971103,
+    "reason": "both_pairwise_gaps_cross_zero_interior",
+    "representative_p": 0.06493942679376123,
+    "step_reference": 0.020000000000000004
+  },
+  "right_edge_gap_signs": {
+    "3-4": -1,
+    "4-5": -1
+  },
+  "right_edge_gap_values": {
+    "3-4": {
+      "delta": -0.06402466123066264,
+      "pooled_ci95": 0.023758511620866816
+    },
+    "4-5": {
+      "delta": -0.001699182419549805,
+      "pooled_ci95": 0.015792945672351993
+    }
+  },
+  "secondary_proximity_hit": false,
+  "sem95_plot_path": "/home/DATA1/users/yuany/.single_shot/runs/3d_toric_pq_grid_q000_050_nd1_20260511_175054/q_0p0200/scan_result_multi_L_3d_toric_q0p0200_pq_grid_common_random_sem95.png",
+  "summary_path": "/home/DATA1/users/yuany/.single_shot/runs/3d_toric_pq_grid_q000_050_nd1_20260511_175054/q_0p0200/threshold_summary.json",
+  "syndrome_error_probability": 0.02
+}

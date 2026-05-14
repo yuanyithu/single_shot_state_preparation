@@ -16,6 +16,7 @@ from build_toric_code_examples import (
     build_toric_code_by_family,
     build_zero_syndrome_move_data_by_family,
 )
+from cluster_update import combine_cluster_summaries
 from main import run_disorder_average_simulation
 from mcmc_convergence_gate import (
     build_convergence_summary,
@@ -194,6 +195,8 @@ def _build_submit_config_from_args(args):
             args.max_effective_num_burn_in_sweeps is not None
             and args.max_effective_num_burn_in_sweeps < 1):
         raise ValueError("max_effective_num_burn_in_sweeps must be >= 1")
+    if args.cluster_budget_fraction_rho < 0.0:
+        raise ValueError("cluster_budget_fraction_rho must be >= 0")
 
     run_root = Path(args.run_root).expanduser().resolve()
     chunks_dir = run_root / "chunks"
@@ -259,6 +262,9 @@ def _build_submit_config_from_args(args):
             args.num_zero_syndrome_sweeps_per_cycle
         ),
         "winding_repeat_factor": int(args.winding_repeat_factor),
+        "cluster_update_enabled": not bool(args.disable_cluster_update),
+        "cluster_budget_fraction_rho": float(args.cluster_budget_fraction_rho),
+        "cluster_update_debug": bool(args.cluster_debug_assertions),
         "seed_base": int(args.seed_base),
         "burn_in_scaling_reference_num_qubits": int(
             args.burn_in_scaling_reference_num_qubits
@@ -347,6 +353,15 @@ def _build_chunk_tasks(config):
                     ),
                     "winding_repeat_factor": int(
                         config["winding_repeat_factor"]
+                    ),
+                    "cluster_update_enabled": bool(
+                        config["cluster_update_enabled"]
+                    ),
+                    "cluster_budget_fraction_rho": float(
+                        config["cluster_budget_fraction_rho"]
+                    ),
+                    "cluster_update_debug": bool(
+                        config["cluster_update_debug"]
                     ),
                     "code_family": str(config["code_family"]),
                     "common_random_disorder_across_p": bool(
@@ -464,6 +479,11 @@ def _build_manifest(
                 config["num_zero_syndrome_sweeps_per_cycle"]
             ),
             "winding_repeat_factor": config["winding_repeat_factor"],
+            "cluster_update_enabled": config["cluster_update_enabled"],
+            "cluster_budget_fraction_rho": (
+                config["cluster_budget_fraction_rho"]
+            ),
+            "cluster_update_debug": config["cluster_update_debug"],
             "seed_base": config["seed_base"],
             "burn_in_scaling_reference_num_qubits": (
                 config["burn_in_scaling_reference_num_qubits"]
@@ -598,6 +618,11 @@ def _run_chunk_task(task_data):
                 task_data["num_zero_syndrome_sweeps_per_cycle"]
             ),
             winding_repeat_factor=task_data["winding_repeat_factor"],
+            cluster_update_enabled=task_data["cluster_update_enabled"],
+            cluster_budget_fraction_rho=(
+                task_data["cluster_budget_fraction_rho"]
+            ),
+            cluster_update_debug=task_data["cluster_update_debug"],
             precomputed_syndrome_uniform_values_per_disorder=(
                 precomputed_syndrome_uniform_values_per_disorder
             ),
@@ -644,6 +669,13 @@ def _run_chunk_task(task_data):
             winding_repeat_factor=np.int64(
                 task_data["winding_repeat_factor"]
             ),
+            cluster_update_config_enabled=np.bool_(
+                task_data["cluster_update_enabled"]
+            ),
+            cluster_budget_fraction_rho_config=np.float64(
+                task_data["cluster_budget_fraction_rho"]
+            ),
+            cluster_update_debug=np.bool_(task_data["cluster_update_debug"]),
             common_random_disorder_across_p=np.bool_(
                 task_data["common_random_disorder_across_p"]
             ),
@@ -843,6 +875,7 @@ def _merge_outputs(
     num_chains_that_never_flipped_sector_per_disorder_tensor = None
     pt_min_swap_acceptance_rate_per_disorder_tensor = None
     pt_mean_swap_acceptance_rate_per_disorder_tensor = None
+    cluster_summary_list = []
 
     grouped_tasks = {}
     for task_data in task_data_list:
@@ -1189,6 +1222,30 @@ def _merge_outputs(
                         ] = loaded_chunk_result[
                             "pt_mean_swap_acceptance_rate_per_disorder"
                         ]
+                if "cluster_num_attempts" in loaded_chunk_result:
+                    cluster_summary_list.append({
+                        key: loaded_chunk_result[key]
+                        for key in (
+                            "cluster_update_enabled",
+                            "cluster_update_requested_enabled",
+                            "cluster_update_adaptive",
+                            "cluster_budget_fraction_rho",
+                            "cluster_num_attempts",
+                            "cluster_num_nonzero_moves",
+                            "cluster_total_wall_time",
+                            "cluster_wall_time_fraction",
+                            "cluster_nullity_mean",
+                            "cluster_nullity_median",
+                            "cluster_nullity_histogram",
+                            "cluster_move_fraction_mean",
+                            "cluster_by_temperature_attempts",
+                            "cluster_by_temperature_nonzero_rate",
+                            "cluster_by_temperature_mean_nullity",
+                            "cluster_by_temperature_mean_move_fraction",
+                            "cluster_by_temperature_wall_time",
+                            "cluster_controller_frozen",
+                        )
+                    })
 
         if total_loaded_num_disorders != num_disorder_samples_total:
             raise ValueError(
@@ -1344,6 +1401,8 @@ def _merge_outputs(
             logical_observable_mean_values_per_disorder_tensor
         ),
     }
+    if cluster_summary_list:
+        merged_result.update(combine_cluster_summaries(cluster_summary_list))
     if has_q0_diagnostics:
         merged_result["q0_start_sector_labels"] = q0_start_sector_labels
         merged_result["q0_mean_m_u_spread_linf_curve_matrix"] = (
@@ -1475,6 +1534,13 @@ def _merge_outputs(
             config["num_zero_syndrome_sweeps_per_cycle"]
         ),
         winding_repeat_factor=np.int64(config["winding_repeat_factor"]),
+        cluster_update_config_enabled=np.bool_(
+            config["cluster_update_enabled"]
+        ),
+        cluster_budget_fraction_rho_config=np.float64(
+            config["cluster_budget_fraction_rho"]
+        ),
+        cluster_update_debug=np.bool_(config["cluster_update_debug"]),
         common_random_disorder_across_p=np.bool_(
             config["common_random_disorder_across_p"]
         ),
@@ -1699,13 +1765,49 @@ def _submit_run(args):
         _log("All chunk outputs already present; skipping worker launch")
 
     _log("Merging chunk outputs")
-    _merge_outputs(
+    merged_result = _merge_outputs(
         config=config,
         task_data_list=task_data_list,
         output_path=config["final_output_path"],
         include_plot=True,
         plot_output_path=config["final_plot_path"],
     )
+    if "cluster_num_attempts" in merged_result:
+        manifest["final_outputs"]["cluster_summary"] = {
+            "cluster_update_enabled": bool(
+                merged_result["cluster_update_enabled"]
+            ),
+            "cluster_update_adaptive": bool(
+                merged_result["cluster_update_adaptive"]
+            ),
+            "cluster_budget_fraction_rho": float(
+                merged_result["cluster_budget_fraction_rho"]
+            ),
+            "cluster_num_attempts": int(
+                merged_result["cluster_num_attempts"]
+            ),
+            "cluster_num_nonzero_moves": int(
+                merged_result["cluster_num_nonzero_moves"]
+            ),
+            "cluster_total_wall_time": float(
+                merged_result["cluster_total_wall_time"]
+            ),
+            "cluster_wall_time_fraction": float(
+                merged_result["cluster_wall_time_fraction"]
+            ),
+            "cluster_nullity_mean": float(
+                merged_result["cluster_nullity_mean"]
+            ),
+            "cluster_nullity_median": float(
+                merged_result["cluster_nullity_median"]
+            ),
+            "cluster_move_fraction_mean": float(
+                merged_result["cluster_move_fraction_mean"]
+            ),
+            "cluster_controller_frozen": bool(
+                merged_result["cluster_controller_frozen"]
+            ),
+        }
     manifest["final_outputs"]["status"] = "completed"
     manifest["final_outputs"]["completed_at"] = _timestamp()
     _update_manifest_summary(manifest)
@@ -1755,6 +1857,9 @@ def _run_chunk_command(args):
             args.num_zero_syndrome_sweeps_per_cycle
         ),
         "winding_repeat_factor": int(args.winding_repeat_factor),
+        "cluster_update_enabled": not bool(args.disable_cluster_update),
+        "cluster_budget_fraction_rho": float(args.cluster_budget_fraction_rho),
+        "cluster_update_debug": bool(args.cluster_debug_assertions),
         "common_random_disorder_across_p": bool(
             args.common_random_disorder_across_p
         ),
@@ -1893,6 +1998,20 @@ def _build_parser():
         default=1,
     )
     common_submit_parser.add_argument(
+        "--disable-cluster-update",
+        action="store_true",
+        help="Disable the q>0 adaptive cluster update.",
+    )
+    common_submit_parser.add_argument(
+        "--cluster-budget-fraction-rho",
+        type=float,
+        default=0.05,
+    )
+    common_submit_parser.add_argument(
+        "--cluster-debug-assertions",
+        action="store_true",
+    )
+    common_submit_parser.add_argument(
         "--seed-base",
         type=int,
         required=True,
@@ -2028,6 +2147,19 @@ def _build_parser():
         "--winding-repeat-factor",
         type=int,
         default=1,
+    )
+    run_chunk_parser.add_argument(
+        "--disable-cluster-update",
+        action="store_true",
+    )
+    run_chunk_parser.add_argument(
+        "--cluster-budget-fraction-rho",
+        type=float,
+        default=0.05,
+    )
+    run_chunk_parser.add_argument(
+        "--cluster-debug-assertions",
+        action="store_true",
     )
     run_chunk_parser.add_argument(
         "--common-random-disorder-across-p",
