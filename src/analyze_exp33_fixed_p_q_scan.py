@@ -302,11 +302,12 @@ def _summarize_diagnostics(rows):
 
 def _write_readme(output_dir, analysis_result):
     lines = [
-        "# exp32 fixed p=0.0500 q scan, nd-2/nd-3",
+        "# exp33 fixed p=0.0500 q scan, corrected observable",
         "",
         f"- Status: `{analysis_result['status']}`.",
         "- Grid: fixed `p=0.0500`, `q=0.0000,0.0050,...,0.0750`, `L=3,4,5,6,7`.",
-        "- Pooling: independent nd-2 and nd-3 source runs, expected `2048` disorder per `(L,q)` after pooling.",
+        "- Pooling: independent nd-1, nd-2, and nd-3 source runs, expected `3072` disorder per `(L,q)` after pooling.",
+        "- Observable: corrected `c + eta + r(H_Z c) + r(H_Z eta)` with BP-LSD section diagnostics.",
         f"- Manifest summary: [`manifest_summary.json`](manifest_summary.json).",
         f"- Diagnostics summary: [`diagnostics_summary.json`](diagnostics_summary.json).",
     ]
@@ -323,7 +324,7 @@ def _write_readme(output_dir, analysis_result):
     Path(output_dir, "README.md").write_text("\n".join(lines), encoding="utf-8")
 
 
-def analyze_exp32(
+def analyze_exp33(
         output_dir,
         host_tags,
         lattice_sizes,
@@ -379,7 +380,7 @@ def analyze_exp32(
             point_output_dir = pooled_dir / f"L{int(lattice_size)}" / f"q_{q_tag}"
             point_output_stem = (
                 f"pooled_L{int(lattice_size)}_p{fixed_p_tag}_q{q_tag}_"
-                "exp32_nd23"
+                "exp33_corrected_observable_nd123"
             )
             pool_summary = pool_independent_runs(
                 input_paths=source_npz_paths,
@@ -466,11 +467,11 @@ def analyze_exp32(
 def main():
     parser = argparse.ArgumentParser(
         description=(
-            "Pool and plot exp32 fixed-p q scan results after remote collection."
+            "Pool and plot exp33 fixed-p q scan results after remote collection."
         )
     )
     parser.add_argument("--output-dir", required=True)
-    parser.add_argument("--host-tags", default="nd2,nd3")
+    parser.add_argument("--host-tags", default="nd1,nd2,nd3")
     parser.add_argument("--lattice-sizes", default="3,4,5,6,7")
     parser.add_argument(
         "--q-values",
@@ -482,12 +483,12 @@ def main():
     parser.add_argument("--fixed-p", type=float, default=0.0500)
     parser.add_argument(
         "--output-stem",
-        default="fixed_p050_q000_075_exp32_nd23_pooled",
+        default="fixed_p050_q000_075_exp33_corrected_observable_nd123_pooled",
     )
     parser.add_argument("--allow-partial", action="store_true")
     args = parser.parse_args()
 
-    result = analyze_exp32(
+    result = analyze_exp33(
         output_dir=args.output_dir,
         host_tags=[
             value.strip() for value in args.host_tags.split(",") if value.strip()

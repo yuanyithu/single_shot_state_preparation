@@ -40,6 +40,7 @@ from main import (
     _run_measurement_update_cycle,
 )
 from linear_section import build_linear_section
+from linear_section import apply_section, build_syndrome_representative_section
 
 
 def _attempt_replica_swaps(
@@ -119,7 +120,8 @@ def run_parallel_tempering_measurement(
         record_all_temperature_trajectories=False,
         cluster_update_enabled=True,
         cluster_budget_fraction_rho=0.05,
-        cluster_update_debug=False):
+        cluster_update_debug=False,
+        section_data=None):
     """
     在 p 温度 ladder 上做 parallel tempering 采样。
 
@@ -163,6 +165,18 @@ def run_parallel_tempering_measurement(
             parity_check_matrix=parity_check_matrix,
             linear_section_data=linear_section_data,
         )
+    if section_data is None:
+        section_data = build_syndrome_representative_section(
+            parity_check_matrix
+        )
+    disorder_syndrome_bits = (
+        parity_check_matrix.astype(np.uint8)
+        @ disorder_data_error_bits.astype(np.uint8)
+    ) % 2
+    disorder_syndrome_representative_bits = apply_section(
+        disorder_syndrome_bits.astype(bool),
+        section_data,
+    )
     num_zero_syndrome_proposals = _count_zero_syndrome_proposals(
         zero_syndrome_move_data=zero_syndrome_move_data,
         kernel_basis=kernel_basis,
@@ -403,6 +417,12 @@ def run_parallel_tempering_measurement(
                 logical_observable_sum_values=(
                     logical_observable_sum_per_temperature[temperature_index]
                 ),
+                parity_check_matrix=parity_check_matrix,
+                section_data=section_data,
+                disorder_data_error_bits=disorder_data_error_bits,
+                disorder_syndrome_representative_bits=(
+                    disorder_syndrome_representative_bits
+                ),
             )
         if diagnostic_config["record_measurement_trajectories"]:
             for diagnostic_slot, temperature_index in enumerate(
@@ -413,6 +433,12 @@ def run_parallel_tempering_measurement(
                 ] = _compute_logical_observable_values(
                     current_chain_bits=chain_bits_list[temperature_index],
                     logical_observable_masks=logical_observable_masks,
+                    parity_check_matrix=parity_check_matrix,
+                    section_data=section_data,
+                    disorder_data_error_bits=disorder_data_error_bits,
+                    disorder_syndrome_representative_bits=(
+                        disorder_syndrome_representative_bits
+                    ),
                 )
 
     m_u_values_per_temperature = (

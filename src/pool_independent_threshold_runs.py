@@ -323,6 +323,69 @@ def _build_pooled_result(input_paths):
             for run in loaded_runs
         )
     )
+    if "section_apply_count" in first:
+        section_apply_count = sum(
+            int(_as_python_scalar(run["section_apply_count"]))
+            for run in loaded_runs
+        )
+        section_cache_hit_count = sum(
+            int(_as_python_scalar(run["section_cache_hit_count"]))
+            for run in loaded_runs
+        )
+        pooled["section_apply_count"] = np.int64(section_apply_count)
+        pooled["section_cache_hit_count"] = np.int64(section_cache_hit_count)
+        pooled["section_cache_hit_rate"] = np.float64(
+            0.0
+            if section_apply_count == 0
+            else section_cache_hit_count / section_apply_count
+        )
+        pooled["section_cache_size"] = np.int64(
+            sum(
+                int(_as_python_scalar(run["section_cache_size"]))
+                for run in loaded_runs
+            )
+        )
+        pooled["section_fallback_count"] = np.int64(
+            sum(
+                int(_as_python_scalar(run["section_fallback_count"]))
+                for run in loaded_runs
+            )
+        )
+        pooled["section_decoder_failure_count"] = np.int64(
+            sum(
+                int(_as_python_scalar(run["section_decoder_failure_count"]))
+                for run in loaded_runs
+            )
+        )
+        section_backend_names = sorted(
+            {
+                str(_as_python_scalar(run["section_backend_name"]))
+                for run in loaded_runs
+            }
+        )
+        pooled["section_backend_names"] = np.asarray(section_backend_names)
+        pooled["section_backend_name"] = np.array(
+            section_backend_names[0]
+            if len(section_backend_names) == 1
+            else ",".join(section_backend_names)
+        )
+        ldpc_import_errors = sorted(
+            {
+                str(_as_python_scalar(run["section_ldpc_import_error"]))
+                for run in loaded_runs
+                if str(_as_python_scalar(run["section_ldpc_import_error"]))
+            }
+        )
+        pooled["section_ldpc_import_error"] = np.array(
+            "; ".join(ldpc_import_errors)
+        )
+        pooled["section_num_chunks"] = np.int64(
+            sum(
+                int(_as_python_scalar(run["section_num_chunks"]))
+                for run in loaded_runs
+                if "section_num_chunks" in run
+            )
+        )
     _recompute_curve_fields(pooled)
     return pooled
 

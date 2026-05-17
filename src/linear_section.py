@@ -1,6 +1,152 @@
 import numpy as np
 
 
+class SyndromeRepresentativeSection:
+    """
+    Syndrome-to-chain representative map r: im(H_Z) -> C^1.
+
+    BP-LSD is used when available.  The Gaussian-elimination section remains a
+    strict fallback and is also used to validate or repair failed decoder output.
+    """
+
+    def __init__(self, parity_check_matrix, prefer_bplsd=True):
+        self.parity_check_matrix = np.asarray(parity_check_matrix, dtype=bool)
+        self.parity_check_matrix_uint8 = self.parity_check_matrix.astype(
+            np.uint8
+        )
+        self.num_checks, self.num_qubits = self.parity_check_matrix.shape
+        self.fallback_linear_section_data = build_linear_section(
+            self.parity_check_matrix
+        )
+        self.decoder = None
+        self.backend_name = "linear_elimination_fallback"
+        self.fallback_count = 0
+        self.decoder_failure_count = 0
+        self.ldpc_import_error = None
+        self.apply_count = 0
+        self.cache_hit_count = 0
+        self.cache = {}
+
+        if prefer_bplsd:
+            self._try_build_bplsd_decoder()
+
+    def _try_build_bplsd_decoder(self):
+        try:
+            try:
+                from ldpc import BpLsdDecoder
+            except ImportError:
+                from ldpc.bplsd_decoder import BpLsdDecoder
+        except Exception as exc:  # pragma: no cover - optional dependency
+            self.ldpc_import_error = repr(exc)
+            return
+
+        decoder_kwargs_candidates = [
+            {
+                "error_rate": 0.05,
+                "bp_method": "product_sum",
+                "max_iter": max(10, self.num_qubits),
+                "schedule": "serial",
+                "lsd_method": "lsd_cs",
+                "lsd_order": 0,
+            },
+            {
+                "error_rate": 0.05,
+                "bp_method": "ms",
+                "max_iter": max(10, self.num_qubits),
+                "lsd_method": "lsd_cs",
+                "lsd_order": 0,
+            },
+            {},
+        ]
+        for decoder_kwargs in decoder_kwargs_candidates:
+            try:
+                self.decoder = BpLsdDecoder(
+                    self.parity_check_matrix.astype(np.uint8),
+                    **decoder_kwargs,
+                )
+                self.backend_name = "bplsd"
+                return
+            except Exception as exc:  # pragma: no cover - version dependent
+                self.ldpc_import_error = repr(exc)
+        self.decoder = None
+
+    def _validate_chain(self, syndrome_bits, chain_bits):
+        recovered_syndrome = (
+            self.parity_check_matrix_uint8 @ chain_bits.astype(np.uint8)
+        ) % 2
+        return np.array_equal(recovered_syndrome.astype(bool), syndrome_bits)
+
+    def _fallback(self, syndrome_bits):
+        self.fallback_count += 1
+        chain_bits = apply_linear_section(
+            syndrome_bits,
+            self.fallback_linear_section_data,
+        )
+        if not self._validate_chain(syndrome_bits, chain_bits):
+            raise ValueError("section fallback failed: H_Z r(s) != s")
+        return chain_bits
+
+    def apply(self, syndrome_bits):
+        syndrome_bits = np.asarray(syndrome_bits, dtype=bool)
+        if syndrome_bits.shape != (self.num_checks,):
+            raise ValueError(
+                f"syndrome_bits must have shape ({self.num_checks},)"
+            )
+        self.apply_count += 1
+        cache_key = np.packbits(syndrome_bits.astype(np.uint8)).tobytes()
+        cached_chain_bits = self.cache.get(cache_key)
+        if cached_chain_bits is not None:
+            self.cache_hit_count += 1
+            return cached_chain_bits.copy()
+
+        if self.decoder is None:
+            chain_bits = self._fallback(syndrome_bits)
+            self.cache[cache_key] = chain_bits.copy()
+            return chain_bits
+
+        try:
+            decoded = self.decoder.decode(syndrome_bits.astype(np.uint8))
+            chain_bits = np.asarray(decoded, dtype=np.uint8).reshape(-1) % 2
+            if chain_bits.shape != (self.num_qubits,):
+                raise ValueError("BpLsdDecoder returned wrong vector length")
+            chain_bits = chain_bits.astype(bool)
+            if self._validate_chain(syndrome_bits, chain_bits):
+                self.cache[cache_key] = chain_bits.copy()
+                return chain_bits
+        except Exception:
+            pass
+
+        self.decoder_failure_count += 1
+        chain_bits = self._fallback(syndrome_bits)
+        self.cache[cache_key] = chain_bits.copy()
+        return chain_bits
+
+    def stats(self):
+        return {
+            "backend_name": self.backend_name,
+            "apply_count": int(self.apply_count),
+            "cache_hit_count": int(self.cache_hit_count),
+            "cache_size": int(len(self.cache)),
+            "fallback_count": int(self.fallback_count),
+            "decoder_failure_count": int(self.decoder_failure_count),
+            "ldpc_import_error": self.ldpc_import_error,
+        }
+
+
+def build_syndrome_representative_section(parity_check_matrix,
+                                          prefer_bplsd=True):
+    return SyndromeRepresentativeSection(
+        parity_check_matrix=parity_check_matrix,
+        prefer_bplsd=prefer_bplsd,
+    )
+
+
+def apply_section(syndrome_bits, section_data):
+    if isinstance(section_data, SyndromeRepresentativeSection):
+        return section_data.apply(syndrome_bits)
+    return apply_linear_section(syndrome_bits, section_data)
+
+
 def build_linear_section(parity_check_matrix):
     """
     对 H_Z 做 GF(2) 高斯消元 + 列置换，得到 E · H_Z · Π = [[I_ρ, A], [0, 0]]。

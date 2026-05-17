@@ -13,7 +13,11 @@ from build_toric_code_examples import (
     build_3d_toric_code,
     build_3d_toric_zero_syndrome_move_data,
 )
-from linear_section import build_linear_section
+from linear_section import (
+    apply_section,
+    build_linear_section,
+    build_syndrome_representative_section,
+)
 from main import (
     _build_kernel_basis_from_linear_section,
     _build_q0_initial_chain_bits_per_start,
@@ -36,6 +40,29 @@ from preprocessing import (
 
 
 DEFAULT_EXACT_ENUMERATION_CHUNK_SIZE = 1 << 18
+
+
+def _compute_closed_logical_chain_chunk(
+        parity_check_matrix_uint8,
+        chain_bits_chunk,
+        disorder_data_error_bits,
+        section_data,
+        disorder_syndrome_representative_bits):
+    chain_syndrome_bits_chunk = (
+        chain_bits_chunk.astype(np.uint8) @ parity_check_matrix_uint8.T
+    ) % 2
+    chain_syndrome_representatives = np.empty_like(chain_bits_chunk)
+    for row_index, chain_syndrome_bits in enumerate(chain_syndrome_bits_chunk):
+        chain_syndrome_representatives[row_index] = apply_section(
+            chain_syndrome_bits.astype(bool),
+            section_data,
+        )
+    return (
+        chain_bits_chunk
+        ^ disorder_data_error_bits[None, :]
+        ^ chain_syndrome_representatives
+        ^ disorder_syndrome_representative_bits[None, :]
+    )
 
 
 def _logsumexp(log_values):
@@ -101,6 +128,14 @@ def compute_exact_logical_observable_means(
     num_checks, num_qubits = parity_check_matrix.shape
     parity_check_matrix_uint8 = parity_check_matrix.astype(np.uint8)
     logical_observable_masks_uint8 = logical_observable_masks.astype(np.uint8)
+    section_data = build_syndrome_representative_section(parity_check_matrix)
+    disorder_syndrome_bits = (
+        parity_check_matrix_uint8 @ disorder_data_error_bits.astype(np.uint8)
+    ) % 2
+    disorder_syndrome_representative_bits = apply_section(
+        disorder_syndrome_bits.astype(bool),
+        section_data,
+    )
 
     max_log_weight = -np.inf
     for chain_bits_chunk in _iter_chain_bit_chunks(num_qubits, chunk_size):
@@ -163,8 +198,18 @@ def compute_exact_logical_observable_means(
             )
         )
         scaled_weights = np.exp(log_weights - max_log_weight)
+        closed_logical_chain_chunk = _compute_closed_logical_chain_chunk(
+            parity_check_matrix_uint8=parity_check_matrix_uint8,
+            chain_bits_chunk=chain_bits_chunk,
+            disorder_data_error_bits=disorder_data_error_bits,
+            section_data=section_data,
+            disorder_syndrome_representative_bits=(
+                disorder_syndrome_representative_bits
+            ),
+        )
         logical_parity_bits = (
-            chain_bits_chunk_uint8 @ logical_observable_masks_uint8.T
+            closed_logical_chain_chunk.astype(np.uint8)
+            @ logical_observable_masks_uint8.T
         ) % 2
         logical_observable_values = (
             1.0 - 2.0 * logical_parity_bits.astype(np.float64)
@@ -215,6 +260,14 @@ def compute_exact_logical_sector_weights(
         :num_primitive_logical_qubits
     ].astype(np.uint8)
     num_signatures = 1 << num_primitive_logical_qubits
+    section_data = build_syndrome_representative_section(parity_check_matrix)
+    disorder_syndrome_bits = (
+        parity_check_matrix_uint8 @ disorder_data_error_bits.astype(np.uint8)
+    ) % 2
+    disorder_syndrome_representative_bits = apply_section(
+        disorder_syndrome_bits.astype(bool),
+        section_data,
+    )
 
     max_log_weight = -np.inf
     for chain_bits_chunk in _iter_chain_bit_chunks(num_qubits, chunk_size):
@@ -278,8 +331,18 @@ def compute_exact_logical_sector_weights(
             )
         )
         scaled_weights = np.exp(log_weights - max_log_weight)
+        closed_logical_chain_chunk = _compute_closed_logical_chain_chunk(
+            parity_check_matrix_uint8=parity_check_matrix_uint8,
+            chain_bits_chunk=chain_bits_chunk,
+            disorder_data_error_bits=disorder_data_error_bits,
+            section_data=section_data,
+            disorder_syndrome_representative_bits=(
+                disorder_syndrome_representative_bits
+            ),
+        )
         primitive_logical_parity_bits = (
-            chain_bits_chunk_uint8 @ primitive_masks_uint8.T
+            closed_logical_chain_chunk.astype(np.uint8)
+            @ primitive_masks_uint8.T
         ) % 2
         signature_indices = primitive_logical_parity_bits.astype(
             np.int64

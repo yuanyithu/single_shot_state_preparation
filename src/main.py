@@ -23,9 +23,15 @@ from build_toric_code_examples import (
     build_toric_code_by_family,
     build_zero_syndrome_move_data_by_family,
 )
-from linear_section import apply_linear_section, build_linear_section
+from linear_section import (
+    apply_linear_section,
+    apply_section,
+    build_linear_section,
+    build_syndrome_representative_section,
+)
 from mcmc import (
     accumulate_logical_observables,
+    compute_logical_observable_values,
     draw_disorder_sample,
     draw_disorder_sample_from_uniform_values,
     initialize_mcmc_state,
@@ -1018,12 +1024,20 @@ def _run_one_zero_syndrome_sweep(
 
 def _compute_logical_observable_values(
         current_chain_bits,
-        logical_observable_masks):
-    masked_bits = logical_observable_masks & current_chain_bits
-    parity_bits = np.bitwise_xor.reduce(masked_bits, axis=1)
-    return (1 - 2 * parity_bits.astype(np.int8)).astype(
-        np.int8,
-        copy=False,
+        logical_observable_masks,
+        parity_check_matrix=None,
+        section_data=None,
+        disorder_data_error_bits=None,
+        disorder_syndrome_representative_bits=None):
+    return compute_logical_observable_values(
+        current_chain_bits=current_chain_bits,
+        logical_observable_masks=logical_observable_masks,
+        parity_check_matrix=parity_check_matrix,
+        section_data=section_data,
+        disorder_data_error_bits=disorder_data_error_bits,
+        disorder_syndrome_representative_bits=(
+            disorder_syndrome_representative_bits
+        ),
     )
 
 
@@ -1251,9 +1265,10 @@ def _build_q0_start_sector_labels(
 
 def _build_q0_initial_chain_bits_per_start(
         observed_syndrome_bits,
-        linear_section_data,
-        zero_syndrome_move_data,
-        q0_num_start_chains):
+        section_data=None,
+        zero_syndrome_move_data=None,
+        q0_num_start_chains=None,
+        linear_section_data=None):
     """
     用 section representative 加上两条独立 kernel winding loop 生成 q=0 初态。
     """
@@ -1261,6 +1276,12 @@ def _build_q0_initial_chain_bits_per_start(
         raise ValueError(
             "zero_syndrome_move_data is required for q=0 multi-start chains"
         )
+    if section_data is None:
+        section_data = linear_section_data
+    if section_data is None:
+        raise ValueError("section_data is required")
+    if q0_num_start_chains is None:
+        raise ValueError("q0_num_start_chains is required")
 
     start_sector_generators = zero_syndrome_move_data[
         "start_sector_generators"
@@ -1270,9 +1291,9 @@ def _build_q0_initial_chain_bits_per_start(
         q0_num_start_chains=q0_num_start_chains,
         num_start_sector_generators=num_start_sector_generators,
     )
-    section_representative = apply_linear_section(
+    section_representative = apply_section(
         observed_syndrome_bits,
-        linear_section_data,
+        section_data,
     )
     initial_chain_bits_per_start = np.repeat(
         section_representative[None, :],
@@ -1303,6 +1324,36 @@ def _compute_q0_diagnostic_spreads(
         - np.min(q0_q_top_values_per_start)
     )
     return q0_m_u_spread_linf, q0_q_top_spread
+
+
+def _section_stats_result(section_data):
+    if hasattr(section_data, "stats"):
+        stats = section_data.stats()
+    else:
+        stats = {
+            "backend_name": "linear_section_compat",
+            "apply_count": 0,
+            "cache_hit_count": 0,
+            "cache_size": 0,
+            "fallback_count": 0,
+            "decoder_failure_count": 0,
+            "ldpc_import_error": None,
+        }
+    return {
+        "section_backend_name": np.array(str(stats["backend_name"])),
+        "section_apply_count": np.int64(stats["apply_count"]),
+        "section_cache_hit_count": np.int64(stats["cache_hit_count"]),
+        "section_cache_size": np.int64(stats["cache_size"]),
+        "section_fallback_count": np.int64(stats["fallback_count"]),
+        "section_decoder_failure_count": np.int64(
+            stats["decoder_failure_count"]
+        ),
+        "section_ldpc_import_error": np.array(
+            "" if stats["ldpc_import_error"] is None else str(
+                stats["ldpc_import_error"]
+            )
+        ),
+    }
 
 
 def _resolve_num_start_chains(q0_num_start_chains, num_start_chains):
@@ -1356,7 +1407,8 @@ def _run_parallel_tempering_single_chain(
         pt_swap_attempt_every_num_sweeps=1,
         cluster_update_enabled=True,
         cluster_budget_fraction_rho=0.05,
-        cluster_update_debug=False):
+        cluster_update_debug=False,
+        section_data=None):
     from mcmc_parallel_tempering import run_parallel_tempering_measurement
 
     num_temperatures = int(len(data_error_probability_ladder))
@@ -1391,6 +1443,7 @@ def _run_parallel_tempering_single_chain(
         cluster_update_enabled=cluster_update_enabled,
         cluster_budget_fraction_rho=cluster_budget_fraction_rho,
         cluster_update_debug=cluster_update_debug,
+        section_data=section_data,
     )
     cold_index = 0
     acceptance_rate = _compute_total_acceptance_rate_from_counts(
@@ -1514,7 +1567,8 @@ def _run_single_disorder_measurement(
         return_diagnostics=False,
         cluster_update_enabled=True,
         cluster_budget_fraction_rho=0.05,
-        cluster_update_debug=False):
+        cluster_update_debug=False,
+        section_data=None):
     """
     对固定的 (s, eta) 运行一次 MCMC，返回 (m_u_values, acceptance_rate)。
     """
@@ -1543,6 +1597,18 @@ def _run_single_disorder_measurement(
             parity_check_matrix=parity_check_matrix,
             linear_section_data=linear_section_data,
         )
+    if section_data is None:
+        section_data = build_syndrome_representative_section(
+            parity_check_matrix
+        )
+    disorder_syndrome_bits = (
+        parity_check_matrix.astype(np.uint8)
+        @ disorder_data_error_bits.astype(np.uint8)
+    ) % 2
+    disorder_syndrome_representative_bits = apply_section(
+        disorder_syndrome_bits.astype(bool),
+        section_data,
+    )
     if syndrome_error_probability == 0.0 and initial_chain_bits is not None:
         initial_syndrome_bits = (
             parity_check_matrix.astype(np.uint8)
@@ -1756,6 +1822,12 @@ def _run_single_disorder_measurement(
             current_chain_bits=current_chain_bits,
             logical_observable_masks=logical_observable_masks,
             logical_observable_sum_values=logical_observable_sum_values,
+            parity_check_matrix=parity_check_matrix,
+            section_data=section_data,
+            disorder_data_error_bits=disorder_data_error_bits,
+            disorder_syndrome_representative_bits=(
+                disorder_syndrome_representative_bits
+            ),
         )
         total_single_bit_accepted_count += (
             measurement_single_bit_accepted_count
@@ -1779,6 +1851,12 @@ def _run_single_disorder_measurement(
             logical_observable_values = _compute_logical_observable_values(
                 current_chain_bits=current_chain_bits,
                 logical_observable_masks=logical_observable_masks,
+                parity_check_matrix=parity_check_matrix,
+                section_data=section_data,
+                disorder_data_error_bits=disorder_data_error_bits,
+                disorder_syndrome_representative_bits=(
+                    disorder_syndrome_representative_bits
+                ),
             )
             logical_observable_values_per_measurement[
                 measurement_index
@@ -2008,6 +2086,9 @@ def run_disorder_average_simulation(
         parity_check_matrix
     )
     linear_section_data = build_linear_section(parity_check_matrix)
+    syndrome_representative_section = build_syndrome_representative_section(
+        parity_check_matrix
+    )
     logical_observable_masks = build_logical_observable_masks(
         parity_check_matrix=parity_check_matrix,
         dual_logical_z_basis=dual_logical_z_basis,
@@ -2078,7 +2159,7 @@ def run_disorder_average_simulation(
             and zero_syndrome_move_data is not None):
         q0_start_sector_labels = _build_q0_initial_chain_bits_per_start(
             observed_syndrome_bits=np.zeros(num_checks, dtype=bool),
-            linear_section_data=linear_section_data,
+            section_data=syndrome_representative_section,
             zero_syndrome_move_data=zero_syndrome_move_data,
             q0_num_start_chains=resolved_num_start_chains,
         )[1]
@@ -2123,7 +2204,7 @@ def run_disorder_average_simulation(
             q_positive_start_sector_labels = (
                 _build_q0_initial_chain_bits_per_start(
                     observed_syndrome_bits=np.zeros(num_checks, dtype=bool),
-                    linear_section_data=linear_section_data,
+                    section_data=syndrome_representative_section,
                     zero_syndrome_move_data=zero_syndrome_move_data,
                     q0_num_start_chains=resolved_num_start_chains,
                 )[1]
@@ -2222,7 +2303,7 @@ def run_disorder_average_simulation(
                 _,
             ) = _build_q0_initial_chain_bits_per_start(
                 observed_syndrome_bits=observed_syndrome_bits,
-                linear_section_data=linear_section_data,
+                section_data=syndrome_representative_section,
                 zero_syndrome_move_data=zero_syndrome_move_data,
                 q0_num_start_chains=resolved_num_start_chains,
             )
@@ -2303,20 +2384,17 @@ def run_disorder_average_simulation(
             )
         else:
             if zero_syndrome_move_data is None:
-                section_representative = apply_linear_section(
-                    observed_syndrome_bits,
-                    linear_section_data,
+                initial_chain_bits_per_start = np.zeros(
+                    (1, num_qubits),
+                    dtype=bool,
                 )
-                initial_chain_bits_per_start = section_representative[
-                    None, :
-                ]
             else:
                 (
                     initial_chain_bits_per_start,
                     _,
                 ) = _build_q0_initial_chain_bits_per_start(
-                    observed_syndrome_bits=observed_syndrome_bits,
-                    linear_section_data=linear_section_data,
+                    observed_syndrome_bits=np.zeros(num_checks, dtype=bool),
+                    section_data=syndrome_representative_section,
                     zero_syndrome_move_data=zero_syndrome_move_data,
                     q0_num_start_chains=resolved_num_start_chains,
                 )
@@ -2436,6 +2514,7 @@ def run_disorder_average_simulation(
                                 winding_repeat_factor=diagnostic_config[
                                     "winding_repeat_factor"
                                 ],
+                                section_data=syndrome_representative_section,
                             )
                         )
                         pt_swap_acceptance_rates = np.asarray(
@@ -2508,6 +2587,7 @@ def run_disorder_average_simulation(
                                 cluster_budget_fraction_rho
                             ),
                             cluster_update_debug=cluster_update_debug,
+                            section_data=syndrome_representative_section,
                         )
                     cluster_summary_list.append({
                         key: measurement_result[key]
@@ -2714,6 +2794,7 @@ def run_disorder_average_simulation(
             "q0_q_top_spread_per_disorder": q0_q_top_spread_per_disorder,
         }
         result.update(cluster_summary)
+        result.update(_section_stats_result(syndrome_representative_section))
         return result
 
     result = {
@@ -2733,6 +2814,7 @@ def run_disorder_average_simulation(
         ),
     }
     result.update(cluster_summary)
+    result.update(_section_stats_result(syndrome_representative_section))
     if q_positive_start_sector_labels is not None:
         result["start_sector_labels"] = q_positive_start_sector_labels
         result["num_start_chains"] = np.int64(resolved_num_start_chains)
