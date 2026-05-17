@@ -2307,3 +2307,126 @@ HOST_RUN_IDS=3d_toric_exp32_fixed_p050_q000_075_L34567_20260514_140000_nd2,3d_to
 ```
 
 允许 partial 回收；分析脚本会把已完成的两节点 `(L,q)` 池化到 `pooled/`，并在某个 L 的 16 个 q 都齐全时更新 fixed-p q 曲线和 gap 图。最终完成后再补充数值摘要、诊断 summary 和结论。
+
+## 2026-05-17 固定 `p=0.0500` 的 q 方向长扫描 `exp32` 完成
+
+摘要：
+- 做什么：回收并池化 `exp32`，固定 `p=0.0500`，`q=0.0000,0.0050,...,0.0750`，`L=3,4,5,6,7`。
+- 完成状态：`nd-2` 和 `nd-3` 各 `80/80` 个 `(L,q)` 子 run 完成；两节点合计 `160/160` manifest，`failed_chunks=0`、`pending_chunks=0`。
+- 样本：每个 `(L,q)` 池化 `2048` disorder。
+- 主要结论：没有看到五尺寸共同 q-threshold。`L3-L4` gap 在 `q≈0.0182` 翻号，而更大尺寸 pair 的翻号靠近 `q=0.0004~0.0074`，彼此明显不同步；同时 q>0 convergence gate 仅 `2/75` 通过。因此本轮更像有限尺寸 drift 与 large-L/q>0 mixing 限制的高统计诊断，不应宣称固定 `p=0.0500` 的 clean q-threshold。
+
+### 运行与产物
+
+本地目录：
+
+```text
+data/3d_toric_code/with_measurement_noise/exp32_fixed_p050_q000_075_L34567_20260514_nd23
+```
+
+主看图：
+
+- [fixed p=0.0500 q scan q_top](data/3d_toric_code/with_measurement_noise/exp32_fixed_p050_q000_075_L34567_20260514_nd23/analysis/fixed_p050_q000_075_exp32_nd23_pooled_sem95.png)
+- [fixed p=0.0500 q scan pairwise gaps](data/3d_toric_code/with_measurement_noise/exp32_fixed_p050_q000_075_L34567_20260514_nd23/analysis/fixed_p050_q000_075_exp32_nd23_pooled_gap_ci95.png)
+- [machine-readable fixed-p summary](data/3d_toric_code/with_measurement_noise/exp32_fixed_p050_q000_075_L34567_20260514_nd23/analysis/fixed_p050_q000_075_exp32_nd23_pooled_summary.json)
+- [diagnostics summary](data/3d_toric_code/with_measurement_noise/exp32_fixed_p050_q000_075_L34567_20260514_nd23/diagnostics_summary.json)
+- [manifest summary](data/3d_toric_code/with_measurement_noise/exp32_fixed_p050_q000_075_L34567_20260514_nd23/manifest_summary.json)
+
+远端 run：
+
+```text
+nd-2: 3d_toric_exp32_fixed_p050_q000_075_L34567_20260514_140000_nd2
+nd-3: 3d_toric_exp32_fixed_p050_q000_075_L34567_20260514_140000_nd3
+```
+
+本地下载目录大小约 `1.3G`。图文件检查为有效 PNG，尺寸均为 `1680x1000`。
+
+### 数值摘要
+
+`p=0.0500`，每个点 `2048` disorder；gap 定义为
+`q_top(Lsmall)-q_top(Llarge)`，below-threshold 方向应为负。
+
+```text
+q      L3       L4       L5       L6       L7       L3-L4    L4-L5    L5-L6    L6-L7
+0.000  0.99940  1.00000  0.99970  0.99996  1.00000  -0.00060  +0.00030  -0.00026  -0.00004
+0.005  0.99919  0.99970  0.99982  0.99990  0.99948  -0.00050  -0.00012  -0.00008  +0.00042
+0.010  0.99845  0.99903  0.99873  0.99865  0.99814  -0.00058  +0.00031  +0.00008  +0.00051
+0.015  0.99726  0.99775  0.99729  0.99638  0.99581  -0.00049  +0.00047  +0.00091  +0.00057
+0.020  0.99577  0.99549  0.99484  0.99288  0.99235  +0.00028  +0.00064  +0.00196  +0.00054
+0.025  0.99260  0.99114  0.99043  0.98731  0.98643  +0.00146  +0.00071  +0.00312  +0.00088
+0.030  0.98917  0.98545  0.98301  0.97875  0.97826  +0.00372  +0.00244  +0.00427  +0.00049
+0.035  0.98437  0.97977  0.97650  0.96978  0.96935  +0.00460  +0.00328  +0.00671  +0.00044
+0.040  0.97871  0.97317  0.96691  0.95603  0.95350  +0.00554  +0.00626  +0.01088  +0.00253
+0.045  0.97143  0.96172  0.95259  0.94256  0.93930  +0.00971  +0.00913  +0.01003  +0.00325
+0.050  0.96212  0.94839  0.93846  0.92628  0.92227  +0.01373  +0.00993  +0.01218  +0.00400
+0.055  0.95549  0.93421  0.92440  0.90952  0.90132  +0.02127  +0.00982  +0.01488  +0.00820
+0.060  0.94567  0.91967  0.90438  0.88930  0.87960  +0.02599  +0.01530  +0.01508  +0.00970
+0.065  0.93273  0.90677  0.88572  0.86655  0.85307  +0.02597  +0.02105  +0.01917  +0.01348
+0.070  0.92103  0.89101  0.86702  0.84344  0.82796  +0.03002  +0.02400  +0.02357  +0.01548
+0.075  0.90706  0.87346  0.84482  0.81855  0.80275  +0.03360  +0.02864  +0.02627  +0.01580
+```
+
+pairwise gap 翻号：
+
+```text
+L3-L4: q≈0.0182
+L4-L5: q≈0.0036 and q≈0.0064, very small noisy double sign change
+L5-L6: q≈0.0074
+L6-L7: q≈0.0004
+```
+
+这组 crossing 不形成共同点。特别是 `L6-L7` 几乎贴近 `q=0`，而 `L3-L4` 到 `q≈0.018` 才翻号；这比统计误差能自然解释的“同一个 crossing”要分散得多。
+
+### 诊断
+
+q=0 multi-start spread：
+
+```text
+passed = 5 / 5
+max mean_q_top_spread = 0.00033
+```
+
+q>0 strict convergence gate：
+
+```text
+passed = 2 / 75
+max mean_q_top_spread = 0.0265
+max R-hat = 1.2223
+min ESS = 5.39
+min PT min swap acceptance = 0.0
+```
+
+仅通过的 q>0 点：
+
+```text
+L=4,q=0.0150: mean_q_top_spread≈0.00104, R-hat≈1.0009, ESS≈551, PT min swap≈2.74e-4
+L=4,q=0.0200: mean_q_top_spread≈0.00162, R-hat≈1.0021, ESS≈302, PT min swap≈2.81e-4
+```
+
+最差 spread 主要集中在 large-L/high-q：
+
+```text
+L=7,q=0.0750: spread≈0.0265, ESS≈42.4, PT min swap=0
+L=7,q=0.0700: spread≈0.0249, ESS≈56.2, PT min swap=0
+L=6,q=0.0750: spread≈0.0247, ESS≈50.7, PT min swap=0
+L=7,q=0.0650: spread≈0.0233, ESS≈13.0, PT min swap=0
+```
+
+因此，尽管 disorder 数已经比 `exp31` 大很多，large-L 的 q>0 mixing 仍然不足。当前图能说明 q 方向上很快进入大码更差的区域，但不能作为可靠的 asymptotic threshold 定值。
+
+### 判读
+
+固定 `p=0.0500` 时，`q_top` 随 q 增大单调下降且尺寸越大下降越快；从 `q≈0.02` 起所有相邻 gap 基本为正，即大尺寸 `q_top` 更低。按方向判读，这已经在 high-q side。
+
+但 `q=0` 附近的更大尺寸 pair 已经出现非常小的翻号/回翻，说明这里受有限尺寸和接近饱和的 `q_top≈1` 平台影响很大。`L3-L4` 给出的 `q≈0.0182` 不能被拿来代表 `L=3..7` 的共同 crossing；更稳妥的结论是：在 `p=0.05` 下，如果存在 q-threshold，本轮可见有限尺寸 crossing 也非常靠近 `q=0`，而现有 PT7/单 replica 设置不足以支撑 large-L 的定量外推。
+
+后续若要继续，应先改善 q>0 mixing，而不是只堆 disorder：
+
+```text
+fixed p = 0.0500
+focus q = 0.0000~0.0250
+L = 4,5,6,7
+num_replicas_per_start >= 2
+pt_num_temperatures = 11 or 13
+先小 disorder pilot，要求 PT min swap 不再贴 0、ESS/R-hat 大面积通过，再扩大 disorder。
+```

@@ -1,0 +1,18 @@
+{
+  "complete_lattices_for_plot": [
+    3,
+    4,
+    5,
+    6,
+    7
+  ],
+  "diagnostics_summary_path": "/Users/yuan/Desktop/sync/project D/data/3d_toric_code/with_measurement_noise/exp32_fixed_p050_q000_075_L34567_20260514_nd23/diagnostics_summary.json",
+  "expected_num_points": 80,
+  "fixed_p_summary_path": "/Users/yuan/Desktop/sync/project D/data/3d_toric_code/with_measurement_noise/exp32_fixed_p050_q000_075_L34567_20260514_nd23/analysis/fixed_p050_q000_075_exp32_nd23_pooled_summary.json",
+  "gap_plot_path": "/Users/yuan/Desktop/sync/project D/data/3d_toric_code/with_measurement_noise/exp32_fixed_p050_q000_075_L34567_20260514_nd23/analysis/fixed_p050_q000_075_exp32_nd23_pooled_gap_ci95.png",
+  "manifest_summary_path": "/Users/yuan/Desktop/sync/project D/data/3d_toric_code/with_measurement_noise/exp32_fixed_p050_q000_075_L34567_20260514_nd23/manifest_summary.json",
+  "num_pooled_points": 80,
+  "output_dir": "/Users/yuan/Desktop/sync/project D/data/3d_toric_code/with_measurement_noise/exp32_fixed_p050_q000_075_L34567_20260514_nd23",
+  "q_top_plot_path": "/Users/yuan/Desktop/sync/project D/data/3d_toric_code/with_measurement_noise/exp32_fixed_p050_q000_075_L34567_20260514_nd23/analysis/fixed_p050_q000_075_exp32_nd23_pooled_sem95.png",
+  "status": "complete"
+}
