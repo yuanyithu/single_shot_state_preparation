@@ -2327,7 +2327,9 @@ data/3d_toric_code/with_measurement_noise/exp32_fixed_p050_q000_075_L34567_20260
 主看图：
 
 - [fixed p=0.0500 q scan q_top](data/3d_toric_code/with_measurement_noise/exp32_fixed_p050_q000_075_L34567_20260514_nd23/analysis/fixed_p050_q000_075_exp32_nd23_pooled_sem95.png)
+- [fixed p=0.0500 q scan q_top PDF, tight](data/3d_toric_code/with_measurement_noise/exp32_fixed_p050_q000_075_L34567_20260514_nd23/analysis/fixed_p050_q000_075_exp32_nd23_pooled_sem95_tight.pdf)
 - [fixed p=0.0500 q scan pairwise gaps](data/3d_toric_code/with_measurement_noise/exp32_fixed_p050_q000_075_L34567_20260514_nd23/analysis/fixed_p050_q000_075_exp32_nd23_pooled_gap_ci95.png)
+- [fixed p=0.0500 q scan pairwise gaps PDF, tight](data/3d_toric_code/with_measurement_noise/exp32_fixed_p050_q000_075_L34567_20260514_nd23/analysis/fixed_p050_q000_075_exp32_nd23_pooled_gap_ci95_tight.pdf)
 - [machine-readable fixed-p summary](data/3d_toric_code/with_measurement_noise/exp32_fixed_p050_q000_075_L34567_20260514_nd23/analysis/fixed_p050_q000_075_exp32_nd23_pooled_summary.json)
 - [diagnostics summary](data/3d_toric_code/with_measurement_noise/exp32_fixed_p050_q000_075_L34567_20260514_nd23/diagnostics_summary.json)
 - [manifest summary](data/3d_toric_code/with_measurement_noise/exp32_fixed_p050_q000_075_L34567_20260514_nd23/manifest_summary.json)
