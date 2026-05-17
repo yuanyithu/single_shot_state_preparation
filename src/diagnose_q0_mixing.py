@@ -4,7 +4,11 @@ import numpy as np
 
 from build_toric_code_examples import build_2d_toric_code
 from exact_enumeration import compute_exact_logical_observable_means
-from linear_section import apply_linear_section, build_linear_section
+from linear_section import (
+    apply_section,
+    build_linear_section,
+    build_syndrome_representative_section,
+)
 from main import (
     _build_kernel_basis_from_linear_section,
     _compute_log_odds,
@@ -22,15 +26,15 @@ def _compute_syndrome_bits(parity_check_matrix, chain_bits):
 
 def _build_reference_kernel_state(
         parity_check_matrix,
-        linear_section_data,
+        section_data,
         disorder_data_error_bits):
     disorder_syndrome_bits = _compute_syndrome_bits(
         parity_check_matrix=parity_check_matrix,
         chain_bits=disorder_data_error_bits,
     )
-    section_representative_bits = apply_linear_section(
+    section_representative_bits = apply_section(
         disorder_syndrome_bits,
-        linear_section_data,
+        section_data,
     )
     reference_kernel_state = (
         disorder_data_error_bits ^ section_representative_bits
@@ -39,6 +43,8 @@ def _build_reference_kernel_state(
 
 
 def _run_q0_chain(
+        parity_check_matrix,
+        section_data,
         logical_observable_masks,
         disorder_data_error_bits,
         initial_chain_bits,
@@ -52,6 +58,14 @@ def _run_q0_chain(
     current_chain_bits = initial_chain_bits.copy()
     current_data_term_bits = current_chain_bits ^ disorder_data_error_bits
     log_odds_data = _compute_log_odds(data_error_probability)
+    disorder_syndrome_bits = (
+        parity_check_matrix.astype(np.uint8)
+        @ disorder_data_error_bits.astype(np.uint8)
+    ) % 2
+    disorder_syndrome_representative_bits = apply_section(
+        disorder_syndrome_bits.astype(bool),
+        section_data,
+    )
 
     for _ in range(num_burn_in_sweeps):
         _run_one_kernel_sweep_zero_syndrome(
@@ -71,12 +85,16 @@ def _run_q0_chain(
 
     for _ in range(num_measurements):
         for _ in range(num_sweeps_between_measurements):
-            accepted_count += _run_one_kernel_sweep_zero_syndrome(
+            sweep_result = _run_one_kernel_sweep_zero_syndrome(
                 current_chain_bits=current_chain_bits,
                 current_data_term_bits=current_data_term_bits,
                 kernel_basis=kernel_basis,
                 log_odds_data=log_odds_data,
                 rng=rng,
+            )
+            accepted_count += (
+                sweep_result["contractible_accepted"]
+                + sweep_result["winding_accepted"]
             )
             attempted_count += kernel_basis.shape[0]
 
@@ -84,6 +102,12 @@ def _run_q0_chain(
             current_chain_bits=current_chain_bits,
             logical_observable_masks=logical_observable_masks,
             logical_observable_sum_values=logical_observable_sum_values,
+            parity_check_matrix=parity_check_matrix,
+            section_data=section_data,
+            disorder_data_error_bits=disorder_data_error_bits,
+            disorder_syndrome_representative_bits=(
+                disorder_syndrome_representative_bits
+            ),
         )
 
     m_u_values = (
@@ -122,6 +146,7 @@ def main():
         lattice_size=args.lattice_size
     )
     linear_section_data = build_linear_section(parity_check_matrix)
+    section_data = build_syndrome_representative_section(parity_check_matrix)
     logical_observable_masks = build_logical_observable_masks(
         parity_check_matrix=parity_check_matrix,
         dual_logical_z_basis=dual_logical_z_basis,
@@ -147,7 +172,7 @@ def main():
 
     reference_kernel_state = _build_reference_kernel_state(
         parity_check_matrix=parity_check_matrix,
-        linear_section_data=linear_section_data,
+        section_data=section_data,
         disorder_data_error_bits=disorder_data_error_bits,
     )
 
@@ -172,7 +197,7 @@ def main():
     exact_m_u_values = None
     exact_q_top_value = None
     if num_qubits <= 22:
-        exact_m_u_values = compute_exact_logical_observable_means(
+        exact_result = compute_exact_logical_observable_means(
             parity_check_matrix=parity_check_matrix,
             observed_syndrome_bits=observed_syndrome_bits,
             disorder_data_error_bits=disorder_data_error_bits,
@@ -180,6 +205,7 @@ def main():
             data_error_probability=args.data_error_probability,
             logical_observable_masks=logical_observable_masks,
         )
+        exact_m_u_values = exact_result["m_u_values"]
         exact_q_top_value = float(np.mean(exact_m_u_values ** 2))
 
     print(
@@ -201,6 +227,8 @@ def main():
 
     for init_index, (name, initial_chain_bits) in enumerate(initial_state_map.items()):
         m_u_values, q_top_value, acceptance_rate = _run_q0_chain(
+            parity_check_matrix=parity_check_matrix,
+            section_data=section_data,
             logical_observable_masks=logical_observable_masks,
             disorder_data_error_bits=disorder_data_error_bits,
             initial_chain_bits=initial_chain_bits,

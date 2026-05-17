@@ -6,7 +6,6 @@ from build_toric_code_examples import (
 )
 from linear_section import (
     apply_linear_section,
-    apply_linear_section_transpose,
     build_linear_section,
     verify_linear_section,
 )
@@ -41,51 +40,34 @@ def build_logical_observable_masks(
         dual_logical_z_basis,
         linear_section_data):
     """
-    构造所有非零 u 对应的逻辑观测量掩码 Λ_u。
+    构造所有非零 u 对应的 dual logical representative \\bar z_u。
+
+    历史上这个函数返回线性化 observable mask。r 修正为任意 section
+    之后，真正的 observable 必须在采样时按
+    c + eta + r(H_Z c) + r(H_Z eta) 计算。为减少调用面变更，
+    函数名暂时保留，但返回值语义已经是 \\bar z_u 向量集合。
 
     输入：
       parity_check_matrix: np.ndarray，shape (num_checks, num_qubits)，dtype=bool
       dual_logical_z_basis: np.ndarray，shape (num_logical_qubits, num_qubits)，dtype=bool
-      linear_section_data: dict
+      linear_section_data: dict，保留兼容参数；不再用于构造 mask
 
     输出：
       logical_observable_masks: np.ndarray，
         shape (2**num_logical_qubits - 1, num_qubits)，dtype=bool
     """
+    del parity_check_matrix, linear_section_data
     num_logical_qubits, num_qubits = dual_logical_z_basis.shape
     num_masks = (1 << num_logical_qubits) - 1
 
-    parity_check_matrix_transpose_uint8 = parity_check_matrix.T.astype(np.uint8)
-
-    # 先对每个逻辑 Z 基向量各算一次 primitive mask，避免重复调用 r^T
-    primitive_logical_observable_masks = np.zeros(
-        (num_logical_qubits, num_qubits),
-        dtype=bool,
-    )
-    for logical_qubit_index in range(num_logical_qubits):
-        logical_z_basis_vector = dual_logical_z_basis[logical_qubit_index]
-        r_transpose_of_logical_z = apply_linear_section_transpose(
-            logical_z_basis_vector,
-            linear_section_data,
-        )
-        gauge_adjustment_bits = (
-            parity_check_matrix_transpose_uint8
-            @ r_transpose_of_logical_z.astype(np.uint8)
-        ) % 2
-        primitive_logical_observable_masks[logical_qubit_index] = (
-            logical_z_basis_vector ^ gauge_adjustment_bits.astype(bool)
-        )
-
     logical_observable_masks = np.zeros((num_masks, num_qubits), dtype=bool)
 
-    # 对每个非零 u，按位异或组合 primitive mask
+    # 对每个非零 u，按位异或组合 primitive dual logical vectors。
     for mask_index in range(1, num_masks + 1):
         combined_mask = np.zeros(num_qubits, dtype=bool)
         for logical_qubit_index in range(num_logical_qubits):
             if (mask_index >> logical_qubit_index) & 1:
-                combined_mask ^= primitive_logical_observable_masks[
-                    logical_qubit_index
-                ]
+                combined_mask ^= dual_logical_z_basis[logical_qubit_index]
         logical_observable_masks[mask_index - 1] = combined_mask
 
     return logical_observable_masks
@@ -157,7 +139,8 @@ def _run_preprocessing_self_check(
         for mask_index in range(num_masks):
             logical_observable_parity = bool(
                 np.bitwise_xor.reduce(
-                    logical_observable_masks[mask_index] & random_chain_bits
+                    logical_observable_masks[mask_index]
+                    & gauge_representative_bits
                 )
             )
             logical_z_parity = bool(

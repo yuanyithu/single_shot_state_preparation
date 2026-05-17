@@ -22,7 +22,11 @@ from preprocessing import (
     build_checks_touching_each_qubit,
     build_logical_observable_masks,
 )
-from linear_section import apply_linear_section, build_linear_section
+from linear_section import (
+    apply_section,
+    build_linear_section,
+    build_syndrome_representative_section,
+)
 
 
 def _json_default(value):
@@ -79,6 +83,7 @@ def run_benchmark(args):
         parity_check_matrix
     )
     linear_section_data = build_linear_section(parity_check_matrix)
+    section_data = build_syndrome_representative_section(parity_check_matrix)
     logical_observable_masks = build_logical_observable_masks(
         parity_check_matrix=parity_check_matrix,
         dual_logical_z_basis=dual_logical_z_basis,
@@ -94,9 +99,9 @@ def run_benchmark(args):
     )
     initial_chain_bits = None
     if args.syndrome_error_probability == 0.0:
-        initial_chain_bits = apply_linear_section(
+        initial_chain_bits = apply_section(
             observed_syndrome_bits,
-            linear_section_data,
+            section_data,
         )
 
     started_at = time.perf_counter()

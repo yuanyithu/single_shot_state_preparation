@@ -1,7 +1,7 @@
 import numpy as np
 
 from build_toric_code_examples import build_2d_toric_code
-from linear_section import build_linear_section
+from linear_section import apply_section, build_linear_section
 from preprocessing import (
     build_checks_touching_each_qubit,
     build_logical_observable_masks,
@@ -229,7 +229,11 @@ def run_one_sweep(
 def accumulate_logical_observables(
         current_chain_bits,
         logical_observable_masks,
-        logical_observable_sum_values):
+        logical_observable_sum_values,
+        parity_check_matrix=None,
+        section_data=None,
+        disorder_data_error_bits=None,
+        disorder_syndrome_representative_bits=None):
     """
     累加全部逻辑观测量。
 
@@ -238,9 +242,72 @@ def accumulate_logical_observables(
       logical_observable_masks: np.ndarray，shape (num_masks, num_qubits)，dtype=bool
       logical_observable_sum_values: np.ndarray，shape (num_masks,)，dtype=int64，原地更新
     """
-    masked_bits = logical_observable_masks & current_chain_bits
+    logical_observable_values = compute_logical_observable_values(
+        current_chain_bits=current_chain_bits,
+        logical_observable_masks=logical_observable_masks,
+        parity_check_matrix=parity_check_matrix,
+        section_data=section_data,
+        disorder_data_error_bits=disorder_data_error_bits,
+        disorder_syndrome_representative_bits=(
+            disorder_syndrome_representative_bits
+        ),
+    )
+    logical_observable_sum_values += logical_observable_values.astype(np.int64)
+
+
+def compute_logical_observable_values(
+        current_chain_bits,
+        logical_observable_masks,
+        parity_check_matrix=None,
+        section_data=None,
+        disorder_data_error_bits=None,
+        disorder_syndrome_representative_bits=None):
+    """
+    计算修正后的逻辑观测量：
+
+        O_u(c; eta) = (-1)^<z_u, c + eta + r(H_Z c) + r(H_Z eta)>.
+
+    当没有提供 parity_check_matrix/section_data 时保留旧 mask 点积路径，
+    仅用于尚未迁移的内部缓存测试。
+    """
+    if parity_check_matrix is None and section_data is None:
+        logical_chain_bits = current_chain_bits
+    else:
+        if parity_check_matrix is None or section_data is None:
+            raise ValueError(
+                "parity_check_matrix and section_data must be provided together"
+            )
+        if disorder_data_error_bits is None:
+            raise ValueError("disorder_data_error_bits is required")
+
+        parity_check_matrix_uint8 = parity_check_matrix.astype(np.uint8)
+        chain_syndrome_bits = (
+            parity_check_matrix_uint8 @ current_chain_bits.astype(np.uint8)
+        ) % 2
+        chain_syndrome_representative_bits = apply_section(
+            chain_syndrome_bits.astype(bool),
+            section_data,
+        )
+        if disorder_syndrome_representative_bits is None:
+            disorder_syndrome_bits = (
+                parity_check_matrix_uint8
+                @ disorder_data_error_bits.astype(np.uint8)
+            ) % 2
+            disorder_syndrome_representative_bits = apply_section(
+                disorder_syndrome_bits.astype(bool),
+                section_data,
+            )
+
+        logical_chain_bits = (
+            current_chain_bits
+            ^ disorder_data_error_bits
+            ^ chain_syndrome_representative_bits
+            ^ disorder_syndrome_representative_bits
+        )
+
+    masked_bits = logical_observable_masks & logical_chain_bits
     parity_bits = np.bitwise_xor.reduce(masked_bits, axis=1)
-    logical_observable_sum_values += 1 - 2 * parity_bits.astype(np.int64)
+    return (1 - 2 * parity_bits.astype(np.int8)).astype(np.int8, copy=False)
 
 
 def _compute_syndrome_bits_mod2(parity_check_matrix, chain_bits):

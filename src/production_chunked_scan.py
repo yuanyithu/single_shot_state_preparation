@@ -101,6 +101,115 @@ def _load_json(input_path):
         return json.load(handle)
 
 
+def _as_python_scalar(value):
+    array = np.asarray(value)
+    if array.shape == ():
+        return array.item()
+    return value
+
+
+def _npz_scalar_string(value):
+    return str(_as_python_scalar(value))
+
+
+def _extract_section_stats(result):
+    if "section_apply_count" not in result:
+        return None
+    return {
+        "backend_name": _npz_scalar_string(result["section_backend_name"]),
+        "apply_count": int(_as_python_scalar(result["section_apply_count"])),
+        "cache_hit_count": int(
+            _as_python_scalar(result["section_cache_hit_count"])
+        ),
+        "cache_size": int(_as_python_scalar(result["section_cache_size"])),
+        "fallback_count": int(
+            _as_python_scalar(result["section_fallback_count"])
+        ),
+        "decoder_failure_count": int(
+            _as_python_scalar(result["section_decoder_failure_count"])
+        ),
+        "ldpc_import_error": _npz_scalar_string(
+            result["section_ldpc_import_error"]
+        ),
+    }
+
+
+def _combine_section_stats(section_summary_list):
+    if not section_summary_list:
+        return {}
+    backend_names = sorted(
+        {item["backend_name"] for item in section_summary_list}
+    )
+    ldpc_import_errors = sorted(
+        {
+            item["ldpc_import_error"]
+            for item in section_summary_list
+            if item["ldpc_import_error"]
+        }
+    )
+    apply_count = sum(item["apply_count"] for item in section_summary_list)
+    cache_hit_count = sum(
+        item["cache_hit_count"] for item in section_summary_list
+    )
+    cache_size = sum(item["cache_size"] for item in section_summary_list)
+    fallback_count = sum(item["fallback_count"] for item in section_summary_list)
+    decoder_failure_count = sum(
+        item["decoder_failure_count"] for item in section_summary_list
+    )
+    cache_hit_rate = (
+        0.0 if apply_count == 0 else float(cache_hit_count / apply_count)
+    )
+    backend_name = (
+        backend_names[0]
+        if len(backend_names) == 1
+        else ",".join(backend_names)
+    )
+    return {
+        "section_backend_name": np.array(backend_name),
+        "section_backend_names": np.asarray(backend_names),
+        "section_apply_count": np.int64(apply_count),
+        "section_cache_hit_count": np.int64(cache_hit_count),
+        "section_cache_hit_rate": np.float64(cache_hit_rate),
+        "section_cache_size": np.int64(cache_size),
+        "section_fallback_count": np.int64(fallback_count),
+        "section_decoder_failure_count": np.int64(decoder_failure_count),
+        "section_ldpc_import_error": np.array(
+            "; ".join(ldpc_import_errors)
+        ),
+        "section_num_chunks": np.int64(len(section_summary_list)),
+    }
+
+
+def _section_summary_for_manifest(merged_result):
+    if "section_apply_count" not in merged_result:
+        return None
+    return {
+        "backend_name": _npz_scalar_string(
+            merged_result["section_backend_name"]
+        ),
+        "apply_count": int(
+            _as_python_scalar(merged_result["section_apply_count"])
+        ),
+        "cache_hit_count": int(
+            _as_python_scalar(merged_result["section_cache_hit_count"])
+        ),
+        "cache_hit_rate": float(
+            _as_python_scalar(merged_result["section_cache_hit_rate"])
+        ),
+        "cache_size": int(_as_python_scalar(merged_result["section_cache_size"])),
+        "fallback_count": int(
+            _as_python_scalar(merged_result["section_fallback_count"])
+        ),
+        "decoder_failure_count": int(
+            _as_python_scalar(merged_result["section_decoder_failure_count"])
+        ),
+        "ldpc_import_error": _npz_scalar_string(
+            merged_result["section_ldpc_import_error"]
+        ),
+        "num_chunks": int(_as_python_scalar(merged_result["section_num_chunks"])),
+    }
+
+
 def _effective_num_burn_in_sweeps(
         num_burn_in_sweeps,
         num_qubits,
@@ -435,6 +544,7 @@ def _build_manifest(
             "started_at": None,
             "completed_at": None,
             "error": None,
+            "section_stats": None,
         })
 
     return {
@@ -636,6 +746,7 @@ def _run_chunk_task(task_data):
             None,
         )
         simulation_result_for_save.pop("winding_repeat_factor", None)
+        section_stats = _extract_section_stats(simulation_result_for_save)
 
         np.savez(
             temporary_output_path,
@@ -687,6 +798,7 @@ def _run_chunk_task(task_data):
             "task_id": task_data["task_id"],
             "output_path": str(output_path),
             "duration_seconds": time.time() - start_time,
+            "section_stats": section_stats,
         }
     except Exception:
         if temporary_output_path.exists():
@@ -707,6 +819,9 @@ def _run_pending_tasks_sequentially(
             chunk_entry["status"] = "completed"
             chunk_entry["completed_at"] = _timestamp()
             chunk_entry["error"] = None
+            chunk_entry["section_stats"] = chunk_result.get(
+                "section_stats"
+            )
             completed_task_count += 1
             _log(
                 f"Completed {chunk_result['task_id']} "
@@ -876,6 +991,7 @@ def _merge_outputs(
     pt_min_swap_acceptance_rate_per_disorder_tensor = None
     pt_mean_swap_acceptance_rate_per_disorder_tensor = None
     cluster_summary_list = []
+    section_summary_list = []
 
     grouped_tasks = {}
     for task_data in task_data_list:
@@ -1246,6 +1362,9 @@ def _merge_outputs(
                             "cluster_controller_frozen",
                         )
                     })
+                section_stats = _extract_section_stats(loaded_chunk_result)
+                if section_stats is not None:
+                    section_summary_list.append(section_stats)
 
         if total_loaded_num_disorders != num_disorder_samples_total:
             raise ValueError(
@@ -1403,6 +1522,7 @@ def _merge_outputs(
     }
     if cluster_summary_list:
         merged_result.update(combine_cluster_summaries(cluster_summary_list))
+    merged_result.update(_combine_section_stats(section_summary_list))
     if has_q0_diagnostics:
         merged_result["q0_start_sector_labels"] = q0_start_sector_labels
         merged_result["q0_mean_m_u_spread_linf_curve_matrix"] = (
@@ -1726,6 +1846,9 @@ def _submit_run(args):
                         chunk_entry["status"] = "completed"
                         chunk_entry["completed_at"] = _timestamp()
                         chunk_entry["error"] = None
+                        chunk_entry["section_stats"] = chunk_result.get(
+                            "section_stats"
+                        )
                         completed_future_count += 1
                         _log(
                             f"Completed {chunk_result['task_id']} "
@@ -1808,6 +1931,9 @@ def _submit_run(args):
                 merged_result["cluster_controller_frozen"]
             ),
         }
+    section_summary = _section_summary_for_manifest(merged_result)
+    if section_summary is not None:
+        manifest["final_outputs"]["section_summary"] = section_summary
     manifest["final_outputs"]["status"] = "completed"
     manifest["final_outputs"]["completed_at"] = _timestamp()
     _update_manifest_summary(manifest)
