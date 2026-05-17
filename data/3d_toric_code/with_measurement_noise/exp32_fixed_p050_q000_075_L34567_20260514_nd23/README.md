@@ -15,7 +15,9 @@
 - Pooling: all `80` `(L,q)` points were pooled from the two independent nodes; every point has `2048` disorder samples.
 - Main plots:
   - [`analysis/fixed_p050_q000_075_exp32_nd23_pooled_sem95.png`](analysis/fixed_p050_q000_075_exp32_nd23_pooled_sem95.png)
+  - [`analysis/fixed_p050_q000_075_exp32_nd23_pooled_sem95_tight.pdf`](analysis/fixed_p050_q000_075_exp32_nd23_pooled_sem95_tight.pdf)
   - [`analysis/fixed_p050_q000_075_exp32_nd23_pooled_gap_ci95.png`](analysis/fixed_p050_q000_075_exp32_nd23_pooled_gap_ci95.png)
+  - [`analysis/fixed_p050_q000_075_exp32_nd23_pooled_gap_ci95_tight.pdf`](analysis/fixed_p050_q000_075_exp32_nd23_pooled_gap_ci95_tight.pdf)
 - Pairwise gap sign changes:
   - `L3-L4`: `q≈0.0182`
   - `L4-L5`: noisy double sign change near `q≈0.0036` and `q≈0.0064`
