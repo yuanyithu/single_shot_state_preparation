@@ -11,3 +11,32 @@ __pycache__/
 htmlcov/
 .codex-home/
 .codex-log/
+
+# Generated experiment data and remote run artifacts.
+data/**/chunks/
+data/**/remote_run/
+data/**/remote_runs/
+data/**/pooled/
+data/**/analysis/
+data/**/*.npz
+data/**/*.npy
+data/**/*.h5
+data/**/*.hdf5
+data/**/*.parquet
+data/**/*.pkl
+data/**/*.pickle
+data/**/*.joblib
+data/**/*.mat
+data/**/*.zarr/
+data/**/*.sqlite
+data/**/*.db
+data/**/*.log
+data/**/*.tsv
+data/**/*.csv
+data/**/*.json
+data/**/*.png
+data/**/*.pdf
+
+# Local launcher/collector scratch outputs.
+runs/
+logs/

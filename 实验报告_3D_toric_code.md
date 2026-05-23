@@ -2433,3 +2433,91 @@ num_replicas_per_start >= 2
 pt_num_temperatures = 11 or 13
 先小 disorder pilot，要求 PT min swap 不再贴 0、ESS/R-hat 大面积通过，再扩大 disorder。
 ```
+
+## 2026-05-24 exp34 fixed `p=0.0500` q-scan final stopped snapshot
+
+### 停止点与回收
+
+本轮是 corrected observable 公式后的固定 `p=0.0500` q 方向生产扫描，原计划为 `L=3,4,5,6,7` 与 `q=0.0000,0.0100,...,0.0800`，双节点 `nd-1/nd-2` 独立 seed，每节点每点 `1024` disorder，池化后每点 `2048` disorder。
+
+按本次人工决策，等待 `nd-2` 的 `L=6,q=0.0600` 最后一个长尾 chunk 完成后停止后续扫描。该点在远端日志中于 `2026-05-23T12:54:20-04:00` 生成 final NPZ，`Chunk counts: completed=256 failed=0 pending=0`。随后先回收数据，再停止两台节点上本次 exp34 的 screen 和匹配 run id 的 Python/conda 进程；停止后复查 `nd-1/nd-2` 均无 exp34 screen 和进程。
+
+本地快照：
+
+```text
+data/3d_toric_code/with_measurement_noise/exp34_fixed_p050_q000_080_L34567_corrected_observable_20260524_final_stopped_after_L6q060_nd12/
+```
+
+回收策略只复制 `manifest.json`、最终 `scan_result_*.npz/png`、convergence JSON、run index 和日志；没有复制 `chunks/`。本地目录约 `135M`，用于分析和留档，但不应提交到 Git。
+
+### 完成情况
+
+双节点均完整的池化点数为 `34/45`：
+
+```text
+L=3: q=0.0000..0.0800 全部完成
+L=4: q=0.0000..0.0800 全部完成
+L=5: q=0.0000..0.0800 全部完成
+L=6: q=0.0000..0.0600 完成，q=0.0700/0.0800 未完成
+L=7: 未启动
+```
+
+`L=6,q=0.0700` 在停止前两台节点都只建立了 pending manifest，没有 final NPZ，因此不进入物理池化。`analyze_exp33_fixed_p_q_scan.py --allow-partial` 生成了 `34` 个 pooled NPZ；标准 lattice-union 图只包含完整的 `L=3,4,5`。另用 `scripts/plot_exp34_partial_qtop_snapshot.py` 生成了包含 `L=6` 部分曲线的 q_top 图。
+
+主要产物：
+
+```text
+analysis/fixed_p050_q000_080_exp34_final_stopped_after_L6q060_nd12_qtop_by_L.png
+analysis/fixed_p050_q000_080_exp34_final_stopped_after_L6q060_nd12_qtop_by_L_points.csv
+analysis/fixed_p050_q000_080_exp34_final_stopped_after_L6q060_nd12_qtop_by_L_summary.json
+analysis/fixed_p050_q000_080_exp34_final_stopped_after_L6q060_nd12_pooled_sem95.png
+analysis/fixed_p050_q000_080_exp34_final_stopped_after_L6q060_nd12_pooled_gap_ci95.png
+manifest_summary.json
+diagnostics_summary.json
+```
+
+### q_top 结果摘要
+
+每个列出的点均池化 `2048` disorder。关键大尺寸数值：
+
+```text
+L  q       q_top     95% CI
+5  0.0000  0.999512  0.000430
+5  0.0400  0.999997  0.000003
+5  0.0500  0.999983  0.000012
+5  0.0600  0.999939  0.000038
+5  0.0700  0.999803  0.000152
+5  0.0800  0.999468  0.000378
+6  0.0000  0.999698  0.000348
+6  0.0400  0.999996  0.000002
+6  0.0500  0.999977  0.000010
+6  0.0600  0.999882  0.000055
+```
+
+在已完成窗口内，大尺寸 `L=5,6` 的 `q_top` 基本贴近 1，且 `L=6` 在 `q<=0.0600` 未显示向下穿过 `L=5` 的趋势。`L=3` 在高 q 下降更明显，例如 `q=0.0800` 时 `q_top=0.991275±0.002096`；这仍符合固定 `p=0.05` 处大尺寸更稳的方向判读。
+
+### 诊断与结论
+
+诊断摘要：
+
+```text
+pooled rows = 34
+q0 passed = 4/4
+q>0 passed = 23/30
+section backend = bplsd
+section fallback = 0
+section decoder failures = 0
+overall section cache hit rate ≈ 0.9324
+max q>0 mean_q_top_spread ≈ 0.00207
+max q>0 Rhat ≈ 1.2807
+min q>0 ESS ≈ 6.15
+min PT min-swap acceptance ≈ 3.54e-08
+```
+
+未通过 convergence gate 的点主要是 `L=3,q=0.0300..0.0800` 和 `L=4,q=0.0800`。这些点的 `q_top` 估计仍可作曲线形状参考，但高 q 端混合诊断不应被忽略。
+
+本次 exp34 的结论应表述为“停在 `L=6,q=0.0600` 后的最终快照”，不是完整 `L=7` 生产扫描。它支持以下判断：
+
+- corrected observable 后，固定 `p=0.0500` 的 `q=0.0000..0.0800` 窗口内，`L=5` 仍非常接近稳定；`L=6` 到 `q=0.0600` 也接近稳定。
+- 当前数据没有给出固定 `p=0.0500` 下的共同 q-threshold；缺失的 `L=6` 高 q 和全部 `L=7` 使得最终 finite-size crossing 结论不能补强。
+- 继续原生产参数往 `L=6,q=0.0700/0.0800` 和 `L=7` 推进的 wall time 代价过高；后续若要补大尺寸，应先采用 2026-05-23 production-path 优化候选或重新设计更省的 pilot。
