@@ -36,6 +36,9 @@ data/**/*.csv
 data/**/*.json
 data/**/*.png
 data/**/*.pdf
+data/**/*.txt
+data/**/*.sh
+data/**/.gitignore
 
 # Local launcher/collector scratch outputs.
 runs/
