@@ -24,16 +24,13 @@ from cluster_update import (
     maybe_run_cluster_update,
     summarize_cluster_controller,
 )
-from mcmc import (
-    accumulate_logical_observables,
-    initialize_mcmc_state,
-)
+from mcmc import initialize_mcmc_state
 from main import (
+    _accumulate_logical_observables_fast,
     _build_kernel_basis_from_linear_section,
     _build_measurement_diagnostic_config,
     _build_numba_update_kernel_data,
     _compute_log_odds,
-    _compute_logical_observable_values,
     _count_zero_syndrome_proposals,
     _count_zero_syndrome_proposals_split,
     _has_zero_syndrome_proposals,
@@ -121,7 +118,9 @@ def run_parallel_tempering_measurement(
         cluster_update_enabled=True,
         cluster_budget_fraction_rho=0.05,
         cluster_update_debug=False,
-        section_data=None):
+        section_data=None,
+        single_bit_proposal_fraction=1.0,
+        observable_temperature_mode="all"):
     """
     在 p 温度 ladder 上做 parallel tempering 采样。
 
@@ -150,6 +149,8 @@ def run_parallel_tempering_measurement(
     num_temperatures = int(data_error_probability_ladder.shape[0])
     if num_temperatures < 1:
         raise ValueError("data_error_probability_ladder must be non-empty")
+    if observable_temperature_mode not in ("all", "cold"):
+        raise ValueError("observable_temperature_mode must be all or cold")
 
     num_checks, num_qubits = parity_check_matrix.shape
     diagnostic_config = _build_measurement_diagnostic_config(
@@ -267,6 +268,7 @@ def run_parallel_tempering_measurement(
     )
 
     def _run_one_sweep_for_all_temperatures():
+        nonlocal ordinary_update_wall_time
         ordinary_elapsed_per_temperature = np.empty(
             num_temperatures,
             dtype=np.float64,
@@ -303,6 +305,7 @@ def run_parallel_tempering_measurement(
                 ],
                 qubit_order_buffer=qubit_order_buffer,
                 numba_update_kernel_data=numba_update_kernel_data,
+                single_bit_proposal_fraction=single_bit_proposal_fraction,
             )
             ordinary_elapsed_per_temperature[temperature_index] = (
                 time.perf_counter() - ordinary_started_at
@@ -343,17 +346,20 @@ def run_parallel_tempering_measurement(
             data_weight_per_temperature[
                 cluster_result["temperature_index"]
             ] += cluster_result["data_weight_delta"]
+        ordinary_update_wall_time += float(np.sum(ordinary_elapsed_per_temperature))
 
     swap_parity_counter = 0
 
     def _maybe_attempt_swap(sweep_counter):
         nonlocal swap_parity_counter
+        nonlocal pt_swap_wall_time
         if num_temperatures < 2:
             return
         if swap_attempt_every_num_sweeps <= 0:
             return
         if sweep_counter % swap_attempt_every_num_sweeps != 0:
             return
+        swap_started_at = time.perf_counter()
         _attempt_replica_swaps(
             chain_bits_list=chain_bits_list,
             data_term_bits_list=data_term_bits_list,
@@ -365,9 +371,14 @@ def run_parallel_tempering_measurement(
             swap_accept_counts=swap_accept_counts,
             swap_attempt_counts=swap_attempt_counts,
         )
+        pt_swap_wall_time += time.perf_counter() - swap_started_at
         swap_parity_counter += 1
 
     sweep_counter = 0
+    ordinary_update_wall_time = 0.0
+    pt_swap_wall_time = 0.0
+    observable_wall_time = 0.0
+    measurement_started_at = time.perf_counter()
     for _ in range(num_burn_in_sweeps):
         _run_one_sweep_for_all_temperatures()
         sweep_counter += 1
@@ -379,6 +390,17 @@ def run_parallel_tempering_measurement(
     num_masks = logical_observable_masks.shape[0]
     logical_observable_sum_per_temperature = np.zeros(
         (num_temperatures, num_masks), dtype=np.int64,
+    )
+    if observable_temperature_mode == "all":
+        observable_temperature_indices = np.arange(
+            num_temperatures,
+            dtype=np.int64,
+        )
+    else:
+        observable_temperature_indices = np.array([0], dtype=np.int64)
+    logical_observable_count_per_temperature = np.zeros(
+        num_temperatures,
+        dtype=np.int64,
     )
     if diagnostic_config["record_measurement_trajectories"]:
         if record_all_temperature_trajectories:
@@ -410,41 +432,78 @@ def run_parallel_tempering_measurement(
             _run_one_sweep_for_all_temperatures()
             sweep_counter += 1
             _maybe_attempt_swap(sweep_counter)
-        for temperature_index in range(num_temperatures):
-            accumulate_logical_observables(
+        observable_started_at = time.perf_counter()
+        measured_logical_values = {}
+        for temperature_index in observable_temperature_indices:
+            temperature_index = int(temperature_index)
+            logical_observable_values = _accumulate_logical_observables_fast(
                 current_chain_bits=chain_bits_list[temperature_index],
                 logical_observable_masks=logical_observable_masks,
                 logical_observable_sum_values=(
                     logical_observable_sum_per_temperature[temperature_index]
                 ),
-                parity_check_matrix=parity_check_matrix,
                 section_data=section_data,
                 disorder_data_error_bits=disorder_data_error_bits,
                 disorder_syndrome_representative_bits=(
                     disorder_syndrome_representative_bits
                 ),
+                current_syndrome_term_bits=(
+                    syndrome_term_bits_list[temperature_index]
+                ),
+                observed_syndrome_bits=observed_syndrome_bits,
             )
+            logical_observable_count_per_temperature[temperature_index] += 1
+            measured_logical_values[temperature_index] = logical_observable_values
         if diagnostic_config["record_measurement_trajectories"]:
             for diagnostic_slot, temperature_index in enumerate(
                     diagnostic_temperature_indices):
+                temperature_index = int(temperature_index)
+                if temperature_index in measured_logical_values:
+                    logical_observable_values = measured_logical_values[
+                        temperature_index
+                    ]
+                else:
+                    logical_observable_values = _accumulate_logical_observables_fast(
+                        current_chain_bits=chain_bits_list[temperature_index],
+                        logical_observable_masks=logical_observable_masks,
+                        logical_observable_sum_values=(
+                            logical_observable_sum_per_temperature[
+                                temperature_index
+                            ]
+                        ),
+                        section_data=section_data,
+                        disorder_data_error_bits=disorder_data_error_bits,
+                        disorder_syndrome_representative_bits=(
+                            disorder_syndrome_representative_bits
+                        ),
+                        current_syndrome_term_bits=(
+                            syndrome_term_bits_list[temperature_index]
+                        ),
+                        observed_syndrome_bits=observed_syndrome_bits,
+                    )
+                    logical_observable_count_per_temperature[
+                        temperature_index
+                    ] += 1
                 logical_observable_values_per_measurement[
                     diagnostic_slot,
                     measurement_index,
-                ] = _compute_logical_observable_values(
-                    current_chain_bits=chain_bits_list[temperature_index],
-                    logical_observable_masks=logical_observable_masks,
-                    parity_check_matrix=parity_check_matrix,
-                    section_data=section_data,
-                    disorder_data_error_bits=disorder_data_error_bits,
-                    disorder_syndrome_representative_bits=(
-                        disorder_syndrome_representative_bits
-                    ),
-                )
+                ] = logical_observable_values
+        observable_wall_time += time.perf_counter() - observable_started_at
 
-    m_u_values_per_temperature = (
-        logical_observable_sum_per_temperature.astype(np.float64)
-        / float(num_measurements)
+    m_u_values_per_temperature = np.full(
+        (num_temperatures, num_masks),
+        np.nan,
+        dtype=np.float64,
     )
+    for temperature_index in range(num_temperatures):
+        count = int(logical_observable_count_per_temperature[temperature_index])
+        if count > 0:
+            m_u_values_per_temperature[temperature_index] = (
+                logical_observable_sum_per_temperature[temperature_index].astype(
+                    np.float64
+                )
+                / float(count)
+            )
     q_top_value_per_temperature = np.mean(
         m_u_values_per_temperature ** 2, axis=1,
     )
@@ -474,6 +533,7 @@ def run_parallel_tempering_measurement(
         swap_accept_counts,
         swap_attempt_counts,
     )
+    measurement_wall_time = time.perf_counter() - measurement_started_at
 
     result = {
         "data_error_probability_ladder": data_error_probability_ladder,
@@ -509,6 +569,10 @@ def run_parallel_tempering_measurement(
         "swap_accept_counts": swap_accept_counts,
         "swap_attempt_counts": swap_attempt_counts,
         "swap_acceptance_rates": swap_acceptance_rates,
+        "ordinary_update_wall_time": np.float64(ordinary_update_wall_time),
+        "pt_swap_wall_time": np.float64(pt_swap_wall_time),
+        "observable_wall_time": np.float64(observable_wall_time),
+        "measurement_wall_time": np.float64(measurement_wall_time),
     }
     if diagnostic_config["record_measurement_trajectories"]:
         result["logical_observable_values_per_measurement_per_temperature"] = (

@@ -41,6 +41,10 @@ data/**/*.sh
 data/**/.gitignore
 data/3d_toric_code/with_measurement_noise/prod_*/
 data/3d_toric_code/with_measurement_noise/profile_*/
+data/3d_toric_code/with_measurement_noise/profile/
+
+# Notes / reference docs - excluded from version control.
+笔记/
 
 # Local launcher/collector scratch outputs.
 runs/
