@@ -1,24 +1,8 @@
 # 3D Toric Code With Measurement Noise
 
-- [`exp05_q005_local_precheck_after_fix`](exp05_q005_local_precheck_after_fix/)：修复后本地轻量预检，只验证 `q>0` 生产路径和诊断字段。
-- [`exp06_zero_disorder_quick_scan`](exp06_zero_disorder_quick_scan/)：全零 disorder 单样本快速扫描，不作正式 threshold 结论。
-- [`exp07_q005_broad_scan`](exp07_q005_broad_scan/)：正式 `q=0.005` broad scan，给出 `p≈0.2077` deep-window 线索，但 CI 较宽。
-- [`exp08_q005_oneday_deep_scan`](exp08_q005_oneday_deep_scan/)：一天内快速 deep；convergence 失败较多，不宣称 threshold。
-- [`exp11_q001_oneday_deep_partial`](exp11_q001_oneday_deep_partial/)：停止过慢 `q=0.0100` one-day deep 后回收的 partial 数据；只有 `L=3,4`，不能作三尺寸 threshold。
-- [`exp12_q005_fine_20260425_nd1`](exp12_q005_fine_20260425_nd1/)：Numba 后的 `q=0.0050` fine run；`528/528` chunks 完成，自动推荐窗口 `p≈0.2164~0.2200`。
-- [`exp13_q001_coarse_20260425_nd2`](exp13_q001_coarse_20260425_nd2/)：`q=0.0100` coarse right-side check；说明 `p>0.24` 已偏右，不应继续把算力放在更大 `p`。
-- [`exp14_q001_fine_20260425_nd3`](exp14_q001_fine_20260425_nd3/)：`q=0.0100` `0.225~0.270` fine scan；多数 gap 已偏正，支持回到左侧加样本。
-- [`exp15_q001_left_denseA_20260425_nd1`](exp15_q001_left_denseA_20260425_nd1/) / [`exp16_q001_left_denseB_20260425_nd2`](exp16_q001_left_denseB_20260425_nd2/)：`q=0.0100` 左侧 dense 独立复本，各 `64` disorder，用于池化。
-- [`exp17_q001_left_fine_20260425_nd3`](exp17_q001_left_fine_20260425_nd3/)：`q=0.0100` 左侧 `0.0025` fine grid，作为 dense 池化的局部对照。
-- [`exp18_q001_left_combined_summary`](exp18_q001_left_combined_summary/)：`q=0.0100` 左侧综合图和 JSON；当前最重要结论是窗口约 `p≈0.22~0.235`，不应继续向 `p>0.24` 扩展。
-- [`exp19_q050_quick_p010_020_20260425_nd1`](exp19_q050_quick_p010_020_20260425_nd1/)：`q=0.0500` 快速摸底；用于确认曲线形状和修正 threshold 方向判读。
-- [`exp20a_q050_heavy_p018_022_20260425_nd1`](exp20a_q050_heavy_p018_022_20260425_nd1/) / [`exp20b_q050_heavy_p018_022_20260425_nd2`](exp20b_q050_heavy_p018_022_20260425_nd2/) / [`exp20c_q050_heavy_p018_022_20260425_nd3`](exp20c_q050_heavy_p018_022_20260425_nd3/)：`q=0.0500` 在 `p=0.18~0.22` 的高力度独立 seed 复本，各 `96` disorder。
-- [`exp21_q050_heavy_p018_022_combined_summary`](exp21_q050_heavy_p018_022_combined_summary/)：`q=0.0500` 三节点池化综合图和 JSON；`288` disorder 时 `L3-L4` crossing 约 `p≈0.193`，`L4-L5` 到 `p=0.22` 仍未 crossing；后续判断已被 `exp25` 的 `1152` disorder dense grid 更新。
-- [`exp22a_q050_L6_p018_022_20260425_nd1`](exp22a_q050_L6_p018_022_20260425_nd1/) / [`exp22b_q050_L6_p018_022_20260425_nd2`](exp22b_q050_L6_p018_022_20260425_nd2/) / [`exp22c_q050_L6_p018_022_20260425_nd3`](exp22c_q050_L6_p018_022_20260425_nd3/)：`q=0.0500` `L=6` extension，各 `96` disorder。
-- [`exp23_q050_L3456_p018_022_combined_summary`](exp23_q050_L3456_p018_022_combined_summary/)：`q=0.0500` L=3/4/5/6 综合图；L=6 低于 L=5 但诊断较差，暂不作最终 threshold。
-- [`exp24a_q001_q050_q100_p018_022_dense_20260426_nd1`](exp24a_q001_q050_q100_p018_022_dense_20260426_nd1/) / [`exp24b_q001_q050_q100_p018_022_dense_20260426_nd2`](exp24b_q001_q050_q100_p018_022_dense_20260426_nd2/) / [`exp24c_q001_q050_q100_p018_022_dense_20260426_nd3`](exp24c_q001_q050_q100_p018_022_dense_20260426_nd3/)：`q=0.0100/0.0500/0.1000`、`p=0.180~0.220`、步长 `0.005` 的三节点高采样 run，各 q 每节点 `384` disorder。
-- [`exp25_q001_q050_q100_p018_022_dense_combined_summary`](exp25_q001_q050_q100_p018_022_dense_combined_summary/)：`exp24a/b/c` 池化综合图和 JSON；每个 q 为 `1152` disorder。`q=0.0500` 共同 crossing window `p≈0.2032~0.2121`，`q=0.0100` 到 `p=0.220` 仍偏 threshold 左侧，`q=0.1000` 在 `p=0.180` 已偏右侧；`q=0.0100/0.0500` 的 L=4/5 mixing 诊断仍需谨慎。
-- [`exp26a_fixed_p010_q000_100_20260426_nd1`](exp26a_fixed_p010_q000_100_20260426_nd1/) / [`exp26b_fixed_p010_q000_100_20260426_nd2`](exp26b_fixed_p010_q000_100_20260426_nd2/) / [`exp26c_fixed_p010_q000_100_20260426_nd3`](exp26c_fixed_p010_q000_100_20260426_nd3/)：固定 `p=0.1000`、扫描 `q=0.0000~0.1000` 步长 `0.0100` 的三节点独立 run，各 q 每节点 `512` disorder。
-- [`exp27_fixed_p010_q000_100_combined_summary`](exp27_fixed_p010_q000_100_combined_summary/)：`exp26a/b/c` 池化综合图和 JSON；每个 q 为 `1536` disorder。`L4-L5` gap 在 `q≈0.0247` 翻号，`L3-L4` gap 在 `q≈0.0608` 翻号，两者不重合，因此固定 `p=0.1` 下暂不宣称共同 q-threshold。
-- [`exp28a_fixed_p010_q000_100_L6_20260427_nd1`](exp28a_fixed_p010_q000_100_L6_20260427_nd1/) / [`exp28b_fixed_p010_q000_100_L6_20260427_nd2`](exp28b_fixed_p010_q000_100_L6_20260427_nd2/) / [`exp28c_fixed_p010_q000_100_L6_20260427_nd3`](exp28c_fixed_p010_q000_100_L6_20260427_nd3/)：固定 `p=0.1000`、扫描 `q=0.0000~0.1000` 的 `L=6` extension，各 q 每节点 `512` disorder；单尺寸 run 不做 crossing analysis。
-- [`exp29_fixed_p010_q000_100_L3456_combined_summary`](exp29_fixed_p010_q000_100_L3456_combined_summary/)：将 `exp27` 的 L=3/4/5 与 `exp28a/b/c` 池化后的 L=6 合成四尺寸图。L6 在 q>0 的 PT min swap acceptance 近似为 0，故只作为 mixing/finite-size 诊断，不作为最终 threshold 定值。
+This directory keeps only the corrected-observable `q_top` data needed for plotting and later checks.
+
+- `exp24` and earlier with-measurement-noise runs were removed because they were insufficient for threshold decisions.
+- Old pre-corrected-observable runs and node-split run directories were removed instead of keeping separate `nd1`/`nd2`/`nd3` copies.
+- The retained local binary archive is ignored by Git: `exp34_fixed_p050_q000_080_L34567_corrected_observable_20260524_final_stopped_after_L6q060_nd12/qtop_samples/exp34_corrected_observable_qtop_samples_only.npz`.
+- Durable metadata kept in Git lives in the final snapshot README and `qtop_samples/README.md`.
