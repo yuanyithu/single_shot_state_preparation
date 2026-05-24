@@ -1,7 +1,9 @@
 import argparse
+import csv
 import json
 import math
 import multiprocessing
+import os
 import socket
 import subprocess
 import sys
@@ -73,6 +75,7 @@ STAGE_NAMES = (
 DEFAULT_Q_VALUE = 0.005
 DEFAULT_SEED_BASE = 2026052301
 NUMBA_AVAILABLE = njit is not None
+DEFAULT_EXP35_Q_VALUES = "0.10,0.11,0.12,0.13,0.14,0.15,0.16,0.17,0.18,0.19,0.20"
 
 
 if njit is not None:
@@ -357,6 +360,51 @@ def _safe_rate(numerator, denominator):
     if denominator <= 0.0:
         return 0.0
     return float(numerator) / denominator
+
+
+def _probability_to_odds(probability):
+    probability = float(probability)
+    if not (0.0 < probability < 0.5):
+        raise ValueError("probability must be in (0, 0.5)")
+    return probability / (1.0 - probability)
+
+
+def _odds_to_probability(odds):
+    odds = float(odds)
+    if odds <= 0.0:
+        raise ValueError("odds must be positive")
+    return odds / (1.0 + odds)
+
+
+def _build_sync_pt_enlarge_ladder(q_cold, q_hot, num_temperatures):
+    num_temperatures = int(num_temperatures)
+    if num_temperatures < 1:
+        raise ValueError("num_temperatures must be >= 1")
+    if num_temperatures == 1:
+        return np.asarray([1.0], dtype=np.float64)
+    hot_enlarge = _probability_to_odds(q_hot) / _probability_to_odds(q_cold)
+    if hot_enlarge < 1.0:
+        raise ValueError("q_hot must be >= q_cold for sync PT")
+    return np.exp(
+        np.linspace(0.0, math.log(hot_enlarge), num_temperatures)
+    ).astype(np.float64)
+
+
+def _build_sync_pt_ladders(p_cold, q_cold, pt_enlarge):
+    pt_enlarge = np.asarray(pt_enlarge, dtype=np.float64)
+    p_odds_cold = _probability_to_odds(p_cold)
+    q_odds_cold = _probability_to_odds(q_cold)
+    p_ladder = np.asarray(
+        [_odds_to_probability(scale * p_odds_cold) for scale in pt_enlarge],
+        dtype=np.float64,
+    )
+    q_ladder = np.asarray(
+        [_odds_to_probability(scale * q_odds_cold) for scale in pt_enlarge],
+        dtype=np.float64,
+    )
+    if np.any(p_ladder >= 0.5) or np.any(q_ladder >= 0.5):
+        raise ValueError("sync PT ladder must keep p_k and q_k below 0.5")
+    return p_ladder, q_ladder
 
 
 def _new_stage_profile():
@@ -671,7 +719,9 @@ def _attempt_profiled_replica_swaps(
         data_term_bits_list,
         syndrome_term_bits_list,
         data_weight_per_temperature,
+        syndrome_weight_per_temperature,
         log_odds_data_per_temperature,
+        log_odds_syndrome_per_temperature,
         replica_id_per_temperature,
         rng,
         parity_index,
@@ -686,6 +736,14 @@ def _attempt_profiled_replica_swaps(
         log_ratio = (
             (log_odds_data_per_temperature[j] - log_odds_data_per_temperature[i])
             * (int(data_weight_per_temperature[i]) - int(data_weight_per_temperature[j]))
+            + (
+                log_odds_syndrome_per_temperature[j]
+                - log_odds_syndrome_per_temperature[i]
+            )
+            * (
+                int(syndrome_weight_per_temperature[i])
+                - int(syndrome_weight_per_temperature[j])
+            )
         )
         if log_ratio >= 0.0:
             accepted = True
@@ -712,6 +770,10 @@ def _attempt_profiled_replica_swaps(
         data_weight_per_temperature[i], data_weight_per_temperature[j] = (
             data_weight_per_temperature[j],
             data_weight_per_temperature[i],
+        )
+        syndrome_weight_per_temperature[i], syndrome_weight_per_temperature[j] = (
+            syndrome_weight_per_temperature[j],
+            syndrome_weight_per_temperature[i],
         )
         replica_id_per_temperature[i], replica_id_per_temperature[j] = (
             replica_id_per_temperature[j],
@@ -780,6 +842,132 @@ def _build_pt_transport(num_temperatures):
     }
 
 
+def _build_adaptive_pt_flow_tracker(num_temperatures):
+    return {
+        "replica_tags": np.zeros(num_temperatures, dtype=np.int8),
+        "l_count_per_temperature": np.zeros(num_temperatures, dtype=np.int64),
+        "r_count_per_temperature": np.zeros(num_temperatures, dtype=np.int64),
+        "unlabeled_count_per_temperature": np.zeros(
+            num_temperatures,
+            dtype=np.int64,
+        ),
+        "num_observations": 0,
+    }
+
+
+def _record_adaptive_pt_flow(flow_tracker, replica_id_per_temperature):
+    if flow_tracker is None:
+        return
+    num_temperatures = int(replica_id_per_temperature.shape[0])
+    if num_temperatures < 2:
+        return
+    flow_tracker["replica_tags"][int(replica_id_per_temperature[0])] = 1
+    flow_tracker["replica_tags"][int(replica_id_per_temperature[-1])] = 2
+    for temperature_index, replica_id in enumerate(replica_id_per_temperature):
+        tag = int(flow_tracker["replica_tags"][int(replica_id)])
+        if tag == 1:
+            flow_tracker["l_count_per_temperature"][temperature_index] += 1
+        elif tag == 2:
+            flow_tracker["r_count_per_temperature"][temperature_index] += 1
+        else:
+            flow_tracker["unlabeled_count_per_temperature"][
+                temperature_index
+            ] += 1
+    flow_tracker["num_observations"] += 1
+
+
+def _summarize_adaptive_pt_flow(flow_tracker):
+    if flow_tracker is None:
+        return None
+    l_counts = np.asarray(flow_tracker["l_count_per_temperature"], dtype=np.int64)
+    r_counts = np.asarray(flow_tracker["r_count_per_temperature"], dtype=np.int64)
+    unlabeled_counts = np.asarray(
+        flow_tracker["unlabeled_count_per_temperature"],
+        dtype=np.int64,
+    )
+    denominator = l_counts + r_counts
+    f_raw = np.full(l_counts.shape[0], np.nan, dtype=np.float64)
+    mask = denominator > 0
+    f_raw[mask] = l_counts[mask].astype(np.float64) / denominator[mask]
+    f_filled = _fill_flow_nan_values(f_raw)
+    f_mono = _monotone_flow_profile(f_filled)
+    return {
+        "l_count_per_temperature": l_counts,
+        "r_count_per_temperature": r_counts,
+        "unlabeled_count_per_temperature": unlabeled_counts,
+        "num_observations": int(flow_tracker["num_observations"]),
+        "f_raw": f_raw,
+        "f_mono": f_mono,
+        "f_target": np.linspace(1.0, 0.0, l_counts.shape[0]),
+    }
+
+
+def _fill_flow_nan_values(f_raw):
+    f_raw = np.asarray(f_raw, dtype=np.float64)
+    if f_raw.size == 0:
+        return f_raw.copy()
+    finite_mask = np.isfinite(f_raw)
+    if not np.any(finite_mask):
+        return np.linspace(1.0, 0.0, f_raw.size)
+    indices = np.arange(f_raw.size, dtype=np.float64)
+    filled = np.interp(
+        indices,
+        indices[finite_mask],
+        f_raw[finite_mask],
+    )
+    filled[0] = 1.0
+    if f_raw.size > 1:
+        filled[-1] = 0.0
+    return filled
+
+
+def _monotone_flow_profile(f_values):
+    f_values = np.asarray(f_values, dtype=np.float64)
+    if f_values.size == 0:
+        return f_values.copy()
+    f_mono = np.empty_like(f_values)
+    f_mono[0] = 1.0
+    for index in range(1, f_values.size - 1):
+        f_mono[index] = min(float(f_values[index]), float(f_mono[index - 1]))
+    if f_values.size > 1:
+        f_mono[-1] = 0.0
+    return f_mono
+
+
+def _adaptive_ladder_from_flow(pt_enlarge, f_mono):
+    pt_enlarge = np.asarray(pt_enlarge, dtype=np.float64)
+    f_mono = np.asarray(f_mono, dtype=np.float64)
+    if pt_enlarge.size != f_mono.size:
+        raise ValueError("pt_enlarge and f_mono must have the same length")
+    if pt_enlarge.size < 2:
+        return pt_enlarge.copy(), "single_temperature"
+
+    target_flow = np.linspace(1.0, 0.0, pt_enlarge.size)
+    log_enlarge = np.log(pt_enlarge)
+    reverse_flow = f_mono[::-1]
+    reverse_log_enlarge = log_enlarge[::-1]
+    unique_flow = []
+    unique_log_enlarge = []
+    for flow_value, log_value in zip(reverse_flow, reverse_log_enlarge):
+        flow_value = float(flow_value)
+        if not unique_flow or flow_value > unique_flow[-1] + 1e-12:
+            unique_flow.append(flow_value)
+            unique_log_enlarge.append(float(log_value))
+        else:
+            unique_log_enlarge[-1] = min(unique_log_enlarge[-1], float(log_value))
+    if len(unique_flow) < 2:
+        return pt_enlarge.copy(), "degenerate_flow"
+    new_log_enlarge = np.interp(
+        target_flow,
+        np.asarray(unique_flow, dtype=np.float64),
+        np.asarray(unique_log_enlarge, dtype=np.float64),
+    )
+    new_log_enlarge[0] = log_enlarge[0]
+    new_log_enlarge[-1] = log_enlarge[-1]
+    new_log_enlarge = np.maximum.accumulate(new_log_enlarge)
+    return np.exp(new_log_enlarge), "ok"
+
+
 def _summarize_cluster_result(result):
     if not result.get("attempted", False):
         return {
@@ -811,11 +999,28 @@ def _run_profile_chain(
         task["data_error_probability_ladder"],
         dtype=np.float64,
     )
+    syndrome_error_probability_ladder = np.asarray(
+        task.get(
+            "syndrome_error_probability_ladder",
+            np.full_like(data_error_probability_ladder, q_value),
+        ),
+        dtype=np.float64,
+    )
+    if syndrome_error_probability_ladder.shape != data_error_probability_ladder.shape:
+        raise ValueError(
+            "syndrome_error_probability_ladder must match data ladder shape"
+        )
     log_odds_data_per_temperature = np.asarray(
         [_compute_log_odds(float(value)) for value in data_error_probability_ladder],
         dtype=np.float64,
     )
-    log_odds_syndrome = _compute_log_odds(q_value)
+    log_odds_syndrome_per_temperature = np.asarray(
+        [
+            _compute_log_odds(float(value))
+            for value in syndrome_error_probability_ladder
+        ],
+        dtype=np.float64,
+    )
     num_temperatures = int(data_error_probability_ladder.shape[0])
     num_measurements = int(task["num_measurements"])
     num_sweeps_between_measurements = int(task["num_sweeps_between_measurements"])
@@ -843,11 +1048,17 @@ def _run_profile_chain(
     if stage_signature_mode not in ("stage", "none"):
         raise ValueError("stage_signature_mode must be stage or none")
     stage_signature_enabled = stage_signature_mode == "stage"
+    flow_tracker = (
+        _build_adaptive_pt_flow_tracker(num_temperatures)
+        if bool(task.get("adaptive_pt_flow_enabled", False))
+        else None
+    )
 
     chain_bits_list = []
     data_term_bits_list = []
     syndrome_term_bits_list = []
     data_weight_per_temperature = np.empty(num_temperatures, dtype=np.int64)
+    syndrome_weight_per_temperature = np.empty(num_temperatures, dtype=np.int64)
     for temperature_index in range(num_temperatures):
         (
             current_chain_bits,
@@ -866,6 +1077,9 @@ def _run_profile_chain(
         syndrome_term_bits_list.append(current_syndrome_term_bits)
         data_weight_per_temperature[temperature_index] = np.count_nonzero(
             current_data_term_bits
+        )
+        syndrome_weight_per_temperature[temperature_index] = np.count_nonzero(
+            current_syndrome_term_bits
         )
 
     cluster_controller = build_cluster_controller(
@@ -1014,7 +1228,11 @@ def _run_profile_chain(
                             log_odds_data=(
                                 log_odds_data_per_temperature[temperature_index]
                             ),
-                            log_odds_syndrome=log_odds_syndrome,
+                            log_odds_syndrome=(
+                                log_odds_syndrome_per_temperature[
+                                    temperature_index
+                                ]
+                            ),
                             random_seed=random_seed,
                         )
                     )
@@ -1042,7 +1260,11 @@ def _run_profile_chain(
                             log_odds_data=(
                                 log_odds_data_per_temperature[temperature_index]
                             ),
-                            log_odds_syndrome=log_odds_syndrome,
+                            log_odds_syndrome=(
+                                log_odds_syndrome_per_temperature[
+                                    temperature_index
+                                ]
+                            ),
                             random_seed=random_seed,
                         )
                     )
@@ -1065,7 +1287,11 @@ def _run_profile_chain(
                             log_odds_data=(
                                 log_odds_data_per_temperature[temperature_index]
                             ),
-                            log_odds_syndrome=log_odds_syndrome,
+                            log_odds_syndrome=(
+                                log_odds_syndrome_per_temperature[
+                                    temperature_index
+                                ]
+                            ),
                             rng=rng,
                             qubit_order_buffer=(
                                 qubit_order_buffer_per_temperature[
@@ -1092,7 +1318,11 @@ def _run_profile_chain(
                             log_odds_data=(
                                 log_odds_data_per_temperature[temperature_index]
                             ),
-                            log_odds_syndrome=log_odds_syndrome,
+                            log_odds_syndrome=(
+                                log_odds_syndrome_per_temperature[
+                                    temperature_index
+                                ]
+                            ),
                             rng=rng,
                             qubit_order_buffer=(
                                 qubit_order_buffer_per_temperature[
@@ -1105,6 +1335,9 @@ def _run_profile_chain(
             elapsed = time.perf_counter() - started_at
             data_weight_per_temperature[temperature_index] += (
                 single_bit_data_weight_delta
+            )
+            syndrome_weight_per_temperature[temperature_index] = (
+                np.count_nonzero(syndrome_term_bits_list[temperature_index])
             )
             after_signature = (
                 _signature(temperature_index)
@@ -1326,7 +1559,11 @@ def _run_profile_chain(
             data_term_bits_list=data_term_bits_list,
             syndrome_term_bits_list=syndrome_term_bits_list,
             data_weight_per_temperature=data_weight_per_temperature,
+            syndrome_weight_per_temperature=syndrome_weight_per_temperature,
             log_odds_data_per_temperature=log_odds_data_per_temperature,
+            log_odds_syndrome_per_temperature=(
+                log_odds_syndrome_per_temperature
+            ),
             replica_id_per_temperature=replica_id_per_temperature,
             rng=rng,
             parity_index=swap_parity_counter,
@@ -1335,6 +1572,10 @@ def _run_profile_chain(
         )
         elapsed = time.perf_counter() - started_at
         swap_parity_counter += 1
+        _record_adaptive_pt_flow(
+            flow_tracker=flow_tracker,
+            replica_id_per_temperature=replica_id_per_temperature,
+        )
         after_signatures = _all_signatures() if stage_signature_enabled else None
         _record_stage(
             stage_profile=stage_profile,
@@ -1485,6 +1726,14 @@ def _run_profile_chain(
         "p_value": p_value,
         "q_value": q_value,
         "data_error_probability_ladder": data_error_probability_ladder,
+        "syndrome_error_probability_ladder": syndrome_error_probability_ladder,
+        "pt_enlarge_ladder": np.asarray(
+            task.get(
+                "pt_enlarge_ladder",
+                np.ones(num_temperatures, dtype=np.float64),
+            ),
+            dtype=np.float64,
+        ),
         "m_u_values_per_temperature": m_u_values_per_temperature,
         "q_top_value_per_temperature": q_top_value_per_temperature,
         "cold_m_u_values": m_u_values_per_temperature[0],
@@ -1539,6 +1788,9 @@ def _run_profile_chain(
         "stage_signature_mode": stage_signature_mode,
         "stage_signature_instrumentation_enabled": bool(stage_signature_enabled),
     }
+    adaptive_flow_summary = _summarize_adaptive_pt_flow(flow_tracker)
+    if adaptive_flow_summary is not None:
+        summary["adaptive_pt_flow"] = adaptive_flow_summary
     raw = {
         "logical_trace_per_temperature": logical_trace_per_temperature,
         "temperature_signature_trace": temperature_signature_trace,
@@ -1547,10 +1799,126 @@ def _run_profile_chain(
     return summary, raw
 
 
+def _calibrate_adaptive_pt_ladder(
+        context,
+        observed_syndrome_bits,
+        disorder_data_error_bits,
+        disorder_syndrome_representative_bits,
+        initial_chain_bits,
+        task):
+    num_rounds = int(task.get("adaptive_pt_rounds", 0))
+    if num_rounds <= 0:
+        return task, None
+    pt_enlarge = np.asarray(task["pt_enlarge_ladder"], dtype=np.float64)
+    round_summaries = []
+    calibration_sweeps = int(task.get("adaptive_pt_calibration_sweeps", 128))
+    calibration_sweeps = max(1, calibration_sweeps)
+    for round_index in range(num_rounds):
+        p_ladder, q_ladder = _build_sync_pt_ladders(
+            p_cold=task["p_value"],
+            q_cold=task["q_value"],
+            pt_enlarge=pt_enlarge,
+        )
+        calibration_task = dict(task)
+        calibration_task.update({
+            "data_error_probability_ladder": p_ladder,
+            "syndrome_error_probability_ladder": q_ladder,
+            "pt_enlarge_ladder": pt_enlarge,
+            "num_burn_in_sweeps": calibration_sweeps,
+            "num_measurements": 1,
+            "num_sweeps_between_measurements": 1,
+            "adaptive_pt_flow_enabled": True,
+            "cluster_update_enabled": False,
+        })
+        chain_seed = (
+            int(task["chain_seed_base"])
+            + 10000019
+            + 7919 * int(round_index)
+        )
+        chain_summary, _chain_raw = _run_profile_chain(
+            context=context,
+            observed_syndrome_bits=observed_syndrome_bits,
+            disorder_data_error_bits=disorder_data_error_bits,
+            disorder_syndrome_representative_bits=(
+                disorder_syndrome_representative_bits
+            ),
+            initial_chain_bits=initial_chain_bits,
+            task=calibration_task,
+            chain_seed=chain_seed,
+        )
+        flow_summary = chain_summary.get("adaptive_pt_flow")
+        if flow_summary is None:
+            break
+        new_pt_enlarge, interpolation_status = _adaptive_ladder_from_flow(
+            pt_enlarge=pt_enlarge,
+            f_mono=flow_summary["f_mono"],
+        )
+        new_p_ladder, new_q_ladder = _build_sync_pt_ladders(
+            p_cold=task["p_value"],
+            q_cold=task["q_value"],
+            pt_enlarge=new_pt_enlarge,
+        )
+        round_summaries.append({
+            "round_index": int(round_index + 1),
+            "input_pt_enlarge": pt_enlarge.copy(),
+            "input_p_ladder": p_ladder.copy(),
+            "input_q_ladder": q_ladder.copy(),
+            "f_raw": np.asarray(flow_summary["f_raw"], dtype=np.float64),
+            "f_mono": np.asarray(flow_summary["f_mono"], dtype=np.float64),
+            "f_target": np.asarray(flow_summary["f_target"], dtype=np.float64),
+            "l_count_per_temperature": np.asarray(
+                flow_summary["l_count_per_temperature"],
+                dtype=np.int64,
+            ),
+            "r_count_per_temperature": np.asarray(
+                flow_summary["r_count_per_temperature"],
+                dtype=np.int64,
+            ),
+            "unlabeled_count_per_temperature": np.asarray(
+                flow_summary["unlabeled_count_per_temperature"],
+                dtype=np.int64,
+            ),
+            "num_observations": int(flow_summary["num_observations"]),
+            "output_pt_enlarge": new_pt_enlarge.copy(),
+            "output_p_ladder": new_p_ladder.copy(),
+            "output_q_ladder": new_q_ladder.copy(),
+            "interpolation_status": interpolation_status,
+        })
+        pt_enlarge = new_pt_enlarge
+
+    final_p_ladder, final_q_ladder = _build_sync_pt_ladders(
+        p_cold=task["p_value"],
+        q_cold=task["q_value"],
+        pt_enlarge=pt_enlarge,
+    )
+    calibrated_task = dict(task)
+    calibrated_task["pt_enlarge_ladder"] = pt_enlarge
+    calibrated_task["data_error_probability_ladder"] = final_p_ladder
+    calibrated_task["syndrome_error_probability_ladder"] = final_q_ladder
+    adaptive_summary = {
+        "task_id": task["task_id"],
+        "config_label": task["config_label"],
+        "lattice_size": int(task["lattice_size"]),
+        "p_value": float(task["p_value"]),
+        "q_value": float(task["q_value"]),
+        "disorder_index": int(task["disorder_index"]),
+        "num_rounds_requested": int(num_rounds),
+        "num_rounds_completed": int(len(round_summaries)),
+        "initial_pt_enlarge": np.asarray(task["pt_enlarge_ladder"], dtype=np.float64),
+        "final_pt_enlarge": pt_enlarge,
+        "final_p_ladder": final_p_ladder,
+        "final_q_ladder": final_q_ladder,
+        "rounds": round_summaries,
+    }
+    calibrated_task["adaptive_pt_summary"] = adaptive_summary
+    return calibrated_task, adaptive_summary
+
+
 def _task_raw_stem(task):
     return (
         f"L{int(task['lattice_size']):02d}_"
         f"p{_probability_tag(task['p_value'])}_"
+        f"q{_probability_tag(task['q_value'])}_"
         f"{_sanitize_label(task['config_label'])}_"
         f"d{int(task['disorder_index']):03d}"
     )
@@ -1737,6 +2105,20 @@ def _summarize_task_chains(context, task, chain_summaries):
         "first_sector_change_measurements": (
             first_sector_change_measurements
         ),
+        "data_error_probability_ladder": np.asarray(
+            task["data_error_probability_ladder"],
+            dtype=np.float64,
+        ),
+        "syndrome_error_probability_ladder": np.asarray(
+            task.get("syndrome_error_probability_ladder", [task["q_value"]]),
+            dtype=np.float64,
+        ),
+        "pt_enlarge_ladder": np.asarray(
+            task.get("pt_enlarge_ladder", [1.0]),
+            dtype=np.float64,
+        ),
+        "adaptive_pt_rounds": int(task.get("adaptive_pt_rounds", 0)),
+        "adaptive_pt_summary": task.get("adaptive_pt_summary"),
     }
     return task_summary
 
@@ -1768,6 +2150,16 @@ def _run_profile_task(task):
             zero_syndrome_move_data=context["zero_syndrome_move_data"],
             q0_num_start_chains=int(task["num_start_chains"]),
         )
+    )
+    task, adaptive_pt_summary = _calibrate_adaptive_pt_ladder(
+        context=context,
+        observed_syndrome_bits=observed_syndrome_bits,
+        disorder_data_error_bits=disorder_data_error_bits,
+        disorder_syndrome_representative_bits=(
+            disorder_syndrome_representative_bits
+        ),
+        initial_chain_bits=initial_chain_bits_per_start[0],
+        task=task,
     )
 
     chain_summaries = []
@@ -1818,6 +2210,15 @@ def _run_profile_task(task):
         task["data_error_probability_ladder"],
         dtype=np.float64,
     )
+    task_summary["syndrome_error_probability_ladder"] = np.asarray(
+        task["syndrome_error_probability_ladder"],
+        dtype=np.float64,
+    )
+    task_summary["pt_enlarge_ladder"] = np.asarray(
+        task["pt_enlarge_ladder"],
+        dtype=np.float64,
+    )
+    task_summary["adaptive_pt_summary"] = adaptive_pt_summary
 
     raw_stem = _task_raw_stem(task)
     raw_npz_path = raw_dir / f"{raw_stem}.npz"
@@ -1849,6 +2250,14 @@ def _run_profile_task(task):
         disorder_data_error_bits=disorder_data_error_bits,
         data_error_probability_ladder=np.asarray(
             task["data_error_probability_ladder"],
+            dtype=np.float64,
+        ),
+        syndrome_error_probability_ladder=np.asarray(
+            task["syndrome_error_probability_ladder"],
+            dtype=np.float64,
+        ),
+        pt_enlarge_ladder=np.asarray(
+            task["pt_enlarge_ladder"],
             dtype=np.float64,
         ),
         lattice_size=np.int64(task["lattice_size"]),
@@ -1901,7 +2310,12 @@ def _config_with(label, **updates):
 
 
 def _build_experiment_points(args):
-    q_value = float(args.q)
+    q_values = (
+        _parse_float_csv(args.q_values)
+        if args.q_values
+        else [float(args.q)]
+    )
+    q_value = float(q_values[0])
     if args.suite == "smoke":
         lattice_sizes = _parse_int_csv(args.lattice_sizes or "4")
         p_values = _parse_float_csv(args.p_values or "0.26")
@@ -2034,6 +2448,103 @@ def _build_experiment_points(args):
             for config in optimization_configs
         ]
 
+    if args.suite == "exp35":
+        q_values = (
+            _parse_float_csv(args.q_values)
+            if args.q_values
+            else _parse_float_csv(DEFAULT_EXP35_Q_VALUES)
+        )
+        p_values = _parse_float_csv(args.p_values or "0.05")
+        lattice_sizes = _parse_int_csv(args.lattice_sizes or "3,4,5,6")
+        num_disorders = int(args.num_disorders or 1)
+        num_start_chains = max(1, int(args.num_start_chains or 4))
+        num_replicas_per_start = max(1, int(args.num_replicas_per_start or 1))
+        exp35_configs = (
+            _config_with(
+                "static_syncPT",
+                pt_num_temperatures=int(args.pt_num_temperatures or 7),
+                cluster_update_enabled=False,
+                single_bit_proposal_fraction=0.05,
+                observable_temperature_mode="cold",
+                stage_signature_mode=args.stage_signature_mode,
+                num_start_chains=num_start_chains,
+                num_replicas_per_start=num_replicas_per_start,
+                pt_ladder_mode="sync_enlarge",
+                adaptive_pt_rounds=0,
+            ),
+            _config_with(
+                "adaptivePT_r1",
+                pt_num_temperatures=int(args.pt_num_temperatures or 7),
+                cluster_update_enabled=False,
+                single_bit_proposal_fraction=0.05,
+                observable_temperature_mode="cold",
+                stage_signature_mode=args.stage_signature_mode,
+                num_start_chains=num_start_chains,
+                num_replicas_per_start=num_replicas_per_start,
+                pt_ladder_mode="sync_enlarge",
+                adaptive_pt_rounds=1,
+            ),
+            _config_with(
+                "adaptivePT_r3",
+                pt_num_temperatures=int(args.pt_num_temperatures or 7),
+                cluster_update_enabled=False,
+                single_bit_proposal_fraction=0.05,
+                observable_temperature_mode="cold",
+                stage_signature_mode=args.stage_signature_mode,
+                num_start_chains=num_start_chains,
+                num_replicas_per_start=num_replicas_per_start,
+                pt_ladder_mode="sync_enlarge",
+                adaptive_pt_rounds=3,
+            ),
+            _config_with(
+                "adaptivePT_r5",
+                pt_num_temperatures=int(args.pt_num_temperatures or 7),
+                cluster_update_enabled=False,
+                single_bit_proposal_fraction=0.05,
+                observable_temperature_mode="cold",
+                stage_signature_mode=args.stage_signature_mode,
+                num_start_chains=num_start_chains,
+                num_replicas_per_start=num_replicas_per_start,
+                pt_ladder_mode="sync_enlarge",
+                adaptive_pt_rounds=5,
+            ),
+            _config_with(
+                "static_syncPT_single_0p10",
+                pt_num_temperatures=int(args.pt_num_temperatures or 7),
+                cluster_update_enabled=False,
+                single_bit_proposal_fraction=0.10,
+                observable_temperature_mode="cold",
+                stage_signature_mode=args.stage_signature_mode,
+                num_start_chains=num_start_chains,
+                num_replicas_per_start=num_replicas_per_start,
+                pt_ladder_mode="sync_enlarge",
+                adaptive_pt_rounds=0,
+            ),
+        )
+        if args.config_labels:
+            requested_labels = {
+                token.strip()
+                for token in args.config_labels.split(",")
+                if token.strip()
+            }
+            exp35_configs = tuple(
+                config for config in exp35_configs
+                if config["config_label"] in requested_labels
+            )
+        return [
+            {
+                "lattice_size": lattice_size,
+                "p_value": p_value,
+                "q_value": q_value,
+                "config": dict(config),
+                "num_disorders": num_disorders,
+            }
+            for lattice_size in lattice_sizes
+            for p_value in p_values
+            for q_value in q_values
+            for config in exp35_configs
+        ]
+
     points = []
     seen = set()
 
@@ -2133,14 +2644,31 @@ def _build_tasks(args, run_root):
     for point_index, point in enumerate(points):
         config = dict(point["config"])
         p_value = float(point["p_value"])
+        q_value = float(point["q_value"])
+        pt_ladder_mode = str(config.get("pt_ladder_mode", "data_only"))
         if int(config["pt_num_temperatures"]) <= 1:
             ladder = np.asarray([p_value], dtype=np.float64)
+            syndrome_ladder = np.asarray([q_value], dtype=np.float64)
+            pt_enlarge_ladder = np.asarray([1.0], dtype=np.float64)
+        elif pt_ladder_mode == "sync_enlarge":
+            pt_enlarge_ladder = _build_sync_pt_enlarge_ladder(
+                q_cold=q_value,
+                q_hot=float(config.get("pt_q_hot", 0.44)),
+                num_temperatures=int(config["pt_num_temperatures"]),
+            )
+            ladder, syndrome_ladder = _build_sync_pt_ladders(
+                p_cold=p_value,
+                q_cold=q_value,
+                pt_enlarge=pt_enlarge_ladder,
+            )
         else:
             ladder = equal_log_odds_ladder(
                 p_cold=p_value,
                 p_hot=float(config["pt_p_hot"]),
                 num_temperatures=int(config["pt_num_temperatures"]),
             )
+            syndrome_ladder = np.full(ladder.shape, q_value, dtype=np.float64)
+            pt_enlarge_ladder = ladder / ladder
         for disorder_index in range(int(point["num_disorders"])):
             p_seed_component = int(round(p_value * 1_000_000))
             q_seed_component = int(round(float(point["q_value"]) * 1_000_000))
@@ -2155,6 +2683,7 @@ def _build_tasks(args, run_root):
                 f"task{task_index:04d}_"
                 f"L{int(point['lattice_size']):02d}_"
                 f"p{_probability_tag(point['p_value'])}_"
+                f"q{_probability_tag(point['q_value'])}_"
                 f"{_sanitize_label(config['config_label'])}_"
                 f"d{disorder_index:03d}"
             )
@@ -2165,13 +2694,21 @@ def _build_tasks(args, run_root):
                 "code_family": "3d_toric",
                 "lattice_size": int(point["lattice_size"]),
                 "p_value": p_value,
-                "q_value": float(point["q_value"]),
+                "q_value": q_value,
                 "disorder_index": int(disorder_index),
                 "config_label": str(config["config_label"]),
                 "data_error_probability_ladder": ladder,
+                "syndrome_error_probability_ladder": syndrome_ladder,
+                "pt_enlarge_ladder": pt_enlarge_ladder,
+                "pt_ladder_mode": pt_ladder_mode,
                 "pt_num_temperatures": int(config["pt_num_temperatures"]),
                 "pt_p_hot": (
                     None if config["pt_p_hot"] is None else float(config["pt_p_hot"])
+                ),
+                "pt_q_hot": (
+                    None
+                    if config.get("pt_q_hot", None) is None
+                    else float(config["pt_q_hot"])
                 ),
                 "pt_swap_attempt_every_num_sweeps": int(
                     config["pt_swap_attempt_every_num_sweeps"]
@@ -2195,6 +2732,10 @@ def _build_tasks(args, run_root):
                 ),
                 "stage_signature_mode": str(
                     config.get("stage_signature_mode", "stage")
+                ),
+                "adaptive_pt_rounds": int(config.get("adaptive_pt_rounds", 0)),
+                "adaptive_pt_calibration_sweeps": int(
+                    args.adaptive_pt_calibration_sweeps
                 ),
                 "num_burn_in_sweeps": int(args.num_burn_in_sweeps),
                 "num_measurements": int(args.num_measurements),
@@ -2344,6 +2885,11 @@ def _aggregate_group(group_results):
         [result["mean_ess_per_total_second"] for result in group_results],
         dtype=np.float64,
     )
+    r_hat_values = np.asarray(
+        [result["max_r_hat"] for result in group_results],
+        dtype=np.float64,
+    )
+    finite_r_hat_values = r_hat_values[np.isfinite(r_hat_values)]
     swap_accept_counts = np.sum(
         [np.asarray(result["swap_accept_counts"], dtype=np.int64) for result in group_results],
         axis=0,
@@ -2384,9 +2930,11 @@ def _aggregate_group(group_results):
         "mean_m_u_spread_linf": float(np.mean([
             result["m_u_spread_linf"] for result in group_results
         ])),
-        "max_r_hat": float(np.nanmax([
-            result["max_r_hat"] for result in group_results
-        ])),
+        "max_r_hat": (
+            float(np.max(finite_r_hat_values))
+            if finite_r_hat_values.size
+            else np.nan
+        ),
         "min_effective_sample_size": float(np.min([
             result["min_effective_sample_size"] for result in group_results
         ])),
@@ -2445,12 +2993,156 @@ def _aggregate_group(group_results):
     return summary
 
 
+def _write_adaptive_pt_outputs(run_root, results):
+    adaptive_entries = [
+        result.get("adaptive_pt_summary")
+        for result in results
+        if result.get("adaptive_pt_summary") is not None
+    ]
+    if not adaptive_entries:
+        return None
+    json_path = Path(run_root) / "adaptive_pt_summary.json"
+    csv_path = Path(run_root) / "adaptive_pt_summary.csv"
+    _write_json(json_path, {"tasks": adaptive_entries})
+
+    fieldnames = (
+        "task_id",
+        "config_label",
+        "lattice_size",
+        "p_value",
+        "q_value",
+        "disorder_index",
+        "round_index",
+        "temperature_index",
+        "input_pt_enlarge",
+        "output_pt_enlarge",
+        "input_p",
+        "input_q",
+        "output_p",
+        "output_q",
+        "f_raw",
+        "f_mono",
+        "f_target",
+        "l_count",
+        "r_count",
+        "unlabeled_count",
+        "interpolation_status",
+    )
+    with csv_path.open("w", encoding="utf-8", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=fieldnames)
+        writer.writeheader()
+        for entry in adaptive_entries:
+            for round_summary in entry["rounds"]:
+                for temperature_index in range(
+                        len(round_summary["input_pt_enlarge"])):
+                    writer.writerow({
+                        "task_id": entry["task_id"],
+                        "config_label": entry["config_label"],
+                        "lattice_size": entry["lattice_size"],
+                        "p_value": entry["p_value"],
+                        "q_value": entry["q_value"],
+                        "disorder_index": entry["disorder_index"],
+                        "round_index": round_summary["round_index"],
+                        "temperature_index": temperature_index,
+                        "input_pt_enlarge": round_summary["input_pt_enlarge"][
+                            temperature_index
+                        ],
+                        "output_pt_enlarge": round_summary["output_pt_enlarge"][
+                            temperature_index
+                        ],
+                        "input_p": round_summary["input_p_ladder"][
+                            temperature_index
+                        ],
+                        "input_q": round_summary["input_q_ladder"][
+                            temperature_index
+                        ],
+                        "output_p": round_summary["output_p_ladder"][
+                            temperature_index
+                        ],
+                        "output_q": round_summary["output_q_ladder"][
+                            temperature_index
+                        ],
+                        "f_raw": round_summary["f_raw"][temperature_index],
+                        "f_mono": round_summary["f_mono"][temperature_index],
+                        "f_target": round_summary["f_target"][temperature_index],
+                        "l_count": round_summary["l_count_per_temperature"][
+                            temperature_index
+                        ],
+                        "r_count": round_summary["r_count_per_temperature"][
+                            temperature_index
+                        ],
+                        "unlabeled_count": round_summary[
+                            "unlabeled_count_per_temperature"
+                        ][temperature_index],
+                        "interpolation_status": round_summary[
+                            "interpolation_status"
+                        ],
+                    })
+    png_path = _write_adaptive_pt_flow_plot(run_root, adaptive_entries)
+    return {
+        "adaptive_pt_summary_json": str(json_path),
+        "adaptive_pt_summary_csv": str(csv_path),
+        "adaptive_pt_flow_png": None if png_path is None else str(png_path),
+    }
+
+
+def _write_adaptive_pt_flow_plot(run_root, adaptive_entries):
+    try:
+        os.environ.setdefault(
+            "MPLCONFIGDIR",
+            str(Path(run_root) / "matplotlib-cache"),
+        )
+        import matplotlib
+        matplotlib.use("Agg")
+        import matplotlib.pyplot as plt
+    except Exception:
+        return None
+    plot_entries = [
+        entry for entry in adaptive_entries
+        if entry.get("rounds")
+    ]
+    if not plot_entries:
+        return None
+    max_panels = min(12, len(plot_entries))
+    figure, axes = plt.subplots(
+        max_panels,
+        1,
+        figsize=(7.6, max(2.6, 2.2 * max_panels)),
+        squeeze=False,
+        constrained_layout=True,
+    )
+    for axis, entry in zip(axes[:, 0], plot_entries[:max_panels]):
+        last_round = entry["rounds"][-1]
+        x_values = np.arange(len(last_round["f_target"]))
+        axis.plot(x_values, last_round["f_target"], color="0.35", label="target")
+        axis.plot(x_values, last_round["f_raw"], marker="o", label="raw")
+        axis.plot(x_values, last_round["f_mono"], marker="s", label="mono")
+        axis.set_ylim(-0.05, 1.05)
+        axis.set_xlabel("temperature index")
+        axis.set_ylabel("flow")
+        axis.set_title(
+            " ".join((
+                f"L={entry['lattice_size']}",
+                f"p={entry['p_value']:.3f}",
+                f"q={entry['q_value']:.3f}",
+                str(entry["config_label"]),
+                f"d={entry['disorder_index']}",
+            ))
+        )
+        axis.legend(loc="best", fontsize=8)
+    png_path = Path(run_root) / "adaptive_pt_flow.png"
+    figure.savefig(png_path, dpi=160)
+    plt.close(figure)
+    return png_path
+
+
 def _aggregate_results(args, run_root, tasks, results, skipped_tasks, started_at):
     groups = {}
     for result in results:
         key = (
             int(result["lattice_size"]),
             float(result["p_value"]),
+            float(result["q_value"]),
             str(result["config_label"]),
         )
         groups.setdefault(key, []).append(result)
@@ -2468,6 +3160,7 @@ def _aggregate_results(args, run_root, tasks, results, skipped_tasks, started_at
         )
         stage_rankings[
             f"L{group['lattice_size']}_p{_probability_tag(group['p_value'])}_{group['config_label']}"
+            f"_q{_probability_tag(group['q_value'])}"
         ] = [
             {
                 "stage": stage_name,
@@ -2488,6 +3181,11 @@ def _aggregate_results(args, run_root, tasks, results, skipped_tasks, started_at
         "suite": args.suite,
         "code_family": args.code_family,
         "q_value": float(args.q),
+        "q_values": (
+            _parse_float_csv(args.q_values)
+            if args.q_values
+            else [float(args.q)]
+        ),
         "num_tasks": int(len(tasks)),
         "num_completed_tasks": int(len(results)),
         "num_skipped_tasks": int(len(skipped_tasks)),
@@ -2501,6 +3199,9 @@ def _aggregate_results(args, run_root, tasks, results, skipped_tasks, started_at
             "winding_report_unit": "accepted/sector-changing winding stage changes per 1000 sweeps",
         },
     }
+    adaptive_outputs = _write_adaptive_pt_outputs(run_root, results)
+    if adaptive_outputs is not None:
+        summary["adaptive_pt_outputs"] = adaptive_outputs
     _write_json(Path(run_root) / "profile_summary.json", summary)
     _write_markdown_summary(Path(run_root) / "profile_summary.md", summary)
     return summary
@@ -2533,10 +3234,10 @@ def _write_markdown_summary(path, summary):
     lines.append("## Config summaries")
     lines.append("")
     lines.append(
-        "| L | p | config | disorders | q_top | ESS/sec | R-hat max | q_top spread | m_u spread | cold flips | hot flips | hot->cold deliveries | cluster nonzero | top wall stage |"
+        "| L | p | q | config | disorders | q_top | ESS/sec | R-hat max | q_top spread | m_u spread | cold flips | hot flips | hot->cold deliveries | cluster nonzero | top wall stage |"
     )
     lines.append(
-        "|---:|---:|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|"
+        "|---:|---:|---:|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|"
     )
     for group in summary["group_summaries"]:
         top_stage = max(
@@ -2550,6 +3251,7 @@ def _write_markdown_summary(path, summary):
             "| "
             f"{group['lattice_size']} | "
             f"{group['p_value']:.4f} | "
+            f"{group['q_value']:.4f} | "
             f"`{group['config_label']}` | "
             f"{group['num_disorders_completed']} | "
             f"{_format_float(group['mean_q_top'])} | "
@@ -2584,9 +3286,10 @@ def _build_parser():
     )
     parser.add_argument("--code-family", default="3d_toric")
     parser.add_argument("--q", type=float, default=DEFAULT_Q_VALUE)
+    parser.add_argument("--q-values", default=None)
     parser.add_argument(
         "--suite",
-        choices=("default", "calibration", "smoke", "optimization"),
+        choices=("default", "calibration", "smoke", "optimization", "exp35"),
         default="default",
     )
     parser.add_argument("--run-root", default=None)
@@ -2602,6 +3305,8 @@ def _build_parser():
     parser.add_argument("--num-sweeps-between-measurements", type=int, default=4)
     parser.add_argument("--num-start-chains", type=int, default=None)
     parser.add_argument("--num-replicas-per-start", type=int, default=None)
+    parser.add_argument("--pt-num-temperatures", type=int, default=None)
+    parser.add_argument("--adaptive-pt-calibration-sweeps", type=int, default=128)
     parser.add_argument(
         "--stage-signature-mode",
         choices=("stage", "none"),
@@ -2623,6 +3328,10 @@ def main(argv=None):
         raise ValueError("--code-family must be 3d_toric for this profiler")
     if float(args.q) <= 0.0:
         raise ValueError("--q must be > 0 for this profiler")
+    if args.q_values:
+        for q_value in _parse_float_csv(args.q_values):
+            if q_value <= 0.0:
+                raise ValueError("--q-values entries must be > 0")
     if args.num_burn_in_sweeps < 0:
         raise ValueError("--num-burn-in-sweeps must be >= 0")
     if args.num_measurements < 1:
@@ -2647,6 +3356,11 @@ def main(argv=None):
         "suite": args.suite,
         "code_family": args.code_family,
         "q_value": float(args.q),
+        "q_values": (
+            _parse_float_csv(args.q_values)
+            if args.q_values
+            else [float(args.q)]
+        ),
         "workers": int(workers),
         "max_wall_seconds": args.max_wall_seconds,
         "num_tasks": len(tasks),
