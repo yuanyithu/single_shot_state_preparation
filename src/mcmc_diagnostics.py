@@ -1,6 +1,20 @@
 import numpy as np
 
 
+def probability_to_odds(probability):
+    probability = float(probability)
+    if not (0.0 < probability < 0.5):
+        raise ValueError("probability must be in (0, 0.5)")
+    return probability / (1.0 - probability)
+
+
+def odds_to_probability(odds):
+    odds = float(odds)
+    if odds <= 0.0:
+        raise ValueError("odds must be positive")
+    return odds / (1.0 + odds)
+
+
 def equal_log_odds_ladder(p_cold, p_hot, num_temperatures):
     if num_temperatures < 1:
         raise ValueError("num_temperatures must be >= 1")
@@ -12,6 +26,169 @@ def equal_log_odds_ladder(p_cold, p_hot, num_temperatures):
         int(num_temperatures),
     )
     return np.exp(log_odds_values) / (1.0 + np.exp(log_odds_values))
+
+
+def sync_pt_enlarge_ladder(q_cold, q_hot, num_temperatures):
+    num_temperatures = int(num_temperatures)
+    if num_temperatures < 1:
+        raise ValueError("num_temperatures must be >= 1")
+    if num_temperatures == 1:
+        return np.asarray([1.0], dtype=np.float64)
+    hot_enlarge = probability_to_odds(q_hot) / probability_to_odds(q_cold)
+    if hot_enlarge < 1.0:
+        raise ValueError("q_hot must be >= q_cold for sync PT")
+    return np.exp(
+        np.linspace(0.0, np.log(hot_enlarge), num_temperatures)
+    ).astype(np.float64)
+
+
+def sync_pt_ladders_from_enlarge(p_cold, q_cold, pt_enlarge):
+    pt_enlarge = np.asarray(pt_enlarge, dtype=np.float64)
+    if pt_enlarge.ndim != 1:
+        raise ValueError("pt_enlarge must be 1D")
+    p_odds_cold = probability_to_odds(p_cold)
+    q_odds_cold = probability_to_odds(q_cold)
+    p_ladder = np.asarray(
+        [odds_to_probability(scale * p_odds_cold) for scale in pt_enlarge],
+        dtype=np.float64,
+    )
+    q_ladder = np.asarray(
+        [odds_to_probability(scale * q_odds_cold) for scale in pt_enlarge],
+        dtype=np.float64,
+    )
+    if np.any(p_ladder >= 0.5) or np.any(q_ladder >= 0.5):
+        raise ValueError("sync PT ladder must keep p_k and q_k below 0.5")
+    return p_ladder, q_ladder
+
+
+def build_adaptive_pt_flow_tracker(num_temperatures):
+    return {
+        "replica_tags": np.zeros(num_temperatures, dtype=np.int8),
+        "l_count_per_temperature": np.zeros(num_temperatures, dtype=np.int64),
+        "r_count_per_temperature": np.zeros(num_temperatures, dtype=np.int64),
+        "unlabeled_count_per_temperature": np.zeros(
+            num_temperatures,
+            dtype=np.int64,
+        ),
+        "num_observations": 0,
+    }
+
+
+def record_adaptive_pt_flow(flow_tracker, replica_id_per_temperature):
+    if flow_tracker is None:
+        return
+    replica_id_per_temperature = np.asarray(
+        replica_id_per_temperature,
+        dtype=np.int64,
+    )
+    num_temperatures = int(replica_id_per_temperature.shape[0])
+    if num_temperatures < 2:
+        return
+    flow_tracker["replica_tags"][int(replica_id_per_temperature[0])] = 1
+    flow_tracker["replica_tags"][int(replica_id_per_temperature[-1])] = 2
+    for temperature_index, replica_id in enumerate(replica_id_per_temperature):
+        tag = int(flow_tracker["replica_tags"][int(replica_id)])
+        if tag == 1:
+            flow_tracker["l_count_per_temperature"][temperature_index] += 1
+        elif tag == 2:
+            flow_tracker["r_count_per_temperature"][temperature_index] += 1
+        else:
+            flow_tracker["unlabeled_count_per_temperature"][
+                temperature_index
+            ] += 1
+    flow_tracker["num_observations"] += 1
+
+
+def _fill_flow_nan_values(f_raw):
+    f_raw = np.asarray(f_raw, dtype=np.float64)
+    if f_raw.size == 0:
+        return f_raw.copy()
+    finite_mask = np.isfinite(f_raw)
+    if not np.any(finite_mask):
+        return np.linspace(1.0, 0.0, f_raw.size)
+    indices = np.arange(f_raw.size, dtype=np.float64)
+    filled = np.interp(
+        indices,
+        indices[finite_mask],
+        f_raw[finite_mask],
+    )
+    filled[0] = 1.0
+    if f_raw.size > 1:
+        filled[-1] = 0.0
+    return filled
+
+
+def _monotone_flow_profile(f_values):
+    f_values = np.asarray(f_values, dtype=np.float64)
+    if f_values.size == 0:
+        return f_values.copy()
+    f_mono = np.empty_like(f_values)
+    f_mono[0] = 1.0
+    for index in range(1, f_values.size - 1):
+        f_mono[index] = min(float(f_values[index]), float(f_mono[index - 1]))
+    if f_values.size > 1:
+        f_mono[-1] = 0.0
+    return f_mono
+
+
+def summarize_adaptive_pt_flow(flow_tracker):
+    if flow_tracker is None:
+        return None
+    l_counts = np.asarray(flow_tracker["l_count_per_temperature"], dtype=np.int64)
+    r_counts = np.asarray(flow_tracker["r_count_per_temperature"], dtype=np.int64)
+    unlabeled_counts = np.asarray(
+        flow_tracker["unlabeled_count_per_temperature"],
+        dtype=np.int64,
+    )
+    denominator = l_counts + r_counts
+    f_raw = np.full(l_counts.shape[0], np.nan, dtype=np.float64)
+    mask = denominator > 0
+    f_raw[mask] = l_counts[mask].astype(np.float64) / denominator[mask]
+    f_filled = _fill_flow_nan_values(f_raw)
+    f_mono = _monotone_flow_profile(f_filled)
+    return {
+        "l_count_per_temperature": l_counts,
+        "r_count_per_temperature": r_counts,
+        "unlabeled_count_per_temperature": unlabeled_counts,
+        "num_observations": int(flow_tracker["num_observations"]),
+        "f_raw": f_raw,
+        "f_mono": f_mono,
+        "f_target": np.linspace(1.0, 0.0, l_counts.shape[0]),
+    }
+
+
+def adaptive_ladder_from_flow(pt_enlarge, f_mono):
+    pt_enlarge = np.asarray(pt_enlarge, dtype=np.float64)
+    f_mono = np.asarray(f_mono, dtype=np.float64)
+    if pt_enlarge.size != f_mono.size:
+        raise ValueError("pt_enlarge and f_mono must have the same length")
+    if pt_enlarge.size < 2:
+        return pt_enlarge.copy(), "single_temperature"
+
+    target_flow = np.linspace(1.0, 0.0, pt_enlarge.size)
+    log_enlarge = np.log(pt_enlarge)
+    reverse_flow = f_mono[::-1]
+    reverse_log_enlarge = log_enlarge[::-1]
+    unique_flow = []
+    unique_log_enlarge = []
+    for flow_value, log_value in zip(reverse_flow, reverse_log_enlarge):
+        flow_value = float(flow_value)
+        if not unique_flow or flow_value > unique_flow[-1] + 1e-12:
+            unique_flow.append(flow_value)
+            unique_log_enlarge.append(float(log_value))
+        else:
+            unique_log_enlarge[-1] = min(unique_log_enlarge[-1], float(log_value))
+    if len(unique_flow) < 2:
+        return pt_enlarge.copy(), "degenerate_flow"
+    new_log_enlarge = np.interp(
+        target_flow,
+        np.asarray(unique_flow, dtype=np.float64),
+        np.asarray(unique_log_enlarge, dtype=np.float64),
+    )
+    new_log_enlarge[0] = log_enlarge[0]
+    new_log_enlarge[-1] = log_enlarge[-1]
+    new_log_enlarge = np.maximum.accumulate(new_log_enlarge)
+    return np.exp(new_log_enlarge), "ok"
 
 
 def _autocovariance_fft(values):

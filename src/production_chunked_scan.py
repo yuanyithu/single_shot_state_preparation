@@ -22,6 +22,10 @@ from mcmc_convergence_gate import (
     build_convergence_summary,
     write_convergence_summary_json,
 )
+from mcmc_diagnostics import (
+    sync_pt_enlarge_ladder,
+    sync_pt_ladders_from_enlarge,
+)
 from plot_scan_results import plot_scan_result
 
 
@@ -308,6 +312,48 @@ def _build_submit_config_from_args(args):
         raise ValueError("cluster_budget_fraction_rho must be >= 0")
     if not (0.0 < float(args.single_bit_proposal_fraction) <= 1.0):
         raise ValueError("single_bit_proposal_fraction must be in (0, 1]")
+    if args.pt_ladder_mode not in ("data_only", "sync_enlarge"):
+        raise ValueError("pt_ladder_mode must be data_only or sync_enlarge")
+    pt_requested = (
+        args.pt_p_hot is not None
+        or args.pt_num_temperatures is not None
+        or args.pt_ladder_mode != "data_only"
+        or args.pt_q_hot is not None
+        or int(args.adaptive_pt_rounds) > 0
+    )
+    if pt_requested and (
+            args.pt_p_hot is None or args.pt_num_temperatures is None):
+        raise ValueError(
+            "--pt-p-hot and --pt-num-temperatures are required together"
+        )
+    if args.pt_ladder_mode == "sync_enlarge":
+        if args.pt_q_hot is None:
+            raise ValueError("--pt-q-hot is required for sync_enlarge PT")
+        if float(args.pt_q_hot) < float(args.syndrome_error_probability):
+            raise ValueError("--pt-q-hot must be >= cold q")
+        if not bool(args.disable_cluster_update):
+            raise ValueError(
+                "sync_enlarge PT requires --disable-cluster-update"
+            )
+        pt_enlarge_ladder = sync_pt_enlarge_ladder(
+            q_cold=float(args.syndrome_error_probability),
+            q_hot=float(args.pt_q_hot),
+            num_temperatures=int(args.pt_num_temperatures),
+        )
+        for data_error_probability in data_error_probability_list:
+            sync_pt_ladders_from_enlarge(
+                p_cold=float(data_error_probability),
+                q_cold=float(args.syndrome_error_probability),
+                pt_enlarge=pt_enlarge_ladder,
+            )
+    if int(args.adaptive_pt_rounds) < 0:
+        raise ValueError("--adaptive-pt-rounds must be >= 0")
+    if int(args.adaptive_pt_rounds) > 0 and args.pt_ladder_mode != "sync_enlarge":
+        raise ValueError(
+            "--adaptive-pt-rounds requires --pt-ladder-mode sync_enlarge"
+        )
+    if int(args.adaptive_pt_calibration_sweeps) < 1:
+        raise ValueError("--adaptive-pt-calibration-sweeps must be >= 1")
 
     run_root = Path(args.run_root).expanduser().resolve()
     chunks_dir = run_root / "chunks"
@@ -365,6 +411,14 @@ def _build_submit_config_from_args(args):
             None
             if args.pt_num_temperatures is None
             else int(args.pt_num_temperatures)
+        ),
+        "pt_ladder_mode": str(args.pt_ladder_mode),
+        "pt_q_hot": (
+            None if args.pt_q_hot is None else float(args.pt_q_hot)
+        ),
+        "adaptive_pt_rounds": int(args.adaptive_pt_rounds),
+        "adaptive_pt_calibration_sweeps": int(
+            args.adaptive_pt_calibration_sweeps
         ),
         "pt_swap_attempt_every_num_sweeps": int(
             args.pt_swap_attempt_every_num_sweeps
@@ -460,6 +514,12 @@ def _build_chunk_tasks(config):
                     ),
                     "pt_p_hot": config["pt_p_hot"],
                     "pt_num_temperatures": config["pt_num_temperatures"],
+                    "pt_ladder_mode": config["pt_ladder_mode"],
+                    "pt_q_hot": config["pt_q_hot"],
+                    "adaptive_pt_rounds": config["adaptive_pt_rounds"],
+                    "adaptive_pt_calibration_sweeps": (
+                        config["adaptive_pt_calibration_sweeps"]
+                    ),
                     "pt_swap_attempt_every_num_sweeps": int(
                         config["pt_swap_attempt_every_num_sweeps"]
                     ),
@@ -594,6 +654,12 @@ def _build_manifest(
             "num_replicas_per_start": config["num_replicas_per_start"],
             "pt_p_hot": config["pt_p_hot"],
             "pt_num_temperatures": config["pt_num_temperatures"],
+            "pt_ladder_mode": config["pt_ladder_mode"],
+            "pt_q_hot": config["pt_q_hot"],
+            "adaptive_pt_rounds": config["adaptive_pt_rounds"],
+            "adaptive_pt_calibration_sweeps": (
+                config["adaptive_pt_calibration_sweeps"]
+            ),
             "pt_swap_attempt_every_num_sweeps": (
                 config["pt_swap_attempt_every_num_sweeps"]
             ),
@@ -737,6 +803,12 @@ def _run_chunk_task(task_data):
             num_replicas_per_start=task_data["num_replicas_per_start"],
             pt_p_hot=task_data["pt_p_hot"],
             pt_num_temperatures=task_data["pt_num_temperatures"],
+            pt_ladder_mode=task_data["pt_ladder_mode"],
+            pt_q_hot=task_data["pt_q_hot"],
+            adaptive_pt_rounds=task_data["adaptive_pt_rounds"],
+            adaptive_pt_calibration_sweeps=(
+                task_data["adaptive_pt_calibration_sweeps"]
+            ),
             pt_swap_attempt_every_num_sweeps=(
                 task_data["pt_swap_attempt_every_num_sweeps"]
             ),
@@ -805,6 +877,16 @@ def _run_chunk_task(task_data):
             ),
             observable_temperature_mode=np.array(
                 task_data["observable_temperature_mode"]
+            ),
+            pt_ladder_mode_config=np.array(task_data["pt_ladder_mode"]),
+            pt_q_hot_config=np.float64(
+                np.nan
+                if task_data["pt_q_hot"] is None
+                else task_data["pt_q_hot"]
+            ),
+            adaptive_pt_rounds_config=np.int64(task_data["adaptive_pt_rounds"]),
+            adaptive_pt_calibration_sweeps_config=np.int64(
+                task_data["adaptive_pt_calibration_sweeps"]
             ),
             cluster_update_config_enabled=np.bool_(
                 task_data["cluster_update_enabled"]
@@ -930,6 +1012,10 @@ def _merge_outputs(
         config["pt_p_hot"] is not None
         and config["pt_num_temperatures"] is not None
     )
+    pt_num_temperatures = (
+        0 if not pt_enabled else int(config["pt_num_temperatures"])
+    )
+    adaptive_pt_rounds = int(config.get("adaptive_pt_rounds", 0))
     num_qubits_list = np.empty(num_sizes, dtype=np.int64)
     num_logical_qubits_list = np.empty(num_sizes, dtype=np.int64)
     effective_num_burn_in_sweeps_list = np.empty(num_sizes, dtype=np.int64)
@@ -1020,6 +1106,13 @@ def _merge_outputs(
     num_chains_that_never_flipped_sector_per_disorder_tensor = None
     pt_min_swap_acceptance_rate_per_disorder_tensor = None
     pt_mean_swap_acceptance_rate_per_disorder_tensor = None
+    pt_data_error_probability_ladder_per_disorder_tensor = None
+    pt_syndrome_error_probability_ladder_per_disorder_tensor = None
+    pt_enlarge_ladder_per_disorder_tensor = None
+    adaptive_pt_num_rounds_completed_per_disorder_tensor = None
+    adaptive_pt_round_f_raw_tensor = None
+    adaptive_pt_round_f_mono_tensor = None
+    adaptive_pt_round_f_target_tensor = None
     cluster_summary_list = []
     section_summary_list = []
 
@@ -1240,6 +1333,73 @@ def _merge_outputs(
                         (num_sizes, num_points, num_disorder_samples_total),
                         dtype=np.float64,
                     )
+                    pt_data_error_probability_ladder_per_disorder_tensor = (
+                        np.full(
+                            (
+                                num_sizes,
+                                num_points,
+                                num_disorder_samples_total,
+                                pt_num_temperatures,
+                            ),
+                            np.nan,
+                            dtype=np.float64,
+                        )
+                    )
+                    pt_syndrome_error_probability_ladder_per_disorder_tensor = (
+                        np.full(
+                            (
+                                num_sizes,
+                                num_points,
+                                num_disorder_samples_total,
+                                pt_num_temperatures,
+                            ),
+                            np.nan,
+                            dtype=np.float64,
+                        )
+                    )
+                    pt_enlarge_ladder_per_disorder_tensor = np.full(
+                        (
+                            num_sizes,
+                            num_points,
+                            num_disorder_samples_total,
+                            pt_num_temperatures,
+                        ),
+                        np.nan,
+                        dtype=np.float64,
+                    )
+                    if adaptive_pt_rounds > 0:
+                        adaptive_pt_num_rounds_completed_per_disorder_tensor = (
+                            np.zeros(
+                                (
+                                    num_sizes,
+                                    num_points,
+                                    num_disorder_samples_total,
+                                ),
+                                dtype=np.int64,
+                            )
+                        )
+                        adaptive_shape = (
+                            num_sizes,
+                            num_points,
+                            num_disorder_samples_total,
+                            adaptive_pt_rounds,
+                            pt_num_temperatures,
+                        )
+                        adaptive_pt_round_f_raw_tensor = np.full(
+                            adaptive_shape,
+                            np.nan,
+                            dtype=np.float64,
+                        )
+                        adaptive_pt_round_f_mono_tensor = np.full(
+                            adaptive_shape,
+                            np.nan,
+                            dtype=np.float64,
+                        )
+                        adaptive_pt_round_f_target_tensor = np.full(
+                            adaptive_shape,
+                            np.nan,
+                            dtype=np.float64,
+                        )
         elif current_num_masks != num_masks:
             raise ValueError("num_masks must be consistent across sizes")
 
@@ -1452,6 +1612,87 @@ def _merge_outputs(
                         ] = loaded_chunk_result[
                             "pt_mean_swap_acceptance_rate_per_disorder"
                         ]
+                        if (
+                                "pt_data_error_probability_ladder_per_disorder"
+                                in loaded_chunk_result):
+                            pt_data_error_probability_ladder_per_disorder_tensor[
+                                lattice_index,
+                                point_index,
+                                start_index:stop_index,
+                                :,
+                            ] = loaded_chunk_result[
+                                "pt_data_error_probability_ladder_per_disorder"
+                            ]
+                        if (
+                                "pt_syndrome_error_probability_ladder_per_disorder"
+                                in loaded_chunk_result):
+                            pt_syndrome_error_probability_ladder_per_disorder_tensor[
+                                lattice_index,
+                                point_index,
+                                start_index:stop_index,
+                                :,
+                            ] = loaded_chunk_result[
+                                "pt_syndrome_error_probability_ladder_per_disorder"
+                            ]
+                        if "pt_enlarge_ladder_per_disorder" in loaded_chunk_result:
+                            pt_enlarge_ladder_per_disorder_tensor[
+                                lattice_index,
+                                point_index,
+                                start_index:stop_index,
+                                :,
+                            ] = loaded_chunk_result[
+                                "pt_enlarge_ladder_per_disorder"
+                            ]
+                        if (
+                                adaptive_pt_rounds > 0
+                                and "adaptive_pt_num_rounds_completed_per_disorder"
+                                in loaded_chunk_result):
+                            adaptive_pt_num_rounds_completed_per_disorder_tensor[
+                                lattice_index,
+                                point_index,
+                                start_index:stop_index,
+                            ] = loaded_chunk_result[
+                                "adaptive_pt_num_rounds_completed_per_disorder"
+                            ]
+                        if (
+                                adaptive_pt_rounds > 0
+                                and "adaptive_pt_round_f_raw_per_disorder"
+                                in loaded_chunk_result):
+                            adaptive_pt_round_f_raw_tensor[
+                                lattice_index,
+                                point_index,
+                                start_index:stop_index,
+                                :,
+                                :,
+                            ] = loaded_chunk_result[
+                                "adaptive_pt_round_f_raw_per_disorder"
+                            ]
+                        if (
+                                adaptive_pt_rounds > 0
+                                and "adaptive_pt_round_f_mono_per_disorder"
+                                in loaded_chunk_result):
+                            adaptive_pt_round_f_mono_tensor[
+                                lattice_index,
+                                point_index,
+                                start_index:stop_index,
+                                :,
+                                :,
+                            ] = loaded_chunk_result[
+                                "adaptive_pt_round_f_mono_per_disorder"
+                            ]
+                        if (
+                                adaptive_pt_rounds > 0
+                                and "adaptive_pt_round_f_target_per_disorder"
+                                in loaded_chunk_result):
+                            adaptive_pt_round_f_target_tensor[
+                                lattice_index,
+                                point_index,
+                                start_index:stop_index,
+                                :,
+                                :,
+                            ] = loaded_chunk_result[
+                                "adaptive_pt_round_f_target_per_disorder"
+                            ]
                 if "cluster_num_attempts" in loaded_chunk_result:
                     cluster_summary_list.append({
                         key: loaded_chunk_result[key]
@@ -1724,8 +1965,24 @@ def _merge_outputs(
         merged_result["pt_enabled"] = np.bool_(pt_enabled)
         if pt_enabled:
             merged_result["pt_p_hot"] = np.float64(config["pt_p_hot"])
+            merged_result["pt_q_hot"] = np.float64(
+                (
+                    config["syndrome_error_probability"]
+                    if config.get("pt_q_hot") is None
+                    else config["pt_q_hot"]
+                )
+            )
             merged_result["pt_num_temperatures"] = np.int64(
                 config["pt_num_temperatures"]
+            )
+            merged_result["pt_ladder_mode"] = np.array(
+                config.get("pt_ladder_mode", "data_only")
+            )
+            merged_result["adaptive_pt_rounds"] = np.int64(
+                adaptive_pt_rounds
+            )
+            merged_result["adaptive_pt_calibration_sweeps"] = np.int64(
+                config.get("adaptive_pt_calibration_sweeps", 128)
             )
             merged_result["pt_min_swap_acceptance_rate_per_disorder_tensor"] = (
                 pt_min_swap_acceptance_rate_per_disorder_tensor
@@ -1734,11 +1991,33 @@ def _merge_outputs(
                 pt_mean_swap_acceptance_rate_per_disorder_tensor
             )
             merged_result[
+                "pt_data_error_probability_ladder_per_disorder_tensor"
+            ] = pt_data_error_probability_ladder_per_disorder_tensor
+            merged_result[
+                "pt_syndrome_error_probability_ladder_per_disorder_tensor"
+            ] = pt_syndrome_error_probability_ladder_per_disorder_tensor
+            merged_result["pt_enlarge_ladder_per_disorder_tensor"] = (
+                pt_enlarge_ladder_per_disorder_tensor
+            )
+            merged_result[
                 "mean_pt_min_swap_acceptance_rate_curve_matrix"
             ] = mean_pt_min_swap_acceptance_rate_curve_matrix
             merged_result[
                 "mean_pt_mean_swap_acceptance_rate_curve_matrix"
             ] = mean_pt_mean_swap_acceptance_rate_curve_matrix
+            if adaptive_pt_rounds > 0:
+                merged_result[
+                    "adaptive_pt_num_rounds_completed_per_disorder_tensor"
+                ] = adaptive_pt_num_rounds_completed_per_disorder_tensor
+                merged_result["adaptive_pt_round_f_raw_tensor"] = (
+                    adaptive_pt_round_f_raw_tensor
+                )
+                merged_result["adaptive_pt_round_f_mono_tensor"] = (
+                    adaptive_pt_round_f_mono_tensor
+                )
+                merged_result["adaptive_pt_round_f_target_tensor"] = (
+                    adaptive_pt_round_f_target_tensor
+                )
 
     convergence_summary = None
     convergence_summary_path = None
@@ -1785,6 +2064,16 @@ def _merge_outputs(
         ),
         observable_temperature_mode=np.array(
             config["observable_temperature_mode"]
+        ),
+        pt_ladder_mode_config=np.array(config.get("pt_ladder_mode", "data_only")),
+        pt_q_hot_config=np.float64(
+            np.nan
+            if config.get("pt_q_hot") is None
+            else config["pt_q_hot"]
+        ),
+        adaptive_pt_rounds_config=np.int64(adaptive_pt_rounds),
+        adaptive_pt_calibration_sweeps_config=np.int64(
+            config.get("adaptive_pt_calibration_sweeps", 128)
         ),
         cluster_update_config_enabled=np.bool_(
             config["cluster_update_enabled"]
@@ -1835,7 +2124,9 @@ def _run_preflight(config):
     preflight_config["chunks_dir"] = str(preflight_chunks_dir)
     preflight_config["manifest_path"] = str(preflight_root / "manifest.json")
     preflight_config["lattice_size_list"] = [3]
-    preflight_config["data_error_probability_list"] = [0.10]
+    preflight_config["data_error_probability_list"] = [
+        float(config["data_error_probability_list"][0])
+    ]
     preflight_config["num_disorder_samples_total"] = 2
     preflight_config["chunk_size"] = 2
     preflight_config["num_chunks_per_point"] = 1
@@ -2063,6 +2354,35 @@ def _submit_run(args):
                 merged_result["cluster_controller_frozen"]
             ),
         }
+    if "adaptive_pt_round_f_mono_tensor" in merged_result:
+        f_mono = np.asarray(
+            merged_result["adaptive_pt_round_f_mono_tensor"],
+            dtype=np.float64,
+        )
+        f_target = np.asarray(
+            merged_result["adaptive_pt_round_f_target_tensor"],
+            dtype=np.float64,
+        )
+        finite_delta = np.abs(f_mono - f_target)
+        finite_delta = finite_delta[np.isfinite(finite_delta)]
+        manifest["final_outputs"]["adaptive_pt_summary"] = {
+            "adaptive_pt_rounds": int(
+                merged_result.get("adaptive_pt_rounds", 0)
+            ),
+            "adaptive_pt_calibration_sweeps": int(
+                merged_result.get("adaptive_pt_calibration_sweeps", 0)
+            ),
+            "mean_abs_flow_error": (
+                None
+                if finite_delta.size == 0
+                else float(np.mean(finite_delta))
+            ),
+            "max_abs_flow_error": (
+                None
+                if finite_delta.size == 0
+                else float(np.max(finite_delta))
+            ),
+        }
     section_summary = _section_summary_for_manifest(merged_result)
     if section_summary is not None:
         manifest["final_outputs"]["section_summary"] = section_summary
@@ -2107,6 +2427,14 @@ def _run_chunk_command(args):
             None
             if args.pt_num_temperatures is None
             else int(args.pt_num_temperatures)
+        ),
+        "pt_ladder_mode": str(args.pt_ladder_mode),
+        "pt_q_hot": (
+            None if args.pt_q_hot is None else float(args.pt_q_hot)
+        ),
+        "adaptive_pt_rounds": int(args.adaptive_pt_rounds),
+        "adaptive_pt_calibration_sweeps": int(
+            args.adaptive_pt_calibration_sweeps
         ),
         "pt_swap_attempt_every_num_sweeps": int(
             args.pt_swap_attempt_every_num_sweeps
@@ -2243,6 +2571,26 @@ def _build_parser():
         "--pt-num-temperatures",
         type=int,
         default=None,
+    )
+    common_submit_parser.add_argument(
+        "--pt-ladder-mode",
+        choices=("data_only", "sync_enlarge"),
+        default="data_only",
+    )
+    common_submit_parser.add_argument(
+        "--pt-q-hot",
+        type=float,
+        default=None,
+    )
+    common_submit_parser.add_argument(
+        "--adaptive-pt-rounds",
+        type=int,
+        default=0,
+    )
+    common_submit_parser.add_argument(
+        "--adaptive-pt-calibration-sweeps",
+        type=int,
+        default=128,
     )
     common_submit_parser.add_argument(
         "--pt-swap-attempt-every-num-sweeps",
@@ -2412,6 +2760,26 @@ def _build_parser():
         "--pt-num-temperatures",
         type=int,
         default=None,
+    )
+    run_chunk_parser.add_argument(
+        "--pt-ladder-mode",
+        choices=("data_only", "sync_enlarge"),
+        default="data_only",
+    )
+    run_chunk_parser.add_argument(
+        "--pt-q-hot",
+        type=float,
+        default=None,
+    )
+    run_chunk_parser.add_argument(
+        "--adaptive-pt-rounds",
+        type=int,
+        default=0,
+    )
+    run_chunk_parser.add_argument(
+        "--adaptive-pt-calibration-sweeps",
+        type=int,
+        default=128,
     )
     run_chunk_parser.add_argument(
         "--pt-swap-attempt-every-num-sweeps",

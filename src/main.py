@@ -36,8 +36,11 @@ from mcmc import (
     initialize_mcmc_state,
 )
 from mcmc_diagnostics import (
+    adaptive_ladder_from_flow,
     analyze_chain_diagnostics,
     equal_log_odds_ladder,
+    sync_pt_enlarge_ladder,
+    sync_pt_ladders_from_enlarge,
     summarize_multi_chain_convergence,
 )
 from preprocessing import (
@@ -1515,12 +1518,61 @@ def _compute_total_acceptance_rate_from_counts(
     return float(total_accepted_count / total_attempted_count)
 
 
+def _build_pt_ladders(
+        data_error_probability,
+        syndrome_error_probability,
+        pt_p_hot,
+        pt_num_temperatures,
+        pt_ladder_mode="data_only",
+        pt_q_hot=None,
+        pt_enlarge_ladder=None):
+    pt_ladder_mode = str(pt_ladder_mode)
+    if pt_ladder_mode not in ("data_only", "sync_enlarge"):
+        raise ValueError("pt_ladder_mode must be data_only or sync_enlarge")
+    if pt_enlarge_ladder is not None:
+        pt_enlarge_ladder = np.asarray(pt_enlarge_ladder, dtype=np.float64)
+        if pt_enlarge_ladder.ndim != 1:
+            raise ValueError("pt_enlarge_ladder must be 1D")
+        if int(pt_enlarge_ladder.shape[0]) != int(pt_num_temperatures):
+            raise ValueError("pt_enlarge_ladder length must match temperatures")
+    if pt_ladder_mode == "sync_enlarge":
+        if pt_q_hot is None:
+            raise ValueError("pt_q_hot is required for sync_enlarge PT")
+        if pt_enlarge_ladder is None:
+            pt_enlarge_ladder = sync_pt_enlarge_ladder(
+                q_cold=syndrome_error_probability,
+                q_hot=float(pt_q_hot),
+                num_temperatures=int(pt_num_temperatures),
+            )
+        data_ladder, syndrome_ladder = sync_pt_ladders_from_enlarge(
+            p_cold=data_error_probability,
+            q_cold=syndrome_error_probability,
+            pt_enlarge=pt_enlarge_ladder,
+        )
+        return data_ladder, syndrome_ladder, pt_enlarge_ladder
+
+    data_ladder = equal_log_odds_ladder(
+        p_cold=float(data_error_probability),
+        p_hot=float(pt_p_hot),
+        num_temperatures=int(pt_num_temperatures),
+    )
+    syndrome_ladder = np.full(
+        data_ladder.shape,
+        float(syndrome_error_probability),
+        dtype=np.float64,
+    )
+    if pt_enlarge_ladder is None:
+        pt_enlarge_ladder = np.ones(data_ladder.shape, dtype=np.float64)
+    return data_ladder, syndrome_ladder, pt_enlarge_ladder
+
+
 def _run_parallel_tempering_single_chain(
         parity_check_matrix,
         observed_syndrome_bits,
         disorder_data_error_bits,
         syndrome_error_probability,
         data_error_probability_ladder,
+        syndrome_error_probability_ladder,
         logical_observable_masks,
         checks_touching_each_qubit,
         num_burn_in_sweeps,
@@ -1537,7 +1589,8 @@ def _run_parallel_tempering_single_chain(
         cluster_update_debug=False,
         section_data=None,
         single_bit_proposal_fraction=1.0,
-        observable_temperature_mode="all"):
+        observable_temperature_mode="all",
+        adaptive_pt_flow_enabled=False):
     from mcmc_parallel_tempering import run_parallel_tempering_measurement
 
     num_temperatures = int(len(data_error_probability_ladder))
@@ -1555,6 +1608,7 @@ def _run_parallel_tempering_single_chain(
         disorder_data_error_bits=disorder_data_error_bits,
         syndrome_error_probability=syndrome_error_probability,
         data_error_probability_ladder=data_error_probability_ladder,
+        syndrome_error_probability_ladder=syndrome_error_probability_ladder,
         logical_observable_masks=logical_observable_masks,
         checks_touching_each_qubit=checks_touching_each_qubit,
         num_burn_in_sweeps=num_burn_in_sweeps,
@@ -1575,6 +1629,7 @@ def _run_parallel_tempering_single_chain(
         section_data=section_data,
         single_bit_proposal_fraction=single_bit_proposal_fraction,
         observable_temperature_mode=observable_temperature_mode,
+        adaptive_pt_flow_enabled=adaptive_pt_flow_enabled,
     )
     cold_index = 0
     acceptance_rate = _compute_total_acceptance_rate_from_counts(
@@ -1644,6 +1699,9 @@ def _run_parallel_tempering_single_chain(
             "logical_observable_values_per_measurement_per_temperature"
         ][cold_index],
         "pt_ladder": pt_result["data_error_probability_ladder"],
+        "pt_syndrome_error_probability_ladder": (
+            pt_result["syndrome_error_probability_ladder"]
+        ),
         "pt_q_top_value_per_temperature": (
             pt_result["q_top_value_per_temperature"]
         ),
@@ -1656,6 +1714,8 @@ def _run_parallel_tempering_single_chain(
         "observable_wall_time": pt_result["observable_wall_time"],
         "measurement_wall_time": pt_result["measurement_wall_time"],
     }
+    if "adaptive_pt_flow" in pt_result:
+        result["adaptive_pt_flow"] = pt_result["adaptive_pt_flow"]
     for key in (
             "cluster_update_enabled",
             "cluster_update_requested_enabled",
@@ -2187,6 +2247,10 @@ def run_disorder_average_simulation(
         num_replicas_per_start=1,
         pt_p_hot=None,
         pt_num_temperatures=None,
+        pt_ladder_mode="data_only",
+        pt_q_hot=None,
+        adaptive_pt_rounds=0,
+        adaptive_pt_calibration_sweeps=128,
         pt_swap_attempt_every_num_sweeps=1,
         num_zero_syndrome_sweeps_per_cycle=1,
         winding_repeat_factor=1,
@@ -2216,7 +2280,11 @@ def run_disorder_average_simulation(
         record_measurement_trajectories=False,
     )
     use_parallel_tempering = (
-        pt_p_hot is not None or pt_num_temperatures is not None
+        pt_p_hot is not None
+        or pt_num_temperatures is not None
+        or pt_ladder_mode != "data_only"
+        or pt_q_hot is not None
+        or int(adaptive_pt_rounds) > 0
     )
     if use_parallel_tempering:
         if pt_p_hot is None or pt_num_temperatures is None:
@@ -2225,12 +2293,31 @@ def run_disorder_average_simulation(
             )
         if syndrome_error_probability == 0.0:
             raise ValueError("parallel tempering is only supported for q>0")
+        if pt_ladder_mode not in ("data_only", "sync_enlarge"):
+            raise ValueError("pt_ladder_mode must be data_only or sync_enlarge")
         if float(pt_p_hot) <= float(data_error_probability):
             raise ValueError("pt_p_hot must be greater than cold p")
         if int(pt_num_temperatures) < 2:
             raise ValueError("pt_num_temperatures must be >= 2")
         if observable_temperature_mode not in ("all", "cold"):
             raise ValueError("observable_temperature_mode must be all or cold")
+        if pt_ladder_mode == "sync_enlarge":
+            if pt_q_hot is None:
+                raise ValueError("pt_q_hot is required for sync_enlarge PT")
+            if float(pt_q_hot) < float(syndrome_error_probability):
+                raise ValueError("pt_q_hot must be >= cold q")
+            if cluster_update_enabled:
+                raise ValueError(
+                    "cluster update must be disabled for sync_enlarge PT"
+                )
+        if int(adaptive_pt_rounds) > 0 and pt_ladder_mode != "sync_enlarge":
+            raise ValueError(
+                "adaptive_pt_rounds requires sync_enlarge PT ladder"
+            )
+        if int(adaptive_pt_rounds) < 0:
+            raise ValueError("adaptive_pt_rounds must be >= 0")
+        if int(adaptive_pt_calibration_sweeps) < 1:
+            raise ValueError("adaptive_pt_calibration_sweeps must be >= 1")
     _resolve_single_bit_attempts_per_cycle(
         syndrome_error_probability=syndrome_error_probability,
         num_qubits=num_qubits,
@@ -2351,6 +2438,13 @@ def run_disorder_average_simulation(
     num_chains_that_never_flipped_sector_per_disorder = None
     pt_min_swap_acceptance_rate_per_disorder = None
     pt_mean_swap_acceptance_rate_per_disorder = None
+    pt_data_error_probability_ladder_per_disorder = None
+    pt_syndrome_error_probability_ladder_per_disorder = None
+    pt_enlarge_ladder_per_disorder = None
+    adaptive_pt_num_rounds_completed_per_disorder = None
+    adaptive_pt_round_f_raw_per_disorder = None
+    adaptive_pt_round_f_mono_per_disorder = None
+    adaptive_pt_round_f_target_per_disorder = None
     cluster_summary_list = []
     if syndrome_error_probability > 0.0:
         if zero_syndrome_move_data is None and resolved_num_start_chains > 1:
@@ -2433,13 +2527,59 @@ def run_disorder_average_simulation(
                 num_disorder_samples,
                 dtype=np.float64,
             )
-            data_error_probability_ladder = equal_log_odds_ladder(
-                p_cold=float(data_error_probability),
-                p_hot=float(pt_p_hot),
-                num_temperatures=int(pt_num_temperatures),
+            (
+                data_error_probability_ladder,
+                syndrome_error_probability_ladder,
+                pt_enlarge_ladder,
+            ) = _build_pt_ladders(
+                data_error_probability=float(data_error_probability),
+                syndrome_error_probability=float(syndrome_error_probability),
+                pt_p_hot=pt_p_hot,
+                pt_num_temperatures=pt_num_temperatures,
+                pt_ladder_mode=pt_ladder_mode,
+                pt_q_hot=pt_q_hot,
             )
+            pt_data_error_probability_ladder_per_disorder = np.empty(
+                (num_disorder_samples, int(pt_num_temperatures)),
+                dtype=np.float64,
+            )
+            pt_syndrome_error_probability_ladder_per_disorder = np.empty(
+                (num_disorder_samples, int(pt_num_temperatures)),
+                dtype=np.float64,
+            )
+            pt_enlarge_ladder_per_disorder = np.empty(
+                (num_disorder_samples, int(pt_num_temperatures)),
+                dtype=np.float64,
+            )
+            if int(adaptive_pt_rounds) > 0:
+                adaptive_shape = (
+                    num_disorder_samples,
+                    int(adaptive_pt_rounds),
+                    int(pt_num_temperatures),
+                )
+                adaptive_pt_num_rounds_completed_per_disorder = np.zeros(
+                    num_disorder_samples,
+                    dtype=np.int64,
+                )
+                adaptive_pt_round_f_raw_per_disorder = np.full(
+                    adaptive_shape,
+                    np.nan,
+                    dtype=np.float64,
+                )
+                adaptive_pt_round_f_mono_per_disorder = np.full(
+                    adaptive_shape,
+                    np.nan,
+                    dtype=np.float64,
+                )
+                adaptive_pt_round_f_target_per_disorder = np.full(
+                    adaptive_shape,
+                    np.nan,
+                    dtype=np.float64,
+                )
         else:
             data_error_probability_ladder = None
+            syndrome_error_probability_ladder = None
+            pt_enlarge_ladder = None
 
     for disorder_index in range(num_disorder_samples):
         if use_precomputed_disorder_uniforms:
@@ -2572,6 +2712,148 @@ def run_disorder_average_simulation(
                     zero_syndrome_move_data=zero_syndrome_move_data,
                     q0_num_start_chains=resolved_num_start_chains,
                 )
+            if use_parallel_tempering:
+                current_pt_enlarge_ladder = np.asarray(
+                    pt_enlarge_ladder,
+                    dtype=np.float64,
+                ).copy()
+                current_data_error_probability_ladder = np.asarray(
+                    data_error_probability_ladder,
+                    dtype=np.float64,
+                ).copy()
+                current_syndrome_error_probability_ladder = np.asarray(
+                    syndrome_error_probability_ladder,
+                    dtype=np.float64,
+                ).copy()
+                round_summaries = []
+                for adaptive_round_index in range(int(adaptive_pt_rounds)):
+                    calibration_seed = int(
+                        rng.integers(
+                            0,
+                            np.iinfo(np.uint64).max,
+                            dtype=np.uint64,
+                        )
+                    )
+                    calibration_rng = np.random.default_rng(calibration_seed)
+                    calibration_result = _run_parallel_tempering_single_chain(
+                        parity_check_matrix=parity_check_matrix,
+                        observed_syndrome_bits=observed_syndrome_bits,
+                        disorder_data_error_bits=disorder_data_error_bits,
+                        syndrome_error_probability=syndrome_error_probability,
+                        data_error_probability_ladder=(
+                            current_data_error_probability_ladder
+                        ),
+                        syndrome_error_probability_ladder=(
+                            current_syndrome_error_probability_ladder
+                        ),
+                        logical_observable_masks=logical_observable_masks,
+                        checks_touching_each_qubit=checks_touching_each_qubit,
+                        num_burn_in_sweeps=int(adaptive_pt_calibration_sweeps),
+                        num_measurements_per_disorder=1,
+                        num_sweeps_between_measurements=1,
+                        rng=calibration_rng,
+                        zero_syndrome_move_data=zero_syndrome_move_data,
+                        initial_chain_bits=initial_chain_bits_per_start[0],
+                        pt_swap_attempt_every_num_sweeps=(
+                            pt_swap_attempt_every_num_sweeps
+                        ),
+                        cluster_update_enabled=False,
+                        cluster_budget_fraction_rho=cluster_budget_fraction_rho,
+                        cluster_update_debug=cluster_update_debug,
+                        num_zero_syndrome_sweeps_per_cycle=(
+                            diagnostic_config["num_zero_syndrome_sweeps_per_cycle"]
+                        ),
+                        winding_repeat_factor=diagnostic_config[
+                            "winding_repeat_factor"
+                        ],
+                        section_data=syndrome_representative_section,
+                        single_bit_proposal_fraction=(
+                            single_bit_proposal_fraction
+                        ),
+                        observable_temperature_mode="cold",
+                        adaptive_pt_flow_enabled=True,
+                    )
+                    flow_summary = calibration_result.get("adaptive_pt_flow")
+                    if flow_summary is None:
+                        break
+                    new_pt_enlarge_ladder, interpolation_status = (
+                        adaptive_ladder_from_flow(
+                            pt_enlarge=current_pt_enlarge_ladder,
+                            f_mono=flow_summary["f_mono"],
+                        )
+                    )
+                    (
+                        new_data_ladder,
+                        new_syndrome_ladder,
+                        _,
+                    ) = _build_pt_ladders(
+                        data_error_probability=float(data_error_probability),
+                        syndrome_error_probability=float(
+                            syndrome_error_probability
+                        ),
+                        pt_p_hot=pt_p_hot,
+                        pt_num_temperatures=pt_num_temperatures,
+                        pt_ladder_mode=pt_ladder_mode,
+                        pt_q_hot=pt_q_hot,
+                        pt_enlarge_ladder=new_pt_enlarge_ladder,
+                    )
+                    round_summaries.append({
+                        "round_index": int(adaptive_round_index + 1),
+                        "input_pt_enlarge": current_pt_enlarge_ladder.copy(),
+                        "input_p_ladder": (
+                            current_data_error_probability_ladder.copy()
+                        ),
+                        "input_q_ladder": (
+                            current_syndrome_error_probability_ladder.copy()
+                        ),
+                        "f_raw": np.asarray(
+                            flow_summary["f_raw"],
+                            dtype=np.float64,
+                        ),
+                        "f_mono": np.asarray(
+                            flow_summary["f_mono"],
+                            dtype=np.float64,
+                        ),
+                        "f_target": np.asarray(
+                            flow_summary["f_target"],
+                            dtype=np.float64,
+                        ),
+                        "output_pt_enlarge": new_pt_enlarge_ladder.copy(),
+                        "output_p_ladder": new_data_ladder.copy(),
+                        "output_q_ladder": new_syndrome_ladder.copy(),
+                        "interpolation_status": interpolation_status,
+                    })
+                    current_pt_enlarge_ladder = new_pt_enlarge_ladder
+                    current_data_error_probability_ladder = new_data_ladder
+                    current_syndrome_error_probability_ladder = (
+                        new_syndrome_ladder
+                    )
+                pt_data_error_probability_ladder_per_disorder[
+                    disorder_index
+                ] = current_data_error_probability_ladder
+                pt_syndrome_error_probability_ladder_per_disorder[
+                    disorder_index
+                ] = current_syndrome_error_probability_ladder
+                pt_enlarge_ladder_per_disorder[
+                    disorder_index
+                ] = current_pt_enlarge_ladder
+                if adaptive_pt_num_rounds_completed_per_disorder is not None:
+                    adaptive_pt_num_rounds_completed_per_disorder[
+                        disorder_index
+                    ] = len(round_summaries)
+                    for round_index, round_summary in enumerate(round_summaries):
+                        adaptive_pt_round_f_raw_per_disorder[
+                            disorder_index,
+                            round_index,
+                        ] = round_summary["f_raw"]
+                        adaptive_pt_round_f_mono_per_disorder[
+                            disorder_index,
+                            round_index,
+                        ] = round_summary["f_mono"]
+                        adaptive_pt_round_f_target_per_disorder[
+                            disorder_index,
+                            round_index,
+                        ] = round_summary["f_target"]
 
             chain_m_u_values_per_start_replica = np.empty(
                 (
@@ -2664,7 +2946,10 @@ def run_disorder_average_simulation(
                                     syndrome_error_probability
                                 ),
                                 data_error_probability_ladder=(
-                                    data_error_probability_ladder
+                                    current_data_error_probability_ladder
+                                ),
+                                syndrome_error_probability_ladder=(
+                                    current_syndrome_error_probability_ladder
                                 ),
                                 logical_observable_masks=(
                                     logical_observable_masks
@@ -3089,7 +3374,37 @@ def run_disorder_average_simulation(
         result["pt_enabled"] = np.bool_(use_parallel_tempering)
         if use_parallel_tempering:
             result["pt_p_hot"] = np.float64(pt_p_hot)
+            result["pt_q_hot"] = np.float64(
+                syndrome_error_probability if pt_q_hot is None else pt_q_hot
+            )
             result["pt_num_temperatures"] = np.int64(pt_num_temperatures)
+            result["pt_ladder_mode"] = np.array(pt_ladder_mode)
+            result["pt_data_error_probability_ladder_per_disorder"] = (
+                pt_data_error_probability_ladder_per_disorder
+            )
+            result["pt_syndrome_error_probability_ladder_per_disorder"] = (
+                pt_syndrome_error_probability_ladder_per_disorder
+            )
+            result["pt_enlarge_ladder_per_disorder"] = (
+                pt_enlarge_ladder_per_disorder
+            )
+            result["adaptive_pt_rounds"] = np.int64(adaptive_pt_rounds)
+            result["adaptive_pt_calibration_sweeps"] = np.int64(
+                adaptive_pt_calibration_sweeps
+            )
+            if adaptive_pt_num_rounds_completed_per_disorder is not None:
+                result["adaptive_pt_num_rounds_completed_per_disorder"] = (
+                    adaptive_pt_num_rounds_completed_per_disorder
+                )
+                result["adaptive_pt_round_f_raw_per_disorder"] = (
+                    adaptive_pt_round_f_raw_per_disorder
+                )
+                result["adaptive_pt_round_f_mono_per_disorder"] = (
+                    adaptive_pt_round_f_mono_per_disorder
+                )
+                result["adaptive_pt_round_f_target_per_disorder"] = (
+                    adaptive_pt_round_f_target_per_disorder
+                )
             result["pt_observable_temperature_mode"] = np.array(
                 observable_temperature_mode
             )
@@ -3118,6 +3433,10 @@ def scan_data_error_probability(
         num_replicas_per_start=1,
         pt_p_hot=None,
         pt_num_temperatures=None,
+        pt_ladder_mode="data_only",
+        pt_q_hot=None,
+        adaptive_pt_rounds=0,
+        adaptive_pt_calibration_sweeps=128,
         pt_swap_attempt_every_num_sweeps=1,
         num_zero_syndrome_sweeps_per_cycle=1,
         winding_repeat_factor=1,
@@ -3168,6 +3487,10 @@ def scan_data_error_probability(
             num_replicas_per_start=num_replicas_per_start,
             pt_p_hot=pt_p_hot,
             pt_num_temperatures=pt_num_temperatures,
+            pt_ladder_mode=pt_ladder_mode,
+            pt_q_hot=pt_q_hot,
+            adaptive_pt_rounds=adaptive_pt_rounds,
+            adaptive_pt_calibration_sweeps=adaptive_pt_calibration_sweeps,
             pt_swap_attempt_every_num_sweeps=(
                 pt_swap_attempt_every_num_sweeps
             ),
@@ -3250,6 +3573,13 @@ def _run_single_scan_point_task(task_data):
     num_replicas_per_start = task_data.get("num_replicas_per_start", 1)
     pt_p_hot = task_data.get("pt_p_hot")
     pt_num_temperatures = task_data.get("pt_num_temperatures")
+    pt_ladder_mode = task_data.get("pt_ladder_mode", "data_only")
+    pt_q_hot = task_data.get("pt_q_hot")
+    adaptive_pt_rounds = task_data.get("adaptive_pt_rounds", 0)
+    adaptive_pt_calibration_sweeps = task_data.get(
+        "adaptive_pt_calibration_sweeps",
+        128,
+    )
     pt_swap_attempt_every_num_sweeps = task_data.get(
         "pt_swap_attempt_every_num_sweeps",
         1,
@@ -3300,6 +3630,10 @@ def _run_single_scan_point_task(task_data):
         num_replicas_per_start=num_replicas_per_start,
         pt_p_hot=pt_p_hot,
         pt_num_temperatures=pt_num_temperatures,
+        pt_ladder_mode=pt_ladder_mode,
+        pt_q_hot=pt_q_hot,
+        adaptive_pt_rounds=adaptive_pt_rounds,
+        adaptive_pt_calibration_sweeps=adaptive_pt_calibration_sweeps,
         pt_swap_attempt_every_num_sweeps=(
             pt_swap_attempt_every_num_sweeps
         ),
@@ -3457,6 +3791,10 @@ def scan_multiple_code_sizes(
         num_replicas_per_start=1,
         pt_p_hot=None,
         pt_num_temperatures=None,
+        pt_ladder_mode="data_only",
+        pt_q_hot=None,
+        adaptive_pt_rounds=0,
+        adaptive_pt_calibration_sweeps=128,
         pt_swap_attempt_every_num_sweeps=1,
         num_zero_syndrome_sweeps_per_cycle=1,
         winding_repeat_factor=1,
@@ -3536,6 +3874,12 @@ def scan_multiple_code_sizes(
                 "num_replicas_per_start": num_replicas_per_start,
                 "pt_p_hot": pt_p_hot,
                 "pt_num_temperatures": pt_num_temperatures,
+                "pt_ladder_mode": pt_ladder_mode,
+                "pt_q_hot": pt_q_hot,
+                "adaptive_pt_rounds": adaptive_pt_rounds,
+                "adaptive_pt_calibration_sweeps": (
+                    adaptive_pt_calibration_sweeps
+                ),
                 "pt_swap_attempt_every_num_sweeps": (
                     pt_swap_attempt_every_num_sweeps
                 ),

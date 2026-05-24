@@ -1,13 +1,15 @@
 """
-Parallel tempering in data-error probability p.
+Parallel tempering in error probabilities.
 
-在 K 条并行链上运行相同的 (disorder, observed syndrome)，每条链使用自己的
-`data_error_probability`（因此也有不同的 `log_odds_data`）。`syndrome_error_probability`
-在所有温度共享，因此 swap 的 acceptance ratio 只依赖 data-term weight：
+在 K 条并行链上运行相同的 (disorder, observed syndrome)。每条链使用自己的
+`data_error_probability`；可选地也可以使用自己的 `syndrome_error_probability`。
+swap 的 acceptance ratio 同时包含 data 和 syndrome 权重：
 
-    log ratio = (log_odds_j - log_odds_i) * (W_i - W_j)
+    log ratio = (log_odds_p[j] - log_odds_p[i]) * (W_data_i - W_data_j)
+              + (log_odds_q[j] - log_odds_q[i]) * (W_syn_i - W_syn_j)
 
-其中 W_i = sum(data_term_bits_i)。相邻温度对 (i, i+1) 以 alternating even/odd 轮询尝试 swap。
+旧的 data-only PT 传入标量 q 即可，此时 syndrome 项为 0。相邻温度对
+(i, i+1) 以 alternating even/odd 轮询尝试 swap。
 
 只交换 (chain_bits, data_term_bits, syndrome_term_bits)；disorder 与 observed syndrome
 不变（在所有温度共享同一个 disorder 样本）。
@@ -25,6 +27,11 @@ from cluster_update import (
     summarize_cluster_controller,
 )
 from mcmc import initialize_mcmc_state
+from mcmc_diagnostics import (
+    build_adaptive_pt_flow_tracker,
+    record_adaptive_pt_flow,
+    summarize_adaptive_pt_flow,
+)
 from main import (
     _accumulate_logical_observables_fast,
     _build_kernel_basis_from_linear_section,
@@ -49,7 +56,10 @@ def _attempt_replica_swaps(
         rng,
         parity_index,
         swap_accept_counts,
-        swap_attempt_counts):
+        swap_attempt_counts,
+        syndrome_weight_per_temperature=None,
+        log_odds_syndrome_per_temperature=None,
+        replica_id_per_temperature=None):
     """
     对相邻温度对做一次 alternating even/odd swap 扫描。
 
@@ -70,6 +80,18 @@ def _attempt_replica_swaps(
             (log_odds_data_per_temperature[j] - log_odds_data_per_temperature[i])
             * (data_weight_i - data_weight_j)
         )
+        if (
+                syndrome_weight_per_temperature is not None
+                and log_odds_syndrome_per_temperature is not None):
+            syndrome_weight_i = int(syndrome_weight_per_temperature[i])
+            syndrome_weight_j = int(syndrome_weight_per_temperature[j])
+            log_ratio += (
+                (
+                    log_odds_syndrome_per_temperature[j]
+                    - log_odds_syndrome_per_temperature[i]
+                )
+                * (syndrome_weight_i - syndrome_weight_j)
+            )
         if log_ratio >= 0.0:
             accepted = True
         else:
@@ -93,6 +115,19 @@ def _attempt_replica_swaps(
                 data_weight_per_temperature[j],
                 data_weight_per_temperature[i],
             )
+            if syndrome_weight_per_temperature is not None:
+                (
+                    syndrome_weight_per_temperature[i],
+                    syndrome_weight_per_temperature[j],
+                ) = (
+                    syndrome_weight_per_temperature[j],
+                    syndrome_weight_per_temperature[i],
+                )
+            if replica_id_per_temperature is not None:
+                replica_id_per_temperature[i], replica_id_per_temperature[j] = (
+                    replica_id_per_temperature[j],
+                    replica_id_per_temperature[i],
+                )
 
 
 def run_parallel_tempering_measurement(
@@ -120,7 +155,9 @@ def run_parallel_tempering_measurement(
         cluster_update_debug=False,
         section_data=None,
         single_bit_proposal_fraction=1.0,
-        observable_temperature_mode="all"):
+        observable_temperature_mode="all",
+        syndrome_error_probability_ladder=None,
+        adaptive_pt_flow_enabled=False):
     """
     在 p 温度 ladder 上做 parallel tempering 采样。
 
@@ -151,6 +188,42 @@ def run_parallel_tempering_measurement(
         raise ValueError("data_error_probability_ladder must be non-empty")
     if observable_temperature_mode not in ("all", "cold"):
         raise ValueError("observable_temperature_mode must be all or cold")
+    if syndrome_error_probability_ladder is None:
+        syndrome_error_probability_ladder = np.full(
+            num_temperatures,
+            float(syndrome_error_probability),
+            dtype=np.float64,
+        )
+    else:
+        syndrome_error_probability_ladder = np.asarray(
+            syndrome_error_probability_ladder,
+            dtype=np.float64,
+        )
+        if syndrome_error_probability_ladder.ndim != 1:
+            raise ValueError("syndrome_error_probability_ladder must be 1D")
+        if syndrome_error_probability_ladder.shape != data_error_probability_ladder.shape:
+            raise ValueError(
+                "syndrome_error_probability_ladder must match data ladder shape"
+            )
+        if not np.isclose(
+                float(syndrome_error_probability_ladder[0]),
+                float(syndrome_error_probability),
+                rtol=1e-12,
+                atol=0.0):
+            raise ValueError(
+                "syndrome_error_probability_ladder[0] must match "
+                "syndrome_error_probability"
+            )
+    has_nonconstant_syndrome_ladder = bool(
+        np.any(
+            syndrome_error_probability_ladder
+            != syndrome_error_probability_ladder[0]
+        )
+    )
+    if has_nonconstant_syndrome_ladder and cluster_update_enabled:
+        raise ValueError(
+            "cluster update is not supported with nonconstant PT q ladder"
+        )
 
     num_checks, num_qubits = parity_check_matrix.shape
     diagnostic_config = _build_measurement_diagnostic_config(
@@ -201,12 +274,19 @@ def run_parallel_tempering_measurement(
         ],
         dtype=np.float64,
     )
-    log_odds_syndrome = _compute_log_odds(syndrome_error_probability)
+    log_odds_syndrome_per_temperature = np.array(
+        [
+            _compute_log_odds(float(probability))
+            for probability in syndrome_error_probability_ladder
+        ],
+        dtype=np.float64,
+    )
 
     chain_bits_list = []
     data_term_bits_list = []
     syndrome_term_bits_list = []
     data_weight_per_temperature = np.empty(num_temperatures, dtype=np.int64)
+    syndrome_weight_per_temperature = np.empty(num_temperatures, dtype=np.int64)
     for temperature_index in range(num_temperatures):
         if initial_chain_bits_per_temperature is None:
             initial_chain_bits = None
@@ -231,6 +311,9 @@ def run_parallel_tempering_measurement(
         syndrome_term_bits_list.append(current_syndrome_term_bits)
         data_weight_per_temperature[temperature_index] = np.count_nonzero(
             current_data_term_bits
+        )
+        syndrome_weight_per_temperature[temperature_index] = np.count_nonzero(
+            current_syndrome_term_bits
         )
 
     single_bit_accepted_per_temperature = np.zeros(
@@ -258,6 +341,12 @@ def run_parallel_tempering_measurement(
         max(num_temperatures - 1, 0), dtype=np.int64,
     )
     qubit_order_buffer = np.arange(num_qubits, dtype=np.int32)
+    replica_id_per_temperature = np.arange(num_temperatures, dtype=np.int64)
+    flow_tracker = (
+        build_adaptive_pt_flow_tracker(num_temperatures)
+        if adaptive_pt_flow_enabled
+        else None
+    )
     cluster_controller = build_cluster_controller(
         parity_check_matrix=parity_check_matrix,
         syndrome_error_probability=syndrome_error_probability,
@@ -283,12 +372,16 @@ def run_parallel_tempering_measurement(
                 current_syndrome_term_bits=(
                     syndrome_term_bits_list[temperature_index]
                 ),
-                syndrome_error_probability=syndrome_error_probability,
+                syndrome_error_probability=float(
+                    syndrome_error_probability_ladder[temperature_index]
+                ),
                 checks_touching_each_qubit=checks_touching_each_qubit,
                 log_odds_data=(
                     log_odds_data_per_temperature[temperature_index]
                 ),
-                log_odds_syndrome=log_odds_syndrome,
+                log_odds_syndrome=(
+                    log_odds_syndrome_per_temperature[temperature_index]
+                ),
                 rng=rng,
                 num_qubits=num_qubits,
                 num_zero_syndrome_proposals=num_zero_syndrome_proposals,
@@ -312,6 +405,9 @@ def run_parallel_tempering_measurement(
             )
             data_weight_per_temperature[temperature_index] += (
                 cycle_result["data_weight_delta"]
+            )
+            syndrome_weight_per_temperature[temperature_index] = (
+                np.count_nonzero(syndrome_term_bits_list[temperature_index])
             )
             single_bit_accepted_per_temperature[temperature_index] += (
                 cycle_result["single_bit_accepted_count"]
@@ -346,6 +442,11 @@ def run_parallel_tempering_measurement(
             data_weight_per_temperature[
                 cluster_result["temperature_index"]
             ] += cluster_result["data_weight_delta"]
+            syndrome_weight_per_temperature[
+                cluster_result["temperature_index"]
+            ] = np.count_nonzero(
+                syndrome_term_bits_list[cluster_result["temperature_index"]]
+            )
         ordinary_update_wall_time += float(np.sum(ordinary_elapsed_per_temperature))
 
     swap_parity_counter = 0
@@ -370,6 +471,15 @@ def run_parallel_tempering_measurement(
             parity_index=swap_parity_counter,
             swap_accept_counts=swap_accept_counts,
             swap_attempt_counts=swap_attempt_counts,
+            syndrome_weight_per_temperature=syndrome_weight_per_temperature,
+            log_odds_syndrome_per_temperature=(
+                log_odds_syndrome_per_temperature
+            ),
+            replica_id_per_temperature=replica_id_per_temperature,
+        )
+        record_adaptive_pt_flow(
+            flow_tracker=flow_tracker,
+            replica_id_per_temperature=replica_id_per_temperature,
         )
         pt_swap_wall_time += time.perf_counter() - swap_started_at
         swap_parity_counter += 1
@@ -537,6 +647,7 @@ def run_parallel_tempering_measurement(
 
     result = {
         "data_error_probability_ladder": data_error_probability_ladder,
+        "syndrome_error_probability_ladder": syndrome_error_probability_ladder,
         "m_u_values_per_temperature": m_u_values_per_temperature,
         "q_top_value_per_temperature": q_top_value_per_temperature,
         "single_bit_accepted_count_per_temperature": (
@@ -574,6 +685,9 @@ def run_parallel_tempering_measurement(
         "observable_wall_time": np.float64(observable_wall_time),
         "measurement_wall_time": np.float64(measurement_wall_time),
     }
+    adaptive_flow_summary = summarize_adaptive_pt_flow(flow_tracker)
+    if adaptive_flow_summary is not None:
+        result["adaptive_pt_flow"] = adaptive_flow_summary
     if diagnostic_config["record_measurement_trajectories"]:
         result["logical_observable_values_per_measurement_per_temperature"] = (
             logical_observable_values_per_measurement
