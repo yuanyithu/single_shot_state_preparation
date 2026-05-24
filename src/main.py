@@ -30,7 +30,6 @@ from linear_section import (
     build_syndrome_representative_section,
 )
 from mcmc import (
-    accumulate_logical_observables,
     compute_logical_observable_values,
     draw_disorder_sample,
     draw_disorder_sample_from_uniform_values,
@@ -78,6 +77,24 @@ def _compute_log_odds(probability):
     if probability == 1.0:
         return np.inf
     return float(np.log(probability / (1.0 - probability)))
+
+
+def _resolve_single_bit_attempts_per_cycle(
+        syndrome_error_probability,
+        num_qubits,
+        single_bit_proposal_fraction):
+    single_bit_proposal_fraction = float(single_bit_proposal_fraction)
+    if not (0.0 < single_bit_proposal_fraction <= 1.0):
+        raise ValueError("single_bit_proposal_fraction must be in (0, 1]")
+    if syndrome_error_probability == 0.0:
+        return 0
+    return max(
+        1,
+        min(
+            int(num_qubits),
+            int(math.ceil(single_bit_proposal_fraction * int(num_qubits))),
+        ),
+    )
 
 
 def _attempt_single_bit_metropolis_update_safe(
@@ -295,7 +312,8 @@ def _run_one_sweep_safe(
         log_odds_data,
         log_odds_syndrome,
         rng,
-        qubit_order_buffer=None):
+        qubit_order_buffer=None,
+        num_attempts=None):
     """
     边界安全版本的 sweep。
     """
@@ -303,11 +321,28 @@ def _run_one_sweep_safe(
     accepted_count = 0
     data_weight_delta = 0
 
-    if qubit_order_buffer is None:
-        qubit_order = rng.permutation(num_qubits)
+    if num_attempts is None:
+        num_attempts = num_qubits
     else:
+        num_attempts = max(0, min(int(num_attempts), num_qubits))
+
+    if num_attempts == 0:
+        return 0, 0
+
+    if qubit_order_buffer is None and num_attempts >= num_qubits:
+        qubit_order = rng.permutation(num_qubits)
+    elif qubit_order_buffer is None:
+        qubit_order = rng.choice(num_qubits, size=num_attempts, replace=False)
+    elif num_attempts >= num_qubits:
         rng.shuffle(qubit_order_buffer)
         qubit_order = qubit_order_buffer
+    else:
+        for order_position in range(num_attempts):
+            swap_index = int(rng.integers(order_position, num_qubits))
+            temporary_value = qubit_order_buffer[order_position]
+            qubit_order_buffer[order_position] = qubit_order_buffer[swap_index]
+            qubit_order_buffer[swap_index] = temporary_value
+        qubit_order = qubit_order_buffer[:num_attempts]
 
     for qubit_index in qubit_order:
         qubit_index = int(qubit_index)
@@ -372,6 +407,7 @@ if njit is not None:
             log_odds_data,
             log_odds_syndrome,
             syndrome_error_is_positive,
+            single_bit_attempts_per_cycle,
             num_zero_syndrome_sweeps_per_cycle,
             winding_repeat_factor,
             random_seed):
@@ -390,9 +426,22 @@ if njit is not None:
         zero_syndrome_data_weight_delta = 0
 
         if syndrome_error_is_positive:
-            _numba_shuffle_int32_inplace(qubit_order_buffer)
             num_qubits = qubit_order_buffer.shape[0]
-            for order_position in range(num_qubits):
+            if single_bit_attempts_per_cycle > num_qubits:
+                single_bit_attempts_per_cycle = num_qubits
+            if single_bit_attempts_per_cycle < 0:
+                single_bit_attempts_per_cycle = 0
+            if single_bit_attempts_per_cycle >= num_qubits:
+                _numba_shuffle_int32_inplace(qubit_order_buffer)
+            else:
+                for order_position in range(single_bit_attempts_per_cycle):
+                    swap_index = np.random.randint(order_position, num_qubits)
+                    temporary_value = qubit_order_buffer[order_position]
+                    qubit_order_buffer[order_position] = (
+                        qubit_order_buffer[swap_index]
+                    )
+                    qubit_order_buffer[swap_index] = temporary_value
+            for order_position in range(single_bit_attempts_per_cycle):
                 qubit_index = qubit_order_buffer[order_position]
                 if current_data_term_bits[qubit_index]:
                     delta_data_weight = -1
@@ -1028,7 +1077,53 @@ def _compute_logical_observable_values(
         parity_check_matrix=None,
         section_data=None,
         disorder_data_error_bits=None,
-        disorder_syndrome_representative_bits=None):
+        disorder_syndrome_representative_bits=None,
+        current_syndrome_term_bits=None,
+        observed_syndrome_bits=None):
+    if current_syndrome_term_bits is not None:
+        if observed_syndrome_bits is None:
+            raise ValueError(
+                "observed_syndrome_bits is required with current_syndrome_term_bits"
+            )
+        if section_data is None:
+            raise ValueError(
+                "section_data is required with current_syndrome_term_bits"
+            )
+        if disorder_data_error_bits is None:
+            raise ValueError("disorder_data_error_bits is required")
+        if disorder_syndrome_representative_bits is None:
+            if parity_check_matrix is None:
+                raise ValueError(
+                    "parity_check_matrix is required to build the disorder section"
+                )
+            disorder_syndrome_bits = (
+                parity_check_matrix.astype(np.uint8)
+                @ disorder_data_error_bits.astype(np.uint8)
+            ) % 2
+            disorder_syndrome_representative_bits = apply_section(
+                disorder_syndrome_bits.astype(bool),
+                section_data,
+            )
+        chain_syndrome_bits = (
+            np.asarray(current_syndrome_term_bits, dtype=bool)
+            ^ np.asarray(observed_syndrome_bits, dtype=bool)
+        )
+        chain_syndrome_representative_bits = apply_section(
+            chain_syndrome_bits,
+            section_data,
+        )
+        logical_chain_bits = (
+            current_chain_bits
+            ^ disorder_data_error_bits
+            ^ chain_syndrome_representative_bits
+            ^ disorder_syndrome_representative_bits
+        )
+        masked_bits = logical_observable_masks & logical_chain_bits
+        parity_bits = np.bitwise_xor.reduce(masked_bits, axis=1)
+        return (1 - 2 * parity_bits.astype(np.int8)).astype(
+            np.int8,
+            copy=False,
+        )
     return compute_logical_observable_values(
         current_chain_bits=current_chain_bits,
         logical_observable_masks=logical_observable_masks,
@@ -1039,6 +1134,30 @@ def _compute_logical_observable_values(
             disorder_syndrome_representative_bits
         ),
     )
+
+
+def _accumulate_logical_observables_fast(
+        current_chain_bits,
+        logical_observable_masks,
+        logical_observable_sum_values,
+        section_data,
+        disorder_data_error_bits,
+        disorder_syndrome_representative_bits,
+        current_syndrome_term_bits,
+        observed_syndrome_bits):
+    logical_observable_values = _compute_logical_observable_values(
+        current_chain_bits=current_chain_bits,
+        logical_observable_masks=logical_observable_masks,
+        section_data=section_data,
+        disorder_data_error_bits=disorder_data_error_bits,
+        disorder_syndrome_representative_bits=(
+            disorder_syndrome_representative_bits
+        ),
+        current_syndrome_term_bits=current_syndrome_term_bits,
+        observed_syndrome_bits=observed_syndrome_bits,
+    )
+    logical_observable_sum_values += logical_observable_values.astype(np.int64)
+    return logical_observable_values
 
 
 def _build_measurement_diagnostic_config(
@@ -1076,6 +1195,7 @@ def _run_measurement_update_cycle(
         kernel_basis=None,
         num_zero_syndrome_sweeps_per_cycle=1,
         winding_repeat_factor=1,
+        single_bit_proposal_fraction=1.0,
         qubit_order_buffer=None,
         track_data_weight_delta=True,
         numba_update_kernel_data=None):
@@ -1094,6 +1214,11 @@ def _run_measurement_update_cycle(
         zero_syndrome_move_data=zero_syndrome_move_data,
         kernel_basis=kernel_basis,
         winding_repeat_factor=winding_repeat_factor,
+    )
+    single_bit_attempts_per_cycle = _resolve_single_bit_attempts_per_cycle(
+        syndrome_error_probability=syndrome_error_probability,
+        num_qubits=num_qubits,
+        single_bit_proposal_fraction=single_bit_proposal_fraction,
     )
 
     if (
@@ -1144,6 +1269,7 @@ def _run_measurement_update_cycle(
             syndrome_error_is_positive=(
                 syndrome_error_probability > 0.0
             ),
+            single_bit_attempts_per_cycle=single_bit_attempts_per_cycle,
             num_zero_syndrome_sweeps_per_cycle=(
                 num_zero_syndrome_sweeps_per_cycle
             ),
@@ -1151,7 +1277,7 @@ def _run_measurement_update_cycle(
             random_seed=random_seed,
         )
         single_bit_attempted_count = (
-            num_qubits if syndrome_error_probability > 0.0 else 0
+            single_bit_attempts_per_cycle
         )
         contractible_attempted_count = (
             num_zero_syndrome_sweeps_per_cycle * contractible_per_sweep
@@ -1222,9 +1348,10 @@ def _run_measurement_update_cycle(
         log_odds_syndrome=log_odds_syndrome,
         rng=rng,
         qubit_order_buffer=qubit_order_buffer,
+        num_attempts=single_bit_attempts_per_cycle,
     )
     single_bit_accepted_count += single_bit_sweep_accepted_count
-    single_bit_attempted_count += num_qubits
+    single_bit_attempted_count += single_bit_attempts_per_cycle
     data_weight_delta += single_bit_data_weight_delta
 
     if use_hybrid_zero_syndrome_sweeps:
@@ -1408,7 +1535,9 @@ def _run_parallel_tempering_single_chain(
         cluster_update_enabled=True,
         cluster_budget_fraction_rho=0.05,
         cluster_update_debug=False,
-        section_data=None):
+        section_data=None,
+        single_bit_proposal_fraction=1.0,
+        observable_temperature_mode="all"):
     from mcmc_parallel_tempering import run_parallel_tempering_measurement
 
     num_temperatures = int(len(data_error_probability_ladder))
@@ -1444,6 +1573,8 @@ def _run_parallel_tempering_single_chain(
         cluster_budget_fraction_rho=cluster_budget_fraction_rho,
         cluster_update_debug=cluster_update_debug,
         section_data=section_data,
+        single_bit_proposal_fraction=single_bit_proposal_fraction,
+        observable_temperature_mode=observable_temperature_mode,
     )
     cold_index = 0
     acceptance_rate = _compute_total_acceptance_rate_from_counts(
@@ -1520,6 +1651,10 @@ def _run_parallel_tempering_single_chain(
             pt_result["winding_acceptance_rate_per_temperature"]
         ),
         "pt_swap_acceptance_rates": pt_result["swap_acceptance_rates"],
+        "ordinary_update_wall_time": pt_result["ordinary_update_wall_time"],
+        "pt_swap_wall_time": pt_result["pt_swap_wall_time"],
+        "observable_wall_time": pt_result["observable_wall_time"],
+        "measurement_wall_time": pt_result["measurement_wall_time"],
     }
     for key in (
             "cluster_update_enabled",
@@ -1568,11 +1703,17 @@ def _run_single_disorder_measurement(
         cluster_update_enabled=True,
         cluster_budget_fraction_rho=0.05,
         cluster_update_debug=False,
-        section_data=None):
+        section_data=None,
+        single_bit_proposal_fraction=1.0):
     """
     对固定的 (s, eta) 运行一次 MCMC，返回 (m_u_values, acceptance_rate)。
     """
     num_qubits = parity_check_matrix.shape[1]
+    _resolve_single_bit_attempts_per_cycle(
+        syndrome_error_probability=syndrome_error_probability,
+        num_qubits=num_qubits,
+        single_bit_proposal_fraction=single_bit_proposal_fraction,
+    )
     cluster_requested_enabled = bool(cluster_update_enabled)
     actual_cluster_enabled = (
         cluster_requested_enabled
@@ -1662,6 +1803,9 @@ def _run_single_disorder_measurement(
             debug_assertions=cluster_update_debug,
         )
 
+    ordinary_update_wall_time = 0.0
+    observable_wall_time = 0.0
+    measurement_started_at = time.perf_counter()
     for _ in range(num_burn_in_sweeps):
         ordinary_started_at = time.perf_counter()
         _run_measurement_update_cycle(
@@ -1689,8 +1833,10 @@ def _run_single_disorder_measurement(
             qubit_order_buffer=qubit_order_buffer,
             track_data_weight_delta=False,
             numba_update_kernel_data=numba_update_kernel_data,
+            single_bit_proposal_fraction=single_bit_proposal_fraction,
         )
         ordinary_elapsed = time.perf_counter() - ordinary_started_at
+        ordinary_update_wall_time += ordinary_elapsed
         maybe_run_cluster_update(
             controller=cluster_controller,
             chain_bits_list=[current_chain_bits],
@@ -1781,8 +1927,10 @@ def _run_single_disorder_measurement(
                 qubit_order_buffer=qubit_order_buffer,
                 track_data_weight_delta=False,
                 numba_update_kernel_data=numba_update_kernel_data,
+                single_bit_proposal_fraction=single_bit_proposal_fraction,
             )
             ordinary_elapsed = time.perf_counter() - ordinary_started_at
+            ordinary_update_wall_time += ordinary_elapsed
             measurement_single_bit_accepted_count += cycle_result[
                 "single_bit_accepted_count"
             ]
@@ -1818,17 +1966,20 @@ def _run_single_disorder_measurement(
                 rng=rng,
             )
 
-        accumulate_logical_observables(
+        observable_started_at = time.perf_counter()
+        logical_observable_values = _accumulate_logical_observables_fast(
             current_chain_bits=current_chain_bits,
             logical_observable_masks=logical_observable_masks,
             logical_observable_sum_values=logical_observable_sum_values,
-            parity_check_matrix=parity_check_matrix,
             section_data=section_data,
             disorder_data_error_bits=disorder_data_error_bits,
             disorder_syndrome_representative_bits=(
                 disorder_syndrome_representative_bits
             ),
+            current_syndrome_term_bits=current_syndrome_term_bits,
+            observed_syndrome_bits=observed_syndrome_bits,
         )
+        observable_wall_time += time.perf_counter() - observable_started_at
         total_single_bit_accepted_count += (
             measurement_single_bit_accepted_count
         )
@@ -1848,16 +1999,6 @@ def _run_single_disorder_measurement(
             measurement_winding_attempted_count
         )
         if diagnostic_config["record_measurement_trajectories"]:
-            logical_observable_values = _compute_logical_observable_values(
-                current_chain_bits=current_chain_bits,
-                logical_observable_masks=logical_observable_masks,
-                parity_check_matrix=parity_check_matrix,
-                section_data=section_data,
-                disorder_data_error_bits=disorder_data_error_bits,
-                disorder_syndrome_representative_bits=(
-                    disorder_syndrome_representative_bits
-                ),
-            )
             logical_observable_values_per_measurement[
                 measurement_index
             ] = logical_observable_values
@@ -1946,6 +2087,7 @@ def _run_single_disorder_measurement(
         acceptance_rate = total_accepted_count / total_attempted_count
     if not return_diagnostics:
         return m_u_values, acceptance_rate
+    measurement_wall_time = time.perf_counter() - measurement_started_at
     if total_single_bit_attempted_count == 0:
         single_bit_acceptance_rate = 0.0
     else:
@@ -2013,6 +2155,10 @@ def _run_single_disorder_measurement(
         "winding_repeat_factor": np.int64(
             diagnostic_config["winding_repeat_factor"]
         ),
+        "ordinary_update_wall_time": np.float64(ordinary_update_wall_time),
+        "pt_swap_wall_time": np.float64(0.0),
+        "observable_wall_time": np.float64(observable_wall_time),
+        "measurement_wall_time": np.float64(measurement_wall_time),
     }
     if cluster_controller is None:
         result.update(make_disabled_cluster_summary(
@@ -2044,6 +2190,8 @@ def run_disorder_average_simulation(
         pt_swap_attempt_every_num_sweeps=1,
         num_zero_syndrome_sweeps_per_cycle=1,
         winding_repeat_factor=1,
+        single_bit_proposal_fraction=1.0,
+        observable_temperature_mode="all",
         cluster_update_enabled=True,
         cluster_budget_fraction_rho=0.05,
         cluster_update_debug=False,
@@ -2081,6 +2229,13 @@ def run_disorder_average_simulation(
             raise ValueError("pt_p_hot must be greater than cold p")
         if int(pt_num_temperatures) < 2:
             raise ValueError("pt_num_temperatures must be >= 2")
+        if observable_temperature_mode not in ("all", "cold"):
+            raise ValueError("observable_temperature_mode must be all or cold")
+    _resolve_single_bit_attempts_per_cycle(
+        syndrome_error_probability=syndrome_error_probability,
+        num_qubits=num_qubits,
+        single_bit_proposal_fraction=single_bit_proposal_fraction,
+    )
 
     checks_touching_each_qubit = build_checks_touching_each_qubit(
         parity_check_matrix
@@ -2185,6 +2340,10 @@ def run_disorder_average_simulation(
     chain_average_acceptance_rate_per_disorder_per_start_replica = None
     chain_contractible_acceptance_rate_per_disorder_per_start_replica = None
     chain_winding_acceptance_rate_per_disorder_per_start_replica = None
+    chain_ordinary_update_wall_time_per_disorder_per_start_replica = None
+    chain_pt_swap_wall_time_per_disorder_per_start_replica = None
+    chain_observable_wall_time_per_disorder_per_start_replica = None
+    chain_measurement_wall_time_per_disorder_per_start_replica = None
     q_top_spread_per_disorder = None
     m_u_spread_linf_per_disorder = None
     max_r_hat_per_disorder = None
@@ -2229,6 +2388,21 @@ def run_disorder_average_simulation(
         )
         chain_winding_acceptance_rate_per_disorder_per_start_replica = (
             np.empty(chain_shape, dtype=np.float64)
+        )
+        chain_ordinary_update_wall_time_per_disorder_per_start_replica = (
+            np.empty(chain_shape, dtype=np.float64)
+        )
+        chain_pt_swap_wall_time_per_disorder_per_start_replica = np.empty(
+            chain_shape,
+            dtype=np.float64,
+        )
+        chain_observable_wall_time_per_disorder_per_start_replica = np.empty(
+            chain_shape,
+            dtype=np.float64,
+        )
+        chain_measurement_wall_time_per_disorder_per_start_replica = np.empty(
+            chain_shape,
+            dtype=np.float64,
         )
         q_top_spread_per_disorder = np.empty(
             num_disorder_samples,
@@ -2423,6 +2597,22 @@ def run_disorder_average_simulation(
                 (resolved_num_start_chains, num_replicas_per_start),
                 dtype=np.float64,
             )
+            chain_ordinary_update_wall_times_per_start_replica = np.empty(
+                (resolved_num_start_chains, num_replicas_per_start),
+                dtype=np.float64,
+            )
+            chain_pt_swap_wall_times_per_start_replica = np.empty(
+                (resolved_num_start_chains, num_replicas_per_start),
+                dtype=np.float64,
+            )
+            chain_observable_wall_times_per_start_replica = np.empty(
+                (resolved_num_start_chains, num_replicas_per_start),
+                dtype=np.float64,
+            )
+            chain_measurement_wall_times_per_start_replica = np.empty(
+                (resolved_num_start_chains, num_replicas_per_start),
+                dtype=np.float64,
+            )
             chain_effective_sample_size_values = np.empty(
                 (resolved_num_start_chains, num_replicas_per_start),
                 dtype=np.float64,
@@ -2515,6 +2705,12 @@ def run_disorder_average_simulation(
                                     "winding_repeat_factor"
                                 ],
                                 section_data=syndrome_representative_section,
+                                single_bit_proposal_fraction=(
+                                    single_bit_proposal_fraction
+                                ),
+                                observable_temperature_mode=(
+                                    observable_temperature_mode
+                                ),
                             )
                         )
                         pt_swap_acceptance_rates = np.asarray(
@@ -2588,6 +2784,9 @@ def run_disorder_average_simulation(
                             ),
                             cluster_update_debug=cluster_update_debug,
                             section_data=syndrome_representative_section,
+                            single_bit_proposal_fraction=(
+                                single_bit_proposal_fraction
+                            ),
                         )
                     cluster_summary_list.append({
                         key: measurement_result[key]
@@ -2650,6 +2849,22 @@ def run_disorder_average_simulation(
                             0.0,
                         )
                     )
+                    chain_ordinary_update_wall_times_per_start_replica[
+                        start_index,
+                        replica_index,
+                    ] = float(measurement_result["ordinary_update_wall_time"])
+                    chain_pt_swap_wall_times_per_start_replica[
+                        start_index,
+                        replica_index,
+                    ] = float(measurement_result["pt_swap_wall_time"])
+                    chain_observable_wall_times_per_start_replica[
+                        start_index,
+                        replica_index,
+                    ] = float(measurement_result["observable_wall_time"])
+                    chain_measurement_wall_times_per_start_replica[
+                        start_index,
+                        replica_index,
+                    ] = float(measurement_result["measurement_wall_time"])
                     chain_effective_sample_size_values[
                         start_index,
                         replica_index,
@@ -2716,6 +2931,18 @@ def run_disorder_average_simulation(
             chain_winding_acceptance_rate_per_disorder_per_start_replica[
                 disorder_index
             ] = chain_winding_acceptance_rates_per_start_replica
+            chain_ordinary_update_wall_time_per_disorder_per_start_replica[
+                disorder_index
+            ] = chain_ordinary_update_wall_times_per_start_replica
+            chain_pt_swap_wall_time_per_disorder_per_start_replica[
+                disorder_index
+            ] = chain_pt_swap_wall_times_per_start_replica
+            chain_observable_wall_time_per_disorder_per_start_replica[
+                disorder_index
+            ] = chain_observable_wall_times_per_start_replica
+            chain_measurement_wall_time_per_disorder_per_start_replica[
+                disorder_index
+            ] = chain_measurement_wall_times_per_start_replica
             q_top_spread_per_disorder[disorder_index] = (
                 convergence_summary["q_top_spread"]
             )
@@ -2836,6 +3063,18 @@ def run_disorder_average_simulation(
         result[
             "chain_winding_acceptance_rate_per_disorder_per_start_replica"
         ] = chain_winding_acceptance_rate_per_disorder_per_start_replica
+        result[
+            "chain_ordinary_update_wall_time_per_disorder_per_start_replica"
+        ] = chain_ordinary_update_wall_time_per_disorder_per_start_replica
+        result[
+            "chain_pt_swap_wall_time_per_disorder_per_start_replica"
+        ] = chain_pt_swap_wall_time_per_disorder_per_start_replica
+        result[
+            "chain_observable_wall_time_per_disorder_per_start_replica"
+        ] = chain_observable_wall_time_per_disorder_per_start_replica
+        result[
+            "chain_measurement_wall_time_per_disorder_per_start_replica"
+        ] = chain_measurement_wall_time_per_disorder_per_start_replica
         result["q_top_spread_per_disorder"] = q_top_spread_per_disorder
         result["m_u_spread_linf_per_disorder"] = (
             m_u_spread_linf_per_disorder
@@ -2851,6 +3090,9 @@ def run_disorder_average_simulation(
         if use_parallel_tempering:
             result["pt_p_hot"] = np.float64(pt_p_hot)
             result["pt_num_temperatures"] = np.int64(pt_num_temperatures)
+            result["pt_observable_temperature_mode"] = np.array(
+                observable_temperature_mode
+            )
             result["pt_min_swap_acceptance_rate_per_disorder"] = (
                 pt_min_swap_acceptance_rate_per_disorder
             )
@@ -2879,6 +3121,8 @@ def scan_data_error_probability(
         pt_swap_attempt_every_num_sweeps=1,
         num_zero_syndrome_sweeps_per_cycle=1,
         winding_repeat_factor=1,
+        single_bit_proposal_fraction=1.0,
+        observable_temperature_mode="all",
         cluster_update_enabled=True,
         cluster_budget_fraction_rho=0.05,
         cluster_update_debug=False):
@@ -2931,6 +3175,8 @@ def scan_data_error_probability(
                 num_zero_syndrome_sweeps_per_cycle
             ),
             winding_repeat_factor=winding_repeat_factor,
+            single_bit_proposal_fraction=single_bit_proposal_fraction,
+            observable_temperature_mode=observable_temperature_mode,
             cluster_update_enabled=cluster_update_enabled,
             cluster_budget_fraction_rho=cluster_budget_fraction_rho,
             cluster_update_debug=cluster_update_debug,
@@ -2965,6 +3211,9 @@ def scan_data_error_probability(
             num_zero_syndrome_sweeps_per_cycle
         ),
         "winding_repeat_factor": np.int64(winding_repeat_factor),
+        "single_bit_proposal_fraction": np.float64(
+            single_bit_proposal_fraction
+        ),
     }
     if q0_mean_m_u_spread_linf_curve is not None:
         scan_result["q0_start_sector_labels"] = result[
@@ -3004,6 +3253,14 @@ def _run_single_scan_point_task(task_data):
     pt_swap_attempt_every_num_sweeps = task_data.get(
         "pt_swap_attempt_every_num_sweeps",
         1,
+    )
+    single_bit_proposal_fraction = task_data.get(
+        "single_bit_proposal_fraction",
+        1.0,
+    )
+    observable_temperature_mode = task_data.get(
+        "observable_temperature_mode",
+        "all",
     )
     num_zero_syndrome_sweeps_per_cycle = task_data.get(
         "num_zero_syndrome_sweeps_per_cycle",
@@ -3050,6 +3307,8 @@ def _run_single_scan_point_task(task_data):
             num_zero_syndrome_sweeps_per_cycle
         ),
         winding_repeat_factor=winding_repeat_factor,
+        single_bit_proposal_fraction=single_bit_proposal_fraction,
+        observable_temperature_mode=observable_temperature_mode,
         cluster_update_enabled=cluster_update_enabled,
         cluster_budget_fraction_rho=cluster_budget_fraction_rho,
         cluster_update_debug=cluster_update_debug,
@@ -3201,6 +3460,8 @@ def scan_multiple_code_sizes(
         pt_swap_attempt_every_num_sweeps=1,
         num_zero_syndrome_sweeps_per_cycle=1,
         winding_repeat_factor=1,
+        single_bit_proposal_fraction=1.0,
+        observable_temperature_mode="all",
         cluster_update_enabled=True,
         cluster_budget_fraction_rho=0.05,
         cluster_update_debug=False,
@@ -3282,6 +3543,8 @@ def scan_multiple_code_sizes(
                     num_zero_syndrome_sweeps_per_cycle
                 ),
                 "winding_repeat_factor": winding_repeat_factor,
+                "single_bit_proposal_fraction": single_bit_proposal_fraction,
+                "observable_temperature_mode": observable_temperature_mode,
                 "cluster_update_enabled": cluster_update_enabled,
                 "cluster_budget_fraction_rho": cluster_budget_fraction_rho,
                 "cluster_update_debug": cluster_update_debug,
@@ -3463,6 +3726,9 @@ def scan_multiple_code_sizes(
             num_zero_syndrome_sweeps_per_cycle
         ),
         "winding_repeat_factor": np.int64(winding_repeat_factor),
+        "single_bit_proposal_fraction": np.float64(
+            single_bit_proposal_fraction
+        ),
     }
     if q0_start_sector_labels is not None:
         scan_result["q0_start_sector_labels"] = q0_start_sector_labels

@@ -306,6 +306,8 @@ def _build_submit_config_from_args(args):
         raise ValueError("max_effective_num_burn_in_sweeps must be >= 1")
     if args.cluster_budget_fraction_rho < 0.0:
         raise ValueError("cluster_budget_fraction_rho must be >= 0")
+    if not (0.0 < float(args.single_bit_proposal_fraction) <= 1.0):
+        raise ValueError("single_bit_proposal_fraction must be in (0, 1]")
 
     run_root = Path(args.run_root).expanduser().resolve()
     chunks_dir = run_root / "chunks"
@@ -371,6 +373,10 @@ def _build_submit_config_from_args(args):
             args.num_zero_syndrome_sweeps_per_cycle
         ),
         "winding_repeat_factor": int(args.winding_repeat_factor),
+        "single_bit_proposal_fraction": float(
+            args.single_bit_proposal_fraction
+        ),
+        "observable_temperature_mode": str(args.observable_temperature_mode),
         "cluster_update_enabled": not bool(args.disable_cluster_update),
         "cluster_budget_fraction_rho": float(args.cluster_budget_fraction_rho),
         "cluster_update_debug": bool(args.cluster_debug_assertions),
@@ -462,6 +468,12 @@ def _build_chunk_tasks(config):
                     ),
                     "winding_repeat_factor": int(
                         config["winding_repeat_factor"]
+                    ),
+                    "single_bit_proposal_fraction": float(
+                        config["single_bit_proposal_fraction"]
+                    ),
+                    "observable_temperature_mode": str(
+                        config["observable_temperature_mode"]
                     ),
                     "cluster_update_enabled": bool(
                         config["cluster_update_enabled"]
@@ -589,6 +601,10 @@ def _build_manifest(
                 config["num_zero_syndrome_sweeps_per_cycle"]
             ),
             "winding_repeat_factor": config["winding_repeat_factor"],
+            "single_bit_proposal_fraction": (
+                config["single_bit_proposal_fraction"]
+            ),
+            "observable_temperature_mode": config["observable_temperature_mode"],
             "cluster_update_enabled": config["cluster_update_enabled"],
             "cluster_budget_fraction_rho": (
                 config["cluster_budget_fraction_rho"]
@@ -728,6 +744,10 @@ def _run_chunk_task(task_data):
                 task_data["num_zero_syndrome_sweeps_per_cycle"]
             ),
             winding_repeat_factor=task_data["winding_repeat_factor"],
+            single_bit_proposal_fraction=(
+                task_data["single_bit_proposal_fraction"]
+            ),
+            observable_temperature_mode=task_data["observable_temperature_mode"],
             cluster_update_enabled=task_data["cluster_update_enabled"],
             cluster_budget_fraction_rho=(
                 task_data["cluster_budget_fraction_rho"]
@@ -779,6 +799,12 @@ def _run_chunk_task(task_data):
             ),
             winding_repeat_factor=np.int64(
                 task_data["winding_repeat_factor"]
+            ),
+            single_bit_proposal_fraction=np.float64(
+                task_data["single_bit_proposal_fraction"]
+            ),
+            observable_temperature_mode=np.array(
+                task_data["observable_temperature_mode"]
             ),
             cluster_update_config_enabled=np.bool_(
                 task_data["cluster_update_enabled"]
@@ -983,6 +1009,10 @@ def _merge_outputs(
     chain_average_acceptance_rate_per_disorder_per_start_replica_tensor = None
     chain_contractible_acceptance_rate_per_disorder_per_start_replica_tensor = None
     chain_winding_acceptance_rate_per_disorder_per_start_replica_tensor = None
+    chain_ordinary_update_wall_time_per_disorder_per_start_replica_tensor = None
+    chain_pt_swap_wall_time_per_disorder_per_start_replica_tensor = None
+    chain_observable_wall_time_per_disorder_per_start_replica_tensor = None
+    chain_measurement_wall_time_per_disorder_per_start_replica_tensor = None
     q_top_spread_per_disorder_tensor = None
     m_u_spread_linf_per_disorder_tensor = None
     max_r_hat_per_disorder_tensor = None
@@ -1120,6 +1150,54 @@ def _merge_outputs(
                     )
                 )
                 chain_winding_acceptance_rate_per_disorder_per_start_replica_tensor = (
+                    np.empty(
+                        (
+                            num_sizes,
+                            num_points,
+                            num_disorder_samples_total,
+                            num_start_chains,
+                            num_replicas_per_start,
+                        ),
+                        dtype=np.float64,
+                    )
+                )
+                chain_ordinary_update_wall_time_per_disorder_per_start_replica_tensor = (
+                    np.empty(
+                        (
+                            num_sizes,
+                            num_points,
+                            num_disorder_samples_total,
+                            num_start_chains,
+                            num_replicas_per_start,
+                        ),
+                        dtype=np.float64,
+                    )
+                )
+                chain_pt_swap_wall_time_per_disorder_per_start_replica_tensor = (
+                    np.empty(
+                        (
+                            num_sizes,
+                            num_points,
+                            num_disorder_samples_total,
+                            num_start_chains,
+                            num_replicas_per_start,
+                        ),
+                        dtype=np.float64,
+                    )
+                )
+                chain_observable_wall_time_per_disorder_per_start_replica_tensor = (
+                    np.empty(
+                        (
+                            num_sizes,
+                            num_points,
+                            num_disorder_samples_total,
+                            num_start_chains,
+                            num_replicas_per_start,
+                        ),
+                        dtype=np.float64,
+                    )
+                )
+                chain_measurement_wall_time_per_disorder_per_start_replica_tensor = (
                     np.empty(
                         (
                             num_sizes,
@@ -1293,6 +1371,42 @@ def _merge_outputs(
                         :,
                     ] = loaded_chunk_result[
                         "chain_winding_acceptance_rate_per_disorder_per_start_replica"
+                    ]
+                    chain_ordinary_update_wall_time_per_disorder_per_start_replica_tensor[
+                        lattice_index,
+                        point_index,
+                        start_index:stop_index,
+                        :,
+                        :,
+                    ] = loaded_chunk_result[
+                        "chain_ordinary_update_wall_time_per_disorder_per_start_replica"
+                    ]
+                    chain_pt_swap_wall_time_per_disorder_per_start_replica_tensor[
+                        lattice_index,
+                        point_index,
+                        start_index:stop_index,
+                        :,
+                        :,
+                    ] = loaded_chunk_result[
+                        "chain_pt_swap_wall_time_per_disorder_per_start_replica"
+                    ]
+                    chain_observable_wall_time_per_disorder_per_start_replica_tensor[
+                        lattice_index,
+                        point_index,
+                        start_index:stop_index,
+                        :,
+                        :,
+                    ] = loaded_chunk_result[
+                        "chain_observable_wall_time_per_disorder_per_start_replica"
+                    ]
+                    chain_measurement_wall_time_per_disorder_per_start_replica_tensor[
+                        lattice_index,
+                        point_index,
+                        start_index:stop_index,
+                        :,
+                        :,
+                    ] = loaded_chunk_result[
+                        "chain_measurement_wall_time_per_disorder_per_start_replica"
                     ]
                     q_top_spread_per_disorder_tensor[
                         lattice_index,
@@ -1564,6 +1678,18 @@ def _merge_outputs(
         merged_result[
             "chain_winding_acceptance_rate_per_disorder_per_start_replica_tensor"
         ] = chain_winding_acceptance_rate_per_disorder_per_start_replica_tensor
+        merged_result[
+            "chain_ordinary_update_wall_time_per_disorder_per_start_replica_tensor"
+        ] = chain_ordinary_update_wall_time_per_disorder_per_start_replica_tensor
+        merged_result[
+            "chain_pt_swap_wall_time_per_disorder_per_start_replica_tensor"
+        ] = chain_pt_swap_wall_time_per_disorder_per_start_replica_tensor
+        merged_result[
+            "chain_observable_wall_time_per_disorder_per_start_replica_tensor"
+        ] = chain_observable_wall_time_per_disorder_per_start_replica_tensor
+        merged_result[
+            "chain_measurement_wall_time_per_disorder_per_start_replica_tensor"
+        ] = chain_measurement_wall_time_per_disorder_per_start_replica_tensor
         merged_result["q_top_spread_per_disorder_tensor"] = (
             q_top_spread_per_disorder_tensor
         )
@@ -1654,6 +1780,12 @@ def _merge_outputs(
             config["num_zero_syndrome_sweeps_per_cycle"]
         ),
         winding_repeat_factor=np.int64(config["winding_repeat_factor"]),
+        single_bit_proposal_fraction=np.float64(
+            config["single_bit_proposal_fraction"]
+        ),
+        observable_temperature_mode=np.array(
+            config["observable_temperature_mode"]
+        ),
         cluster_update_config_enabled=np.bool_(
             config["cluster_update_enabled"]
         ),
@@ -1983,6 +2115,10 @@ def _run_chunk_command(args):
             args.num_zero_syndrome_sweeps_per_cycle
         ),
         "winding_repeat_factor": int(args.winding_repeat_factor),
+        "single_bit_proposal_fraction": float(
+            args.single_bit_proposal_fraction
+        ),
+        "observable_temperature_mode": str(args.observable_temperature_mode),
         "cluster_update_enabled": not bool(args.disable_cluster_update),
         "cluster_budget_fraction_rho": float(args.cluster_budget_fraction_rho),
         "cluster_update_debug": bool(args.cluster_debug_assertions),
@@ -2122,6 +2258,24 @@ def _build_parser():
         "--winding-repeat-factor",
         type=int,
         default=1,
+    )
+    common_submit_parser.add_argument(
+        "--single-bit-proposal-fraction",
+        type=float,
+        default=1.0,
+        help=(
+            "Fraction of qubits attempted in the q>0 single-bit stage per "
+            "update cycle. The default 1.0 preserves a full sweep."
+        ),
+    )
+    common_submit_parser.add_argument(
+        "--observable-temperature-mode",
+        choices=("all", "cold"),
+        default="all",
+        help=(
+            "For parallel tempering, accumulate logical observables at all "
+            "temperatures or only at the cold target temperature."
+        ),
     )
     common_submit_parser.add_argument(
         "--disable-cluster-update",
@@ -2273,6 +2427,16 @@ def _build_parser():
         "--winding-repeat-factor",
         type=int,
         default=1,
+    )
+    run_chunk_parser.add_argument(
+        "--single-bit-proposal-fraction",
+        type=float,
+        default=1.0,
+    )
+    run_chunk_parser.add_argument(
+        "--observable-temperature-mode",
+        choices=("all", "cold"),
+        default="all",
     )
     run_chunk_parser.add_argument(
         "--disable-cluster-update",

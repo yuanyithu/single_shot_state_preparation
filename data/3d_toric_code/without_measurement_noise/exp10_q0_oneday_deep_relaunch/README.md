@@ -2,11 +2,11 @@
 
 ## 实验目的
 
-重开一天内快速 deep 的 `q=0` 基线实验，修正此前错误启动导致的不可用结果。
+重开一天内快速 deep 的 `q=0` 基线实验，作为后续 `q>0` threshold 搜索的 calibration。
 
 ## 为什么做
 
-`q=0` 是后续 `q>0` threshold 搜索的 calibration。此前 run 被判定为错误后，本轮绕过旧 launcher，直接用不带任何 `--pt-*` 的 q=0 命令重开，并显式使用 `q0_num_start_chains=8` / `num_start_chains=8`。
+`q=0` 是后续 `q>0` threshold 搜索的 calibration。本轮直接用不带任何 `--pt-*` 的 q=0 命令启动，并显式使用 `q0_num_start_chains=8` / `num_start_chains=8`。
 
 ## 参数
 
