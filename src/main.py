@@ -1593,6 +1593,7 @@ def _run_parallel_tempering_single_chain(
         num_zero_syndrome_sweeps_per_cycle=1,
         winding_repeat_factor=1,
         pt_swap_attempt_every_num_sweeps=1,
+        pt_swap_sweeps_per_attempt=1,
         cluster_update_enabled=True,
         cluster_budget_fraction_rho=0.05,
         cluster_update_debug=False,
@@ -1634,6 +1635,7 @@ def _run_parallel_tempering_single_chain(
         ),
         winding_repeat_factor=winding_repeat_factor,
         swap_attempt_every_num_sweeps=pt_swap_attempt_every_num_sweeps,
+        swap_sweeps_per_attempt=pt_swap_sweeps_per_attempt,
         return_diagnostics=True,
         cluster_update_enabled=cluster_update_enabled,
         cluster_budget_fraction_rho=cluster_budget_fraction_rho,
@@ -1732,6 +1734,7 @@ def _run_parallel_tempering_single_chain(
         "pt_swap_acceptance_rates": pt_result["swap_acceptance_rates"],
         "pt_swap_accept_counts": pt_result["swap_accept_counts"],
         "pt_swap_attempt_counts": pt_result["swap_attempt_counts"],
+        "pt_swap_sweeps_per_attempt": pt_result["pt_swap_sweeps_per_attempt"],
         "pt_transport_position_sample_count": (
             pt_result["pt_transport_position_sample_count"]
         ),
@@ -2324,6 +2327,7 @@ def run_disorder_average_simulation(
         adaptive_pt_rounds=0,
         adaptive_pt_calibration_sweeps=128,
         pt_swap_attempt_every_num_sweeps=1,
+        pt_swap_sweeps_per_attempt=1,
         num_zero_syndrome_sweeps_per_cycle=1,
         winding_repeat_factor=1,
         single_bit_proposal_fraction=1.0,
@@ -2371,6 +2375,9 @@ def run_disorder_average_simulation(
             raise ValueError("pt_num_temperatures must be >= 2")
         if observable_temperature_mode not in ("all", "cold"):
             raise ValueError("observable_temperature_mode must be all or cold")
+        pt_swap_sweeps_per_attempt = int(pt_swap_sweeps_per_attempt)
+        if pt_swap_sweeps_per_attempt < 1:
+            raise ValueError("pt_swap_sweeps_per_attempt must be >= 1")
         track_pt_sector_diagnostics = bool(track_pt_sector_diagnostics)
         pt_sector_diagnostic_stride = int(pt_sector_diagnostic_stride)
         if pt_sector_diagnostic_stride < 1:
@@ -2930,6 +2937,9 @@ def run_disorder_average_simulation(
                         pt_swap_attempt_every_num_sweeps=(
                             pt_swap_attempt_every_num_sweeps
                         ),
+                        pt_swap_sweeps_per_attempt=(
+                            pt_swap_sweeps_per_attempt
+                        ),
                         cluster_update_enabled=False,
                         cluster_budget_fraction_rho=cluster_budget_fraction_rho,
                         cluster_update_debug=cluster_update_debug,
@@ -3148,6 +3158,9 @@ def run_disorder_average_simulation(
                                 ),
                                 pt_swap_attempt_every_num_sweeps=(
                                     pt_swap_attempt_every_num_sweeps
+                                ),
+                                pt_swap_sweeps_per_attempt=(
+                                    pt_swap_sweeps_per_attempt
                                 ),
                                 cluster_update_enabled=cluster_update_enabled,
                                 cluster_budget_fraction_rho=(
@@ -3747,6 +3760,12 @@ def run_disorder_average_simulation(
             result["pt_observable_temperature_mode"] = np.array(
                 observable_temperature_mode
             )
+            result["pt_swap_attempt_every_num_sweeps"] = np.int64(
+                pt_swap_attempt_every_num_sweeps
+            )
+            result["pt_swap_sweeps_per_attempt"] = np.int64(
+                pt_swap_sweeps_per_attempt
+            )
             result["pt_track_sector_diagnostics"] = np.bool_(
                 track_pt_sector_diagnostics
             )
@@ -3884,6 +3903,7 @@ def scan_data_error_probability(
         adaptive_pt_rounds=0,
         adaptive_pt_calibration_sweeps=128,
         pt_swap_attempt_every_num_sweeps=1,
+        pt_swap_sweeps_per_attempt=1,
         num_zero_syndrome_sweeps_per_cycle=1,
         winding_repeat_factor=1,
         single_bit_proposal_fraction=1.0,
@@ -3942,6 +3962,7 @@ def scan_data_error_probability(
             pt_swap_attempt_every_num_sweeps=(
                 pt_swap_attempt_every_num_sweeps
             ),
+            pt_swap_sweeps_per_attempt=pt_swap_sweeps_per_attempt,
             num_zero_syndrome_sweeps_per_cycle=(
                 num_zero_syndrome_sweeps_per_cycle
             ),
@@ -3980,6 +4001,10 @@ def scan_data_error_probability(
         "q_top_curve": q_top_curve,
         "q_top_std_curve": q_top_std_curve,
         "average_acceptance_rate_curve": average_acceptance_rate_curve,
+        "pt_swap_attempt_every_num_sweeps": np.int64(
+            pt_swap_attempt_every_num_sweeps
+        ),
+        "pt_swap_sweeps_per_attempt": np.int64(pt_swap_sweeps_per_attempt),
         "num_zero_syndrome_sweeps_per_cycle": np.int64(
             num_zero_syndrome_sweeps_per_cycle
         ),
@@ -4032,6 +4057,10 @@ def _run_single_scan_point_task(task_data):
     )
     pt_swap_attempt_every_num_sweeps = task_data.get(
         "pt_swap_attempt_every_num_sweeps",
+        1,
+    )
+    pt_swap_sweeps_per_attempt = task_data.get(
+        "pt_swap_sweeps_per_attempt",
         1,
     )
     pt_sector_diagnostic_stride = task_data.get(
@@ -4094,6 +4123,7 @@ def _run_single_scan_point_task(task_data):
         pt_swap_attempt_every_num_sweeps=(
             pt_swap_attempt_every_num_sweeps
         ),
+        pt_swap_sweeps_per_attempt=pt_swap_sweeps_per_attempt,
         num_zero_syndrome_sweeps_per_cycle=(
             num_zero_syndrome_sweeps_per_cycle
         ),
@@ -4255,6 +4285,7 @@ def scan_multiple_code_sizes(
         adaptive_pt_rounds=0,
         adaptive_pt_calibration_sweeps=128,
         pt_swap_attempt_every_num_sweeps=1,
+        pt_swap_sweeps_per_attempt=1,
         num_zero_syndrome_sweeps_per_cycle=1,
         winding_repeat_factor=1,
         single_bit_proposal_fraction=1.0,
@@ -4344,6 +4375,7 @@ def scan_multiple_code_sizes(
                 "pt_swap_attempt_every_num_sweeps": (
                     pt_swap_attempt_every_num_sweeps
                 ),
+                "pt_swap_sweeps_per_attempt": pt_swap_sweeps_per_attempt,
                 "num_zero_syndrome_sweeps_per_cycle": (
                     num_zero_syndrome_sweeps_per_cycle
                 ),
@@ -4529,6 +4561,10 @@ def scan_multiple_code_sizes(
         "average_acceptance_rate_curve_matrix": (
             average_acceptance_rate_curve_matrix
         ),
+        "pt_swap_attempt_every_num_sweeps": np.int64(
+            pt_swap_attempt_every_num_sweeps
+        ),
+        "pt_swap_sweeps_per_attempt": np.int64(pt_swap_sweeps_per_attempt),
         "num_zero_syndrome_sweeps_per_cycle": np.int64(
             num_zero_syndrome_sweeps_per_cycle
         ),
