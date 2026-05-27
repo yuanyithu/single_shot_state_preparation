@@ -45,9 +45,13 @@ from mcmc import (
     initialize_mcmc_state,
 )
 from mcmc_diagnostics import (
+    DATA_ONLY_PT_LADDER_SEMANTICS,
+    SYNC_PT_LADDER_SEMANTICS,
     aggregate_r_hat,
     equal_log_odds_ladder,
     integrated_autocorrelation_time,
+    sync_pt_enlarge_ladder,
+    sync_pt_ladders_from_enlarge,
 )
 from preprocessing import (
     build_checks_touching_each_qubit,
@@ -362,49 +366,20 @@ def _safe_rate(numerator, denominator):
     return float(numerator) / denominator
 
 
-def _probability_to_odds(probability):
-    probability = float(probability)
-    if not (0.0 < probability < 0.5):
-        raise ValueError("probability must be in (0, 0.5)")
-    return probability / (1.0 - probability)
-
-
-def _odds_to_probability(odds):
-    odds = float(odds)
-    if odds <= 0.0:
-        raise ValueError("odds must be positive")
-    return odds / (1.0 + odds)
-
-
 def _build_sync_pt_enlarge_ladder(q_cold, q_hot, num_temperatures):
-    num_temperatures = int(num_temperatures)
-    if num_temperatures < 1:
-        raise ValueError("num_temperatures must be >= 1")
-    if num_temperatures == 1:
-        return np.asarray([1.0], dtype=np.float64)
-    hot_enlarge = _probability_to_odds(q_hot) / _probability_to_odds(q_cold)
-    if hot_enlarge < 1.0:
-        raise ValueError("q_hot must be >= q_cold for sync PT")
-    return np.exp(
-        np.linspace(0.0, math.log(hot_enlarge), num_temperatures)
-    ).astype(np.float64)
+    return sync_pt_enlarge_ladder(
+        q_cold=q_cold,
+        q_hot=q_hot,
+        num_temperatures=num_temperatures,
+    )
 
 
 def _build_sync_pt_ladders(p_cold, q_cold, pt_enlarge):
-    pt_enlarge = np.asarray(pt_enlarge, dtype=np.float64)
-    p_odds_cold = _probability_to_odds(p_cold)
-    q_odds_cold = _probability_to_odds(q_cold)
-    p_ladder = np.asarray(
-        [_odds_to_probability(scale * p_odds_cold) for scale in pt_enlarge],
-        dtype=np.float64,
+    return sync_pt_ladders_from_enlarge(
+        p_cold=p_cold,
+        q_cold=q_cold,
+        pt_enlarge=pt_enlarge,
     )
-    q_ladder = np.asarray(
-        [_odds_to_probability(scale * q_odds_cold) for scale in pt_enlarge],
-        dtype=np.float64,
-    )
-    if np.any(p_ladder >= 0.5) or np.any(q_ladder >= 0.5):
-        raise ValueError("sync PT ladder must keep p_k and q_k below 0.5")
-    return p_ladder, q_ladder
 
 
 def _new_stage_profile():
@@ -1725,6 +1700,12 @@ def _run_profile_chain(
     summary = {
         "p_value": p_value,
         "q_value": q_value,
+        "pt_ladder_semantics": task.get(
+            "pt_ladder_semantics",
+            SYNC_PT_LADDER_SEMANTICS
+            if task.get("pt_ladder_mode") == "sync_enlarge"
+            else DATA_ONLY_PT_LADDER_SEMANTICS,
+        ),
         "data_error_probability_ladder": data_error_probability_ladder,
         "syndrome_error_probability_ladder": syndrome_error_probability_ladder,
         "pt_enlarge_ladder": np.asarray(
@@ -2117,6 +2098,12 @@ def _summarize_task_chains(context, task, chain_summaries):
             task.get("pt_enlarge_ladder", [1.0]),
             dtype=np.float64,
         ),
+        "pt_ladder_semantics": task.get(
+            "pt_ladder_semantics",
+            SYNC_PT_LADDER_SEMANTICS
+            if task.get("pt_ladder_mode") == "sync_enlarge"
+            else DATA_ONLY_PT_LADDER_SEMANTICS,
+        ),
         "adaptive_pt_rounds": int(task.get("adaptive_pt_rounds", 0)),
         "adaptive_pt_summary": task.get("adaptive_pt_summary"),
     }
@@ -2259,6 +2246,9 @@ def _run_profile_task(task):
         pt_enlarge_ladder=np.asarray(
             task["pt_enlarge_ladder"],
             dtype=np.float64,
+        ),
+        pt_ladder_semantics=np.asarray(
+            task_summary["pt_ladder_semantics"],
         ),
         lattice_size=np.int64(task["lattice_size"]),
         p_value=np.float64(task["p_value"]),
@@ -2701,6 +2691,11 @@ def _build_tasks(args, run_root):
                 "syndrome_error_probability_ladder": syndrome_ladder,
                 "pt_enlarge_ladder": pt_enlarge_ladder,
                 "pt_ladder_mode": pt_ladder_mode,
+                "pt_ladder_semantics": (
+                    SYNC_PT_LADDER_SEMANTICS
+                    if pt_ladder_mode == "sync_enlarge"
+                    else DATA_ONLY_PT_LADDER_SEMANTICS
+                ),
                 "pt_num_temperatures": int(config["pt_num_temperatures"]),
                 "pt_p_hot": (
                     None if config["pt_p_hot"] is None else float(config["pt_p_hot"])
