@@ -1601,6 +1601,7 @@ def _run_parallel_tempering_single_chain(
         observable_temperature_mode="all",
         adaptive_pt_flow_enabled=False,
         track_pt_sector_diagnostics=False,
+        pt_sector_diagnostic_stride=1,
         num_logical_qubits=None):
     from mcmc_parallel_tempering import run_parallel_tempering_measurement
 
@@ -1642,6 +1643,7 @@ def _run_parallel_tempering_single_chain(
         observable_temperature_mode=observable_temperature_mode,
         adaptive_pt_flow_enabled=adaptive_pt_flow_enabled,
         track_logical_sector_diagnostics=track_pt_sector_diagnostics,
+        logical_sector_diagnostic_stride=pt_sector_diagnostic_stride,
         num_logical_qubits=num_logical_qubits,
     )
     cold_index = 0
@@ -1745,6 +1747,12 @@ def _run_parallel_tempering_single_chain(
         )
         result["pt_sector_histogram_per_temperature"] = (
             pt_result["pt_sector_histogram_per_temperature"]
+        )
+        result["pt_sector_diagnostic_stride"] = (
+            pt_result["pt_sector_diagnostic_stride"]
+        )
+        result["pt_sector_diagnostic_sample_count"] = (
+            pt_result["pt_sector_diagnostic_sample_count"]
         )
         result["pt_hot_to_cold_sector_delivery_count"] = (
             pt_result["pt_hot_to_cold_sector_delivery_count"]
@@ -2297,6 +2305,7 @@ def run_disorder_average_simulation(
         single_bit_proposal_fraction=1.0,
         observable_temperature_mode="all",
         track_pt_sector_diagnostics=False,
+        pt_sector_diagnostic_stride=1,
         cluster_update_enabled=True,
         cluster_budget_fraction_rho=0.05,
         cluster_update_debug=False,
@@ -2339,6 +2348,9 @@ def run_disorder_average_simulation(
         if observable_temperature_mode not in ("all", "cold"):
             raise ValueError("observable_temperature_mode must be all or cold")
         track_pt_sector_diagnostics = bool(track_pt_sector_diagnostics)
+        pt_sector_diagnostic_stride = int(pt_sector_diagnostic_stride)
+        if pt_sector_diagnostic_stride < 1:
+            raise ValueError("pt_sector_diagnostic_stride must be >= 1")
         if pt_ladder_mode == "data_only":
             if pt_p_hot is None:
                 raise ValueError("pt_p_hot is required for data_only PT")
@@ -2493,6 +2505,7 @@ def run_disorder_average_simulation(
     chain_pt_sector_flip_count_per_temperature_per_disorder_per_start_replica = None
     chain_pt_first_sector_change_index_per_temperature_per_disorder_per_start_replica = None
     chain_pt_sector_histogram_per_temperature_per_disorder_per_start_replica = None
+    chain_pt_sector_diagnostic_sample_count_per_disorder_per_start_replica = None
     chain_pt_hot_to_cold_sector_delivery_count_per_disorder_per_start_replica = None
     chain_pt_hot_to_cold_sector_change_delivery_count_per_disorder_per_start_replica = None
     pt_data_error_probability_ladder_per_disorder = None
@@ -2645,6 +2658,9 @@ def run_disorder_average_simulation(
                         sector_chain_shape + (1 << num_logical_qubits,),
                         dtype=np.int64,
                     )
+                )
+                chain_pt_sector_diagnostic_sample_count_per_disorder_per_start_replica = (
+                    np.empty(chain_shape, dtype=np.int64)
                 )
                 chain_pt_hot_to_cold_sector_delivery_count_per_disorder_per_start_replica = (
                     np.empty(chain_shape, dtype=np.int64)
@@ -3100,6 +3116,9 @@ def run_disorder_average_simulation(
                                 track_pt_sector_diagnostics=(
                                     track_pt_sector_diagnostics
                                 ),
+                                pt_sector_diagnostic_stride=(
+                                    pt_sector_diagnostic_stride
+                                ),
                                 num_logical_qubits=num_logical_qubits,
                             )
                         )
@@ -3193,6 +3212,15 @@ def run_disorder_average_simulation(
                             ] = measurement_result[
                                 "pt_sector_histogram_per_temperature"
                             ]
+                            chain_pt_sector_diagnostic_sample_count_per_disorder_per_start_replica[
+                                disorder_index,
+                                start_index,
+                                replica_index,
+                            ] = int(
+                                measurement_result[
+                                    "pt_sector_diagnostic_sample_count"
+                                ]
+                            )
                             chain_pt_hot_to_cold_sector_delivery_count_per_disorder_per_start_replica[
                                 disorder_index,
                                 start_index,
@@ -3607,6 +3635,9 @@ def run_disorder_average_simulation(
             result["pt_track_sector_diagnostics"] = np.bool_(
                 track_pt_sector_diagnostics
             )
+            result["pt_sector_diagnostic_stride"] = np.int64(
+                pt_sector_diagnostic_stride
+            )
             result["pt_min_swap_acceptance_rate_per_disorder"] = (
                 pt_min_swap_acceptance_rate_per_disorder
             )
@@ -3660,6 +3691,11 @@ def run_disorder_average_simulation(
                     chain_pt_sector_histogram_per_temperature_per_disorder_per_start_replica
                 )
                 result[
+                    "chain_pt_sector_diagnostic_sample_count_per_disorder_per_start_replica"
+                ] = (
+                    chain_pt_sector_diagnostic_sample_count_per_disorder_per_start_replica
+                )
+                result[
                     "chain_pt_hot_to_cold_sector_delivery_count_per_disorder_per_start_replica"
                 ] = (
                     chain_pt_hot_to_cold_sector_delivery_count_per_disorder_per_start_replica
@@ -3698,6 +3734,7 @@ def scan_data_error_probability(
         single_bit_proposal_fraction=1.0,
         observable_temperature_mode="all",
         track_pt_sector_diagnostics=False,
+        pt_sector_diagnostic_stride=1,
         cluster_update_enabled=True,
         cluster_budget_fraction_rho=0.05,
         cluster_update_debug=False):
@@ -3757,6 +3794,7 @@ def scan_data_error_probability(
             single_bit_proposal_fraction=single_bit_proposal_fraction,
             observable_temperature_mode=observable_temperature_mode,
             track_pt_sector_diagnostics=track_pt_sector_diagnostics,
+            pt_sector_diagnostic_stride=pt_sector_diagnostic_stride,
             cluster_update_enabled=cluster_update_enabled,
             cluster_budget_fraction_rho=cluster_budget_fraction_rho,
             cluster_update_debug=cluster_update_debug,
@@ -3841,6 +3879,10 @@ def _run_single_scan_point_task(task_data):
         "pt_swap_attempt_every_num_sweeps",
         1,
     )
+    pt_sector_diagnostic_stride = task_data.get(
+        "pt_sector_diagnostic_stride",
+        1,
+    )
     single_bit_proposal_fraction = task_data.get(
         "single_bit_proposal_fraction",
         1.0,
@@ -3904,6 +3946,7 @@ def _run_single_scan_point_task(task_data):
         single_bit_proposal_fraction=single_bit_proposal_fraction,
         observable_temperature_mode=observable_temperature_mode,
         track_pt_sector_diagnostics=track_pt_sector_diagnostics,
+        pt_sector_diagnostic_stride=pt_sector_diagnostic_stride,
         cluster_update_enabled=cluster_update_enabled,
         cluster_budget_fraction_rho=cluster_budget_fraction_rho,
         cluster_update_debug=cluster_update_debug,
@@ -4062,6 +4105,7 @@ def scan_multiple_code_sizes(
         single_bit_proposal_fraction=1.0,
         observable_temperature_mode="all",
         track_pt_sector_diagnostics=False,
+        pt_sector_diagnostic_stride=1,
         cluster_update_enabled=True,
         cluster_budget_fraction_rho=0.05,
         cluster_update_debug=False,
@@ -4152,6 +4196,7 @@ def scan_multiple_code_sizes(
                 "single_bit_proposal_fraction": single_bit_proposal_fraction,
                 "observable_temperature_mode": observable_temperature_mode,
                 "track_pt_sector_diagnostics": track_pt_sector_diagnostics,
+                "pt_sector_diagnostic_stride": pt_sector_diagnostic_stride,
                 "cluster_update_enabled": cluster_update_enabled,
                 "cluster_budget_fraction_rho": cluster_budget_fraction_rho,
                 "cluster_update_debug": cluster_update_debug,
