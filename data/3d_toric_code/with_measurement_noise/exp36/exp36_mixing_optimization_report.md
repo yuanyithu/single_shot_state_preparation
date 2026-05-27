@@ -406,3 +406,151 @@ fast probe `F_m128` 也给出一致信号：
 - 三个任务均通过 preflight merge。
 - 三个任务均已进入 `Launching chunk workers: 1 workers for 1 chunks`。
 - 下一轮先检查 final NPZ；若完成则同步到本地并比较 strict delivery、cold flips、min swap 与每温度 sector flip onset。
+
+### stride long probe 局部结果与 round-trip 诊断
+
+已完成并同步：
+
+- `data/3d_toric_code/with_measurement_noise/exp36/stride_long_probe_20260528/P_stride_K17_qhot032_m512_s4/P_stride_K17_qhot032_m512_s4.npz`
+- `data/3d_toric_code/with_measurement_noise/exp36/stride_long_probe_20260528/Q_stride_K17_qhot035_m512_s4/Q_stride_K17_qhot035_m512_s4.npz`
+
+`R_stride_K17_qhot044_m512_s4` 仍在 nd-3 运行；`q_hot=0.44` 明显比低热端慢。
+
+P/Q 共同参数：
+
+- `L=6,p=0.05,q=0.08`
+- `num_disorder_samples_total=1`
+- `num_start_chains=4`
+- `num_measurements_per_disorder=512`
+- `pt_sector_diagnostic_stride=4`
+- 每链 sector diagnostic sample count 为 `128`
+
+结果：
+
+| config | q_hot | min swap | bottleneck pair | cold flips mean | hot flips mean | proxy delivery | strict delivery |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| P | 0.32 | 0.2094 | 12-13 | 0.0 | 98.5 | 22/4 | 0/4 |
+| Q | 0.35 | 0.1264 | 11-12 | 0.0 | 95.3 | 20/4 | 0/4 |
+
+定量观察：
+
+- cold sector histogram 全部在 sector 0：P/Q 的 4 条 chain 都是 `[128,0,0,0,0,0,0,0]`。
+- hot sector 在多个 sector 之间频繁切换：
+  - P hot histogram mean 约 `[39.25,0,0,24.25,0,31.0,33.5,0]`。
+  - Q hot histogram mean 约 `[31.0,0,0,30.0,0,37.0,30.0,0]`。
+- P/Q 的 min swap 已经不低，但 cold sector 仍完全不变；因此仅靠“热端会翻 sector + 相邻 swap 接受率高”还不能证明 cold-hot-cold transport 足够。
+
+新增程序诊断：
+
+- 新增轻量 PT replica round-trip diagnostics，不计算 logical observable，只跟踪 `replica_id_per_temperature`。
+- 每条链输出：
+  - `pt_transport_position_sample_count`
+  - `pt_replica_cold_visit_count`
+  - `pt_replica_hot_visit_count`
+  - `pt_replica_cold_to_hot_passage_count`
+  - `pt_replica_hot_to_cold_passage_count`
+  - `pt_replica_endpoint_round_trip_count`
+  - `pt_replica_min_temperature_visited`
+  - `pt_replica_max_temperature_visited`
+- 生产 merge 保存对应 tensor：
+  - `chain_pt_transport_position_sample_count_per_disorder_per_start_replica_tensor`
+  - `chain_pt_replica_*_per_disorder_per_start_replica_tensor`
+- 该诊断从 burn-in 结束后开始计数，每次生产期 swap attempt 后记录一次，因此用于区分：
+  - replica 是否真的完成 cold→hot→cold round trip；
+  - 或者 round trip 已发生，但 sector change 在冷却过程中回到原 sector。
+
+验证：
+
+- `PYTHONPATH=src conda run -n 12 python -m py_compile src/mcmc_parallel_tempering.py src/main.py src/production_chunked_scan.py` 通过。
+- `PYTHONPATH=src conda run -n 12 python -m unittest discover -s tests` 通过。
+- smoke 输出：`data/3d_toric_code/with_measurement_noise/exp36/roundtrip_smoke_20260528/roundtrip_smoke.npz`。
+- smoke 中 round-trip 字段形状正确，例如 `chain_pt_replica_*_tensor` shape 为 `(1,1,1,1,1,4)`。
+
+### roundtrip-only probe 启动记录
+
+代码版本：
+
+- 提交并推送：`46319d276 Add PT replica roundtrip diagnostics`。
+- 远端 source：`/home/DATA1/users/yuany/.single_shot/repos/exp36_roundtrip_probe_20260528/source`。
+- run base：`/home/DATA1/users/yuany/.single_shot/exp36/exp36_roundtrip_probe_20260528`。
+- launcher 留档：`data/3d_toric_code/with_measurement_noise/exp36/launch_roundtrip_probe_20260528.sh`。
+
+共同参数：
+
+- `L=6,p=0.05,q=0.08`
+- `num_disorder_samples_total=1`
+- `num_start_chains=4`
+- `num_measurements_per_disorder=1024`
+- `num_sweeps_between_measurements=6`
+- `num_burn_in_sweeps=150`
+- `max_effective_num_burn_in_sweeps=750`
+- `K=17`
+- `adaptive_pt_rounds=0`
+- `observable_temperature_mode=cold`
+- `track_pt_sector_diagnostics=False`
+- `cluster_update=False`
+
+配置：
+
+| config | node | screen | q_hot | seed_base | run root |
+|---|---|---|---:|---:|---|
+| S | nd-1 | `exp36_S_rt` | 0.32 | 370000 | `S_roundtrip_K17_qhot032_m1024` |
+| T | nd-2 | `exp36_T_rt` | 0.35 | 371000 | `T_roundtrip_K17_qhot035_m1024` |
+| U | nd-3 | `exp36_U_rt` | 0.44 | 372000 | `U_roundtrip_K17_qhot044_m1024` |
+
+启动状态：
+
+- 三个任务均通过 exact validation。
+- 三个任务均通过 preflight merge。
+- 三个任务均已进入 `Launching chunk workers: 1 workers for 1 chunks`。
+- 下一轮先同步 S/T/U final NPZ，读取 round-trip tensor；若 P/Q 的 low-hot ladder 已有充分 endpoint round trips 但 cold sector 仍不变，下一步应测试 sector-preserving 冷却失败机制或显式 cold-sector assist move，而不是继续只优化 swap。
+
+### per-temperature logical-sector 反转定量汇总
+
+输出文件：
+
+- `data/3d_toric_code/with_measurement_noise/exp36/analysis_20260528/pt_temperature_logical_sector_summary.csv`
+- `data/3d_toric_code/with_measurement_noise/exp36/analysis_20260528/pt_temperature_logical_sector_summary.json`
+- `data/3d_toric_code/with_measurement_noise/exp36/analysis_20260528/pt_temperature_logical_sector_summary.md`
+
+定义：
+
+- `winding_acceptance_rate` 是该温度槽上 nontrivial winding proposal 的 Metropolis 接受率。
+- `sector_flip_rate` 是 logical-sector signature 在相邻诊断采样之间改变的频率；stride=4 时一个诊断间隔等于 4 个 measurement。
+- 这些是 temperature-slot 诊断，不是 identity-tracked replica 的 sector 历史；round-trip 另用 `replica_id_per_temperature` 诊断。
+
+配置汇总：
+
+| config | chains | measurements | stride | samples | min swap | bottleneck pair | cold flips | cold flip rate | hot flips | hot flip rate | hot winding acc | strict delivery | proxy delivery |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| M strict `q_hot=0.32` | 4 | 128 | 1 | 128 | 0.172266 | 12 | 0.000 | 0.000000 | 95.500 | 0.751969 | 0.002727 | 0 | 7 |
+| N strict `q_hot=0.35` | 4 | 128 | 1 | 128 | 0.108366 | 11 | 0.000 | 0.000000 | 93.750 | 0.738189 | 0.020724 | 0 | 3 |
+| O strict `q_hot=0.44` | 4 | 128 | 1 | 128 | 0.008893 | 6 | 0.000 | 0.000000 | 97.500 | 0.767717 | 0.385348 | 0 | 0 |
+| P stride `q_hot=0.32` | 4 | 512 | 4 | 128 | 0.209445 | 12 | 0.000 | 0.000000 | 98.500 | 0.775591 | 0.003405 | 0 | 22 |
+| Q stride `q_hot=0.35` | 4 | 512 | 4 | 128 | 0.126374 | 11 | 0.000 | 0.000000 | 95.250 | 0.750000 | 0.020201 | 0 | 20 |
+| R stride `q_hot=0.44` | 4 | 512 | 4 | 128 | 0.013605 | 6 | 0.000 | 0.000000 | 91.500 | 0.720472 | 0.385099 | 0 | 3 |
+| E pilot2 static `q_hot=0.44` | 8 | 512 | 1 | 512 | 0.011866 | 6 | 1.750 | 0.003425 | 387.000 | 0.757339 | 0.385821 | - | 11 |
+| F pilot2 capped `q_hot=0.44` | 8 | 512 | 1 | 512 | 0.012795 | 6 | 1.000 | 0.001957 | 380.125 | 0.743885 | 0.386536 | - | 18 |
+| I pilot3 `q_hot=0.32,wr=1` | 4 | 128 | 1 | 128 | 0.216733 | 12 | 0.000 | 0.000000 | 95.500 | 0.751969 | 0.003294 | - | 8 |
+| J pilot3 `q_hot=0.32,wr=4` | 4 | 128 | 1 | 128 | 0.204216 | 12 | 0.000 | 0.000000 | 93.500 | 0.736220 | 0.003239 | - | 4 |
+| K pilot3 `q_hot=0.35,wr=1` | 4 | 128 | 1 | 128 | 0.140975 | 10 | 0.000 | 0.000000 | 92.250 | 0.726378 | 0.020778 | - | 5 |
+
+关键逐温度结论：
+
+- `q_hot=0.32` 的长 probe P 中，cold `k=0,(p,q)=(0.05,0.08)` 完全无 sector flip；从 `k=11,(0.212,0.252)` 有明显翻转，`k=12,(0.228,0.267)` 后 flip rate 到 `0.215`，`k=14,(0.259,0.295)` 后接近热端水平。
+- `q_hot=0.35` 的长 probe Q 中，cold 仍完全无 sector flip；从 `k=8,(0.185,0.226)` 开始零星翻转，`k=11,(0.241,0.279)` 后 flip rate 到 `0.297`，`k=12,(0.259,0.295)` 后接近热端水平。
+- `q_hot=0.44` 的长 probe R 中，hot winding acceptance 很高，但 bottleneck pair `6-7` swap 只有 `0.013605`；sector flip 从 `k=4,(0.161,0.203)` 开始，`k=6,(0.225,0.264)` 后大量翻转。
+- P/Q/R 的 strict delivery 都是 `0`，说明这些 run 中没有观察到“热端产生的 sector change 被送回冷端并改变冷端 sector”的事件。
+
+roundtrip-only S/T/U 已同步：
+
+| config | q_hot | min swap | bottleneck pair | roundtrip sum | roundtrip per chain | c2h sum | h2c sum |
+|---|---:|---:|---:|---:|---|---:|---:|
+| S | 0.32 | 0.193066 | 13 | 234 | `[52,69,56,57]` | 250 | 250 |
+| T | 0.35 | 0.134755 | 10 | 164 | `[37,41,37,49]` | 184 | 182 |
+| U | 0.44 | 0.013563 | 6 | 37 | `[13,9,10,5]` | 49 | 53 |
+
+解释：
+
+- S/T 显示低热端 ladder 已经有大量 endpoint round trips；结合 P/Q 的 cold sector 完全不翻，瓶颈不再是 replica 到不了热端，而是热端 sector change 在回到 cold 的过程中没有改变 cold ensemble 的 logical sector。
+- U 的 round trips 明显少，和 `q_hot=0.44` 的中间 swap bottleneck 一致；继续把热端加热到 `0.44` 不划算。
