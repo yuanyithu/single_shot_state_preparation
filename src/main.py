@@ -1599,7 +1599,9 @@ def _run_parallel_tempering_single_chain(
         section_data=None,
         single_bit_proposal_fraction=1.0,
         observable_temperature_mode="all",
-        adaptive_pt_flow_enabled=False):
+        adaptive_pt_flow_enabled=False,
+        track_pt_sector_diagnostics=False,
+        num_logical_qubits=None):
     from mcmc_parallel_tempering import run_parallel_tempering_measurement
 
     num_temperatures = int(len(data_error_probability_ladder))
@@ -1639,6 +1641,8 @@ def _run_parallel_tempering_single_chain(
         single_bit_proposal_fraction=single_bit_proposal_fraction,
         observable_temperature_mode=observable_temperature_mode,
         adaptive_pt_flow_enabled=adaptive_pt_flow_enabled,
+        track_logical_sector_diagnostics=track_pt_sector_diagnostics,
+        num_logical_qubits=num_logical_qubits,
     )
     cold_index = 0
     acceptance_rate = _compute_total_acceptance_rate_from_counts(
@@ -1717,12 +1721,36 @@ def _run_parallel_tempering_single_chain(
         "pt_winding_acceptance_rate_per_temperature": (
             pt_result["winding_acceptance_rate_per_temperature"]
         ),
+        "pt_winding_accepted_count_per_temperature": (
+            pt_result["winding_accepted_count_per_temperature"]
+        ),
+        "pt_winding_attempted_count_per_temperature": (
+            pt_result["winding_attempted_count_per_temperature"]
+        ),
         "pt_swap_acceptance_rates": pt_result["swap_acceptance_rates"],
+        "pt_swap_accept_counts": pt_result["swap_accept_counts"],
+        "pt_swap_attempt_counts": pt_result["swap_attempt_counts"],
         "ordinary_update_wall_time": pt_result["ordinary_update_wall_time"],
         "pt_swap_wall_time": pt_result["pt_swap_wall_time"],
         "observable_wall_time": pt_result["observable_wall_time"],
         "measurement_wall_time": pt_result["measurement_wall_time"],
     }
+    if bool(pt_result.get("pt_sector_diagnostics_enabled", False)):
+        result["pt_sector_diagnostics_enabled"] = np.bool_(True)
+        result["pt_sector_flip_count_per_temperature"] = (
+            pt_result["pt_sector_flip_count_per_temperature"]
+        )
+        result["pt_first_sector_change_index_per_temperature"] = (
+            pt_result["pt_first_sector_change_index_per_temperature"]
+        )
+        result["pt_sector_histogram_per_temperature"] = (
+            pt_result["pt_sector_histogram_per_temperature"]
+        )
+        result["pt_hot_to_cold_sector_delivery_count"] = (
+            pt_result["pt_hot_to_cold_sector_delivery_count"]
+        )
+    else:
+        result["pt_sector_diagnostics_enabled"] = np.bool_(False)
     if "adaptive_pt_flow" in pt_result:
         result["adaptive_pt_flow"] = pt_result["adaptive_pt_flow"]
     for key in (
@@ -2265,6 +2293,7 @@ def run_disorder_average_simulation(
         winding_repeat_factor=1,
         single_bit_proposal_fraction=1.0,
         observable_temperature_mode="all",
+        track_pt_sector_diagnostics=False,
         cluster_update_enabled=True,
         cluster_budget_fraction_rho=0.05,
         cluster_update_debug=False,
@@ -2306,6 +2335,7 @@ def run_disorder_average_simulation(
             raise ValueError("pt_num_temperatures must be >= 2")
         if observable_temperature_mode not in ("all", "cold"):
             raise ValueError("observable_temperature_mode must be all or cold")
+        track_pt_sector_diagnostics = bool(track_pt_sector_diagnostics)
         if pt_ladder_mode == "data_only":
             if pt_p_hot is None:
                 raise ValueError("pt_p_hot is required for data_only PT")
@@ -2451,6 +2481,16 @@ def run_disorder_average_simulation(
     num_chains_that_never_flipped_sector_per_disorder = None
     pt_min_swap_acceptance_rate_per_disorder = None
     pt_mean_swap_acceptance_rate_per_disorder = None
+    chain_pt_winding_acceptance_rate_per_temperature_per_disorder_per_start_replica = None
+    chain_pt_winding_accepted_count_per_temperature_per_disorder_per_start_replica = None
+    chain_pt_winding_attempted_count_per_temperature_per_disorder_per_start_replica = None
+    chain_pt_swap_acceptance_rate_per_pair_per_disorder_per_start_replica = None
+    chain_pt_swap_accept_count_per_pair_per_disorder_per_start_replica = None
+    chain_pt_swap_attempt_count_per_pair_per_disorder_per_start_replica = None
+    chain_pt_sector_flip_count_per_temperature_per_disorder_per_start_replica = None
+    chain_pt_first_sector_change_index_per_temperature_per_disorder_per_start_replica = None
+    chain_pt_sector_histogram_per_temperature_per_disorder_per_start_replica = None
+    chain_pt_hot_to_cold_sector_delivery_count_per_disorder_per_start_replica = None
     pt_data_error_probability_ladder_per_disorder = None
     pt_syndrome_error_probability_ladder_per_disorder = None
     pt_enlarge_ladder_per_disorder = None
@@ -2564,6 +2604,47 @@ def run_disorder_average_simulation(
                 (num_disorder_samples, int(pt_num_temperatures)),
                 dtype=np.float64,
             )
+            pt_temperature_chain_shape = (
+                chain_shape + (int(pt_num_temperatures),)
+            )
+            pt_pair_chain_shape = (
+                chain_shape + (max(int(pt_num_temperatures) - 1, 0),)
+            )
+            chain_pt_winding_acceptance_rate_per_temperature_per_disorder_per_start_replica = (
+                np.empty(pt_temperature_chain_shape, dtype=np.float64)
+            )
+            chain_pt_winding_accepted_count_per_temperature_per_disorder_per_start_replica = (
+                np.empty(pt_temperature_chain_shape, dtype=np.int64)
+            )
+            chain_pt_winding_attempted_count_per_temperature_per_disorder_per_start_replica = (
+                np.empty(pt_temperature_chain_shape, dtype=np.int64)
+            )
+            chain_pt_swap_acceptance_rate_per_pair_per_disorder_per_start_replica = (
+                np.empty(pt_pair_chain_shape, dtype=np.float64)
+            )
+            chain_pt_swap_accept_count_per_pair_per_disorder_per_start_replica = (
+                np.empty(pt_pair_chain_shape, dtype=np.int64)
+            )
+            chain_pt_swap_attempt_count_per_pair_per_disorder_per_start_replica = (
+                np.empty(pt_pair_chain_shape, dtype=np.int64)
+            )
+            if track_pt_sector_diagnostics:
+                sector_chain_shape = pt_temperature_chain_shape
+                chain_pt_sector_flip_count_per_temperature_per_disorder_per_start_replica = (
+                    np.empty(sector_chain_shape, dtype=np.int64)
+                )
+                chain_pt_first_sector_change_index_per_temperature_per_disorder_per_start_replica = (
+                    np.empty(sector_chain_shape, dtype=np.int64)
+                )
+                chain_pt_sector_histogram_per_temperature_per_disorder_per_start_replica = (
+                    np.empty(
+                        sector_chain_shape + (1 << num_logical_qubits,),
+                        dtype=np.int64,
+                    )
+                )
+                chain_pt_hot_to_cold_sector_delivery_count_per_disorder_per_start_replica = (
+                    np.empty(chain_shape, dtype=np.int64)
+                )
             if int(adaptive_pt_rounds) > 0:
                 adaptive_shape = (
                     num_disorder_samples,
@@ -3009,6 +3090,10 @@ def run_disorder_average_simulation(
                                 observable_temperature_mode=(
                                     observable_temperature_mode
                                 ),
+                                track_pt_sector_diagnostics=(
+                                    track_pt_sector_diagnostics
+                                ),
+                                num_logical_qubits=num_logical_qubits,
                             )
                         )
                         pt_swap_acceptance_rates = np.asarray(
@@ -3033,6 +3118,83 @@ def run_disorder_average_simulation(
                                 start_index,
                                 replica_index,
                             ] = float(np.mean(pt_swap_acceptance_rates))
+                        chain_pt_winding_acceptance_rate_per_temperature_per_disorder_per_start_replica[
+                            disorder_index,
+                            start_index,
+                            replica_index,
+                            :,
+                        ] = measurement_result[
+                            "pt_winding_acceptance_rate_per_temperature"
+                        ]
+                        chain_pt_winding_accepted_count_per_temperature_per_disorder_per_start_replica[
+                            disorder_index,
+                            start_index,
+                            replica_index,
+                            :,
+                        ] = measurement_result[
+                            "pt_winding_accepted_count_per_temperature"
+                        ]
+                        chain_pt_winding_attempted_count_per_temperature_per_disorder_per_start_replica[
+                            disorder_index,
+                            start_index,
+                            replica_index,
+                            :,
+                        ] = measurement_result[
+                            "pt_winding_attempted_count_per_temperature"
+                        ]
+                        chain_pt_swap_acceptance_rate_per_pair_per_disorder_per_start_replica[
+                            disorder_index,
+                            start_index,
+                            replica_index,
+                            :,
+                        ] = measurement_result["pt_swap_acceptance_rates"]
+                        chain_pt_swap_accept_count_per_pair_per_disorder_per_start_replica[
+                            disorder_index,
+                            start_index,
+                            replica_index,
+                            :,
+                        ] = measurement_result["pt_swap_accept_counts"]
+                        chain_pt_swap_attempt_count_per_pair_per_disorder_per_start_replica[
+                            disorder_index,
+                            start_index,
+                            replica_index,
+                            :,
+                        ] = measurement_result["pt_swap_attempt_counts"]
+                        if track_pt_sector_diagnostics:
+                            chain_pt_sector_flip_count_per_temperature_per_disorder_per_start_replica[
+                                disorder_index,
+                                start_index,
+                                replica_index,
+                                :,
+                            ] = measurement_result[
+                                "pt_sector_flip_count_per_temperature"
+                            ]
+                            chain_pt_first_sector_change_index_per_temperature_per_disorder_per_start_replica[
+                                disorder_index,
+                                start_index,
+                                replica_index,
+                                :,
+                            ] = measurement_result[
+                                "pt_first_sector_change_index_per_temperature"
+                            ]
+                            chain_pt_sector_histogram_per_temperature_per_disorder_per_start_replica[
+                                disorder_index,
+                                start_index,
+                                replica_index,
+                                :,
+                                :,
+                            ] = measurement_result[
+                                "pt_sector_histogram_per_temperature"
+                            ]
+                            chain_pt_hot_to_cold_sector_delivery_count_per_disorder_per_start_replica[
+                                disorder_index,
+                                start_index,
+                                replica_index,
+                            ] = int(
+                                measurement_result[
+                                    "pt_hot_to_cold_sector_delivery_count"
+                                ]
+                            )
                     else:
                         measurement_result = _run_single_disorder_measurement(
                             parity_check_matrix=parity_check_matrix,
@@ -3426,12 +3588,66 @@ def run_disorder_average_simulation(
             result["pt_observable_temperature_mode"] = np.array(
                 observable_temperature_mode
             )
+            result["pt_track_sector_diagnostics"] = np.bool_(
+                track_pt_sector_diagnostics
+            )
             result["pt_min_swap_acceptance_rate_per_disorder"] = (
                 pt_min_swap_acceptance_rate_per_disorder
             )
             result["pt_mean_swap_acceptance_rate_per_disorder"] = (
                 pt_mean_swap_acceptance_rate_per_disorder
             )
+            result[
+                "chain_pt_winding_acceptance_rate_per_temperature_per_disorder_per_start_replica"
+            ] = (
+                chain_pt_winding_acceptance_rate_per_temperature_per_disorder_per_start_replica
+            )
+            result[
+                "chain_pt_winding_accepted_count_per_temperature_per_disorder_per_start_replica"
+            ] = (
+                chain_pt_winding_accepted_count_per_temperature_per_disorder_per_start_replica
+            )
+            result[
+                "chain_pt_winding_attempted_count_per_temperature_per_disorder_per_start_replica"
+            ] = (
+                chain_pt_winding_attempted_count_per_temperature_per_disorder_per_start_replica
+            )
+            result[
+                "chain_pt_swap_acceptance_rate_per_pair_per_disorder_per_start_replica"
+            ] = (
+                chain_pt_swap_acceptance_rate_per_pair_per_disorder_per_start_replica
+            )
+            result[
+                "chain_pt_swap_accept_count_per_pair_per_disorder_per_start_replica"
+            ] = (
+                chain_pt_swap_accept_count_per_pair_per_disorder_per_start_replica
+            )
+            result[
+                "chain_pt_swap_attempt_count_per_pair_per_disorder_per_start_replica"
+            ] = (
+                chain_pt_swap_attempt_count_per_pair_per_disorder_per_start_replica
+            )
+            if track_pt_sector_diagnostics:
+                result[
+                    "chain_pt_sector_flip_count_per_temperature_per_disorder_per_start_replica"
+                ] = (
+                    chain_pt_sector_flip_count_per_temperature_per_disorder_per_start_replica
+                )
+                result[
+                    "chain_pt_first_sector_change_index_per_temperature_per_disorder_per_start_replica"
+                ] = (
+                    chain_pt_first_sector_change_index_per_temperature_per_disorder_per_start_replica
+                )
+                result[
+                    "chain_pt_sector_histogram_per_temperature_per_disorder_per_start_replica"
+                ] = (
+                    chain_pt_sector_histogram_per_temperature_per_disorder_per_start_replica
+                )
+                result[
+                    "chain_pt_hot_to_cold_sector_delivery_count_per_disorder_per_start_replica"
+                ] = (
+                    chain_pt_hot_to_cold_sector_delivery_count_per_disorder_per_start_replica
+                )
     return result
 
 
@@ -3460,6 +3676,7 @@ def scan_data_error_probability(
         winding_repeat_factor=1,
         single_bit_proposal_fraction=1.0,
         observable_temperature_mode="all",
+        track_pt_sector_diagnostics=False,
         cluster_update_enabled=True,
         cluster_budget_fraction_rho=0.05,
         cluster_update_debug=False):
@@ -3518,6 +3735,7 @@ def scan_data_error_probability(
             winding_repeat_factor=winding_repeat_factor,
             single_bit_proposal_fraction=single_bit_proposal_fraction,
             observable_temperature_mode=observable_temperature_mode,
+            track_pt_sector_diagnostics=track_pt_sector_diagnostics,
             cluster_update_enabled=cluster_update_enabled,
             cluster_budget_fraction_rho=cluster_budget_fraction_rho,
             cluster_update_debug=cluster_update_debug,
@@ -3610,6 +3828,9 @@ def _run_single_scan_point_task(task_data):
         "observable_temperature_mode",
         "all",
     )
+    track_pt_sector_diagnostics = bool(
+        task_data.get("track_pt_sector_diagnostics", False)
+    )
     num_zero_syndrome_sweeps_per_cycle = task_data.get(
         "num_zero_syndrome_sweeps_per_cycle",
         1,
@@ -3661,6 +3882,7 @@ def _run_single_scan_point_task(task_data):
         winding_repeat_factor=winding_repeat_factor,
         single_bit_proposal_fraction=single_bit_proposal_fraction,
         observable_temperature_mode=observable_temperature_mode,
+        track_pt_sector_diagnostics=track_pt_sector_diagnostics,
         cluster_update_enabled=cluster_update_enabled,
         cluster_budget_fraction_rho=cluster_budget_fraction_rho,
         cluster_update_debug=cluster_update_debug,
@@ -3818,6 +4040,7 @@ def scan_multiple_code_sizes(
         winding_repeat_factor=1,
         single_bit_proposal_fraction=1.0,
         observable_temperature_mode="all",
+        track_pt_sector_diagnostics=False,
         cluster_update_enabled=True,
         cluster_budget_fraction_rho=0.05,
         cluster_update_debug=False,
@@ -3907,6 +4130,7 @@ def scan_multiple_code_sizes(
                 "winding_repeat_factor": winding_repeat_factor,
                 "single_bit_proposal_fraction": single_bit_proposal_fraction,
                 "observable_temperature_mode": observable_temperature_mode,
+                "track_pt_sector_diagnostics": track_pt_sector_diagnostics,
                 "cluster_update_enabled": cluster_update_enabled,
                 "cluster_budget_fraction_rho": cluster_budget_fraction_rho,
                 "cluster_update_debug": cluster_update_debug,
