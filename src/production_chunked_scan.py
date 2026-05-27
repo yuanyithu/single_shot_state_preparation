@@ -323,6 +323,8 @@ def _build_submit_config_from_args(args):
         raise ValueError("single_bit_proposal_fraction must be in (0, 1]")
     if int(args.pt_sector_diagnostic_stride) < 1:
         raise ValueError("--pt-sector-diagnostic-stride must be >= 1")
+    if int(args.pt_swap_sweeps_per_attempt) < 1:
+        raise ValueError("--pt-swap-sweeps-per-attempt must be >= 1")
     if args.pt_ladder_mode not in ("data_only", "sync_enlarge"):
         raise ValueError("pt_ladder_mode must be data_only or sync_enlarge")
     pt_requested = (
@@ -445,6 +447,7 @@ def _build_submit_config_from_args(args):
         "pt_swap_attempt_every_num_sweeps": int(
             args.pt_swap_attempt_every_num_sweeps
         ),
+        "pt_swap_sweeps_per_attempt": int(args.pt_swap_sweeps_per_attempt),
         "num_zero_syndrome_sweeps_per_cycle": int(
             args.num_zero_syndrome_sweeps_per_cycle
         ),
@@ -549,6 +552,9 @@ def _build_chunk_tasks(config):
                     ),
                     "pt_swap_attempt_every_num_sweeps": int(
                         config["pt_swap_attempt_every_num_sweeps"]
+                    ),
+                    "pt_swap_sweeps_per_attempt": int(
+                        config["pt_swap_sweeps_per_attempt"]
                     ),
                     "num_zero_syndrome_sweeps_per_cycle": int(
                         config["num_zero_syndrome_sweeps_per_cycle"]
@@ -696,6 +702,9 @@ def _build_manifest(
             ),
             "pt_swap_attempt_every_num_sweeps": (
                 config["pt_swap_attempt_every_num_sweeps"]
+            ),
+            "pt_swap_sweeps_per_attempt": (
+                config["pt_swap_sweeps_per_attempt"]
             ),
             "num_zero_syndrome_sweeps_per_cycle": (
                 config["num_zero_syndrome_sweeps_per_cycle"]
@@ -852,6 +861,9 @@ def _run_chunk_task(task_data):
             pt_swap_attempt_every_num_sweeps=(
                 task_data["pt_swap_attempt_every_num_sweeps"]
             ),
+            pt_swap_sweeps_per_attempt=(
+                task_data["pt_swap_sweeps_per_attempt"]
+            ),
             num_zero_syndrome_sweeps_per_cycle=(
                 task_data["num_zero_syndrome_sweeps_per_cycle"]
             ),
@@ -884,6 +896,11 @@ def _run_chunk_task(task_data):
             None,
         )
         simulation_result_for_save.pop("winding_repeat_factor", None)
+        simulation_result_for_save.pop(
+            "pt_swap_attempt_every_num_sweeps",
+            None,
+        )
+        simulation_result_for_save.pop("pt_swap_sweeps_per_attempt", None)
         section_stats = _extract_section_stats(simulation_result_for_save)
 
         np.savez(
@@ -912,6 +929,12 @@ def _run_chunk_task(task_data):
                 task_data["num_measurements_per_disorder"]
             ),
             q0_num_start_chains=np.int64(task_data["q0_num_start_chains"]),
+            pt_swap_attempt_every_num_sweeps=np.int64(
+                task_data["pt_swap_attempt_every_num_sweeps"]
+            ),
+            pt_swap_sweeps_per_attempt=np.int64(
+                task_data["pt_swap_sweeps_per_attempt"]
+            ),
             num_zero_syndrome_sweeps_per_cycle=np.int64(
                 task_data["num_zero_syndrome_sweeps_per_cycle"]
             ),
@@ -1047,6 +1070,11 @@ def _validate_chunk_payload(loaded_chunk_result, task_data):
         raise ValueError("chunk num_disorder_samples mismatch")
     if loaded_chunk_result["disorder_q_top_values"].shape[0] != expected_num_disorders:
         raise ValueError("chunk disorder_q_top_values length mismatch")
+    if "pt_swap_sweeps_per_attempt" in loaded_chunk_result:
+        if (
+                int(loaded_chunk_result["pt_swap_sweeps_per_attempt"])
+                != int(task_data.get("pt_swap_sweeps_per_attempt", 1))):
+            raise ValueError("chunk pt_swap_sweeps_per_attempt mismatch")
 
 
 def _merge_outputs(
@@ -2735,6 +2763,12 @@ def _merge_outputs(
             config["num_measurements_per_disorder"]
         ),
         q0_num_start_chains=np.int64(config["q0_num_start_chains"]),
+        pt_swap_attempt_every_num_sweeps=np.int64(
+            config["pt_swap_attempt_every_num_sweeps"]
+        ),
+        pt_swap_sweeps_per_attempt=np.int64(
+            config["pt_swap_sweeps_per_attempt"]
+        ),
         num_zero_syndrome_sweeps_per_cycle=np.int64(
             config["num_zero_syndrome_sweeps_per_cycle"]
         ),
@@ -3095,6 +3129,8 @@ def _submit_run(args):
 
 
 def _run_chunk_command(args):
+    if int(args.pt_swap_sweeps_per_attempt) < 1:
+        raise ValueError("--pt-swap-sweeps-per-attempt must be >= 1")
     task_data = {
         "lattice_index": int(args.lattice_index),
         "point_index": int(args.point_index),
@@ -3132,6 +3168,7 @@ def _run_chunk_command(args):
         "pt_swap_attempt_every_num_sweeps": int(
             args.pt_swap_attempt_every_num_sweeps
         ),
+        "pt_swap_sweeps_per_attempt": int(args.pt_swap_sweeps_per_attempt),
         "num_zero_syndrome_sweeps_per_cycle": int(
             args.num_zero_syndrome_sweeps_per_cycle
         ),
@@ -3293,6 +3330,15 @@ def _build_parser():
         "--pt-swap-attempt-every-num-sweeps",
         type=int,
         default=1,
+    )
+    common_submit_parser.add_argument(
+        "--pt-swap-sweeps-per-attempt",
+        type=int,
+        default=1,
+        help=(
+            "Number of alternating adjacent PT swap sweeps to run whenever "
+            "the swap cadence fires. The default 1 preserves old behavior."
+        ),
     )
     common_submit_parser.add_argument(
         "--num-zero-syndrome-sweeps-per-cycle",
@@ -3498,6 +3544,11 @@ def _build_parser():
     )
     run_chunk_parser.add_argument(
         "--pt-swap-attempt-every-num-sweeps",
+        type=int,
+        default=1,
+    )
+    run_chunk_parser.add_argument(
+        "--pt-swap-sweeps-per-attempt",
         type=int,
         default=1,
     )

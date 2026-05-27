@@ -149,6 +149,7 @@ def run_parallel_tempering_measurement(
         num_zero_syndrome_sweeps_per_cycle=1,
         winding_repeat_factor=1,
         swap_attempt_every_num_sweeps=1,
+        swap_sweeps_per_attempt=1,
         return_diagnostics=False,
         record_all_temperature_trajectories=False,
         cluster_update_enabled=True,
@@ -195,6 +196,9 @@ def run_parallel_tempering_measurement(
     logical_sector_diagnostic_stride = int(logical_sector_diagnostic_stride)
     if logical_sector_diagnostic_stride < 1:
         raise ValueError("logical_sector_diagnostic_stride must be >= 1")
+    swap_sweeps_per_attempt = int(swap_sweeps_per_attempt)
+    if swap_sweeps_per_attempt < 1:
+        raise ValueError("swap_sweeps_per_attempt must be >= 1")
     if syndrome_error_probability_ladder is None:
         syndrome_error_probability_ladder = np.full(
             num_temperatures,
@@ -495,29 +499,32 @@ def run_parallel_tempering_measurement(
         if sweep_counter % swap_attempt_every_num_sweeps != 0:
             return
         swap_started_at = time.perf_counter()
-        _attempt_replica_swaps(
-            chain_bits_list=chain_bits_list,
-            data_term_bits_list=data_term_bits_list,
-            syndrome_term_bits_list=syndrome_term_bits_list,
-            data_weight_per_temperature=data_weight_per_temperature,
-            log_odds_data_per_temperature=log_odds_data_per_temperature,
-            rng=rng,
-            parity_index=swap_parity_counter,
-            swap_accept_counts=swap_accept_counts,
-            swap_attempt_counts=swap_attempt_counts,
-            syndrome_weight_per_temperature=syndrome_weight_per_temperature,
-            log_odds_syndrome_per_temperature=(
-                log_odds_syndrome_per_temperature
-            ),
-            replica_id_per_temperature=replica_id_per_temperature,
-        )
-        record_adaptive_pt_flow(
-            flow_tracker=flow_tracker,
-            replica_id_per_temperature=replica_id_per_temperature,
-        )
-        _record_replica_transport_position()
+        for _ in range(swap_sweeps_per_attempt):
+            _attempt_replica_swaps(
+                chain_bits_list=chain_bits_list,
+                data_term_bits_list=data_term_bits_list,
+                syndrome_term_bits_list=syndrome_term_bits_list,
+                data_weight_per_temperature=data_weight_per_temperature,
+                log_odds_data_per_temperature=log_odds_data_per_temperature,
+                rng=rng,
+                parity_index=swap_parity_counter,
+                swap_accept_counts=swap_accept_counts,
+                swap_attempt_counts=swap_attempt_counts,
+                syndrome_weight_per_temperature=(
+                    syndrome_weight_per_temperature
+                ),
+                log_odds_syndrome_per_temperature=(
+                    log_odds_syndrome_per_temperature
+                ),
+                replica_id_per_temperature=replica_id_per_temperature,
+            )
+            record_adaptive_pt_flow(
+                flow_tracker=flow_tracker,
+                replica_id_per_temperature=replica_id_per_temperature,
+            )
+            _record_replica_transport_position()
+            swap_parity_counter += 1
         pt_swap_wall_time += time.perf_counter() - swap_started_at
-        swap_parity_counter += 1
 
     def _record_replica_transport_position():
         nonlocal transport_position_sample_count
@@ -933,6 +940,7 @@ def run_parallel_tempering_measurement(
         "swap_accept_counts": swap_accept_counts,
         "swap_attempt_counts": swap_attempt_counts,
         "swap_acceptance_rates": swap_acceptance_rates,
+        "pt_swap_sweeps_per_attempt": np.int64(swap_sweeps_per_attempt),
         "pt_transport_position_sample_count": np.int64(
             transport_position_sample_count
         ),
