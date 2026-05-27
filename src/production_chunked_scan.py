@@ -23,6 +23,8 @@ from mcmc_convergence_gate import (
     write_convergence_summary_json,
 )
 from mcmc_diagnostics import (
+    DATA_ONLY_PT_LADDER_SEMANTICS,
+    SYNC_PT_LADDER_SEMANTICS,
     sync_pt_enlarge_ladder,
     sync_pt_ladders_from_enlarge,
 )
@@ -35,6 +37,13 @@ DEFAULT_Q0_OUTPUT_STEM = (
     "scan_result_multi_L_q0_geometric_multistart_threshold_deep"
 )
 DEFAULT_BURN_IN_SCALING_REFERENCE_NUM_QUBITS = 18
+
+
+def _pt_ladder_semantics(pt_ladder_mode):
+    pt_ladder_mode = str(pt_ladder_mode)
+    if pt_ladder_mode == "sync_enlarge":
+        return SYNC_PT_LADDER_SEMANTICS
+    return DATA_ONLY_PT_LADDER_SEMANTICS
 
 
 def _timestamp():
@@ -321,16 +330,22 @@ def _build_submit_config_from_args(args):
         or args.pt_q_hot is not None
         or int(args.adaptive_pt_rounds) > 0
     )
-    if pt_requested and (
-            args.pt_p_hot is None or args.pt_num_temperatures is None):
-        raise ValueError(
-            "--pt-p-hot and --pt-num-temperatures are required together"
-        )
+    if pt_requested and args.pt_num_temperatures is None:
+        raise ValueError("--pt-num-temperatures is required for PT")
+    if pt_requested and args.pt_ladder_mode == "data_only":
+        if args.pt_p_hot is None:
+            raise ValueError("--pt-p-hot is required for data_only PT")
+        for data_error_probability in data_error_probability_list:
+            if float(args.pt_p_hot) <= float(data_error_probability):
+                raise ValueError("--pt-p-hot must be greater than cold p")
     if args.pt_ladder_mode == "sync_enlarge":
         if args.pt_q_hot is None:
             raise ValueError("--pt-q-hot is required for sync_enlarge PT")
-        if float(args.pt_q_hot) < float(args.syndrome_error_probability):
-            raise ValueError("--pt-q-hot must be >= cold q")
+        if not (
+                float(args.syndrome_error_probability)
+                < float(args.pt_q_hot)
+                < 0.5):
+            raise ValueError("--pt-q-hot must be in (cold q, 0.5)")
         if not bool(args.disable_cluster_update):
             raise ValueError(
                 "sync_enlarge PT requires --disable-cluster-update"
@@ -413,6 +428,11 @@ def _build_submit_config_from_args(args):
             else int(args.pt_num_temperatures)
         ),
         "pt_ladder_mode": str(args.pt_ladder_mode),
+        "pt_ladder_semantics": (
+            None
+            if not pt_requested
+            else _pt_ladder_semantics(args.pt_ladder_mode)
+        ),
         "pt_q_hot": (
             None if args.pt_q_hot is None else float(args.pt_q_hot)
         ),
@@ -515,6 +535,7 @@ def _build_chunk_tasks(config):
                     "pt_p_hot": config["pt_p_hot"],
                     "pt_num_temperatures": config["pt_num_temperatures"],
                     "pt_ladder_mode": config["pt_ladder_mode"],
+                    "pt_ladder_semantics": config["pt_ladder_semantics"],
                     "pt_q_hot": config["pt_q_hot"],
                     "adaptive_pt_rounds": config["adaptive_pt_rounds"],
                     "adaptive_pt_calibration_sweeps": (
@@ -655,6 +676,7 @@ def _build_manifest(
             "pt_p_hot": config["pt_p_hot"],
             "pt_num_temperatures": config["pt_num_temperatures"],
             "pt_ladder_mode": config["pt_ladder_mode"],
+            "pt_ladder_semantics": config["pt_ladder_semantics"],
             "pt_q_hot": config["pt_q_hot"],
             "adaptive_pt_rounds": config["adaptive_pt_rounds"],
             "adaptive_pt_calibration_sweeps": (
@@ -879,6 +901,12 @@ def _run_chunk_task(task_data):
                 task_data["observable_temperature_mode"]
             ),
             pt_ladder_mode_config=np.array(task_data["pt_ladder_mode"]),
+            pt_ladder_semantics_config=np.array(
+                task_data.get(
+                    "pt_ladder_semantics",
+                    _pt_ladder_semantics(task_data["pt_ladder_mode"]),
+                )
+            ),
             pt_q_hot_config=np.float64(
                 np.nan
                 if task_data["pt_q_hot"] is None
@@ -1009,8 +1037,13 @@ def _merge_outputs(
     num_start_chains = int(config["num_start_chains"])
     num_replicas_per_start = int(config["num_replicas_per_start"])
     pt_enabled = (
-        config["pt_p_hot"] is not None
-        and config["pt_num_temperatures"] is not None
+        config["pt_num_temperatures"] is not None
+        and (
+            config["pt_p_hot"] is not None
+            or config.get("pt_ladder_mode", "data_only") != "data_only"
+            or config.get("pt_q_hot") is not None
+            or int(config.get("adaptive_pt_rounds", 0)) > 0
+        )
     )
     pt_num_temperatures = (
         0 if not pt_enabled else int(config["pt_num_temperatures"])
@@ -1964,7 +1997,9 @@ def _merge_outputs(
         )
         merged_result["pt_enabled"] = np.bool_(pt_enabled)
         if pt_enabled:
-            merged_result["pt_p_hot"] = np.float64(config["pt_p_hot"])
+            merged_result["pt_p_hot"] = np.float64(
+                np.nan if config["pt_p_hot"] is None else config["pt_p_hot"]
+            )
             merged_result["pt_q_hot"] = np.float64(
                 (
                     config["syndrome_error_probability"]
@@ -1977,6 +2012,14 @@ def _merge_outputs(
             )
             merged_result["pt_ladder_mode"] = np.array(
                 config.get("pt_ladder_mode", "data_only")
+            )
+            merged_result["pt_ladder_semantics"] = np.array(
+                config.get(
+                    "pt_ladder_semantics",
+                    _pt_ladder_semantics(
+                        config.get("pt_ladder_mode", "data_only")
+                    ),
+                )
             )
             merged_result["adaptive_pt_rounds"] = np.int64(
                 adaptive_pt_rounds
@@ -2066,6 +2109,12 @@ def _merge_outputs(
             config["observable_temperature_mode"]
         ),
         pt_ladder_mode_config=np.array(config.get("pt_ladder_mode", "data_only")),
+        pt_ladder_semantics_config=np.array(
+            config.get(
+                "pt_ladder_semantics",
+                _pt_ladder_semantics(config.get("pt_ladder_mode", "data_only")),
+            )
+        ),
         pt_q_hot_config=np.float64(
             np.nan
             if config.get("pt_q_hot") is None
@@ -2429,6 +2478,7 @@ def _run_chunk_command(args):
             else int(args.pt_num_temperatures)
         ),
         "pt_ladder_mode": str(args.pt_ladder_mode),
+        "pt_ladder_semantics": _pt_ladder_semantics(args.pt_ladder_mode),
         "pt_q_hot": (
             None if args.pt_q_hot is None else float(args.pt_q_hot)
         ),

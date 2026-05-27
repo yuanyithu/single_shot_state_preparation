@@ -36,6 +36,8 @@ from mcmc import (
     initialize_mcmc_state,
 )
 from mcmc_diagnostics import (
+    DATA_ONLY_PT_LADDER_SEMANTICS,
+    SYNC_PT_LADDER_SEMANTICS,
     adaptive_ladder_from_flow,
     analyze_chain_diagnostics,
     equal_log_odds_ladder,
@@ -55,6 +57,13 @@ DATA_DIR = PROJECT_ROOT / "data"
 LOCAL_RUNS_DIR = (
     DATA_DIR / "2d_toric_code" / "without_measurement_noise"
 )
+
+
+def _pt_ladder_semantics(pt_ladder_mode):
+    pt_ladder_mode = str(pt_ladder_mode)
+    if pt_ladder_mode == "sync_enlarge":
+        return SYNC_PT_LADDER_SEMANTICS
+    return DATA_ONLY_PT_LADDER_SEMANTICS
 
 
 def _ensure_data_dir():
@@ -2287,25 +2296,29 @@ def run_disorder_average_simulation(
         or int(adaptive_pt_rounds) > 0
     )
     if use_parallel_tempering:
-        if pt_p_hot is None or pt_num_temperatures is None:
-            raise ValueError(
-                "pt_p_hot and pt_num_temperatures must be provided together"
-            )
+        if pt_num_temperatures is None:
+            raise ValueError("pt_num_temperatures must be provided for PT")
         if syndrome_error_probability == 0.0:
             raise ValueError("parallel tempering is only supported for q>0")
         if pt_ladder_mode not in ("data_only", "sync_enlarge"):
             raise ValueError("pt_ladder_mode must be data_only or sync_enlarge")
-        if float(pt_p_hot) <= float(data_error_probability):
-            raise ValueError("pt_p_hot must be greater than cold p")
         if int(pt_num_temperatures) < 2:
             raise ValueError("pt_num_temperatures must be >= 2")
         if observable_temperature_mode not in ("all", "cold"):
             raise ValueError("observable_temperature_mode must be all or cold")
-        if pt_ladder_mode == "sync_enlarge":
+        if pt_ladder_mode == "data_only":
+            if pt_p_hot is None:
+                raise ValueError("pt_p_hot is required for data_only PT")
+            if float(pt_p_hot) <= float(data_error_probability):
+                raise ValueError("pt_p_hot must be greater than cold p")
+        elif pt_ladder_mode == "sync_enlarge":
             if pt_q_hot is None:
                 raise ValueError("pt_q_hot is required for sync_enlarge PT")
-            if float(pt_q_hot) < float(syndrome_error_probability):
-                raise ValueError("pt_q_hot must be >= cold q")
+            if not (
+                    float(syndrome_error_probability)
+                    < float(pt_q_hot)
+                    < 0.5):
+                raise ValueError("pt_q_hot must be in (cold q, 0.5)")
             if cluster_update_enabled:
                 raise ValueError(
                     "cluster update must be disabled for sync_enlarge PT"
@@ -3373,12 +3386,17 @@ def run_disorder_average_simulation(
         )
         result["pt_enabled"] = np.bool_(use_parallel_tempering)
         if use_parallel_tempering:
-            result["pt_p_hot"] = np.float64(pt_p_hot)
+            result["pt_p_hot"] = np.float64(
+                np.nan if pt_p_hot is None else pt_p_hot
+            )
             result["pt_q_hot"] = np.float64(
                 syndrome_error_probability if pt_q_hot is None else pt_q_hot
             )
             result["pt_num_temperatures"] = np.int64(pt_num_temperatures)
             result["pt_ladder_mode"] = np.array(pt_ladder_mode)
+            result["pt_ladder_semantics"] = np.array(
+                _pt_ladder_semantics(pt_ladder_mode)
+            )
             result["pt_data_error_probability_ladder_per_disorder"] = (
                 pt_data_error_probability_ladder_per_disorder
             )

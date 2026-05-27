@@ -1,6 +1,10 @@
 import numpy as np
 
 
+SYNC_PT_LADDER_SEMANTICS = "common_beta_heat_scale"
+DATA_ONLY_PT_LADDER_SEMANTICS = "data_only_log_odds"
+
+
 def probability_to_odds(probability):
     probability = float(probability)
     if not (0.0 < probability < 0.5):
@@ -13,6 +17,20 @@ def odds_to_probability(odds):
     if odds <= 0.0:
         raise ValueError("odds must be positive")
     return odds / (1.0 + odds)
+
+
+def probability_to_coupling(probability):
+    probability = float(probability)
+    if not (0.0 < probability < 0.5):
+        raise ValueError("probability must be in (0, 0.5)")
+    return float(np.log((1.0 - probability) / probability))
+
+
+def coupling_to_probability(coupling):
+    coupling = float(coupling)
+    if coupling < 0.0:
+        raise ValueError("coupling must be non-negative")
+    return float(1.0 / (1.0 + np.exp(coupling)))
 
 
 def equal_log_odds_ladder(p_cold, p_hot, num_temperatures):
@@ -34,9 +52,12 @@ def sync_pt_enlarge_ladder(q_cold, q_hot, num_temperatures):
         raise ValueError("num_temperatures must be >= 1")
     if num_temperatures == 1:
         return np.asarray([1.0], dtype=np.float64)
-    hot_enlarge = probability_to_odds(q_hot) / probability_to_odds(q_cold)
-    if hot_enlarge < 1.0:
-        raise ValueError("q_hot must be >= q_cold for sync PT")
+    q_cold_coupling = probability_to_coupling(q_cold)
+    q_hot_coupling = probability_to_coupling(q_hot)
+    beta_hot = q_hot_coupling / q_cold_coupling
+    if not (0.0 < beta_hot < 1.0):
+        raise ValueError("q_hot must be greater than q_cold and below 0.5")
+    hot_enlarge = 1.0 / beta_hot
     return np.exp(
         np.linspace(0.0, np.log(hot_enlarge), num_temperatures)
     ).astype(np.float64)
@@ -46,14 +67,25 @@ def sync_pt_ladders_from_enlarge(p_cold, q_cold, pt_enlarge):
     pt_enlarge = np.asarray(pt_enlarge, dtype=np.float64)
     if pt_enlarge.ndim != 1:
         raise ValueError("pt_enlarge must be 1D")
-    p_odds_cold = probability_to_odds(p_cold)
-    q_odds_cold = probability_to_odds(q_cold)
+    if np.any(~np.isfinite(pt_enlarge)) or np.any(pt_enlarge <= 0.0):
+        raise ValueError("pt_enlarge values must be finite and positive")
+    if np.any(pt_enlarge < 1.0):
+        raise ValueError("sync PT heat scales must be >= 1")
+    p_cold_coupling = probability_to_coupling(p_cold)
+    q_cold_coupling = probability_to_coupling(q_cold)
+    beta_ladder = 1.0 / pt_enlarge
     p_ladder = np.asarray(
-        [odds_to_probability(scale * p_odds_cold) for scale in pt_enlarge],
+        [
+            coupling_to_probability(beta * p_cold_coupling)
+            for beta in beta_ladder
+        ],
         dtype=np.float64,
     )
     q_ladder = np.asarray(
-        [odds_to_probability(scale * q_odds_cold) for scale in pt_enlarge],
+        [
+            coupling_to_probability(beta * q_cold_coupling)
+            for beta in beta_ladder
+        ],
         dtype=np.float64,
     )
     if np.any(p_ladder >= 0.5) or np.any(q_ladder >= 0.5):
