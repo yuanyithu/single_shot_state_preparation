@@ -148,6 +148,7 @@ def run_parallel_tempering_measurement(
         initial_chain_bits_per_temperature=None,
         num_zero_syndrome_sweeps_per_cycle=1,
         winding_repeat_factor=1,
+        winding_plane_heatbath_sweeps=0,
         swap_attempt_every_num_sweeps=1,
         swap_sweeps_per_attempt=1,
         return_diagnostics=False,
@@ -242,6 +243,7 @@ def run_parallel_tempering_measurement(
             num_zero_syndrome_sweeps_per_cycle
         ),
         winding_repeat_factor=winding_repeat_factor,
+        winding_plane_heatbath_sweeps=winding_plane_heatbath_sweeps,
         record_measurement_trajectories=return_diagnostics,
     )
     if zero_syndrome_move_data is None and kernel_basis is None:
@@ -345,6 +347,12 @@ def run_parallel_tempering_measurement(
     winding_attempted_per_temperature = np.zeros(
         num_temperatures, dtype=np.int64,
     )
+    winding_plane_heatbath_changed_per_temperature = np.zeros(
+        num_temperatures, dtype=np.int64,
+    )
+    winding_plane_heatbath_attempted_per_temperature = np.zeros(
+        num_temperatures, dtype=np.int64,
+    )
     swap_accept_counts = np.zeros(
         max(num_temperatures - 1, 0), dtype=np.int64,
     )
@@ -434,6 +442,9 @@ def run_parallel_tempering_measurement(
                 winding_repeat_factor=diagnostic_config[
                     "winding_repeat_factor"
                 ],
+                winding_plane_heatbath_sweeps=diagnostic_config[
+                    "winding_plane_heatbath_sweeps"
+                ],
                 qubit_order_buffer=qubit_order_buffer,
                 numba_update_kernel_data=numba_update_kernel_data,
                 single_bit_proposal_fraction=single_bit_proposal_fraction,
@@ -464,6 +475,12 @@ def run_parallel_tempering_measurement(
             )
             winding_attempted_per_temperature[temperature_index] += (
                 cycle_result["winding_attempted_count"]
+            )
+            winding_plane_heatbath_changed_per_temperature[temperature_index] += (
+                cycle_result["winding_plane_heatbath_changed_count"]
+            )
+            winding_plane_heatbath_attempted_per_temperature[temperature_index] += (
+                cycle_result["winding_plane_heatbath_attempted_count"]
             )
         cluster_result = maybe_run_cluster_update(
             controller=cluster_controller,
@@ -919,6 +936,9 @@ def run_parallel_tempering_measurement(
         "winding_accepted_count_per_temperature": (
             winding_accepted_per_temperature
         ),
+        "winding_plane_heatbath_changed_count_per_temperature": (
+            winding_plane_heatbath_changed_per_temperature
+        ),
         "single_bit_acceptance_rate_per_temperature": (
             single_bit_acceptance_rate_per_temperature
         ),
@@ -936,6 +956,9 @@ def run_parallel_tempering_measurement(
         ),
         "winding_attempted_count_per_temperature": (
             winding_attempted_per_temperature
+        ),
+        "winding_plane_heatbath_attempted_count_per_temperature": (
+            winding_plane_heatbath_attempted_per_temperature
         ),
         "swap_accept_counts": swap_accept_counts,
         "swap_attempt_counts": swap_attempt_counts,

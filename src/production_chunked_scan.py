@@ -325,6 +325,8 @@ def _build_submit_config_from_args(args):
         raise ValueError("--pt-sector-diagnostic-stride must be >= 1")
     if int(args.pt_swap_sweeps_per_attempt) < 1:
         raise ValueError("--pt-swap-sweeps-per-attempt must be >= 1")
+    if int(args.winding_plane_heatbath_sweeps) < 0:
+        raise ValueError("--winding-plane-heatbath-sweeps must be >= 0")
     if args.pt_ladder_mode not in ("data_only", "sync_enlarge"):
         raise ValueError("pt_ladder_mode must be data_only or sync_enlarge")
     pt_requested = (
@@ -452,6 +454,9 @@ def _build_submit_config_from_args(args):
             args.num_zero_syndrome_sweeps_per_cycle
         ),
         "winding_repeat_factor": int(args.winding_repeat_factor),
+        "winding_plane_heatbath_sweeps": int(
+            args.winding_plane_heatbath_sweeps
+        ),
         "single_bit_proposal_fraction": float(
             args.single_bit_proposal_fraction
         ),
@@ -561,6 +566,9 @@ def _build_chunk_tasks(config):
                     ),
                     "winding_repeat_factor": int(
                         config["winding_repeat_factor"]
+                    ),
+                    "winding_plane_heatbath_sweeps": int(
+                        config.get("winding_plane_heatbath_sweeps", 0)
                     ),
                     "single_bit_proposal_fraction": float(
                         config["single_bit_proposal_fraction"]
@@ -710,6 +718,10 @@ def _build_manifest(
                 config["num_zero_syndrome_sweeps_per_cycle"]
             ),
             "winding_repeat_factor": config["winding_repeat_factor"],
+            "winding_plane_heatbath_sweeps": config.get(
+                "winding_plane_heatbath_sweeps",
+                0,
+            ),
             "single_bit_proposal_fraction": (
                 config["single_bit_proposal_fraction"]
             ),
@@ -868,6 +880,9 @@ def _run_chunk_task(task_data):
                 task_data["num_zero_syndrome_sweeps_per_cycle"]
             ),
             winding_repeat_factor=task_data["winding_repeat_factor"],
+            winding_plane_heatbath_sweeps=(
+                task_data.get("winding_plane_heatbath_sweeps", 0)
+            ),
             single_bit_proposal_fraction=(
                 task_data["single_bit_proposal_fraction"]
             ),
@@ -896,6 +911,7 @@ def _run_chunk_task(task_data):
             None,
         )
         simulation_result_for_save.pop("winding_repeat_factor", None)
+        simulation_result_for_save.pop("winding_plane_heatbath_sweeps", None)
         simulation_result_for_save.pop(
             "pt_swap_attempt_every_num_sweeps",
             None,
@@ -940,6 +956,9 @@ def _run_chunk_task(task_data):
             ),
             winding_repeat_factor=np.int64(
                 task_data["winding_repeat_factor"]
+            ),
+            winding_plane_heatbath_sweeps=np.int64(
+                task_data.get("winding_plane_heatbath_sweeps", 0)
             ),
             single_bit_proposal_fraction=np.float64(
                 task_data["single_bit_proposal_fraction"]
@@ -1075,6 +1094,11 @@ def _validate_chunk_payload(loaded_chunk_result, task_data):
                 int(loaded_chunk_result["pt_swap_sweeps_per_attempt"])
                 != int(task_data.get("pt_swap_sweeps_per_attempt", 1))):
             raise ValueError("chunk pt_swap_sweeps_per_attempt mismatch")
+    if "winding_plane_heatbath_sweeps" in loaded_chunk_result:
+        if (
+                int(loaded_chunk_result["winding_plane_heatbath_sweeps"])
+                != int(task_data.get("winding_plane_heatbath_sweeps", 0))):
+            raise ValueError("chunk winding_plane_heatbath_sweeps mismatch")
 
 
 def _merge_outputs(
@@ -1134,6 +1158,7 @@ def _merge_outputs(
     mean_pt_min_swap_acceptance_rate_curve_matrix = None
     mean_pt_mean_swap_acceptance_rate_curve_matrix = None
     mean_pt_winding_acceptance_rate_per_temperature_curve_tensor = None
+    mean_pt_winding_plane_heatbath_changed_count_per_temperature_curve_tensor = None
     mean_pt_sector_flip_count_per_temperature_curve_tensor = None
     mean_pt_sector_diagnostic_sample_count_curve_matrix = None
     mean_pt_hot_to_cold_sector_delivery_count_curve_matrix = None
@@ -1187,6 +1212,12 @@ def _merge_outputs(
                     dtype=np.float64,
                 )
             )
+            mean_pt_winding_plane_heatbath_changed_count_per_temperature_curve_tensor = (
+                np.empty(
+                    (num_sizes, num_points, pt_num_temperatures),
+                    dtype=np.float64,
+                )
+            )
             if track_pt_sector_diagnostics:
                 mean_pt_sector_flip_count_per_temperature_curve_tensor = (
                     np.empty(
@@ -1233,6 +1264,8 @@ def _merge_outputs(
     chain_pt_winding_acceptance_rate_per_temperature_per_disorder_per_start_replica_tensor = None
     chain_pt_winding_accepted_count_per_temperature_per_disorder_per_start_replica_tensor = None
     chain_pt_winding_attempted_count_per_temperature_per_disorder_per_start_replica_tensor = None
+    chain_pt_winding_plane_heatbath_changed_count_per_temperature_per_disorder_per_start_replica_tensor = None
+    chain_pt_winding_plane_heatbath_attempted_count_per_temperature_per_disorder_per_start_replica_tensor = None
     chain_pt_swap_acceptance_rate_per_pair_per_disorder_per_start_replica_tensor = None
     chain_pt_swap_accept_count_per_pair_per_disorder_per_start_replica_tensor = None
     chain_pt_swap_attempt_count_per_pair_per_disorder_per_start_replica_tensor = None
@@ -1531,6 +1564,14 @@ def _merge_outputs(
                         dtype=np.int64,
                     )
                     chain_pt_winding_attempted_count_per_temperature_per_disorder_per_start_replica_tensor = np.empty(
+                        pt_temperature_chain_shape,
+                        dtype=np.int64,
+                    )
+                    chain_pt_winding_plane_heatbath_changed_count_per_temperature_per_disorder_per_start_replica_tensor = np.empty(
+                        pt_temperature_chain_shape,
+                        dtype=np.int64,
+                    )
+                    chain_pt_winding_plane_heatbath_attempted_count_per_temperature_per_disorder_per_start_replica_tensor = np.empty(
                         pt_temperature_chain_shape,
                         dtype=np.int64,
                     )
@@ -1879,6 +1920,46 @@ def _merge_outputs(
                         ] = loaded_chunk_result[
                             "chain_pt_winding_attempted_count_per_temperature_per_disorder_per_start_replica"
                         ]
+                        if "chain_pt_winding_plane_heatbath_changed_count_per_temperature_per_disorder_per_start_replica" in loaded_chunk_result:
+                            chain_pt_winding_plane_heatbath_changed_count_per_temperature_per_disorder_per_start_replica_tensor[
+                                lattice_index,
+                                point_index,
+                                start_index:stop_index,
+                                :,
+                                :,
+                                :,
+                            ] = loaded_chunk_result[
+                                "chain_pt_winding_plane_heatbath_changed_count_per_temperature_per_disorder_per_start_replica"
+                            ]
+                        else:
+                            chain_pt_winding_plane_heatbath_changed_count_per_temperature_per_disorder_per_start_replica_tensor[
+                                lattice_index,
+                                point_index,
+                                start_index:stop_index,
+                                :,
+                                :,
+                                :,
+                            ] = 0
+                        if "chain_pt_winding_plane_heatbath_attempted_count_per_temperature_per_disorder_per_start_replica" in loaded_chunk_result:
+                            chain_pt_winding_plane_heatbath_attempted_count_per_temperature_per_disorder_per_start_replica_tensor[
+                                lattice_index,
+                                point_index,
+                                start_index:stop_index,
+                                :,
+                                :,
+                                :,
+                            ] = loaded_chunk_result[
+                                "chain_pt_winding_plane_heatbath_attempted_count_per_temperature_per_disorder_per_start_replica"
+                            ]
+                        else:
+                            chain_pt_winding_plane_heatbath_attempted_count_per_temperature_per_disorder_per_start_replica_tensor[
+                                lattice_index,
+                                point_index,
+                                start_index:stop_index,
+                                :,
+                                :,
+                                :,
+                            ] = 0
                         chain_pt_swap_acceptance_rate_per_pair_per_disorder_per_start_replica_tensor[
                             lattice_index,
                             point_index,
@@ -2383,6 +2464,16 @@ def _merge_outputs(
                         ],
                         axis=(0, 1, 2),
                     )
+                    mean_pt_winding_plane_heatbath_changed_count_per_temperature_curve_tensor[
+                        lattice_index,
+                        point_index,
+                    ] = np.mean(
+                        chain_pt_winding_plane_heatbath_changed_count_per_temperature_per_disorder_per_start_replica_tensor[
+                            lattice_index,
+                            point_index,
+                        ],
+                        axis=(0, 1, 2),
+                    )
                     if track_pt_sector_diagnostics:
                         mean_pt_sector_flip_count_per_temperature_curve_tensor[
                             lattice_index,
@@ -2590,6 +2681,16 @@ def _merge_outputs(
                 chain_pt_winding_attempted_count_per_temperature_per_disorder_per_start_replica_tensor
             )
             merged_result[
+                "chain_pt_winding_plane_heatbath_changed_count_per_temperature_per_disorder_per_start_replica_tensor"
+            ] = (
+                chain_pt_winding_plane_heatbath_changed_count_per_temperature_per_disorder_per_start_replica_tensor
+            )
+            merged_result[
+                "chain_pt_winding_plane_heatbath_attempted_count_per_temperature_per_disorder_per_start_replica_tensor"
+            ] = (
+                chain_pt_winding_plane_heatbath_attempted_count_per_temperature_per_disorder_per_start_replica_tensor
+            )
+            merged_result[
                 "chain_pt_swap_acceptance_rate_per_pair_per_disorder_per_start_replica_tensor"
             ] = (
                 chain_pt_swap_acceptance_rate_per_pair_per_disorder_per_start_replica_tensor
@@ -2662,6 +2763,11 @@ def _merge_outputs(
             merged_result[
                 "mean_pt_winding_acceptance_rate_per_temperature_curve_tensor"
             ] = mean_pt_winding_acceptance_rate_per_temperature_curve_tensor
+            merged_result[
+                "mean_pt_winding_plane_heatbath_changed_count_per_temperature_curve_tensor"
+            ] = (
+                mean_pt_winding_plane_heatbath_changed_count_per_temperature_curve_tensor
+            )
             merged_result["pt_track_sector_diagnostics"] = np.bool_(
                 track_pt_sector_diagnostics
             )
@@ -2773,6 +2879,9 @@ def _merge_outputs(
             config["num_zero_syndrome_sweeps_per_cycle"]
         ),
         winding_repeat_factor=np.int64(config["winding_repeat_factor"]),
+        winding_plane_heatbath_sweeps=np.int64(
+            config.get("winding_plane_heatbath_sweeps", 0)
+        ),
         single_bit_proposal_fraction=np.float64(
             config["single_bit_proposal_fraction"]
         ),
@@ -3173,6 +3282,9 @@ def _run_chunk_command(args):
             args.num_zero_syndrome_sweeps_per_cycle
         ),
         "winding_repeat_factor": int(args.winding_repeat_factor),
+        "winding_plane_heatbath_sweeps": int(
+            args.winding_plane_heatbath_sweeps
+        ),
         "single_bit_proposal_fraction": float(
             args.single_bit_proposal_fraction
         ),
@@ -3349,6 +3461,15 @@ def _build_parser():
         "--winding-repeat-factor",
         type=int,
         default=1,
+    )
+    common_submit_parser.add_argument(
+        "--winding-plane-heatbath-sweeps",
+        type=int,
+        default=0,
+        help=(
+            "Number of exact heatbath sweeps over parallel nontrivial winding "
+            "planes per update cycle. The default 0 preserves old behavior."
+        ),
     )
     common_submit_parser.add_argument(
         "--single-bit-proposal-fraction",
@@ -3561,6 +3682,11 @@ def _build_parser():
         "--winding-repeat-factor",
         type=int,
         default=1,
+    )
+    run_chunk_parser.add_argument(
+        "--winding-plane-heatbath-sweeps",
+        type=int,
+        default=0,
     )
     run_chunk_parser.add_argument(
         "--single-bit-proposal-fraction",

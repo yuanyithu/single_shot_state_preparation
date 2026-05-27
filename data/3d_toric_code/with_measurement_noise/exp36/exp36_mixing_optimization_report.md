@@ -617,3 +617,85 @@ roundtrip-only S/T/U 已同步：
 - 三个任务均已通过 exact validation 和 preflight merge。
 - 三个任务均已进入 `Launching chunk workers: 1 workers for 1 chunks`。
 - 下一轮同步 final NPZ，比较 cold sector flips、strict delivery、endpoint round trips、transport samples 和 wall time。
+
+### swap-sweep probe 结果与 winding-plane heatbath
+
+`X_swap4_K17_qhot032_m512_s4` 已完成并同步到本地：
+
+- `data/3d_toric_code/with_measurement_noise/exp36/swap_sweep_probe_20260528/X_swap4_K17_qhot032_m512_s4/X_swap4_K17_qhot032_m512_s4.npz`
+
+V/W/X 共同参数：
+
+- `L=6,p=0.05,q=0.08`
+- `num_disorder_samples_total=1`
+- `num_start_chains=4`
+- `num_measurements_per_disorder=512`
+- `num_sweeps_between_measurements=6`
+- `num_burn_in_sweeps=150`
+- `max_effective_num_burn_in_sweeps=750`
+- `K=17,q_hot=0.32`
+- `pt_sector_diagnostic_stride=4`
+
+结果：
+
+| config | swap sweeps | min swap | bottleneck pair | cold flips | hot flips mean | proxy delivery | strict delivery | roundtrip sum | roundtrip per chain | transport samples | wall mean |
+|---|---:|---:|---:|---|---:|---:|---:|---:|---|---|---:|
+| V | 1 | 0.167844 | 12 | `[0,0,0,0]` | 97.25 | 19 | 0 | 95 | `[22,26,25,22]` | `[3073]*4` | 36.70s |
+| W | 2 | 0.190999 | 13 | `[0,0,0,0]` | 93.75 | 23 | 0 | 150 | `[37,28,39,46]` | `[6145]*4` | 35.46s |
+| X | 4 | 0.186846 | 12 | `[0,0,0,0]` | 99.25 | 20 | 0 | 140 | `[37,37,34,32]` | `[12289]*4` | 89.20s |
+
+结论：
+
+- 增加 `pt_swap_sweeps_per_attempt` 能增加 transport sampling，但没有产生任何 cold sector flip，也没有 strict hot-to-cold sector-change delivery。
+- `swap_sweeps=4` 的 wall time 明显增加，roundtrip 反而没有相对 `swap_sweeps=2` 单调增加；继续加 swap sweep 不是主方向。
+- 当前 bottleneck 不再是简单的 temperature-index diffusion，而是 sector-changing configuration 在冷却到 cold ensemble 时被压回原 logical sector。
+
+物理与程序判断：
+
+- 现有代码里已有直接 logical-sector changing move，即 `winding_moves`。
+- 对 3D toric code，`winding_moves` 是整张非平庸 sheet，权重为 `L^2`；`L=6` 时每次翻 36 条边。
+- 在 cold `p=0.05`，接受率只有 `O(1e-5)`，所以“直接翻 sector”虽然存在，但几乎不可能在 cold 端发生。
+
+新增程序方案：
+
+- 新增默认关闭的 `winding_plane_heatbath_sweeps` / CLI `--winding-plane-heatbath-sweeps`。
+- 该更新把同一方向的所有平行 winding sheet 组成一个小闭子群，对其 `2^L` 个组合做 exact heatbath 抽样。
+- 目标分布不变：这是对当前状态沿 winding-plane orbit 的条件分布精确采样，不是无权重地强行改 sector。
+- 该 move 允许一次同时翻多个平行 sheet，测试目的不是降低 cold 端自由能代价，而是让中温/热端的 nontrivial sector 子空间更充分热化，再看 PT 是否能把 sector change 带回 cold。
+- 输出新增：
+  - `winding_plane_heatbath_sweeps`
+  - `chain_pt_winding_plane_heatbath_changed_count_per_temperature_per_disorder_per_start_replica_tensor`
+  - `chain_pt_winding_plane_heatbath_attempted_count_per_temperature_per_disorder_per_start_replica_tensor`
+  - `mean_pt_winding_plane_heatbath_changed_count_per_temperature_curve_tensor`
+
+验证：
+
+- `python -m py_compile src/main.py src/mcmc_parallel_tempering.py src/production_chunked_scan.py` 通过。
+- `PYTHONPATH=src python -m unittest discover -s tests` 通过，6 tests。
+- 本地 production smoke：
+  - `data/3d_toric_code/with_measurement_noise/exp36/winding_heatbath_smoke_20260528/winding_heatbath_smoke.npz`
+  - `winding_plane_heatbath_sweeps=1`
+  - heatbath changed count `[0,0,8]`，attempted count `[108,108,108]`
+  - sector flip count `[0,0,3]`
+
+本地 L=4 快速对照：
+
+| config | heatbath sweeps | cold flips | hot flips mean | strict delivery | min swap | cold heatbath changed | hot heatbath changed | wall |
+|---|---:|---|---:|---:|---:|---|---|---|
+| HB0 | 0 | `[0,0]` | 23.5 | 0 | 0.1190 | `[0,0]` | `[0,0]` | ~0.91s |
+| HB1 | 1 | `[0,0]` | 23.0 | 0 | 0.1458 | `[0,0]` | `[146,128]` | ~1.15s |
+
+解释：
+
+- heatbath 在热端确实大量改变 winding plane，但本地短 L=4 probe 仍没有 cold sector flip。
+- 这说明它不是直接修复 cold 自身势垒的 move；需要远端 L=6 比较 `q_hot=0.32/0.35` 下 strict delivery 是否改善。
+
+下一轮远端 probe：
+
+| config | node | q_hot | heatbath sweeps | swap sweeps | purpose |
+|---|---|---:|---:|---:|---|
+| Y | nd-1 | 0.32 | 0 | 1 | 同代码新基线 |
+| Z | nd-2 | 0.32 | 1 | 1 | 测 heatbath 是否改善 strict delivery |
+| AA | nd-3 | 0.35 | 1 | 1 | 稍热端配合 heatbath 的折中测试 |
+
+共同参数沿用 V/W/X：`L=6,p=0.05,q=0.08,K=17,m=512,stride=4,disable_cluster_update`。

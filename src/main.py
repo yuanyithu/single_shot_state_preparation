@@ -109,6 +109,140 @@ def _resolve_single_bit_attempts_per_cycle(
     )
 
 
+def _compute_delta_log_weight(delta_weight, log_odds):
+    if delta_weight == 0:
+        return 0.0
+    return float(delta_weight * log_odds)
+
+
+def _sample_log_weight_index(log_weights, rng):
+    log_weights = np.asarray(log_weights, dtype=np.float64)
+    positive_infinite_indices = np.flatnonzero(np.isposinf(log_weights))
+    if positive_infinite_indices.size:
+        return int(rng.choice(positive_infinite_indices))
+    max_log_weight = float(np.max(log_weights))
+    if not np.isfinite(max_log_weight):
+        return int(rng.integers(0, log_weights.shape[0]))
+    weights = np.exp(log_weights - max_log_weight)
+    total_weight = float(np.sum(weights))
+    if total_weight <= 0.0 or not np.isfinite(total_weight):
+        return int(rng.integers(0, log_weights.shape[0]))
+    threshold = float(rng.random() * total_weight)
+    cumulative = 0.0
+    for index, weight in enumerate(weights):
+        cumulative += float(weight)
+        if threshold <= cumulative:
+            return int(index)
+    return int(log_weights.shape[0] - 1)
+
+
+def _infer_winding_heatbath_groups(winding_move_supports):
+    num_moves = int(winding_move_supports.shape[0])
+    support_size = int(winding_move_supports.shape[1])
+    if num_moves == 0 or support_size == 0:
+        return []
+
+    square_root_support = int(round(math.sqrt(support_size)))
+    if (
+            square_root_support * square_root_support == support_size
+            and square_root_support > 0
+            and num_moves % square_root_support == 0
+            and num_moves // square_root_support in (2, 3)):
+        group_size = square_root_support
+    elif num_moves % support_size == 0 and num_moves // support_size in (2, 3):
+        group_size = support_size
+    else:
+        return []
+
+    return [
+        np.arange(start, start + group_size, dtype=np.int32)
+        for start in range(0, num_moves, group_size)
+    ]
+
+
+def _run_winding_plane_heatbath_sweeps(
+        current_chain_bits,
+        current_data_term_bits,
+        zero_syndrome_move_data,
+        log_odds_data,
+        rng,
+        num_sweeps,
+        track_data_weight_delta=True):
+    if num_sweeps <= 0 or zero_syndrome_move_data is None:
+        return {
+            "changed_count": 0,
+            "attempted_count": 0,
+            "data_weight_delta": 0,
+        }
+    if "winding_move_supports" not in zero_syndrome_move_data:
+        zero_syndrome_move_data["winding_move_supports"] = _dense_moves_to_supports(
+            zero_syndrome_move_data["winding_moves"]
+        )
+
+    winding_move_supports = zero_syndrome_move_data["winding_move_supports"]
+    groups = _infer_winding_heatbath_groups(winding_move_supports)
+    if not groups:
+        return {
+            "changed_count": 0,
+            "attempted_count": 0,
+            "data_weight_delta": 0,
+        }
+
+    changed_count = 0
+    attempted_count = 0
+    data_weight_delta = 0
+    for _ in range(int(num_sweeps)):
+        for group_index in rng.permutation(len(groups)):
+            move_indices = groups[int(group_index)]
+            num_group_moves = int(move_indices.shape[0])
+            if num_group_moves == 0:
+                continue
+            attempted_count += num_group_moves
+            delta_by_move = np.empty(num_group_moves, dtype=np.int64)
+            for local_index, move_index in enumerate(move_indices):
+                support = winding_move_supports[int(move_index)]
+                current_ones_on_support = int(
+                    np.count_nonzero(current_data_term_bits[support])
+                )
+                delta_by_move[local_index] = (
+                    int(support.shape[0]) - 2 * current_ones_on_support
+                )
+
+            num_configurations = 1 << num_group_moves
+            log_weights = np.empty(num_configurations, dtype=np.float64)
+            log_weights[0] = 0.0
+            for configuration in range(1, num_configurations):
+                least_bit = configuration & -configuration
+                bit_index = least_bit.bit_length() - 1
+                previous_configuration = configuration ^ least_bit
+                log_weights[configuration] = (
+                    log_weights[previous_configuration]
+                    + _compute_delta_log_weight(
+                        int(delta_by_move[bit_index]),
+                        log_odds_data,
+                    )
+                )
+
+            selected_configuration = _sample_log_weight_index(log_weights, rng)
+            if selected_configuration == 0:
+                continue
+            for local_index, move_index in enumerate(move_indices):
+                if ((selected_configuration >> local_index) & 1) == 0:
+                    continue
+                support = winding_move_supports[int(move_index)]
+                current_chain_bits[support] ^= True
+                current_data_term_bits[support] ^= True
+                changed_count += 1
+                if track_data_weight_delta:
+                    data_weight_delta += int(delta_by_move[local_index])
+
+    return {
+        "changed_count": int(changed_count),
+        "attempted_count": int(attempted_count),
+        "data_weight_delta": int(data_weight_delta),
+    }
+
+
 def _attempt_single_bit_metropolis_update_safe(
         current_chain_bits,
         current_data_term_bits,
@@ -1175,16 +1309,20 @@ def _accumulate_logical_observables_fast(
 def _build_measurement_diagnostic_config(
         num_zero_syndrome_sweeps_per_cycle=1,
         winding_repeat_factor=1,
+        winding_plane_heatbath_sweeps=0,
         record_measurement_trajectories=False):
     if num_zero_syndrome_sweeps_per_cycle < 1:
         raise ValueError("num_zero_syndrome_sweeps_per_cycle must be >= 1")
     if winding_repeat_factor < 1:
         raise ValueError("winding_repeat_factor must be >= 1")
+    if winding_plane_heatbath_sweeps < 0:
+        raise ValueError("winding_plane_heatbath_sweeps must be >= 0")
     return {
         "num_zero_syndrome_sweeps_per_cycle": int(
             num_zero_syndrome_sweeps_per_cycle
         ),
         "winding_repeat_factor": int(winding_repeat_factor),
+        "winding_plane_heatbath_sweeps": int(winding_plane_heatbath_sweeps),
         "record_measurement_trajectories": bool(
             record_measurement_trajectories
         ),
@@ -1207,6 +1345,7 @@ def _run_measurement_update_cycle(
         kernel_basis=None,
         num_zero_syndrome_sweeps_per_cycle=1,
         winding_repeat_factor=1,
+        winding_plane_heatbath_sweeps=0,
         single_bit_proposal_fraction=1.0,
         qubit_order_buffer=None,
         track_data_weight_delta=True,
@@ -1217,6 +1356,8 @@ def _run_measurement_update_cycle(
     winding_accepted_count = 0
     contractible_attempted_count = 0
     winding_attempted_count = 0
+    winding_plane_heatbath_changed_count = 0
+    winding_plane_heatbath_attempted_count = 0
     data_weight_delta = 0
 
     (
@@ -1300,6 +1441,24 @@ def _run_measurement_update_cycle(
         data_weight_delta = int(single_bit_data_weight_delta)
         if track_data_weight_delta:
             data_weight_delta += int(zero_syndrome_data_weight_delta)
+        if int(winding_plane_heatbath_sweeps) > 0:
+            heatbath_result = _run_winding_plane_heatbath_sweeps(
+                current_chain_bits=current_chain_bits,
+                current_data_term_bits=current_data_term_bits,
+                zero_syndrome_move_data=zero_syndrome_move_data,
+                log_odds_data=log_odds_data,
+                rng=rng,
+                num_sweeps=int(winding_plane_heatbath_sweeps),
+                track_data_weight_delta=track_data_weight_delta,
+            )
+            winding_plane_heatbath_changed_count = heatbath_result[
+                "changed_count"
+            ]
+            winding_plane_heatbath_attempted_count = heatbath_result[
+                "attempted_count"
+            ]
+            if track_data_weight_delta:
+                data_weight_delta += heatbath_result["data_weight_delta"]
         return {
             "single_bit_accepted_count": int(single_bit_accepted_count),
             "single_bit_attempted_count": int(single_bit_attempted_count),
@@ -1309,6 +1468,12 @@ def _run_measurement_update_cycle(
                 contractible_attempted_count
             ),
             "winding_attempted_count": int(winding_attempted_count),
+            "winding_plane_heatbath_changed_count": int(
+                winding_plane_heatbath_changed_count
+            ),
+            "winding_plane_heatbath_attempted_count": int(
+                winding_plane_heatbath_attempted_count
+            ),
             "data_weight_delta": int(data_weight_delta),
         }
 
@@ -1317,6 +1482,8 @@ def _run_measurement_update_cycle(
         nonlocal winding_accepted_count
         nonlocal contractible_attempted_count
         nonlocal winding_attempted_count
+        nonlocal winding_plane_heatbath_changed_count
+        nonlocal winding_plane_heatbath_attempted_count
         nonlocal data_weight_delta
         for _ in range(num_zero_syndrome_sweeps_per_cycle):
             sweep_result = _run_one_zero_syndrome_sweep(
@@ -1335,6 +1502,30 @@ def _run_measurement_update_cycle(
             winding_attempted_count += winding_per_sweep
             if track_data_weight_delta:
                 data_weight_delta += sweep_result["data_weight_delta"]
+        if int(winding_plane_heatbath_sweeps) > 0:
+            heatbath_result = _run_winding_plane_heatbath_sweeps(
+                current_chain_bits=current_chain_bits,
+                current_data_term_bits=current_data_term_bits,
+                zero_syndrome_move_data=zero_syndrome_move_data,
+                log_odds_data=log_odds_data,
+                rng=rng,
+                num_sweeps=int(winding_plane_heatbath_sweeps),
+                track_data_weight_delta=track_data_weight_delta,
+            )
+            nonlocal_winding_plane_heatbath_changed_count = heatbath_result[
+                "changed_count"
+            ]
+            nonlocal_winding_plane_heatbath_attempted_count = heatbath_result[
+                "attempted_count"
+            ]
+            winding_plane_heatbath_changed_count += (
+                nonlocal_winding_plane_heatbath_changed_count
+            )
+            winding_plane_heatbath_attempted_count += (
+                nonlocal_winding_plane_heatbath_attempted_count
+            )
+            if track_data_weight_delta:
+                data_weight_delta += heatbath_result["data_weight_delta"]
 
     if syndrome_error_probability == 0.0:
         _apply_zero_syndrome_sweeps()
@@ -1345,6 +1536,12 @@ def _run_measurement_update_cycle(
             "winding_accepted_count": winding_accepted_count,
             "contractible_attempted_count": contractible_attempted_count,
             "winding_attempted_count": winding_attempted_count,
+            "winding_plane_heatbath_changed_count": (
+                winding_plane_heatbath_changed_count
+            ),
+            "winding_plane_heatbath_attempted_count": (
+                winding_plane_heatbath_attempted_count
+            ),
             "data_weight_delta": int(data_weight_delta),
         }
 
@@ -1376,6 +1573,12 @@ def _run_measurement_update_cycle(
         "winding_accepted_count": winding_accepted_count,
         "contractible_attempted_count": contractible_attempted_count,
         "winding_attempted_count": winding_attempted_count,
+        "winding_plane_heatbath_changed_count": (
+            winding_plane_heatbath_changed_count
+        ),
+        "winding_plane_heatbath_attempted_count": (
+            winding_plane_heatbath_attempted_count
+        ),
         "data_weight_delta": int(data_weight_delta),
     }
 
@@ -1592,6 +1795,7 @@ def _run_parallel_tempering_single_chain(
         initial_chain_bits=None,
         num_zero_syndrome_sweeps_per_cycle=1,
         winding_repeat_factor=1,
+        winding_plane_heatbath_sweeps=0,
         pt_swap_attempt_every_num_sweeps=1,
         pt_swap_sweeps_per_attempt=1,
         cluster_update_enabled=True,
@@ -1634,6 +1838,7 @@ def _run_parallel_tempering_single_chain(
             num_zero_syndrome_sweeps_per_cycle
         ),
         winding_repeat_factor=winding_repeat_factor,
+        winding_plane_heatbath_sweeps=winding_plane_heatbath_sweeps,
         swap_attempt_every_num_sweeps=pt_swap_attempt_every_num_sweeps,
         swap_sweeps_per_attempt=pt_swap_sweeps_per_attempt,
         return_diagnostics=True,
@@ -1730,6 +1935,12 @@ def _run_parallel_tempering_single_chain(
         ),
         "pt_winding_attempted_count_per_temperature": (
             pt_result["winding_attempted_count_per_temperature"]
+        ),
+        "pt_winding_plane_heatbath_changed_count_per_temperature": (
+            pt_result["winding_plane_heatbath_changed_count_per_temperature"]
+        ),
+        "pt_winding_plane_heatbath_attempted_count_per_temperature": (
+            pt_result["winding_plane_heatbath_attempted_count_per_temperature"]
         ),
         "pt_swap_acceptance_rates": pt_result["swap_acceptance_rates"],
         "pt_swap_accept_counts": pt_result["swap_accept_counts"],
@@ -1834,6 +2045,7 @@ def _run_single_disorder_measurement(
         initial_chain_bits=None,
         num_zero_syndrome_sweeps_per_cycle=1,
         winding_repeat_factor=1,
+        winding_plane_heatbath_sweeps=0,
         return_diagnostics=False,
         cluster_update_enabled=True,
         cluster_budget_fraction_rho=0.05,
@@ -1860,6 +2072,7 @@ def _run_single_disorder_measurement(
             num_zero_syndrome_sweeps_per_cycle
         ),
         winding_repeat_factor=winding_repeat_factor,
+        winding_plane_heatbath_sweeps=winding_plane_heatbath_sweeps,
         record_measurement_trajectories=return_diagnostics,
     )
 
@@ -1965,6 +2178,9 @@ def _run_single_disorder_measurement(
             winding_repeat_factor=diagnostic_config[
                 "winding_repeat_factor"
             ],
+            winding_plane_heatbath_sweeps=diagnostic_config[
+                "winding_plane_heatbath_sweeps"
+            ],
             qubit_order_buffer=qubit_order_buffer,
             track_data_weight_delta=False,
             numba_update_kernel_data=numba_update_kernel_data,
@@ -1998,6 +2214,8 @@ def _run_single_disorder_measurement(
     total_contractible_attempted_count = 0
     total_winding_accepted_count = 0
     total_winding_attempted_count = 0
+    total_winding_plane_heatbath_changed_count = 0
+    total_winding_plane_heatbath_attempted_count = 0
     if diagnostic_config["record_measurement_trajectories"]:
         logical_observable_values_per_measurement = np.empty(
             (num_measurements_per_disorder, num_masks),
@@ -2035,6 +2253,8 @@ def _run_single_disorder_measurement(
         measurement_contractible_attempted_count = 0
         measurement_winding_accepted_count = 0
         measurement_winding_attempted_count = 0
+        measurement_winding_plane_heatbath_changed_count = 0
+        measurement_winding_plane_heatbath_attempted_count = 0
         for _ in range(num_sweeps_between_measurements):
             ordinary_started_at = time.perf_counter()
             cycle_result = _run_measurement_update_cycle(
@@ -2058,6 +2278,9 @@ def _run_single_disorder_measurement(
                 ],
                 winding_repeat_factor=diagnostic_config[
                     "winding_repeat_factor"
+                ],
+                winding_plane_heatbath_sweeps=diagnostic_config[
+                    "winding_plane_heatbath_sweeps"
                 ],
                 qubit_order_buffer=qubit_order_buffer,
                 track_data_weight_delta=False,
@@ -2083,6 +2306,12 @@ def _run_single_disorder_measurement(
             ]
             measurement_winding_attempted_count += cycle_result[
                 "winding_attempted_count"
+            ]
+            measurement_winding_plane_heatbath_changed_count += cycle_result[
+                "winding_plane_heatbath_changed_count"
+            ]
+            measurement_winding_plane_heatbath_attempted_count += cycle_result[
+                "winding_plane_heatbath_attempted_count"
             ]
             if cluster_controller is not None and num_burn_in_sweeps == 0:
                 cluster_controller["production_used_adaptive"] = True
@@ -2132,6 +2361,12 @@ def _run_single_disorder_measurement(
         )
         total_winding_attempted_count += (
             measurement_winding_attempted_count
+        )
+        total_winding_plane_heatbath_changed_count += (
+            measurement_winding_plane_heatbath_changed_count
+        )
+        total_winding_plane_heatbath_attempted_count += (
+            measurement_winding_plane_heatbath_attempted_count
         )
         if diagnostic_config["record_measurement_trajectories"]:
             logical_observable_values_per_measurement[
@@ -2267,6 +2502,12 @@ def _run_single_disorder_measurement(
         "winding_attempted_count": np.int64(
             total_winding_attempted_count
         ),
+        "winding_plane_heatbath_changed_count": np.int64(
+            total_winding_plane_heatbath_changed_count
+        ),
+        "winding_plane_heatbath_attempted_count": np.int64(
+            total_winding_plane_heatbath_attempted_count
+        ),
         "logical_observable_values_per_measurement": (
             logical_observable_values_per_measurement
         ),
@@ -2289,6 +2530,9 @@ def _run_single_disorder_measurement(
         ),
         "winding_repeat_factor": np.int64(
             diagnostic_config["winding_repeat_factor"]
+        ),
+        "winding_plane_heatbath_sweeps": np.int64(
+            diagnostic_config["winding_plane_heatbath_sweeps"]
         ),
         "ordinary_update_wall_time": np.float64(ordinary_update_wall_time),
         "pt_swap_wall_time": np.float64(0.0),
@@ -2330,6 +2574,7 @@ def run_disorder_average_simulation(
         pt_swap_sweeps_per_attempt=1,
         num_zero_syndrome_sweeps_per_cycle=1,
         winding_repeat_factor=1,
+        winding_plane_heatbath_sweeps=0,
         single_bit_proposal_fraction=1.0,
         observable_temperature_mode="all",
         track_pt_sector_diagnostics=False,
@@ -2355,6 +2600,7 @@ def run_disorder_average_simulation(
             num_zero_syndrome_sweeps_per_cycle
         ),
         winding_repeat_factor=winding_repeat_factor,
+        winding_plane_heatbath_sweeps=winding_plane_heatbath_sweeps,
         record_measurement_trajectories=False,
     )
     use_parallel_tempering = (
@@ -2530,6 +2776,8 @@ def run_disorder_average_simulation(
     chain_pt_winding_acceptance_rate_per_temperature_per_disorder_per_start_replica = None
     chain_pt_winding_accepted_count_per_temperature_per_disorder_per_start_replica = None
     chain_pt_winding_attempted_count_per_temperature_per_disorder_per_start_replica = None
+    chain_pt_winding_plane_heatbath_changed_count_per_temperature_per_disorder_per_start_replica = None
+    chain_pt_winding_plane_heatbath_attempted_count_per_temperature_per_disorder_per_start_replica = None
     chain_pt_swap_acceptance_rate_per_pair_per_disorder_per_start_replica = None
     chain_pt_swap_accept_count_per_pair_per_disorder_per_start_replica = None
     chain_pt_swap_attempt_count_per_pair_per_disorder_per_start_replica = None
@@ -2673,6 +2921,12 @@ def run_disorder_average_simulation(
                 np.empty(pt_temperature_chain_shape, dtype=np.int64)
             )
             chain_pt_winding_attempted_count_per_temperature_per_disorder_per_start_replica = (
+                np.empty(pt_temperature_chain_shape, dtype=np.int64)
+            )
+            chain_pt_winding_plane_heatbath_changed_count_per_temperature_per_disorder_per_start_replica = (
+                np.empty(pt_temperature_chain_shape, dtype=np.int64)
+            )
+            chain_pt_winding_plane_heatbath_attempted_count_per_temperature_per_disorder_per_start_replica = (
                 np.empty(pt_temperature_chain_shape, dtype=np.int64)
             )
             chain_pt_swap_acceptance_rate_per_pair_per_disorder_per_start_replica = (
@@ -2949,6 +3203,9 @@ def run_disorder_average_simulation(
                         winding_repeat_factor=diagnostic_config[
                             "winding_repeat_factor"
                         ],
+                        winding_plane_heatbath_sweeps=diagnostic_config[
+                            "winding_plane_heatbath_sweeps"
+                        ],
                         section_data=syndrome_representative_section,
                         single_bit_proposal_fraction=(
                             single_bit_proposal_fraction
@@ -3175,6 +3432,9 @@ def run_disorder_average_simulation(
                                 winding_repeat_factor=diagnostic_config[
                                     "winding_repeat_factor"
                                 ],
+                                winding_plane_heatbath_sweeps=diagnostic_config[
+                                    "winding_plane_heatbath_sweeps"
+                                ],
                                 section_data=syndrome_representative_section,
                                 single_bit_proposal_fraction=(
                                     single_bit_proposal_fraction
@@ -3236,6 +3496,22 @@ def run_disorder_average_simulation(
                             :,
                         ] = measurement_result[
                             "pt_winding_attempted_count_per_temperature"
+                        ]
+                        chain_pt_winding_plane_heatbath_changed_count_per_temperature_per_disorder_per_start_replica[
+                            disorder_index,
+                            start_index,
+                            replica_index,
+                            :,
+                        ] = measurement_result[
+                            "pt_winding_plane_heatbath_changed_count_per_temperature"
+                        ]
+                        chain_pt_winding_plane_heatbath_attempted_count_per_temperature_per_disorder_per_start_replica[
+                            disorder_index,
+                            start_index,
+                            replica_index,
+                            :,
+                        ] = measurement_result[
+                            "pt_winding_plane_heatbath_attempted_count_per_temperature"
                         ]
                         chain_pt_swap_acceptance_rate_per_pair_per_disorder_per_start_replica[
                             disorder_index,
@@ -3408,6 +3684,9 @@ def run_disorder_average_simulation(
                             ),
                             winding_repeat_factor=diagnostic_config[
                                 "winding_repeat_factor"
+                            ],
+                            winding_plane_heatbath_sweeps=diagnostic_config[
+                                "winding_plane_heatbath_sweeps"
                             ],
                             return_diagnostics=True,
                             cluster_update_enabled=cluster_update_enabled,
@@ -3640,6 +3919,9 @@ def run_disorder_average_simulation(
             "winding_repeat_factor": np.int64(
                 diagnostic_config["winding_repeat_factor"]
             ),
+            "winding_plane_heatbath_sweeps": np.int64(
+                diagnostic_config["winding_plane_heatbath_sweeps"]
+            ),
             "q0_start_sector_labels": q0_start_sector_labels,
             "q0_logical_observable_mean_values_per_disorder_per_start": (
                 q0_logical_observable_mean_values_per_disorder_per_start
@@ -3670,6 +3952,9 @@ def run_disorder_average_simulation(
         ),
         "winding_repeat_factor": np.int64(
             diagnostic_config["winding_repeat_factor"]
+        ),
+        "winding_plane_heatbath_sweeps": np.int64(
+            diagnostic_config["winding_plane_heatbath_sweeps"]
         ),
     }
     result.update(cluster_summary)
@@ -3794,6 +4079,16 @@ def run_disorder_average_simulation(
                 chain_pt_winding_attempted_count_per_temperature_per_disorder_per_start_replica
             )
             result[
+                "chain_pt_winding_plane_heatbath_changed_count_per_temperature_per_disorder_per_start_replica"
+            ] = (
+                chain_pt_winding_plane_heatbath_changed_count_per_temperature_per_disorder_per_start_replica
+            )
+            result[
+                "chain_pt_winding_plane_heatbath_attempted_count_per_temperature_per_disorder_per_start_replica"
+            ] = (
+                chain_pt_winding_plane_heatbath_attempted_count_per_temperature_per_disorder_per_start_replica
+            )
+            result[
                 "chain_pt_swap_acceptance_rate_per_pair_per_disorder_per_start_replica"
             ] = (
                 chain_pt_swap_acceptance_rate_per_pair_per_disorder_per_start_replica
@@ -3906,6 +4201,7 @@ def scan_data_error_probability(
         pt_swap_sweeps_per_attempt=1,
         num_zero_syndrome_sweeps_per_cycle=1,
         winding_repeat_factor=1,
+        winding_plane_heatbath_sweeps=0,
         single_bit_proposal_fraction=1.0,
         observable_temperature_mode="all",
         track_pt_sector_diagnostics=False,
@@ -3967,6 +4263,7 @@ def scan_data_error_probability(
                 num_zero_syndrome_sweeps_per_cycle
             ),
             winding_repeat_factor=winding_repeat_factor,
+            winding_plane_heatbath_sweeps=winding_plane_heatbath_sweeps,
             single_bit_proposal_fraction=single_bit_proposal_fraction,
             observable_temperature_mode=observable_temperature_mode,
             track_pt_sector_diagnostics=track_pt_sector_diagnostics,
@@ -4009,6 +4306,9 @@ def scan_data_error_probability(
             num_zero_syndrome_sweeps_per_cycle
         ),
         "winding_repeat_factor": np.int64(winding_repeat_factor),
+        "winding_plane_heatbath_sweeps": np.int64(
+            winding_plane_heatbath_sweeps
+        ),
         "single_bit_proposal_fraction": np.float64(
             single_bit_proposal_fraction
         ),
@@ -4083,6 +4383,10 @@ def _run_single_scan_point_task(task_data):
         1,
     )
     winding_repeat_factor = task_data.get("winding_repeat_factor", 1)
+    winding_plane_heatbath_sweeps = task_data.get(
+        "winding_plane_heatbath_sweeps",
+        0,
+    )
     cluster_update_enabled = task_data.get("cluster_update_enabled", True)
     cluster_budget_fraction_rho = task_data.get(
         "cluster_budget_fraction_rho",
@@ -4128,6 +4432,7 @@ def _run_single_scan_point_task(task_data):
             num_zero_syndrome_sweeps_per_cycle
         ),
         winding_repeat_factor=winding_repeat_factor,
+        winding_plane_heatbath_sweeps=winding_plane_heatbath_sweeps,
         single_bit_proposal_fraction=single_bit_proposal_fraction,
         observable_temperature_mode=observable_temperature_mode,
         track_pt_sector_diagnostics=track_pt_sector_diagnostics,
@@ -4288,6 +4593,7 @@ def scan_multiple_code_sizes(
         pt_swap_sweeps_per_attempt=1,
         num_zero_syndrome_sweeps_per_cycle=1,
         winding_repeat_factor=1,
+        winding_plane_heatbath_sweeps=0,
         single_bit_proposal_fraction=1.0,
         observable_temperature_mode="all",
         track_pt_sector_diagnostics=False,
@@ -4380,6 +4686,9 @@ def scan_multiple_code_sizes(
                     num_zero_syndrome_sweeps_per_cycle
                 ),
                 "winding_repeat_factor": winding_repeat_factor,
+                "winding_plane_heatbath_sweeps": (
+                    winding_plane_heatbath_sweeps
+                ),
                 "single_bit_proposal_fraction": single_bit_proposal_fraction,
                 "observable_temperature_mode": observable_temperature_mode,
                 "track_pt_sector_diagnostics": track_pt_sector_diagnostics,
@@ -4569,6 +4878,9 @@ def scan_multiple_code_sizes(
             num_zero_syndrome_sweeps_per_cycle
         ),
         "winding_repeat_factor": np.int64(winding_repeat_factor),
+        "winding_plane_heatbath_sweeps": np.int64(
+            winding_plane_heatbath_sweeps
+        ),
         "single_bit_proposal_fraction": np.float64(
             single_bit_proposal_fraction
         ),
