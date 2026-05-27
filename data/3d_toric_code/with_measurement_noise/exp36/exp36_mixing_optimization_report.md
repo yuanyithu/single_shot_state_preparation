@@ -303,3 +303,67 @@ fast probe `F_m128` 也给出一致信号：
 - 用严格字段重新跑短版 probe，对比 `q_hot=0.32/0.35/0.44`。
 - 若严格 delivery 仍为 0，则参数优化的重点应转向更长 round-trip/更高 cold-sector change 机会，而不是继续追求 hot 端更热。
 - 考虑新增 sector diagnostics stride，减少全温度 logical signature 计算成本，使 K=33 或更长 measurements 可行。
+
+### strict delivery probe 与 sector diagnostics stride
+
+严格 delivery 短版 probe 已完成并同步：
+
+- `data/3d_toric_code/with_measurement_noise/exp36/strict_delivery_probe_20260528/M_strict_K17_qhot032_wr1_m128/M_strict_K17_qhot032_wr1_m128.npz`
+- `data/3d_toric_code/with_measurement_noise/exp36/strict_delivery_probe_20260528/N_strict_K17_qhot035_wr1_m128/N_strict_K17_qhot035_wr1_m128.npz`
+- `data/3d_toric_code/with_measurement_noise/exp36/strict_delivery_probe_20260528/O_strict_K17_qhot044_wr1_m128/O_strict_K17_qhot044_wr1_m128.npz`
+
+共同参数：
+
+- `L=6,p=0.05,q=0.08`
+- `num_disorder_samples_total=1`
+- `num_start_chains=4`
+- `num_measurements_per_disorder=128`
+- `num_sweeps_between_measurements=6`
+- `num_burn_in_sweeps=150`
+- `max_effective_num_burn_in_sweeps=750`
+- `K=17`
+- `adaptive_pt_rounds=0`
+- `track_pt_sector_diagnostics=True`
+- `cluster_update=False`
+
+结果：
+
+| config | q_hot | min swap | bottleneck pair | cold flips mean | hot flips mean | hot winding acc | proxy delivery | strict delivery |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| M | 0.32 | 0.1723 | 12-13 | 0.0 | 95.5 | 0.00273 | 7/4 | 0/4 |
+| N | 0.35 | 0.1084 | 11-12 | 0.0 | 93.8 | 0.0207 | 3/4 | 0/4 |
+| O | 0.44 | 0.00889 | 6-7 | 0.0 | 97.5 | 0.385 | 0/4 | 0/4 |
+
+定量结论：
+
+- 三个 `q_hot` 的 strict delivery 全为 0，说明 128 measurements 内没有看到“热端产生的 sector change 被带回冷端并改变冷端 sector”的事件。
+- `q_hot=0.44` 热端 winding 接受率最高，但 transport bottleneck 最差；`q_hot=0.32/0.35` 明显改善 min swap。
+- sector flip 打开位置仍在中间热区：
+  - M: 从 `k=11,(p,q)=(0.212,0.252)` 开始有少量 flip，`k=14,(0.259,0.295)` 后接近充分翻转。
+  - N: 从 `k=9,(0.204,0.244)` 开始有少量 flip，`k=12,(0.259,0.295)` 后接近充分翻转。
+  - O: 从 `k=6,(0.225,0.264)` 开始有 flip，但同一位置也是 swap bottleneck。
+- O 的 `m=128` 全温度 sector 诊断耗时约 `803s`，说明继续用 stride=1 无法高效做更长 probe。
+
+代码改动：
+
+- 新增 `pt_sector_diagnostic_stride` / CLI `--pt-sector-diagnostic-stride`。
+- `track_pt_sector_diagnostics=True` 时，只每 `stride` 个 measurement 计算一次全温度 logical-sector signature；默认 `1` 保持旧行为。
+- 新增输出字段：
+  - `pt_sector_diagnostic_stride`
+  - `pt_sector_diagnostic_sample_count`
+  - `chain_pt_sector_diagnostic_sample_count_per_disorder_per_start_replica(_tensor)`
+  - `mean_pt_sector_diagnostic_sample_count_curve_matrix`
+- 注意：stride 大于 1 后，sector flip rate 应使用 `sample_count-1` 归一化，而不是 `num_measurements_per_disorder-1`。
+
+验证：
+
+- `PYTHONPATH=src conda run -n 12 python -m py_compile src/mcmc_parallel_tempering.py src/main.py src/production_chunked_scan.py` 通过。
+- `PYTHONPATH=src conda run -n 12 python -m unittest discover -s tests` 通过。
+- smoke 输出：`data/3d_toric_code/with_measurement_noise/exp36/sector_stride_smoke_20260528/sector_stride_smoke.npz`。
+- smoke 使用 `num_measurements=9,stride=4`，结果 `pt_sector_diagnostic_sample_count=3`，确认采样点为 `0,4,8`。
+
+下一轮远端 probe：
+
+- 用 stride 版本跑更长 `m=512`，先比较 `q_hot=0.32/0.35/0.44` 的 strict delivery。
+- 建议 `--pt-sector-diagnostic-stride 4`，保留足够 sector 时间分辨率，同时把全温度 logical signature 开销降到约 1/4。
+- 若 `q_hot=0.32/0.35` 在 `m=512` 仍无 cold flips/strict delivery，下一步应测试更长 round-trip 或显式 cold-sector assist move；若 `q_hot=0.44` 有 strict delivery 但 min swap 极低，则需要在 `q_hot≈0.35-0.44` 之间找折中或加密 bottleneck 区间。

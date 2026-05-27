@@ -160,6 +160,7 @@ def run_parallel_tempering_measurement(
         syndrome_error_probability_ladder=None,
         adaptive_pt_flow_enabled=False,
         track_logical_sector_diagnostics=False,
+        logical_sector_diagnostic_stride=1,
         num_logical_qubits=None):
     """
     在 p 温度 ladder 上做 parallel tempering 采样。
@@ -191,6 +192,9 @@ def run_parallel_tempering_measurement(
         raise ValueError("data_error_probability_ladder must be non-empty")
     if observable_temperature_mode not in ("all", "cold"):
         raise ValueError("observable_temperature_mode must be all or cold")
+    logical_sector_diagnostic_stride = int(logical_sector_diagnostic_stride)
+    if logical_sector_diagnostic_stride < 1:
+        raise ValueError("logical_sector_diagnostic_stride must be >= 1")
     if syndrome_error_probability_ladder is None:
         syndrome_error_probability_ladder = np.full(
             num_temperatures,
@@ -590,6 +594,7 @@ def run_parallel_tempering_measurement(
             -1,
             dtype=np.int64,
         )
+        sector_diagnostic_sample_count = 0
         hot_to_cold_sector_delivery_count = 0
         hot_to_cold_sector_change_delivery_count = 0
     else:
@@ -602,6 +607,7 @@ def run_parallel_tempering_measurement(
         sector_last_cold_signature_by_replica = None
         sector_last_hot_measurement_by_replica = None
         sector_last_cold_measurement_by_replica = None
+        sector_diagnostic_sample_count = 0
         hot_to_cold_sector_delivery_count = 0
         hot_to_cold_sector_change_delivery_count = 0
 
@@ -694,7 +700,10 @@ def run_parallel_tempering_measurement(
                     diagnostic_slot,
                     measurement_index,
                 ] = logical_observable_values
-        if track_logical_sector_diagnostics:
+        if (
+                track_logical_sector_diagnostics
+                and measurement_index % logical_sector_diagnostic_stride == 0):
+            sector_diagnostic_sample_count += 1
             sector_signatures = np.empty(num_temperatures, dtype=np.int64)
             for temperature_index in range(num_temperatures):
                 if temperature_index in measured_logical_values:
@@ -881,6 +890,12 @@ def run_parallel_tempering_measurement(
         )
         result["pt_sector_histogram_per_temperature"] = (
             sector_histogram_per_temperature
+        )
+        result["pt_sector_diagnostic_stride"] = np.int64(
+            logical_sector_diagnostic_stride
+        )
+        result["pt_sector_diagnostic_sample_count"] = np.int64(
+            sector_diagnostic_sample_count
         )
         result["pt_hot_to_cold_sector_delivery_count"] = np.int64(
             hot_to_cold_sector_delivery_count
