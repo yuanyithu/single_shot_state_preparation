@@ -3,6 +3,8 @@ import unittest
 import numpy as np
 
 from mcmc_diagnostics import (
+    DEFAULT_ADAPTIVE_PT_MAX_LOG_GAP_FACTOR,
+    adaptive_ladder_from_flow,
     probability_to_coupling,
     sync_pt_enlarge_ladder,
     sync_pt_ladders_from_enlarge,
@@ -58,6 +60,42 @@ class SyncParallelTemperingLadderTests(unittest.TestCase):
                 q_hot=0.5,
                 num_temperatures=9,
             )
+
+    def test_adaptive_ladder_caps_degenerate_large_gap(self):
+        initial_heat_scale = sync_pt_enlarge_ladder(
+            q_cold=0.08,
+            q_hot=0.44,
+            num_temperatures=17,
+        )
+        degenerate_flow = np.zeros(17, dtype=np.float64)
+        degenerate_flow[0] = 1.0
+        degenerate_flow[1] = 0.5
+
+        adapted_heat_scale, status = adaptive_ladder_from_flow(
+            initial_heat_scale,
+            degenerate_flow,
+        )
+
+        self.assertEqual(status, "ok_capped_gap")
+        self.assertAlmostEqual(
+            float(adapted_heat_scale[0]),
+            float(initial_heat_scale[0]),
+        )
+        self.assertAlmostEqual(
+            float(adapted_heat_scale[-1]),
+            float(initial_heat_scale[-1]),
+        )
+        log_gaps = np.diff(np.log(adapted_heat_scale))
+        uniform_gap = (
+            np.log(adapted_heat_scale[-1] / adapted_heat_scale[0])
+            / float(adapted_heat_scale.size - 1)
+        )
+        self.assertLessEqual(
+            float(np.max(log_gaps)),
+            DEFAULT_ADAPTIVE_PT_MAX_LOG_GAP_FACTOR * float(uniform_gap)
+            + 1e-12,
+        )
+        self.assertTrue(np.all(log_gaps >= -1e-12))
 
 
 if __name__ == "__main__":
