@@ -243,3 +243,63 @@ fast probe `F_m128` 也给出一致信号：
 2. 比较 `winding_repeat_factor=2/4` 是否增加 sector proposal 供给；注意如果只增加 hot flips 而 cold flips 不变，说明仍是 transport 而非 proposal 瓶颈。
 3. 评估更高频 swap 或更短 measurement 间隔是否能增加 replica round-trip，从而提高 cold sector flips。
 4. 若 K=33 能提高中间 min swap，但 wall time 过高，则需要优化 sector 诊断开销或只在 pilot 阶段使用全温度 sector 诊断。
+
+### pilot3 低热端与诊断修正
+
+短版 probe 运行在远端并同步到：
+
+- `data/3d_toric_code/with_measurement_noise/exp36/pilot3_cold_mixing_20260528/I_static_K17_qhot032_wr1_m128/I_static_K17_qhot032_wr1_m128.npz`
+- `data/3d_toric_code/with_measurement_noise/exp36/pilot3_cold_mixing_20260528/J_static_K17_qhot032_wr4_m128/J_static_K17_qhot032_wr4_m128.npz`
+- `data/3d_toric_code/with_measurement_noise/exp36/pilot3_cold_mixing_20260528/K_static_K17_qhot035_wr1_m128/K_static_K17_qhot035_wr1_m128.npz`
+
+共同参数：
+
+- `L=6,p=0.05,q=0.08`
+- `num_disorder_samples_total=1`
+- `num_start_chains=4`
+- `num_measurements_per_disorder=128`
+- `num_sweeps_between_measurements=6`
+- `num_burn_in_sweeps=150`
+- `max_effective_num_burn_in_sweeps=750`
+- `K=17`
+- `adaptive_pt_rounds=0`
+- `track_pt_sector_diagnostics=True`
+
+结果：
+
+| config | q_hot | winding_repeat | min swap | bottleneck pair | hot flips mean | cold flips mean | proxy delivery |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| F baseline | 0.44 | 1 | 0.0191 | 6-7 | 95.8 | 0.5 | 0 |
+| I | 0.32 | 1 | 0.2167 | 12-13 | 95.5 | 0.0 | 8 |
+| J | 0.32 | 4 | 0.2042 | 12-13 | 93.5 | 0.0 | 4 |
+| K | 0.35 | 1 | 0.1410 | 10-11 | 92.2 | 0.0 | 5 |
+
+结论：
+
+- 降低热端到 `q_hot=0.32/0.35` 能大幅提高 PT swap bottleneck：`0.019 -> 0.14-0.22`。
+- 即使 `q_hot=0.32`，hot 端 sector flips 仍接近 `95/127`，说明热端仍足够热。
+- 但 128 measurements 内 cold sector flips 为 0，说明低热端改善了 transport 平滑性，却没有立刻解决 cold 端 sector sampling。
+- `winding_repeat_factor=4` 没有改善 cold flips，也没有改善 proxy delivery。
+- K=33 q_hot=0.44 短版仍然运行过慢，已停止；后续若再测 K=33，必须先降低 sector 诊断开销。
+
+诊断修正：
+
+- pilot3 暴露出旧的 `hot_to_cold_sector_delivery_count` 是 proxy：当冷端 signature 没变时，也可能因为旧 hot signature 与当前 cold signature 相等而计数。
+- 已新增更严格字段 `pt_hot_to_cold_sector_change_delivery_count`：
+  - 只在该 replica 自上次处于 cold 端之后确实到过 hot 端；
+  - 回到 cold 端时 cold signature 相对该 replica 上次 cold signature 发生改变；
+  - 且该 signature 与该 replica 最近在 hot 端记录的 signature 匹配。
+- 新字段已穿透到 chunk 与 merge 输出：
+  - `chain_pt_hot_to_cold_sector_change_delivery_count_per_disorder_per_start_replica(_tensor)`
+  - `mean_pt_hot_to_cold_sector_change_delivery_count_curve_matrix`
+- 验证：
+  - `PYTHONPATH=src conda run -n 12 python -m py_compile src/mcmc_parallel_tempering.py src/main.py src/production_chunked_scan.py`
+  - `PYTHONPATH=src conda run -n 12 python -m unittest discover -s tests`
+  - smoke 输出：`data/3d_toric_code/with_measurement_noise/exp36/strict_delivery_smoke_20260528/strict_delivery_smoke.npz`
+  - smoke 中旧 proxy delivery 为 `[1,1]`，严格 cold-change delivery 为 `[0,0]`，确认能区分“回到 cold”与“cold sector 真改变”。
+
+下一步：
+
+- 用严格字段重新跑短版 probe，对比 `q_hot=0.32/0.35/0.44`。
+- 若严格 delivery 仍为 0，则参数优化的重点应转向更长 round-trip/更高 cold-sector change 机会，而不是继续追求 hot 端更热。
+- 考虑新增 sector diagnostics stride，减少全温度 logical signature 计算成本，使 K=33 或更长 measurements 可行。
