@@ -367,3 +367,42 @@ fast probe `F_m128` 也给出一致信号：
 - 用 stride 版本跑更长 `m=512`，先比较 `q_hot=0.32/0.35/0.44` 的 strict delivery。
 - 建议 `--pt-sector-diagnostic-stride 4`，保留足够 sector 时间分辨率，同时把全温度 logical signature 开销降到约 1/4。
 - 若 `q_hot=0.32/0.35` 在 `m=512` 仍无 cold flips/strict delivery，下一步应测试更长 round-trip 或显式 cold-sector assist move；若 `q_hot=0.44` 有 strict delivery 但 min swap 极低，则需要在 `q_hot≈0.35-0.44` 之间找折中或加密 bottleneck 区间。
+
+### stride long probe 启动记录
+
+代码版本：
+
+- 提交并推送：`7c691922c Add PT sector diagnostic stride`。
+- 远端 source：`/home/DATA1/users/yuany/.single_shot/repos/exp36_stride_probe_20260528/source`。
+- run base：`/home/DATA1/users/yuany/.single_shot/exp36/exp36_stride_long_probe_20260528`。
+
+共同参数：
+
+- `L=6,p=0.05,q=0.08`
+- `num_disorder_samples_total=1`
+- `num_start_chains=4`
+- `num_measurements_per_disorder=512`
+- `num_sweeps_between_measurements=6`
+- `num_burn_in_sweeps=150`
+- `max_effective_num_burn_in_sweeps=750`
+- `K=17`
+- `adaptive_pt_rounds=0`
+- `observable_temperature_mode=cold`
+- `track_pt_sector_diagnostics=True`
+- `pt_sector_diagnostic_stride=4`
+- `cluster_update=False`
+
+配置：
+
+| config | node | screen | q_hot | seed_base | run root |
+|---|---|---|---:|---:|---|
+| P | nd-1 | `exp36_P_stride` | 0.32 | 366000 | `P_stride_K17_qhot032_m512_s4` |
+| Q | nd-2 | `exp36_Q_stride` | 0.35 | 367000 | `Q_stride_K17_qhot035_m512_s4` |
+| R | nd-3 | `exp36_R_stride` | 0.44 | 368000 | `R_stride_K17_qhot044_m512_s4` |
+
+启动状态：
+
+- 三个任务均通过 exact validation。
+- 三个任务均通过 preflight merge。
+- 三个任务均已进入 `Launching chunk workers: 1 workers for 1 chunks`。
+- 下一轮先检查 final NPZ；若完成则同步到本地并比较 strict delivery、cold flips、min swap 与每温度 sector flip onset。
