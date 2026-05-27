@@ -180,3 +180,66 @@ pilot2 先只跑难点 `L=6,p=0.05,q=0.08`，每配置少量 disorder，用 `--t
 - hot-to-cold sector delivery 是否非零；
 - `pt_min_swap` 是否不再被 terminal gap 压到 0；
 - per-pair swap curve 是否没有孤立断点。
+
+### pilot2 transport 对照结果
+
+完成并同步到本地：
+
+- `data/3d_toric_code/with_measurement_noise/exp36/pilot2_transport_20260527/E_static_K17_qhot044_wr1/E_static_K17_qhot044_wr1.npz`
+- `data/3d_toric_code/with_measurement_noise/exp36/pilot2_transport_20260527/F_capped_K17_qhot044_wr1/F_capped_K17_qhot044_wr1.npz`
+- `data/3d_toric_code/with_measurement_noise/exp36/pilot2_fast_probe_20260527/F_capped_K17_qhot044_wr1_m128/F_capped_K17_qhot044_wr1_m128.npz`
+
+共同正式参数：
+
+- `L=6,p=0.05,q=0.08`
+- `num_disorder_samples_total=2`
+- `num_start_chains=4`
+- `num_measurements_per_disorder=512`
+- `num_sweeps_between_measurements=6`
+- `num_burn_in_sweeps=300`
+- `max_effective_num_burn_in_sweeps=1500`
+- `K=17,q_hot=0.44`
+- `track_pt_sector_diagnostics=True`
+- `cluster_update=False`
+
+远端长版 `G/H`：
+
+- `G_capped_K33_qhot044_wr1` 与 `H_capped_K33_qhot049_wr2` 在运行约 54 分钟后仍无正式 chunk 写出，已停止。
+- 结论：`K=33,512 measurements,全温度 sector diagnostics` 对当前迭代太重；后续 K=33 只做短版 probe 或减少诊断频率。
+
+正式结果：
+
+| config | adaptive | K | q_hot | winding_repeat | pt_min_swap mean | hot-to-cold delivery | cold sector flips mean | cold chains flipped | hot sector flips mean |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| E static | 0 | 17 | 0.44 | 1 | 0.00984 | 11/8 chains | 1.75 | 4/8 | 387.0 |
+| F capped | 3 | 17 | 0.44 | 1 | 0.01028 | 18/8 chains | 1.00 | 4/8 | 380.1 |
+
+per-pair swap 的主要变化：
+
+- 首轮 B 的最后一跳 `15-16` swap 为 `0.000`，terminal gap 完全断开。
+- pilot2 E 的最后一跳 `15-16` mean swap 为 `0.599`。
+- pilot2 F 的最后一跳 `15-16` mean swap 为 `0.414`。
+- 因此 gap cap/静态 ladder 已经修复了热端 terminal transport，hot-to-cold delivery 也从 0 变为非零。
+- 新 bottleneck 出现在中间 pair `6-7`：
+  - E: min swap pair `6-7`，mean `0.01187`，对应平均 `(p,q)=(0.2252,0.2640)->(0.2555,0.2917)`。
+  - F: min swap pair `6-7`，mean `0.01280`，对应平均 `(p,q)=(0.2214,0.2605)->(0.2514,0.2880)`。
+
+fast probe `F_m128` 也给出一致信号：
+
+- `pt_min_swap=0.01713`
+- hot-to-cold delivery `0/4`，但 measurement 太短，不能作为 delivery 结论。
+- cold sector flips mean `0.5`，cold chains flipped `1/4`。
+- hot sector flips mean `95.75/127`。
+
+本轮结论：
+
+- PT transport 已经从“热端完全断开”改善为“能把 hot sector 送回 cold”，这是实质性改善。
+- 但 cold 端真正的 logical-sector sampling 仍严重不足：512 measurements 下 cold sector flips 只有 `1.0-1.75` 次/链，且只有 `4/8` 链发生过 cold-sector 改变。
+- 当前主瓶颈不是 terminal hot gap，而是中间温度带 `p≈0.22-0.26,q≈0.26-0.29` 附近 swap 太低；此外 cold winding acceptance 仍只有 `1.215e-05`，cold 端自身跨 sector 很少。
+
+下一轮方向：
+
+1. 用短版 K=33 probe 检查加密温度点是否抬高中间 `6-7` bottleneck。
+2. 比较 `winding_repeat_factor=2/4` 是否增加 sector proposal 供给；注意如果只增加 hot flips 而 cold flips 不变，说明仍是 transport 而非 proposal 瓶颈。
+3. 评估更高频 swap 或更短 measurement 间隔是否能增加 replica round-trip，从而提高 cold sector flips。
+4. 若 K=33 能提高中间 min swap，但 wall time 过高，则需要优化 sector 诊断开销或只在 pilot 阶段使用全温度 sector 诊断。
