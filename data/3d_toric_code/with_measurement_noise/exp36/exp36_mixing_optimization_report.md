@@ -106,3 +106,77 @@ smoke 数值仅用于确认字段：
 - 四个任务均已通过 exact/preflight validation。
 - 四个任务均已进入 `Launching chunk workers: 4 workers for 16 chunks`。
 - 截至本记录，尚未完成合并；下一轮需要先检查 screen/log，再收集 final NPZ。
+
+### 首轮 pilot 局部结果与诊断
+
+首轮任务后来提前停止，只保留已完成 chunk 用于定位瓶颈。本地同步并补齐远端 A 的 L=6 chunk 后，可用正式数据为：
+
+- A: `K=9,q_hot=0.44,winding_repeat_factor=1`，`L=6,p=0.05,q=0.08`，4 个 disorder chunk，16 条 start-chain 样本。
+- B: `K=17,q_hot=0.44,winding_repeat_factor=1`，`L=6,p=0.05,q=0.08`，2 个 disorder chunk，8 条 start-chain 样本。
+- C/D 只有 preflight，没有正式 L=6 chunk，不用于定量结论。
+
+共同采样参数：
+
+- `num_measurements_per_disorder=512`
+- `num_sweeps_between_measurements=6`
+- `num_burn_in_sweeps=300`
+- `max_effective_num_burn_in_sweeps=1500`
+- `num_start_chains=4`
+- `adaptive_pt_rounds=3`
+- `adaptive_pt_calibration_sweeps=256`
+- `observable_temperature_mode=cold`
+- `track_pt_sector_diagnostics=True`
+- `cluster_update=False`
+
+关键结论：
+
+- A/B 的冷端 `k=0` logical sector 都完全没有翻转。
+  - A: `never=[4,4,4,4]`，cold sector flips `0/16`。
+  - B: `never=[4,4]`，cold sector flips `0/8`。
+- 热端会频繁翻转 logical sector，说明问题不是热端本身缺少 sector-changing move。
+  - A hot `k=8`: winding acceptance `0.386410`，sector flips 平均 `384.812/511`。
+  - B hot `k=16`: winding acceptance `0.385942`，sector flips 平均 `380.375/511`。
+- hot-to-cold sector delivery 全部为 0。
+  - A: `0/16`。
+  - B: `0/8`。
+- A/B 的 PT transport 断在热端附近。
+  - A mean swap per pair: `[7.93e-4,8.48e-3,0.362,0.392,0.423,0.203,1.33e-2,4.65e-4]`，`pt_min_swap=0`。
+  - B mean swap per pair: `[0.813,0.789,0.754,0.717,0.673,0.623,0.568,0.506,0.541,0.482,0.423,0.371,0.328,0.309,0.308,0.000]`，最后一跳 `15-16` 完全为 0。
+- B 的 adaptive ladder 从 `k=15` 到热端 `k=16` 跳跃过大：
+  - `k=15`: mean `(p,q)=(0.255386,0.291545)`。
+  - `k=16`: `(p,q)=(0.427823,0.440000)`。
+  - 这解释了最后一跳 swap acceptance 为 0：热端已经能跨 sector，但不能把状态输送回冷端。
+
+因此首轮定量诊断把瓶颈定位为 adaptive PT ladder 在热端形成过大的 terminal gap，而不是 hot-sector flip scarcity。后续应优先修复/限制 ladder gap，并与 static common-beta ladder 对照。
+
+### adaptive PT gap cap 修复
+
+已实现并提交 adaptive ladder gap cap：`02e4878ef Cap adaptive PT ladder gaps`。
+
+修复内容：
+
+- `adaptive_ladder_from_flow(..., max_log_gap_factor=...)` 增加 log-ladder 相邻 gap 上限。
+- 默认 `DEFAULT_ADAPTIVE_PT_MAX_LOG_GAP_FACTOR=1.5`。
+- 当 cap 生效时 status 记录为 `ok_capped_gap`。
+- 生产扫描保存 gap-cap 相关配置与实际 ladder。
+
+验证：
+
+- `PYTHONPATH=src conda run -n 12 python -m py_compile src/mcmc_diagnostics.py src/main.py src/production_chunked_scan.py src/mcmc_parallel_tempering.py` 通过。
+- `PYTHONPATH=src conda run -n 12 python -m unittest discover -s tests` 通过。
+- 本地 smoke 输出：`data/3d_toric_code/with_measurement_noise/exp36/adaptive_gap_cap_smoke_20260527/adaptive_gap_cap_smoke.npz`。
+- smoke 中 heat ladder log gap `max/uniform = 1.5`，确认 cap 生效。
+
+下一轮 pilot 设计：
+
+- E: static common-beta `K=17,q_hot=0.44,winding_repeat_factor=1,adaptive_rounds=0`，检验不用 adaptive flow 时最后一跳是否消失。
+- F: capped adaptive `K=17,q_hot=0.44,winding_repeat_factor=1,adaptive_rounds=3`，直接检验 gap cap 是否修复 B 的 terminal gap。
+- G: capped adaptive `K=33,q_hot=0.44,winding_repeat_factor=1,adaptive_rounds=3`，提高温度分辨率。
+- H: capped adaptive `K=33,q_hot=0.49,winding_repeat_factor=2`，检查更高热端和更多 winding proposal 是否能在保持 transport 的同时增加 sector exploration。
+
+pilot2 先只跑难点 `L=6,p=0.05,q=0.08`，每配置少量 disorder，用 `--track-pt-sector-diagnostics` 评估：
+
+- cold sector flips 是否从 0 变为正数；
+- hot-to-cold sector delivery 是否非零；
+- `pt_min_swap` 是否不再被 terminal gap 压到 0；
+- per-pair swap curve 是否没有孤立断点。
