@@ -349,6 +349,33 @@ def run_parallel_tempering_measurement(
     )
     qubit_order_buffer = np.arange(num_qubits, dtype=np.int32)
     replica_id_per_temperature = np.arange(num_temperatures, dtype=np.int64)
+    replica_last_endpoint_per_replica = np.full(
+        num_temperatures,
+        -1,
+        dtype=np.int64,
+    )
+    replica_cold_visit_count = np.zeros(num_temperatures, dtype=np.int64)
+    replica_hot_visit_count = np.zeros(num_temperatures, dtype=np.int64)
+    replica_cold_to_hot_passage_count = np.zeros(
+        num_temperatures,
+        dtype=np.int64,
+    )
+    replica_hot_to_cold_passage_count = np.zeros(
+        num_temperatures,
+        dtype=np.int64,
+    )
+    replica_min_temperature_visited = np.full(
+        num_temperatures,
+        num_temperatures,
+        dtype=np.int64,
+    )
+    replica_max_temperature_visited = np.full(
+        num_temperatures,
+        -1,
+        dtype=np.int64,
+    )
+    transport_tracking_started = False
+    transport_position_sample_count = 0
     flow_tracker = (
         build_adaptive_pt_flow_tracker(num_temperatures)
         if adaptive_pt_flow_enabled
@@ -488,8 +515,40 @@ def run_parallel_tempering_measurement(
             flow_tracker=flow_tracker,
             replica_id_per_temperature=replica_id_per_temperature,
         )
+        _record_replica_transport_position()
         pt_swap_wall_time += time.perf_counter() - swap_started_at
         swap_parity_counter += 1
+
+    def _record_replica_transport_position():
+        nonlocal transport_position_sample_count
+        if not transport_tracking_started:
+            return
+        transport_position_sample_count += 1
+        hot_index = num_temperatures - 1
+        for temperature_index in range(num_temperatures):
+            replica_id = int(replica_id_per_temperature[temperature_index])
+            if temperature_index < replica_min_temperature_visited[replica_id]:
+                replica_min_temperature_visited[replica_id] = temperature_index
+            if temperature_index > replica_max_temperature_visited[replica_id]:
+                replica_max_temperature_visited[replica_id] = temperature_index
+            if temperature_index == 0:
+                previous_endpoint = int(
+                    replica_last_endpoint_per_replica[replica_id]
+                )
+                if previous_endpoint != 0:
+                    replica_cold_visit_count[replica_id] += 1
+                    if previous_endpoint == hot_index:
+                        replica_hot_to_cold_passage_count[replica_id] += 1
+                    replica_last_endpoint_per_replica[replica_id] = 0
+            elif temperature_index == hot_index:
+                previous_endpoint = int(
+                    replica_last_endpoint_per_replica[replica_id]
+                )
+                if previous_endpoint != hot_index:
+                    replica_hot_visit_count[replica_id] += 1
+                    if previous_endpoint == 0:
+                        replica_cold_to_hot_passage_count[replica_id] += 1
+                    replica_last_endpoint_per_replica[replica_id] = hot_index
 
     sweep_counter = 0
     ordinary_update_wall_time = 0.0
@@ -503,6 +562,8 @@ def run_parallel_tempering_measurement(
 
     if cluster_controller is not None and num_burn_in_sweeps > 0:
         freeze_cluster_controller(cluster_controller)
+    transport_tracking_started = True
+    _record_replica_transport_position()
 
     num_masks = logical_observable_masks.shape[0]
     if num_logical_qubits is None:
@@ -872,6 +933,23 @@ def run_parallel_tempering_measurement(
         "swap_accept_counts": swap_accept_counts,
         "swap_attempt_counts": swap_attempt_counts,
         "swap_acceptance_rates": swap_acceptance_rates,
+        "pt_transport_position_sample_count": np.int64(
+            transport_position_sample_count
+        ),
+        "pt_replica_cold_visit_count": replica_cold_visit_count,
+        "pt_replica_hot_visit_count": replica_hot_visit_count,
+        "pt_replica_cold_to_hot_passage_count": (
+            replica_cold_to_hot_passage_count
+        ),
+        "pt_replica_hot_to_cold_passage_count": (
+            replica_hot_to_cold_passage_count
+        ),
+        "pt_replica_endpoint_round_trip_count": np.minimum(
+            replica_cold_to_hot_passage_count,
+            replica_hot_to_cold_passage_count,
+        ),
+        "pt_replica_min_temperature_visited": replica_min_temperature_visited,
+        "pt_replica_max_temperature_visited": replica_max_temperature_visited,
         "ordinary_update_wall_time": np.float64(ordinary_update_wall_time),
         "pt_swap_wall_time": np.float64(pt_swap_wall_time),
         "observable_wall_time": np.float64(observable_wall_time),

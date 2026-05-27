@@ -1208,6 +1208,14 @@ def _merge_outputs(
     chain_pt_swap_acceptance_rate_per_pair_per_disorder_per_start_replica_tensor = None
     chain_pt_swap_accept_count_per_pair_per_disorder_per_start_replica_tensor = None
     chain_pt_swap_attempt_count_per_pair_per_disorder_per_start_replica_tensor = None
+    chain_pt_transport_position_sample_count_per_disorder_per_start_replica_tensor = None
+    chain_pt_replica_cold_visit_count_per_disorder_per_start_replica_tensor = None
+    chain_pt_replica_hot_visit_count_per_disorder_per_start_replica_tensor = None
+    chain_pt_replica_cold_to_hot_passage_count_per_disorder_per_start_replica_tensor = None
+    chain_pt_replica_hot_to_cold_passage_count_per_disorder_per_start_replica_tensor = None
+    chain_pt_replica_endpoint_round_trip_count_per_disorder_per_start_replica_tensor = None
+    chain_pt_replica_min_temperature_visited_per_disorder_per_start_replica_tensor = None
+    chain_pt_replica_max_temperature_visited_per_disorder_per_start_replica_tensor = None
     chain_pt_sector_flip_count_per_temperature_per_disorder_per_start_replica_tensor = None
     chain_pt_first_sector_change_index_per_temperature_per_disorder_per_start_replica_tensor = None
     chain_pt_sector_histogram_per_temperature_per_disorder_per_start_replica_tensor = None
@@ -1508,6 +1516,38 @@ def _merge_outputs(
                     )
                     chain_pt_swap_attempt_count_per_pair_per_disorder_per_start_replica_tensor = np.empty(
                         pt_pair_chain_shape,
+                        dtype=np.int64,
+                    )
+                    chain_pt_transport_position_sample_count_per_disorder_per_start_replica_tensor = np.empty(
+                        pt_temperature_chain_shape[:-1],
+                        dtype=np.int64,
+                    )
+                    chain_pt_replica_cold_visit_count_per_disorder_per_start_replica_tensor = np.empty(
+                        pt_temperature_chain_shape,
+                        dtype=np.int64,
+                    )
+                    chain_pt_replica_hot_visit_count_per_disorder_per_start_replica_tensor = np.empty(
+                        pt_temperature_chain_shape,
+                        dtype=np.int64,
+                    )
+                    chain_pt_replica_cold_to_hot_passage_count_per_disorder_per_start_replica_tensor = np.empty(
+                        pt_temperature_chain_shape,
+                        dtype=np.int64,
+                    )
+                    chain_pt_replica_hot_to_cold_passage_count_per_disorder_per_start_replica_tensor = np.empty(
+                        pt_temperature_chain_shape,
+                        dtype=np.int64,
+                    )
+                    chain_pt_replica_endpoint_round_trip_count_per_disorder_per_start_replica_tensor = np.empty(
+                        pt_temperature_chain_shape,
+                        dtype=np.int64,
+                    )
+                    chain_pt_replica_min_temperature_visited_per_disorder_per_start_replica_tensor = np.empty(
+                        pt_temperature_chain_shape,
+                        dtype=np.int64,
+                    )
+                    chain_pt_replica_max_temperature_visited_per_disorder_per_start_replica_tensor = np.empty(
+                        pt_temperature_chain_shape,
                         dtype=np.int64,
                     )
                     if track_pt_sector_diagnostics:
@@ -1841,6 +1881,151 @@ def _merge_outputs(
                         ] = loaded_chunk_result[
                             "chain_pt_swap_attempt_count_per_pair_per_disorder_per_start_replica"
                         ]
+                        transport_shape = (
+                            lattice_index,
+                            point_index,
+                            slice(start_index, stop_index),
+                            slice(None),
+                            slice(None),
+                        )
+                        if (
+                                "chain_pt_transport_position_sample_count_per_disorder_per_start_replica"
+                                in loaded_chunk_result):
+                            chain_pt_transport_position_sample_count_per_disorder_per_start_replica_tensor[
+                                transport_shape
+                            ] = loaded_chunk_result[
+                                "chain_pt_transport_position_sample_count_per_disorder_per_start_replica"
+                            ]
+                            chain_pt_replica_cold_visit_count_per_disorder_per_start_replica_tensor[
+                                lattice_index,
+                                point_index,
+                                start_index:stop_index,
+                                :,
+                                :,
+                                :,
+                            ] = loaded_chunk_result[
+                                "chain_pt_replica_cold_visit_count_per_disorder_per_start_replica"
+                            ]
+                            chain_pt_replica_hot_visit_count_per_disorder_per_start_replica_tensor[
+                                lattice_index,
+                                point_index,
+                                start_index:stop_index,
+                                :,
+                                :,
+                                :,
+                            ] = loaded_chunk_result[
+                                "chain_pt_replica_hot_visit_count_per_disorder_per_start_replica"
+                            ]
+                            chain_pt_replica_cold_to_hot_passage_count_per_disorder_per_start_replica_tensor[
+                                lattice_index,
+                                point_index,
+                                start_index:stop_index,
+                                :,
+                                :,
+                                :,
+                            ] = loaded_chunk_result[
+                                "chain_pt_replica_cold_to_hot_passage_count_per_disorder_per_start_replica"
+                            ]
+                            chain_pt_replica_hot_to_cold_passage_count_per_disorder_per_start_replica_tensor[
+                                lattice_index,
+                                point_index,
+                                start_index:stop_index,
+                                :,
+                                :,
+                                :,
+                            ] = loaded_chunk_result[
+                                "chain_pt_replica_hot_to_cold_passage_count_per_disorder_per_start_replica"
+                            ]
+                            chain_pt_replica_endpoint_round_trip_count_per_disorder_per_start_replica_tensor[
+                                lattice_index,
+                                point_index,
+                                start_index:stop_index,
+                                :,
+                                :,
+                                :,
+                            ] = loaded_chunk_result[
+                                "chain_pt_replica_endpoint_round_trip_count_per_disorder_per_start_replica"
+                            ]
+                            chain_pt_replica_min_temperature_visited_per_disorder_per_start_replica_tensor[
+                                lattice_index,
+                                point_index,
+                                start_index:stop_index,
+                                :,
+                                :,
+                                :,
+                            ] = loaded_chunk_result[
+                                "chain_pt_replica_min_temperature_visited_per_disorder_per_start_replica"
+                            ]
+                            chain_pt_replica_max_temperature_visited_per_disorder_per_start_replica_tensor[
+                                lattice_index,
+                                point_index,
+                                start_index:stop_index,
+                                :,
+                                :,
+                                :,
+                            ] = loaded_chunk_result[
+                                "chain_pt_replica_max_temperature_visited_per_disorder_per_start_replica"
+                            ]
+                        else:
+                            chain_pt_transport_position_sample_count_per_disorder_per_start_replica_tensor[
+                                transport_shape
+                            ] = 0
+                            chain_pt_replica_cold_visit_count_per_disorder_per_start_replica_tensor[
+                                lattice_index,
+                                point_index,
+                                start_index:stop_index,
+                                :,
+                                :,
+                                :,
+                            ] = 0
+                            chain_pt_replica_hot_visit_count_per_disorder_per_start_replica_tensor[
+                                lattice_index,
+                                point_index,
+                                start_index:stop_index,
+                                :,
+                                :,
+                                :,
+                            ] = 0
+                            chain_pt_replica_cold_to_hot_passage_count_per_disorder_per_start_replica_tensor[
+                                lattice_index,
+                                point_index,
+                                start_index:stop_index,
+                                :,
+                                :,
+                                :,
+                            ] = 0
+                            chain_pt_replica_hot_to_cold_passage_count_per_disorder_per_start_replica_tensor[
+                                lattice_index,
+                                point_index,
+                                start_index:stop_index,
+                                :,
+                                :,
+                                :,
+                            ] = 0
+                            chain_pt_replica_endpoint_round_trip_count_per_disorder_per_start_replica_tensor[
+                                lattice_index,
+                                point_index,
+                                start_index:stop_index,
+                                :,
+                                :,
+                                :,
+                            ] = 0
+                            chain_pt_replica_min_temperature_visited_per_disorder_per_start_replica_tensor[
+                                lattice_index,
+                                point_index,
+                                start_index:stop_index,
+                                :,
+                                :,
+                                :,
+                            ] = 0
+                            chain_pt_replica_max_temperature_visited_per_disorder_per_start_replica_tensor[
+                                lattice_index,
+                                point_index,
+                                start_index:stop_index,
+                                :,
+                                :,
+                                :,
+                            ] = 0
                         if track_pt_sector_diagnostics:
                             chain_pt_sector_flip_count_per_temperature_per_disorder_per_start_replica_tensor[
                                 lattice_index,
@@ -2390,6 +2575,46 @@ def _merge_outputs(
                 "chain_pt_swap_attempt_count_per_pair_per_disorder_per_start_replica_tensor"
             ] = (
                 chain_pt_swap_attempt_count_per_pair_per_disorder_per_start_replica_tensor
+            )
+            merged_result[
+                "chain_pt_transport_position_sample_count_per_disorder_per_start_replica_tensor"
+            ] = (
+                chain_pt_transport_position_sample_count_per_disorder_per_start_replica_tensor
+            )
+            merged_result[
+                "chain_pt_replica_cold_visit_count_per_disorder_per_start_replica_tensor"
+            ] = (
+                chain_pt_replica_cold_visit_count_per_disorder_per_start_replica_tensor
+            )
+            merged_result[
+                "chain_pt_replica_hot_visit_count_per_disorder_per_start_replica_tensor"
+            ] = (
+                chain_pt_replica_hot_visit_count_per_disorder_per_start_replica_tensor
+            )
+            merged_result[
+                "chain_pt_replica_cold_to_hot_passage_count_per_disorder_per_start_replica_tensor"
+            ] = (
+                chain_pt_replica_cold_to_hot_passage_count_per_disorder_per_start_replica_tensor
+            )
+            merged_result[
+                "chain_pt_replica_hot_to_cold_passage_count_per_disorder_per_start_replica_tensor"
+            ] = (
+                chain_pt_replica_hot_to_cold_passage_count_per_disorder_per_start_replica_tensor
+            )
+            merged_result[
+                "chain_pt_replica_endpoint_round_trip_count_per_disorder_per_start_replica_tensor"
+            ] = (
+                chain_pt_replica_endpoint_round_trip_count_per_disorder_per_start_replica_tensor
+            )
+            merged_result[
+                "chain_pt_replica_min_temperature_visited_per_disorder_per_start_replica_tensor"
+            ] = (
+                chain_pt_replica_min_temperature_visited_per_disorder_per_start_replica_tensor
+            )
+            merged_result[
+                "chain_pt_replica_max_temperature_visited_per_disorder_per_start_replica_tensor"
+            ] = (
+                chain_pt_replica_max_temperature_visited_per_disorder_per_start_replica_tensor
             )
             merged_result[
                 "pt_data_error_probability_ladder_per_disorder_tensor"

@@ -1732,6 +1732,30 @@ def _run_parallel_tempering_single_chain(
         "pt_swap_acceptance_rates": pt_result["swap_acceptance_rates"],
         "pt_swap_accept_counts": pt_result["swap_accept_counts"],
         "pt_swap_attempt_counts": pt_result["swap_attempt_counts"],
+        "pt_transport_position_sample_count": (
+            pt_result["pt_transport_position_sample_count"]
+        ),
+        "pt_replica_cold_visit_count": (
+            pt_result["pt_replica_cold_visit_count"]
+        ),
+        "pt_replica_hot_visit_count": (
+            pt_result["pt_replica_hot_visit_count"]
+        ),
+        "pt_replica_cold_to_hot_passage_count": (
+            pt_result["pt_replica_cold_to_hot_passage_count"]
+        ),
+        "pt_replica_hot_to_cold_passage_count": (
+            pt_result["pt_replica_hot_to_cold_passage_count"]
+        ),
+        "pt_replica_endpoint_round_trip_count": (
+            pt_result["pt_replica_endpoint_round_trip_count"]
+        ),
+        "pt_replica_min_temperature_visited": (
+            pt_result["pt_replica_min_temperature_visited"]
+        ),
+        "pt_replica_max_temperature_visited": (
+            pt_result["pt_replica_max_temperature_visited"]
+        ),
         "ordinary_update_wall_time": pt_result["ordinary_update_wall_time"],
         "pt_swap_wall_time": pt_result["pt_swap_wall_time"],
         "observable_wall_time": pt_result["observable_wall_time"],
@@ -2502,6 +2526,14 @@ def run_disorder_average_simulation(
     chain_pt_swap_acceptance_rate_per_pair_per_disorder_per_start_replica = None
     chain_pt_swap_accept_count_per_pair_per_disorder_per_start_replica = None
     chain_pt_swap_attempt_count_per_pair_per_disorder_per_start_replica = None
+    chain_pt_transport_position_sample_count_per_disorder_per_start_replica = None
+    chain_pt_replica_cold_visit_count_per_disorder_per_start_replica = None
+    chain_pt_replica_hot_visit_count_per_disorder_per_start_replica = None
+    chain_pt_replica_cold_to_hot_passage_count_per_disorder_per_start_replica = None
+    chain_pt_replica_hot_to_cold_passage_count_per_disorder_per_start_replica = None
+    chain_pt_replica_endpoint_round_trip_count_per_disorder_per_start_replica = None
+    chain_pt_replica_min_temperature_visited_per_disorder_per_start_replica = None
+    chain_pt_replica_max_temperature_visited_per_disorder_per_start_replica = None
     chain_pt_sector_flip_count_per_temperature_per_disorder_per_start_replica = None
     chain_pt_first_sector_change_index_per_temperature_per_disorder_per_start_replica = None
     chain_pt_sector_histogram_per_temperature_per_disorder_per_start_replica = None
@@ -2644,6 +2676,30 @@ def run_disorder_average_simulation(
             )
             chain_pt_swap_attempt_count_per_pair_per_disorder_per_start_replica = (
                 np.empty(pt_pair_chain_shape, dtype=np.int64)
+            )
+            chain_pt_transport_position_sample_count_per_disorder_per_start_replica = (
+                np.empty(chain_shape, dtype=np.int64)
+            )
+            chain_pt_replica_cold_visit_count_per_disorder_per_start_replica = (
+                np.empty(pt_temperature_chain_shape, dtype=np.int64)
+            )
+            chain_pt_replica_hot_visit_count_per_disorder_per_start_replica = (
+                np.empty(pt_temperature_chain_shape, dtype=np.int64)
+            )
+            chain_pt_replica_cold_to_hot_passage_count_per_disorder_per_start_replica = (
+                np.empty(pt_temperature_chain_shape, dtype=np.int64)
+            )
+            chain_pt_replica_hot_to_cold_passage_count_per_disorder_per_start_replica = (
+                np.empty(pt_temperature_chain_shape, dtype=np.int64)
+            )
+            chain_pt_replica_endpoint_round_trip_count_per_disorder_per_start_replica = (
+                np.empty(pt_temperature_chain_shape, dtype=np.int64)
+            )
+            chain_pt_replica_min_temperature_visited_per_disorder_per_start_replica = (
+                np.empty(pt_temperature_chain_shape, dtype=np.int64)
+            )
+            chain_pt_replica_max_temperature_visited_per_disorder_per_start_replica = (
+                np.empty(pt_temperature_chain_shape, dtype=np.int64)
             )
             if track_pt_sector_diagnostics:
                 sector_chain_shape = pt_temperature_chain_shape
@@ -3186,6 +3242,65 @@ def run_disorder_average_simulation(
                             replica_index,
                             :,
                         ] = measurement_result["pt_swap_attempt_counts"]
+                        chain_pt_transport_position_sample_count_per_disorder_per_start_replica[
+                            disorder_index,
+                            start_index,
+                            replica_index,
+                        ] = measurement_result[
+                            "pt_transport_position_sample_count"
+                        ]
+                        chain_pt_replica_cold_visit_count_per_disorder_per_start_replica[
+                            disorder_index,
+                            start_index,
+                            replica_index,
+                            :,
+                        ] = measurement_result["pt_replica_cold_visit_count"]
+                        chain_pt_replica_hot_visit_count_per_disorder_per_start_replica[
+                            disorder_index,
+                            start_index,
+                            replica_index,
+                            :,
+                        ] = measurement_result["pt_replica_hot_visit_count"]
+                        chain_pt_replica_cold_to_hot_passage_count_per_disorder_per_start_replica[
+                            disorder_index,
+                            start_index,
+                            replica_index,
+                            :,
+                        ] = measurement_result[
+                            "pt_replica_cold_to_hot_passage_count"
+                        ]
+                        chain_pt_replica_hot_to_cold_passage_count_per_disorder_per_start_replica[
+                            disorder_index,
+                            start_index,
+                            replica_index,
+                            :,
+                        ] = measurement_result[
+                            "pt_replica_hot_to_cold_passage_count"
+                        ]
+                        chain_pt_replica_endpoint_round_trip_count_per_disorder_per_start_replica[
+                            disorder_index,
+                            start_index,
+                            replica_index,
+                            :,
+                        ] = measurement_result[
+                            "pt_replica_endpoint_round_trip_count"
+                        ]
+                        chain_pt_replica_min_temperature_visited_per_disorder_per_start_replica[
+                            disorder_index,
+                            start_index,
+                            replica_index,
+                            :,
+                        ] = measurement_result[
+                            "pt_replica_min_temperature_visited"
+                        ]
+                        chain_pt_replica_max_temperature_visited_per_disorder_per_start_replica[
+                            disorder_index,
+                            start_index,
+                            replica_index,
+                            :,
+                        ] = measurement_result[
+                            "pt_replica_max_temperature_visited"
+                        ]
                         if track_pt_sector_diagnostics:
                             chain_pt_sector_flip_count_per_temperature_per_disorder_per_start_replica[
                                 disorder_index,
@@ -3673,6 +3788,46 @@ def run_disorder_average_simulation(
                 "chain_pt_swap_attempt_count_per_pair_per_disorder_per_start_replica"
             ] = (
                 chain_pt_swap_attempt_count_per_pair_per_disorder_per_start_replica
+            )
+            result[
+                "chain_pt_transport_position_sample_count_per_disorder_per_start_replica"
+            ] = (
+                chain_pt_transport_position_sample_count_per_disorder_per_start_replica
+            )
+            result[
+                "chain_pt_replica_cold_visit_count_per_disorder_per_start_replica"
+            ] = (
+                chain_pt_replica_cold_visit_count_per_disorder_per_start_replica
+            )
+            result[
+                "chain_pt_replica_hot_visit_count_per_disorder_per_start_replica"
+            ] = (
+                chain_pt_replica_hot_visit_count_per_disorder_per_start_replica
+            )
+            result[
+                "chain_pt_replica_cold_to_hot_passage_count_per_disorder_per_start_replica"
+            ] = (
+                chain_pt_replica_cold_to_hot_passage_count_per_disorder_per_start_replica
+            )
+            result[
+                "chain_pt_replica_hot_to_cold_passage_count_per_disorder_per_start_replica"
+            ] = (
+                chain_pt_replica_hot_to_cold_passage_count_per_disorder_per_start_replica
+            )
+            result[
+                "chain_pt_replica_endpoint_round_trip_count_per_disorder_per_start_replica"
+            ] = (
+                chain_pt_replica_endpoint_round_trip_count_per_disorder_per_start_replica
+            )
+            result[
+                "chain_pt_replica_min_temperature_visited_per_disorder_per_start_replica"
+            ] = (
+                chain_pt_replica_min_temperature_visited_per_disorder_per_start_replica
+            )
+            result[
+                "chain_pt_replica_max_temperature_visited_per_disorder_per_start_replica"
+            ] = (
+                chain_pt_replica_max_temperature_visited_per_disorder_per_start_replica
             )
             if track_pt_sector_diagnostics:
                 result[
