@@ -1090,6 +1090,7 @@ def _merge_outputs(
     mean_pt_winding_acceptance_rate_per_temperature_curve_tensor = None
     mean_pt_sector_flip_count_per_temperature_curve_tensor = None
     mean_pt_hot_to_cold_sector_delivery_count_curve_matrix = None
+    mean_pt_hot_to_cold_sector_change_delivery_count_curve_matrix = None
     if has_q0_diagnostics:
         q0_mean_m_u_spread_linf_curve_matrix = np.empty(
             (num_sizes, num_points),
@@ -1149,6 +1150,9 @@ def _merge_outputs(
                 mean_pt_hot_to_cold_sector_delivery_count_curve_matrix = (
                     np.empty((num_sizes, num_points), dtype=np.float64)
                 )
+                mean_pt_hot_to_cold_sector_change_delivery_count_curve_matrix = (
+                    np.empty((num_sizes, num_points), dtype=np.float64)
+                )
 
     num_masks = None
     q0_start_sector_labels = None
@@ -1186,6 +1190,7 @@ def _merge_outputs(
     chain_pt_first_sector_change_index_per_temperature_per_disorder_per_start_replica_tensor = None
     chain_pt_sector_histogram_per_temperature_per_disorder_per_start_replica_tensor = None
     chain_pt_hot_to_cold_sector_delivery_count_per_disorder_per_start_replica_tensor = None
+    chain_pt_hot_to_cold_sector_change_delivery_count_per_disorder_per_start_replica_tensor = None
     pt_data_error_probability_ladder_per_disorder_tensor = None
     pt_syndrome_error_probability_ladder_per_disorder_tensor = None
     pt_enlarge_ladder_per_disorder_tensor = None
@@ -1497,6 +1502,10 @@ def _merge_outputs(
                             dtype=np.int64,
                         )
                         chain_pt_hot_to_cold_sector_delivery_count_per_disorder_per_start_replica_tensor = np.empty(
+                            pt_temperature_chain_shape[:-1],
+                            dtype=np.int64,
+                        )
+                        chain_pt_hot_to_cold_sector_change_delivery_count_per_disorder_per_start_replica_tensor = np.empty(
                             pt_temperature_chain_shape[:-1],
                             dtype=np.int64,
                         )
@@ -1846,6 +1855,26 @@ def _merge_outputs(
                             ] = loaded_chunk_result[
                                 "chain_pt_hot_to_cold_sector_delivery_count_per_disorder_per_start_replica"
                             ]
+                            if (
+                                    "chain_pt_hot_to_cold_sector_change_delivery_count_per_disorder_per_start_replica"
+                                    in loaded_chunk_result):
+                                chain_pt_hot_to_cold_sector_change_delivery_count_per_disorder_per_start_replica_tensor[
+                                    lattice_index,
+                                    point_index,
+                                    start_index:stop_index,
+                                    :,
+                                    :,
+                                ] = loaded_chunk_result[
+                                    "chain_pt_hot_to_cold_sector_change_delivery_count_per_disorder_per_start_replica"
+                                ]
+                            else:
+                                chain_pt_hot_to_cold_sector_change_delivery_count_per_disorder_per_start_replica_tensor[
+                                    lattice_index,
+                                    point_index,
+                                    start_index:stop_index,
+                                    :,
+                                    :,
+                                ] = 0
                         if (
                                 "pt_data_error_probability_ladder_per_disorder"
                                 in loaded_chunk_result):
@@ -2111,6 +2140,15 @@ def _merge_outputs(
                                 point_index,
                             ]
                         ))
+                        mean_pt_hot_to_cold_sector_change_delivery_count_curve_matrix[
+                            lattice_index,
+                            point_index,
+                        ] = float(np.mean(
+                            chain_pt_hot_to_cold_sector_change_delivery_count_per_disorder_per_start_replica_tensor[
+                                lattice_index,
+                                point_index,
+                            ]
+                        ))
 
     merged_result = {
         "lattice_size_list": np.asarray(
@@ -2337,11 +2375,21 @@ def _merge_outputs(
                     chain_pt_hot_to_cold_sector_delivery_count_per_disorder_per_start_replica_tensor
                 )
                 merged_result[
+                    "chain_pt_hot_to_cold_sector_change_delivery_count_per_disorder_per_start_replica_tensor"
+                ] = (
+                    chain_pt_hot_to_cold_sector_change_delivery_count_per_disorder_per_start_replica_tensor
+                )
+                merged_result[
                     "mean_pt_sector_flip_count_per_temperature_curve_tensor"
                 ] = mean_pt_sector_flip_count_per_temperature_curve_tensor
                 merged_result[
                     "mean_pt_hot_to_cold_sector_delivery_count_curve_matrix"
                 ] = mean_pt_hot_to_cold_sector_delivery_count_curve_matrix
+                merged_result[
+                    "mean_pt_hot_to_cold_sector_change_delivery_count_curve_matrix"
+                ] = (
+                    mean_pt_hot_to_cold_sector_change_delivery_count_curve_matrix
+                )
             if adaptive_pt_rounds > 0:
                 merged_result[
                     "adaptive_pt_num_rounds_completed_per_disorder_tensor"

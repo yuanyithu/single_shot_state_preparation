@@ -575,7 +575,23 @@ def run_parallel_tempering_measurement(
             -1,
             dtype=np.int64,
         )
+        sector_last_cold_signature_by_replica = np.full(
+            num_temperatures,
+            -1,
+            dtype=np.int64,
+        )
+        sector_last_hot_measurement_by_replica = np.full(
+            num_temperatures,
+            -1,
+            dtype=np.int64,
+        )
+        sector_last_cold_measurement_by_replica = np.full(
+            num_temperatures,
+            -1,
+            dtype=np.int64,
+        )
         hot_to_cold_sector_delivery_count = 0
+        hot_to_cold_sector_change_delivery_count = 0
     else:
         sector_previous_signature_per_temperature = None
         sector_flip_count_per_temperature = None
@@ -583,7 +599,11 @@ def run_parallel_tempering_measurement(
         sector_histogram_per_temperature = None
         sector_last_hot_signature_by_replica = None
         sector_last_delivered_hot_signature_by_replica = None
+        sector_last_cold_signature_by_replica = None
+        sector_last_hot_measurement_by_replica = None
+        sector_last_cold_measurement_by_replica = None
         hot_to_cold_sector_delivery_count = 0
+        hot_to_cold_sector_change_delivery_count = 0
 
     def _compute_logical_values_without_accumulating(temperature_index):
         return _compute_logical_observable_values(
@@ -718,11 +738,24 @@ def run_parallel_tempering_measurement(
                 cold_replica_id = int(replica_id_per_temperature[0])
                 hot_signature = int(sector_signatures[-1])
                 cold_signature = int(sector_signatures[0])
+                previous_cold_signature = int(
+                    sector_last_cold_signature_by_replica[cold_replica_id]
+                )
+                previous_cold_measurement = int(
+                    sector_last_cold_measurement_by_replica[cold_replica_id]
+                )
                 sector_last_hot_signature_by_replica[
                     hot_replica_id
                 ] = hot_signature
+                sector_last_hot_measurement_by_replica[
+                    hot_replica_id
+                ] = measurement_index
                 delivered_signature = int(
                     sector_last_hot_signature_by_replica[cold_replica_id]
+                )
+                delivered_after_hot_visit = (
+                    int(sector_last_hot_measurement_by_replica[cold_replica_id])
+                    > previous_cold_measurement
                 )
                 if (
                         delivered_signature >= 0
@@ -734,9 +767,20 @@ def run_parallel_tempering_measurement(
                             ]
                         )):
                     hot_to_cold_sector_delivery_count += 1
+                    if (
+                            previous_cold_signature >= 0
+                            and cold_signature != previous_cold_signature
+                            and delivered_after_hot_visit):
+                        hot_to_cold_sector_change_delivery_count += 1
                     sector_last_delivered_hot_signature_by_replica[
                         cold_replica_id
                     ] = delivered_signature
+                sector_last_cold_signature_by_replica[
+                    cold_replica_id
+                ] = cold_signature
+                sector_last_cold_measurement_by_replica[
+                    cold_replica_id
+                ] = measurement_index
         observable_wall_time += time.perf_counter() - observable_started_at
 
     m_u_values_per_temperature = np.full(
@@ -840,6 +884,9 @@ def run_parallel_tempering_measurement(
         )
         result["pt_hot_to_cold_sector_delivery_count"] = np.int64(
             hot_to_cold_sector_delivery_count
+        )
+        result["pt_hot_to_cold_sector_change_delivery_count"] = np.int64(
+            hot_to_cold_sector_change_delivery_count
         )
     else:
         result["pt_sector_diagnostics_enabled"] = np.bool_(False)
