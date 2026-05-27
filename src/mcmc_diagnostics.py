@@ -3,6 +3,7 @@ import numpy as np
 
 SYNC_PT_LADDER_SEMANTICS = "common_beta_heat_scale"
 DATA_ONLY_PT_LADDER_SEMANTICS = "data_only_log_odds"
+DEFAULT_ADAPTIVE_PT_MAX_LOG_GAP_FACTOR = 1.5
 
 
 def probability_to_odds(probability):
@@ -189,7 +190,53 @@ def summarize_adaptive_pt_flow(flow_tracker):
     }
 
 
-def adaptive_ladder_from_flow(pt_enlarge, f_mono):
+def _cap_adaptive_log_ladder_gaps(
+        proposed_log_enlarge,
+        max_log_gap_factor=DEFAULT_ADAPTIVE_PT_MAX_LOG_GAP_FACTOR):
+    proposed_log_enlarge = np.asarray(proposed_log_enlarge, dtype=np.float64)
+    if proposed_log_enlarge.size < 3:
+        return proposed_log_enlarge.copy(), False
+    total_log_span = float(
+        proposed_log_enlarge[-1] - proposed_log_enlarge[0]
+    )
+    if total_log_span <= 0.0:
+        return proposed_log_enlarge.copy(), False
+    uniform_gap = total_log_span / float(proposed_log_enlarge.size - 1)
+    max_allowed_gap = float(max_log_gap_factor) * uniform_gap
+    if max_allowed_gap < uniform_gap:
+        raise ValueError("max_log_gap_factor must be >= 1")
+    proposed_gaps = np.diff(proposed_log_enlarge)
+    max_proposed_gap = float(np.max(proposed_gaps))
+    if max_proposed_gap <= max_allowed_gap + 1e-12:
+        return proposed_log_enlarge.copy(), False
+
+    uniform_log_enlarge = np.linspace(
+        proposed_log_enlarge[0],
+        proposed_log_enlarge[-1],
+        proposed_log_enlarge.size,
+    )
+    if max_proposed_gap <= uniform_gap + 1e-12:
+        blend_fraction = 0.0
+    else:
+        blend_fraction = (
+            (max_allowed_gap - uniform_gap)
+            / (max_proposed_gap - uniform_gap)
+        )
+        blend_fraction = float(np.clip(blend_fraction, 0.0, 1.0))
+    capped_log_enlarge = (
+        uniform_log_enlarge
+        + blend_fraction * (proposed_log_enlarge - uniform_log_enlarge)
+    )
+    capped_log_enlarge[0] = proposed_log_enlarge[0]
+    capped_log_enlarge[-1] = proposed_log_enlarge[-1]
+    capped_log_enlarge = np.maximum.accumulate(capped_log_enlarge)
+    return capped_log_enlarge, True
+
+
+def adaptive_ladder_from_flow(
+        pt_enlarge,
+        f_mono,
+        max_log_gap_factor=DEFAULT_ADAPTIVE_PT_MAX_LOG_GAP_FACTOR):
     pt_enlarge = np.asarray(pt_enlarge, dtype=np.float64)
     f_mono = np.asarray(f_mono, dtype=np.float64)
     if pt_enlarge.size != f_mono.size:
@@ -220,7 +267,11 @@ def adaptive_ladder_from_flow(pt_enlarge, f_mono):
     new_log_enlarge[0] = log_enlarge[0]
     new_log_enlarge[-1] = log_enlarge[-1]
     new_log_enlarge = np.maximum.accumulate(new_log_enlarge)
-    return np.exp(new_log_enlarge), "ok"
+    new_log_enlarge, capped = _cap_adaptive_log_ladder_gaps(
+        new_log_enlarge,
+        max_log_gap_factor=max_log_gap_factor,
+    )
+    return np.exp(new_log_enlarge), ("ok_capped_gap" if capped else "ok")
 
 
 def _autocovariance_fft(values):
