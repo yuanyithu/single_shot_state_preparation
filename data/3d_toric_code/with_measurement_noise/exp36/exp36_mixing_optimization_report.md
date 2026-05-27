@@ -69,3 +69,40 @@ smoke 数值仅用于确认字段：
 - 使用当前代码提交后的版本，在 nd-1/nd-2/nd-3 分别跑 A-D 中的不同配置。
 - 优先取难点 `L=5,6`、`p=0.05`、`q=0.08,0.12`，每点先用小样本 `32` disorder、`4` start chains、`512` measurements、显式 burn-in cap，打开 `--track-pt-sector-diagnostics`。
 - 如果 `K=17,q_hot=0.49,winding_repeat_factor=4` 仍显示 hot 有 flip 但 delivery=0，则下一轮应重点改 PT ladder/adaptive flow；如果 hot 本身也少 flip，则重点改 sector-changing proposal。
+
+### 远端 pilot 启动记录
+
+已在远端共享存储启动首批 q=0.08 pilot。代码通过 `rsync` 从本机同步，运行命令显式记录 `--git-commit-sha f1afc9b6a`。
+
+共同参数：
+
+- `code_family=3d_toric`
+- `p=0.05`
+- `q=0.08`
+- `L=5,6`
+- `num_disorder_samples_total=8`
+- `num_start_chains=4`
+- `num_measurements_per_disorder=512`
+- `num_sweeps_between_measurements=6`
+- `num_burn_in_sweeps=300`
+- `max_effective_num_burn_in_sweeps=1500`
+- `adaptive_pt_rounds=3`
+- `adaptive_pt_calibration_sweeps=256`
+- `observable_temperature_mode=cold`
+- `track_pt_sector_diagnostics=True`
+- `cluster_update=False`
+
+配置：
+
+| config | node | screen | K | q_hot | winding_repeat_factor | run root |
+|---|---|---|---:|---:|---:|---|
+| A | nd-1 | `exp36_A` | 9 | 0.44 | 1 | `.single_shot/exp36/exp36_mixing_pilot_20260527/A_common_beta_K9_qhot044_wr1` |
+| B | nd-2 | `exp36_B` | 17 | 0.44 | 1 | `.single_shot/exp36/exp36_mixing_pilot_20260527/B_common_beta_K17_qhot044_wr1` |
+| C | nd-3 | `exp36_C` | 17 | 0.49 | 1 | `.single_shot/exp36/exp36_mixing_pilot_20260527/C_common_beta_K17_qhot049_wr1` |
+| D | nd-1 | `exp36_D` | 17 | 0.49 | 4 | `.single_shot/exp36/exp36_mixing_pilot_20260527/D_common_beta_K17_qhot049_wr4` |
+
+启动状态：
+
+- 四个任务均已通过 exact/preflight validation。
+- 四个任务均已进入 `Launching chunk workers: 4 workers for 16 chunks`。
+- 截至本记录，尚未完成合并；下一轮需要先检查 screen/log，再收集 final NPZ。
