@@ -554,3 +554,66 @@ roundtrip-only S/T/U 已同步：
 
 - S/T 显示低热端 ladder 已经有大量 endpoint round trips；结合 P/Q 的 cold sector 完全不翻，瓶颈不再是 replica 到不了热端，而是热端 sector change 在回到 cold 的过程中没有改变 cold ensemble 的 logical sector。
 - U 的 round trips 明显少，和 `q_hot=0.44` 的中间 swap bottleneck 一致；继续把热端加热到 `0.44` 不划算。
+
+### repeated PT swap sweeps 与下一轮 probe
+
+物理动机：
+
+- 3D `winding_moves` 是整张非平庸 sheet，权重为 `L^2`；在 `L=6,p=0.05` 冷端直接接受率只有 `O(1e-5)`，单纯增加 winding repeat 不能根治。
+- P/Q 和 S/T 说明 `q_hot=0.32/0.35` 已有 round trip，但 strict delivery 为 0；下一步优先提高 PT ladder 上 sector-changing 状态的输运/回流机会，而不是继续把热端升到 `0.44`。
+
+程序改动：
+
+- 新增 `pt_swap_sweeps_per_attempt` / CLI `--pt-swap-sweeps-per-attempt`。
+- `pt_swap_attempt_every_num_sweeps` 仍控制 cadence；新参数控制每次 cadence 内连续做多少个 alternating even/odd adjacent swap sweep。
+- 默认 `1` 保持旧行为；`2` 等价于每次 cadence 连续做一轮 even 和一轮 odd，可提高 temperature-index diffusion 常数但不改变目标分布。
+- 结果和 manifest/NPZ 中记录：
+  - `pt_swap_attempt_every_num_sweeps`
+  - `pt_swap_sweeps_per_attempt`
+
+验证：
+
+- 提交并推送：`60497ad7969de1ad5217a7cbeee716832184d726 Add repeated PT swap sweeps`。
+- `python -m py_compile src/mcmc_parallel_tempering.py src/main.py src/production_chunked_scan.py` 通过。
+- `PYTHONPATH=src python -m unittest discover -s tests` 通过，包含新增 `tests/test_pt_swap_sweeps.py`。
+- 本地 smoke：`data/3d_toric_code/with_measurement_noise/exp36/swap_sweeps_smoke_20260528/swap_sweeps_smoke.npz`。
+  - `pt_swap_sweeps_per_attempt=2`
+  - final NPZ 中 `chain_pt_swap_attempt_count... = [10,10,10,10]`
+  - `chain_pt_transport_position_sample_count = 17`
+
+远端 probe 启动记录：
+
+- launcher：`data/3d_toric_code/with_measurement_noise/exp36/launch_swap_sweep_probe_20260528.sh`
+- 远端 source：`/home/DATA1/users/yuany/.single_shot/repos/exp36_swap_sweep_probe_20260528/source`
+- run base：`/home/DATA1/users/yuany/.single_shot/exp36/exp36_swap_sweep_probe_20260528`
+
+共同参数：
+
+- `L=6,p=0.05,q=0.08`
+- `num_disorder_samples_total=1`
+- `num_start_chains=4`
+- `num_measurements_per_disorder=512`
+- `num_sweeps_between_measurements=6`
+- `num_burn_in_sweeps=150`
+- `max_effective_num_burn_in_sweeps=750`
+- `K=17`
+- `q_hot=0.32`
+- `adaptive_pt_rounds=0`
+- `observable_temperature_mode=cold`
+- `track_pt_sector_diagnostics=True`
+- `pt_sector_diagnostic_stride=4`
+- `cluster_update=False`
+
+配置：
+
+| config | node | screen | pt swap sweeps | seed_base | run root |
+|---|---|---|---:|---:|---|
+| V | nd-1 | `exp36_V_swap1` | 1 | 382000 | `V_swap1_K17_qhot032_m512_s4` |
+| W | nd-2 | `exp36_W_swap2` | 2 | 383000 | `W_swap2_K17_qhot032_m512_s4` |
+| X | nd-3 | `exp36_X_swap4` | 4 | 384000 | `X_swap4_K17_qhot032_m512_s4` |
+
+启动状态：
+
+- 三个任务均已通过 exact validation 和 preflight merge。
+- 三个任务均已进入 `Launching chunk workers: 1 workers for 1 chunks`。
+- 下一轮同步 final NPZ，比较 cold sector flips、strict delivery、endpoint round trips、transport samples 和 wall time。
