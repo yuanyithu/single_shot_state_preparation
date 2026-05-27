@@ -451,6 +451,9 @@ def _build_submit_config_from_args(args):
             args.single_bit_proposal_fraction
         ),
         "observable_temperature_mode": str(args.observable_temperature_mode),
+        "track_pt_sector_diagnostics": bool(
+            args.track_pt_sector_diagnostics
+        ),
         "cluster_update_enabled": not bool(args.disable_cluster_update),
         "cluster_budget_fraction_rho": float(args.cluster_budget_fraction_rho),
         "cluster_update_debug": bool(args.cluster_debug_assertions),
@@ -555,6 +558,9 @@ def _build_chunk_tasks(config):
                     ),
                     "observable_temperature_mode": str(
                         config["observable_temperature_mode"]
+                    ),
+                    "track_pt_sector_diagnostics": bool(
+                        config.get("track_pt_sector_diagnostics", False)
                     ),
                     "cluster_update_enabled": bool(
                         config["cluster_update_enabled"]
@@ -693,6 +699,9 @@ def _build_manifest(
                 config["single_bit_proposal_fraction"]
             ),
             "observable_temperature_mode": config["observable_temperature_mode"],
+            "track_pt_sector_diagnostics": bool(
+                config.get("track_pt_sector_diagnostics", False)
+            ),
             "cluster_update_enabled": config["cluster_update_enabled"],
             "cluster_budget_fraction_rho": (
                 config["cluster_budget_fraction_rho"]
@@ -842,6 +851,9 @@ def _run_chunk_task(task_data):
                 task_data["single_bit_proposal_fraction"]
             ),
             observable_temperature_mode=task_data["observable_temperature_mode"],
+            track_pt_sector_diagnostics=bool(
+                task_data.get("track_pt_sector_diagnostics", False)
+            ),
             cluster_update_enabled=task_data["cluster_update_enabled"],
             cluster_budget_fraction_rho=(
                 task_data["cluster_budget_fraction_rho"]
@@ -899,6 +911,9 @@ def _run_chunk_task(task_data):
             ),
             observable_temperature_mode=np.array(
                 task_data["observable_temperature_mode"]
+            ),
+            track_pt_sector_diagnostics_config=np.bool_(
+                task_data.get("track_pt_sector_diagnostics", False)
             ),
             pt_ladder_mode_config=np.array(task_data["pt_ladder_mode"]),
             pt_ladder_semantics_config=np.array(
@@ -1049,6 +1064,9 @@ def _merge_outputs(
         0 if not pt_enabled else int(config["pt_num_temperatures"])
     )
     adaptive_pt_rounds = int(config.get("adaptive_pt_rounds", 0))
+    track_pt_sector_diagnostics = bool(
+        config.get("track_pt_sector_diagnostics", False)
+    )
     num_qubits_list = np.empty(num_sizes, dtype=np.int64)
     num_logical_qubits_list = np.empty(num_sizes, dtype=np.int64)
     effective_num_burn_in_sweeps_list = np.empty(num_sizes, dtype=np.int64)
@@ -1069,6 +1087,9 @@ def _merge_outputs(
     mean_cold_winding_acceptance_rate_curve_matrix = None
     mean_pt_min_swap_acceptance_rate_curve_matrix = None
     mean_pt_mean_swap_acceptance_rate_curve_matrix = None
+    mean_pt_winding_acceptance_rate_per_temperature_curve_tensor = None
+    mean_pt_sector_flip_count_per_temperature_curve_tensor = None
+    mean_pt_hot_to_cold_sector_delivery_count_curve_matrix = None
     if has_q0_diagnostics:
         q0_mean_m_u_spread_linf_curve_matrix = np.empty(
             (num_sizes, num_points),
@@ -1112,6 +1133,22 @@ def _merge_outputs(
                 (num_sizes, num_points),
                 dtype=np.float64,
             )
+            mean_pt_winding_acceptance_rate_per_temperature_curve_tensor = (
+                np.empty(
+                    (num_sizes, num_points, pt_num_temperatures),
+                    dtype=np.float64,
+                )
+            )
+            if track_pt_sector_diagnostics:
+                mean_pt_sector_flip_count_per_temperature_curve_tensor = (
+                    np.empty(
+                        (num_sizes, num_points, pt_num_temperatures),
+                        dtype=np.float64,
+                    )
+                )
+                mean_pt_hot_to_cold_sector_delivery_count_curve_matrix = (
+                    np.empty((num_sizes, num_points), dtype=np.float64)
+                )
 
     num_masks = None
     q0_start_sector_labels = None
@@ -1139,6 +1176,16 @@ def _merge_outputs(
     num_chains_that_never_flipped_sector_per_disorder_tensor = None
     pt_min_swap_acceptance_rate_per_disorder_tensor = None
     pt_mean_swap_acceptance_rate_per_disorder_tensor = None
+    chain_pt_winding_acceptance_rate_per_temperature_per_disorder_per_start_replica_tensor = None
+    chain_pt_winding_accepted_count_per_temperature_per_disorder_per_start_replica_tensor = None
+    chain_pt_winding_attempted_count_per_temperature_per_disorder_per_start_replica_tensor = None
+    chain_pt_swap_acceptance_rate_per_pair_per_disorder_per_start_replica_tensor = None
+    chain_pt_swap_accept_count_per_pair_per_disorder_per_start_replica_tensor = None
+    chain_pt_swap_attempt_count_per_pair_per_disorder_per_start_replica_tensor = None
+    chain_pt_sector_flip_count_per_temperature_per_disorder_per_start_replica_tensor = None
+    chain_pt_first_sector_change_index_per_temperature_per_disorder_per_start_replica_tensor = None
+    chain_pt_sector_histogram_per_temperature_per_disorder_per_start_replica_tensor = None
+    chain_pt_hot_to_cold_sector_delivery_count_per_disorder_per_start_replica_tensor = None
     pt_data_error_probability_ladder_per_disorder_tensor = None
     pt_syndrome_error_probability_ladder_per_disorder_tensor = None
     pt_enlarge_ladder_per_disorder_tensor = None
@@ -1400,6 +1447,59 @@ def _merge_outputs(
                         np.nan,
                         dtype=np.float64,
                     )
+                    pt_temperature_chain_shape = (
+                        num_sizes,
+                        num_points,
+                        num_disorder_samples_total,
+                        num_start_chains,
+                        num_replicas_per_start,
+                        pt_num_temperatures,
+                    )
+                    pt_pair_chain_shape = pt_temperature_chain_shape[:-1] + (
+                        max(pt_num_temperatures - 1, 0),
+                    )
+                    chain_pt_winding_acceptance_rate_per_temperature_per_disorder_per_start_replica_tensor = np.empty(
+                        pt_temperature_chain_shape,
+                        dtype=np.float64,
+                    )
+                    chain_pt_winding_accepted_count_per_temperature_per_disorder_per_start_replica_tensor = np.empty(
+                        pt_temperature_chain_shape,
+                        dtype=np.int64,
+                    )
+                    chain_pt_winding_attempted_count_per_temperature_per_disorder_per_start_replica_tensor = np.empty(
+                        pt_temperature_chain_shape,
+                        dtype=np.int64,
+                    )
+                    chain_pt_swap_acceptance_rate_per_pair_per_disorder_per_start_replica_tensor = np.empty(
+                        pt_pair_chain_shape,
+                        dtype=np.float64,
+                    )
+                    chain_pt_swap_accept_count_per_pair_per_disorder_per_start_replica_tensor = np.empty(
+                        pt_pair_chain_shape,
+                        dtype=np.int64,
+                    )
+                    chain_pt_swap_attempt_count_per_pair_per_disorder_per_start_replica_tensor = np.empty(
+                        pt_pair_chain_shape,
+                        dtype=np.int64,
+                    )
+                    if track_pt_sector_diagnostics:
+                        chain_pt_sector_flip_count_per_temperature_per_disorder_per_start_replica_tensor = np.empty(
+                            pt_temperature_chain_shape,
+                            dtype=np.int64,
+                        )
+                        chain_pt_first_sector_change_index_per_temperature_per_disorder_per_start_replica_tensor = np.empty(
+                            pt_temperature_chain_shape,
+                            dtype=np.int64,
+                        )
+                        chain_pt_sector_histogram_per_temperature_per_disorder_per_start_replica_tensor = np.empty(
+                            pt_temperature_chain_shape
+                            + (1 << int(num_logical_qubits),),
+                            dtype=np.int64,
+                        )
+                        chain_pt_hot_to_cold_sector_delivery_count_per_disorder_per_start_replica_tensor = np.empty(
+                            pt_temperature_chain_shape[:-1],
+                            dtype=np.int64,
+                        )
                     if adaptive_pt_rounds > 0:
                         adaptive_pt_num_rounds_completed_per_disorder_tensor = (
                             np.zeros(
@@ -1645,6 +1745,107 @@ def _merge_outputs(
                         ] = loaded_chunk_result[
                             "pt_mean_swap_acceptance_rate_per_disorder"
                         ]
+                        chain_pt_winding_acceptance_rate_per_temperature_per_disorder_per_start_replica_tensor[
+                            lattice_index,
+                            point_index,
+                            start_index:stop_index,
+                            :,
+                            :,
+                            :,
+                        ] = loaded_chunk_result[
+                            "chain_pt_winding_acceptance_rate_per_temperature_per_disorder_per_start_replica"
+                        ]
+                        chain_pt_winding_accepted_count_per_temperature_per_disorder_per_start_replica_tensor[
+                            lattice_index,
+                            point_index,
+                            start_index:stop_index,
+                            :,
+                            :,
+                            :,
+                        ] = loaded_chunk_result[
+                            "chain_pt_winding_accepted_count_per_temperature_per_disorder_per_start_replica"
+                        ]
+                        chain_pt_winding_attempted_count_per_temperature_per_disorder_per_start_replica_tensor[
+                            lattice_index,
+                            point_index,
+                            start_index:stop_index,
+                            :,
+                            :,
+                            :,
+                        ] = loaded_chunk_result[
+                            "chain_pt_winding_attempted_count_per_temperature_per_disorder_per_start_replica"
+                        ]
+                        chain_pt_swap_acceptance_rate_per_pair_per_disorder_per_start_replica_tensor[
+                            lattice_index,
+                            point_index,
+                            start_index:stop_index,
+                            :,
+                            :,
+                            :,
+                        ] = loaded_chunk_result[
+                            "chain_pt_swap_acceptance_rate_per_pair_per_disorder_per_start_replica"
+                        ]
+                        chain_pt_swap_accept_count_per_pair_per_disorder_per_start_replica_tensor[
+                            lattice_index,
+                            point_index,
+                            start_index:stop_index,
+                            :,
+                            :,
+                            :,
+                        ] = loaded_chunk_result[
+                            "chain_pt_swap_accept_count_per_pair_per_disorder_per_start_replica"
+                        ]
+                        chain_pt_swap_attempt_count_per_pair_per_disorder_per_start_replica_tensor[
+                            lattice_index,
+                            point_index,
+                            start_index:stop_index,
+                            :,
+                            :,
+                            :,
+                        ] = loaded_chunk_result[
+                            "chain_pt_swap_attempt_count_per_pair_per_disorder_per_start_replica"
+                        ]
+                        if track_pt_sector_diagnostics:
+                            chain_pt_sector_flip_count_per_temperature_per_disorder_per_start_replica_tensor[
+                                lattice_index,
+                                point_index,
+                                start_index:stop_index,
+                                :,
+                                :,
+                                :,
+                            ] = loaded_chunk_result[
+                                "chain_pt_sector_flip_count_per_temperature_per_disorder_per_start_replica"
+                            ]
+                            chain_pt_first_sector_change_index_per_temperature_per_disorder_per_start_replica_tensor[
+                                lattice_index,
+                                point_index,
+                                start_index:stop_index,
+                                :,
+                                :,
+                                :,
+                            ] = loaded_chunk_result[
+                                "chain_pt_first_sector_change_index_per_temperature_per_disorder_per_start_replica"
+                            ]
+                            chain_pt_sector_histogram_per_temperature_per_disorder_per_start_replica_tensor[
+                                lattice_index,
+                                point_index,
+                                start_index:stop_index,
+                                :,
+                                :,
+                                :,
+                                :,
+                            ] = loaded_chunk_result[
+                                "chain_pt_sector_histogram_per_temperature_per_disorder_per_start_replica"
+                            ]
+                            chain_pt_hot_to_cold_sector_delivery_count_per_disorder_per_start_replica_tensor[
+                                lattice_index,
+                                point_index,
+                                start_index:stop_index,
+                                :,
+                                :,
+                            ] = loaded_chunk_result[
+                                "chain_pt_hot_to_cold_sector_delivery_count_per_disorder_per_start_replica"
+                            ]
                         if (
                                 "pt_data_error_probability_ladder_per_disorder"
                                 in loaded_chunk_result):
@@ -1880,6 +2081,36 @@ def _merge_outputs(
                             point_index,
                         ]
                     ))
+                    mean_pt_winding_acceptance_rate_per_temperature_curve_tensor[
+                        lattice_index,
+                        point_index,
+                    ] = np.mean(
+                        chain_pt_winding_acceptance_rate_per_temperature_per_disorder_per_start_replica_tensor[
+                            lattice_index,
+                            point_index,
+                        ],
+                        axis=(0, 1, 2),
+                    )
+                    if track_pt_sector_diagnostics:
+                        mean_pt_sector_flip_count_per_temperature_curve_tensor[
+                            lattice_index,
+                            point_index,
+                        ] = np.mean(
+                            chain_pt_sector_flip_count_per_temperature_per_disorder_per_start_replica_tensor[
+                                lattice_index,
+                                point_index,
+                            ],
+                            axis=(0, 1, 2),
+                        )
+                        mean_pt_hot_to_cold_sector_delivery_count_curve_matrix[
+                            lattice_index,
+                            point_index,
+                        ] = float(np.mean(
+                            chain_pt_hot_to_cold_sector_delivery_count_per_disorder_per_start_replica_tensor[
+                                lattice_index,
+                                point_index,
+                            ]
+                        ))
 
     merged_result = {
         "lattice_size_list": np.asarray(
@@ -2034,6 +2265,36 @@ def _merge_outputs(
                 pt_mean_swap_acceptance_rate_per_disorder_tensor
             )
             merged_result[
+                "chain_pt_winding_acceptance_rate_per_temperature_per_disorder_per_start_replica_tensor"
+            ] = (
+                chain_pt_winding_acceptance_rate_per_temperature_per_disorder_per_start_replica_tensor
+            )
+            merged_result[
+                "chain_pt_winding_accepted_count_per_temperature_per_disorder_per_start_replica_tensor"
+            ] = (
+                chain_pt_winding_accepted_count_per_temperature_per_disorder_per_start_replica_tensor
+            )
+            merged_result[
+                "chain_pt_winding_attempted_count_per_temperature_per_disorder_per_start_replica_tensor"
+            ] = (
+                chain_pt_winding_attempted_count_per_temperature_per_disorder_per_start_replica_tensor
+            )
+            merged_result[
+                "chain_pt_swap_acceptance_rate_per_pair_per_disorder_per_start_replica_tensor"
+            ] = (
+                chain_pt_swap_acceptance_rate_per_pair_per_disorder_per_start_replica_tensor
+            )
+            merged_result[
+                "chain_pt_swap_accept_count_per_pair_per_disorder_per_start_replica_tensor"
+            ] = (
+                chain_pt_swap_accept_count_per_pair_per_disorder_per_start_replica_tensor
+            )
+            merged_result[
+                "chain_pt_swap_attempt_count_per_pair_per_disorder_per_start_replica_tensor"
+            ] = (
+                chain_pt_swap_attempt_count_per_pair_per_disorder_per_start_replica_tensor
+            )
+            merged_result[
                 "pt_data_error_probability_ladder_per_disorder_tensor"
             ] = pt_data_error_probability_ladder_per_disorder_tensor
             merged_result[
@@ -2048,6 +2309,39 @@ def _merge_outputs(
             merged_result[
                 "mean_pt_mean_swap_acceptance_rate_curve_matrix"
             ] = mean_pt_mean_swap_acceptance_rate_curve_matrix
+            merged_result[
+                "mean_pt_winding_acceptance_rate_per_temperature_curve_tensor"
+            ] = mean_pt_winding_acceptance_rate_per_temperature_curve_tensor
+            merged_result["pt_track_sector_diagnostics"] = np.bool_(
+                track_pt_sector_diagnostics
+            )
+            if track_pt_sector_diagnostics:
+                merged_result[
+                    "chain_pt_sector_flip_count_per_temperature_per_disorder_per_start_replica_tensor"
+                ] = (
+                    chain_pt_sector_flip_count_per_temperature_per_disorder_per_start_replica_tensor
+                )
+                merged_result[
+                    "chain_pt_first_sector_change_index_per_temperature_per_disorder_per_start_replica_tensor"
+                ] = (
+                    chain_pt_first_sector_change_index_per_temperature_per_disorder_per_start_replica_tensor
+                )
+                merged_result[
+                    "chain_pt_sector_histogram_per_temperature_per_disorder_per_start_replica_tensor"
+                ] = (
+                    chain_pt_sector_histogram_per_temperature_per_disorder_per_start_replica_tensor
+                )
+                merged_result[
+                    "chain_pt_hot_to_cold_sector_delivery_count_per_disorder_per_start_replica_tensor"
+                ] = (
+                    chain_pt_hot_to_cold_sector_delivery_count_per_disorder_per_start_replica_tensor
+                )
+                merged_result[
+                    "mean_pt_sector_flip_count_per_temperature_curve_tensor"
+                ] = mean_pt_sector_flip_count_per_temperature_curve_tensor
+                merged_result[
+                    "mean_pt_hot_to_cold_sector_delivery_count_curve_matrix"
+                ] = mean_pt_hot_to_cold_sector_delivery_count_curve_matrix
             if adaptive_pt_rounds > 0:
                 merged_result[
                     "adaptive_pt_num_rounds_completed_per_disorder_tensor"
@@ -2107,6 +2401,9 @@ def _merge_outputs(
         ),
         observable_temperature_mode=np.array(
             config["observable_temperature_mode"]
+        ),
+        track_pt_sector_diagnostics_config=np.bool_(
+            track_pt_sector_diagnostics
         ),
         pt_ladder_mode_config=np.array(config.get("pt_ladder_mode", "data_only")),
         pt_ladder_semantics_config=np.array(
@@ -2497,6 +2794,9 @@ def _run_chunk_command(args):
             args.single_bit_proposal_fraction
         ),
         "observable_temperature_mode": str(args.observable_temperature_mode),
+        "track_pt_sector_diagnostics": bool(
+            args.track_pt_sector_diagnostics
+        ),
         "cluster_update_enabled": not bool(args.disable_cluster_update),
         "cluster_budget_fraction_rho": float(args.cluster_budget_fraction_rho),
         "cluster_update_debug": bool(args.cluster_debug_assertions),
@@ -2673,6 +2973,14 @@ def _build_parser():
         help=(
             "For parallel tempering, accumulate logical observables at all "
             "temperatures or only at the cold target temperature."
+        ),
+    )
+    common_submit_parser.add_argument(
+        "--track-pt-sector-diagnostics",
+        action="store_true",
+        help=(
+            "Record compressed per-temperature logical-sector flip diagnostics "
+            "for PT runs. This adds all-temperature logical observable probes."
         ),
     )
     common_submit_parser.add_argument(
@@ -2855,6 +3163,10 @@ def _build_parser():
         "--observable-temperature-mode",
         choices=("all", "cold"),
         default="all",
+    )
+    run_chunk_parser.add_argument(
+        "--track-pt-sector-diagnostics",
+        action="store_true",
     )
     run_chunk_parser.add_argument(
         "--disable-cluster-update",

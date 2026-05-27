@@ -37,6 +37,7 @@ from main import (
     _build_kernel_basis_from_linear_section,
     _build_measurement_diagnostic_config,
     _build_numba_update_kernel_data,
+    _compute_logical_observable_values,
     _compute_log_odds,
     _count_zero_syndrome_proposals,
     _count_zero_syndrome_proposals_split,
@@ -157,7 +158,9 @@ def run_parallel_tempering_measurement(
         single_bit_proposal_fraction=1.0,
         observable_temperature_mode="all",
         syndrome_error_probability_ladder=None,
-        adaptive_pt_flow_enabled=False):
+        adaptive_pt_flow_enabled=False,
+        track_logical_sector_diagnostics=False,
+        num_logical_qubits=None):
     """
     在 p 温度 ladder 上做 parallel tempering 采样。
 
@@ -498,6 +501,18 @@ def run_parallel_tempering_measurement(
         freeze_cluster_controller(cluster_controller)
 
     num_masks = logical_observable_masks.shape[0]
+    if num_logical_qubits is None:
+        inferred_num_logical_qubits = int(round(np.log2(num_masks + 1)))
+        if (1 << inferred_num_logical_qubits) - 1 != num_masks:
+            inferred_num_logical_qubits = min(num_masks, inferred_num_logical_qubits)
+        num_logical_qubits = inferred_num_logical_qubits
+    num_logical_qubits = int(num_logical_qubits)
+    if num_logical_qubits < 1 or num_logical_qubits > num_masks:
+        raise ValueError("num_logical_qubits must be in [1, num_masks]")
+    logical_sector_count = 1 << num_logical_qubits
+    logical_sector_bit_weights = (
+        1 << np.arange(num_logical_qubits, dtype=np.int64)
+    )
     logical_observable_sum_per_temperature = np.zeros(
         (num_temperatures, num_masks), dtype=np.int64,
     )
@@ -531,6 +546,67 @@ def run_parallel_tempering_measurement(
     else:
         diagnostic_temperature_indices = None
         logical_observable_values_per_measurement = None
+    if track_logical_sector_diagnostics:
+        sector_previous_signature_per_temperature = np.full(
+            num_temperatures,
+            -1,
+            dtype=np.int64,
+        )
+        sector_flip_count_per_temperature = np.zeros(
+            num_temperatures,
+            dtype=np.int64,
+        )
+        sector_first_change_index_per_temperature = np.full(
+            num_temperatures,
+            -1,
+            dtype=np.int64,
+        )
+        sector_histogram_per_temperature = np.zeros(
+            (num_temperatures, logical_sector_count),
+            dtype=np.int64,
+        )
+        sector_last_hot_signature_by_replica = np.full(
+            num_temperatures,
+            -1,
+            dtype=np.int64,
+        )
+        sector_last_delivered_hot_signature_by_replica = np.full(
+            num_temperatures,
+            -1,
+            dtype=np.int64,
+        )
+        hot_to_cold_sector_delivery_count = 0
+    else:
+        sector_previous_signature_per_temperature = None
+        sector_flip_count_per_temperature = None
+        sector_first_change_index_per_temperature = None
+        sector_histogram_per_temperature = None
+        sector_last_hot_signature_by_replica = None
+        sector_last_delivered_hot_signature_by_replica = None
+        hot_to_cold_sector_delivery_count = 0
+
+    def _compute_logical_values_without_accumulating(temperature_index):
+        return _compute_logical_observable_values(
+            current_chain_bits=chain_bits_list[temperature_index],
+            logical_observable_masks=logical_observable_masks,
+            section_data=section_data,
+            disorder_data_error_bits=disorder_data_error_bits,
+            disorder_syndrome_representative_bits=(
+                disorder_syndrome_representative_bits
+            ),
+            current_syndrome_term_bits=(
+                syndrome_term_bits_list[temperature_index]
+            ),
+            observed_syndrome_bits=observed_syndrome_bits,
+        )
+
+    def _signature_from_logical_values(logical_observable_values):
+        primitive_values = np.asarray(
+            logical_observable_values[:num_logical_qubits],
+            dtype=np.int8,
+        )
+        parity_bits = (primitive_values < 0).astype(np.int64)
+        return int(parity_bits @ logical_sector_bit_weights)
 
     for measurement_index in range(num_measurements):
         for _ in range(num_sweeps_between_measurements):
@@ -598,6 +674,69 @@ def run_parallel_tempering_measurement(
                     diagnostic_slot,
                     measurement_index,
                 ] = logical_observable_values
+        if track_logical_sector_diagnostics:
+            sector_signatures = np.empty(num_temperatures, dtype=np.int64)
+            for temperature_index in range(num_temperatures):
+                if temperature_index in measured_logical_values:
+                    logical_observable_values = measured_logical_values[
+                        temperature_index
+                    ]
+                else:
+                    logical_observable_values = (
+                        _compute_logical_values_without_accumulating(
+                            temperature_index
+                        )
+                    )
+                signature = _signature_from_logical_values(
+                    logical_observable_values
+                )
+                sector_signatures[temperature_index] = signature
+                sector_histogram_per_temperature[
+                    temperature_index,
+                    signature,
+                ] += 1
+                previous_signature = int(
+                    sector_previous_signature_per_temperature[
+                        temperature_index
+                    ]
+                )
+                if previous_signature >= 0 and signature != previous_signature:
+                    sector_flip_count_per_temperature[temperature_index] += 1
+                    if (
+                            sector_first_change_index_per_temperature[
+                                temperature_index
+                            ]
+                            < 0):
+                        sector_first_change_index_per_temperature[
+                            temperature_index
+                        ] = measurement_index
+                sector_previous_signature_per_temperature[
+                    temperature_index
+                ] = signature
+            if num_temperatures > 1:
+                hot_replica_id = int(replica_id_per_temperature[-1])
+                cold_replica_id = int(replica_id_per_temperature[0])
+                hot_signature = int(sector_signatures[-1])
+                cold_signature = int(sector_signatures[0])
+                sector_last_hot_signature_by_replica[
+                    hot_replica_id
+                ] = hot_signature
+                delivered_signature = int(
+                    sector_last_hot_signature_by_replica[cold_replica_id]
+                )
+                if (
+                        delivered_signature >= 0
+                        and delivered_signature == cold_signature
+                        and delivered_signature
+                        != int(
+                            sector_last_delivered_hot_signature_by_replica[
+                                cold_replica_id
+                            ]
+                        )):
+                    hot_to_cold_sector_delivery_count += 1
+                    sector_last_delivered_hot_signature_by_replica[
+                        cold_replica_id
+                    ] = delivered_signature
         observable_wall_time += time.perf_counter() - observable_started_at
 
     m_u_values_per_temperature = np.full(
@@ -688,6 +827,22 @@ def run_parallel_tempering_measurement(
     adaptive_flow_summary = summarize_adaptive_pt_flow(flow_tracker)
     if adaptive_flow_summary is not None:
         result["adaptive_pt_flow"] = adaptive_flow_summary
+    if track_logical_sector_diagnostics:
+        result["pt_sector_diagnostics_enabled"] = np.bool_(True)
+        result["pt_sector_flip_count_per_temperature"] = (
+            sector_flip_count_per_temperature
+        )
+        result["pt_first_sector_change_index_per_temperature"] = (
+            sector_first_change_index_per_temperature
+        )
+        result["pt_sector_histogram_per_temperature"] = (
+            sector_histogram_per_temperature
+        )
+        result["pt_hot_to_cold_sector_delivery_count"] = np.int64(
+            hot_to_cold_sector_delivery_count
+        )
+    else:
+        result["pt_sector_diagnostics_enabled"] = np.bool_(False)
     if diagnostic_config["record_measurement_trajectories"]:
         result["logical_observable_values_per_measurement_per_temperature"] = (
             logical_observable_values_per_measurement
