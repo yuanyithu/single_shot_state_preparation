@@ -9,6 +9,7 @@ REMOTE_HOSTS="${REMOTE_HOSTS:-nd-1,nd-2}"
 HOST_RUN_IDS="${HOST_RUN_IDS:-}"
 LOCAL_RUN_ID="${LOCAL_RUN_ID:-exp35_joint_pq_adaptive_pt_fixed_p050_q080_230_L3456_nd12}"
 OUTPUT_DIR="${OUTPUT_DIR:-$PROJECT_ROOT/data/3d_toric_code/with_measurement_noise/$LOCAL_RUN_ID}"
+LATTICE_SIZES="${LATTICE_SIZES:-3,4,5,6}"
 Q_VALUES="${Q_VALUES:-0.0800,0.0900,0.1000,0.1100,0.1200,0.1300,0.1400,0.1500,0.1600,0.1700,0.1800,0.1900,0.2000,0.2100,0.2200,0.2300}"
 ALLOW_PARTIAL="${ALLOW_PARTIAL:-1}"
 RUN_ANALYSIS="${RUN_ANALYSIS:-1}"
@@ -91,6 +92,7 @@ main() {
       conda run -n 12 python "$PROJECT_ROOT/src/analyze_exp33_fixed_p_q_scan.py"
       --output-dir "$OUTPUT_DIR"
       --host-tags "$host_tags_csv"
+      --lattice-sizes "$LATTICE_SIZES"
       --q-values "$Q_VALUES"
       --output-stem fixed_p050_q080_230_exp35_joint_pq_adaptive_pt_nd12_pooled
     )
