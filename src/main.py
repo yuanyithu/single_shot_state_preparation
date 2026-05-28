@@ -1809,6 +1809,7 @@ def _run_parallel_tempering_single_chain(
         observable_temperature_mode="all",
         adaptive_pt_flow_enabled=False,
         track_pt_sector_diagnostics=False,
+        track_pt_cluster_sector_diagnostics=False,
         pt_sector_diagnostic_stride=1,
         num_logical_qubits=None):
     from mcmc_parallel_tempering import run_parallel_tempering_measurement
@@ -1854,6 +1855,9 @@ def _run_parallel_tempering_single_chain(
         observable_temperature_mode=observable_temperature_mode,
         adaptive_pt_flow_enabled=adaptive_pt_flow_enabled,
         track_logical_sector_diagnostics=track_pt_sector_diagnostics,
+        track_cluster_sector_diagnostics=(
+            track_pt_cluster_sector_diagnostics
+        ),
         logical_sector_diagnostic_stride=pt_sector_diagnostic_stride,
         num_logical_qubits=num_logical_qubits,
     )
@@ -1980,6 +1984,12 @@ def _run_parallel_tempering_single_chain(
         "observable_wall_time": pt_result["observable_wall_time"],
         "measurement_wall_time": pt_result["measurement_wall_time"],
     }
+    result["pt_cluster_sector_diagnostics_enabled"] = np.bool_(
+        pt_result.get("pt_cluster_sector_diagnostics_enabled", False)
+    )
+    result["pt_sector_diagnostic_stride"] = pt_result[
+        "pt_sector_diagnostic_stride"
+    ]
     if bool(pt_result.get("pt_sector_diagnostics_enabled", False)):
         result["pt_sector_diagnostics_enabled"] = np.bool_(True)
         result["pt_sector_flip_count_per_temperature"] = (
@@ -1991,9 +2001,6 @@ def _run_parallel_tempering_single_chain(
         result["pt_sector_histogram_per_temperature"] = (
             pt_result["pt_sector_histogram_per_temperature"]
         )
-        result["pt_sector_diagnostic_stride"] = (
-            pt_result["pt_sector_diagnostic_stride"]
-        )
         result["pt_sector_diagnostic_sample_count"] = (
             pt_result["pt_sector_diagnostic_sample_count"]
         )
@@ -2003,6 +2010,9 @@ def _run_parallel_tempering_single_chain(
         result["pt_hot_to_cold_sector_change_delivery_count"] = (
             pt_result["pt_hot_to_cold_sector_change_delivery_count"]
         )
+    else:
+        result["pt_sector_diagnostics_enabled"] = np.bool_(False)
+    if bool(pt_result.get("pt_cluster_sector_diagnostics_enabled", False)):
         result["pt_cluster_sector_attempted_count_per_temperature"] = (
             pt_result["pt_cluster_sector_attempted_count_per_temperature"]
         )
@@ -2031,8 +2041,6 @@ def _run_parallel_tempering_single_chain(
                 "pt_cluster_sector_pending_remaining_count_per_origin_temperature",
         ):
             result[key] = pt_result[key]
-    else:
-        result["pt_sector_diagnostics_enabled"] = np.bool_(False)
     if "adaptive_pt_flow" in pt_result:
         result["adaptive_pt_flow"] = pt_result["adaptive_pt_flow"]
     for key in (
@@ -2613,6 +2621,7 @@ def run_disorder_average_simulation(
         single_bit_proposal_fraction=1.0,
         observable_temperature_mode="all",
         track_pt_sector_diagnostics=False,
+        track_pt_cluster_sector_diagnostics=False,
         pt_sector_diagnostic_stride=1,
         cluster_update_enabled=True,
         cluster_budget_fraction_rho=0.05,
@@ -2663,6 +2672,10 @@ def run_disorder_average_simulation(
         if pt_cold_edge_swap_stride < 1:
             raise ValueError("pt_cold_edge_swap_stride must be >= 1")
         track_pt_sector_diagnostics = bool(track_pt_sector_diagnostics)
+        track_pt_cluster_sector_diagnostics = bool(
+            track_pt_cluster_sector_diagnostics
+            or track_pt_sector_diagnostics
+        )
         pt_sector_diagnostic_stride = int(pt_sector_diagnostic_stride)
         if pt_sector_diagnostic_stride < 1:
             raise ValueError("pt_sector_diagnostic_stride must be >= 1")
@@ -3044,62 +3057,64 @@ def run_disorder_average_simulation(
                 chain_pt_hot_to_cold_sector_change_delivery_count_per_disorder_per_start_replica = (
                     np.empty(chain_shape, dtype=np.int64)
                 )
+            if track_pt_cluster_sector_diagnostics:
+                cluster_sector_chain_shape = pt_temperature_chain_shape
                 chain_pt_cluster_sector_attempted_count_per_temperature_per_disorder_per_start_replica = (
-                    np.empty(sector_chain_shape, dtype=np.int64)
+                    np.empty(cluster_sector_chain_shape, dtype=np.int64)
                 )
                 chain_pt_cluster_sector_nonzero_count_per_temperature_per_disorder_per_start_replica = (
-                    np.empty(sector_chain_shape, dtype=np.int64)
+                    np.empty(cluster_sector_chain_shape, dtype=np.int64)
                 )
                 chain_pt_cluster_sector_changed_count_per_temperature_per_disorder_per_start_replica = (
-                    np.empty(sector_chain_shape, dtype=np.int64)
+                    np.empty(cluster_sector_chain_shape, dtype=np.int64)
                 )
                 chain_pt_cluster_sector_cold_arrival_count_per_origin_temperature_per_disorder_per_start_replica = (
-                    np.empty(sector_chain_shape, dtype=np.int64)
+                    np.empty(cluster_sector_chain_shape, dtype=np.int64)
                 )
                 chain_pt_cluster_sector_cold_survived_count_per_origin_temperature_per_disorder_per_start_replica = (
-                    np.empty(sector_chain_shape, dtype=np.int64)
+                    np.empty(cluster_sector_chain_shape, dtype=np.int64)
                 )
                 chain_pt_cluster_sector_cold_reverted_count_per_origin_temperature_per_disorder_per_start_replica = (
-                    np.empty(sector_chain_shape, dtype=np.int64)
+                    np.empty(cluster_sector_chain_shape, dtype=np.int64)
                 )
                 chain_pt_cluster_sector_cold_other_count_per_origin_temperature_per_disorder_per_start_replica = (
-                    np.empty(sector_chain_shape, dtype=np.int64)
+                    np.empty(cluster_sector_chain_shape, dtype=np.int64)
                 )
                 chain_pt_cluster_sector_cold_diagnostic_survived_count_per_origin_temperature_per_disorder_per_start_replica = (
-                    np.empty(sector_chain_shape, dtype=np.int64)
+                    np.empty(cluster_sector_chain_shape, dtype=np.int64)
                 )
                 chain_pt_cluster_sector_cold_diagnostic_reverted_count_per_origin_temperature_per_disorder_per_start_replica = (
-                    np.empty(sector_chain_shape, dtype=np.int64)
+                    np.empty(cluster_sector_chain_shape, dtype=np.int64)
                 )
                 chain_pt_cluster_sector_cold_diagnostic_other_count_per_origin_temperature_per_disorder_per_start_replica = (
-                    np.empty(sector_chain_shape, dtype=np.int64)
+                    np.empty(cluster_sector_chain_shape, dtype=np.int64)
                 )
                 chain_pt_cluster_sector_cold_diagnostic_missed_count_per_origin_temperature_per_disorder_per_start_replica = (
-                    np.empty(sector_chain_shape, dtype=np.int64)
+                    np.empty(cluster_sector_chain_shape, dtype=np.int64)
                 )
                 chain_pt_cluster_sector_cold_departure_survived_count_per_origin_temperature_per_disorder_per_start_replica = (
-                    np.empty(sector_chain_shape, dtype=np.int64)
+                    np.empty(cluster_sector_chain_shape, dtype=np.int64)
                 )
                 chain_pt_cluster_sector_cold_departure_reverted_count_per_origin_temperature_per_disorder_per_start_replica = (
-                    np.empty(sector_chain_shape, dtype=np.int64)
+                    np.empty(cluster_sector_chain_shape, dtype=np.int64)
                 )
                 chain_pt_cluster_sector_cold_departure_other_count_per_origin_temperature_per_disorder_per_start_replica = (
-                    np.empty(sector_chain_shape, dtype=np.int64)
+                    np.empty(cluster_sector_chain_shape, dtype=np.int64)
                 )
                 chain_pt_cluster_sector_cold_dwell_sample_sum_per_origin_temperature_per_disorder_per_start_replica = (
-                    np.empty(sector_chain_shape, dtype=np.int64)
+                    np.empty(cluster_sector_chain_shape, dtype=np.int64)
                 )
                 chain_pt_cluster_sector_cold_dwell_sample_max_per_origin_temperature_per_disorder_per_start_replica = (
-                    np.empty(sector_chain_shape, dtype=np.int64)
+                    np.empty(cluster_sector_chain_shape, dtype=np.int64)
                 )
                 chain_pt_cluster_sector_cold_active_remaining_count_per_origin_temperature_per_disorder_per_start_replica = (
-                    np.empty(sector_chain_shape, dtype=np.int64)
+                    np.empty(cluster_sector_chain_shape, dtype=np.int64)
                 )
                 chain_pt_cluster_sector_pending_overwritten_count_per_origin_temperature_per_disorder_per_start_replica = (
-                    np.empty(sector_chain_shape, dtype=np.int64)
+                    np.empty(cluster_sector_chain_shape, dtype=np.int64)
                 )
                 chain_pt_cluster_sector_pending_remaining_count_per_origin_temperature_per_disorder_per_start_replica = (
-                    np.empty(sector_chain_shape, dtype=np.int64)
+                    np.empty(cluster_sector_chain_shape, dtype=np.int64)
                 )
             if int(adaptive_pt_rounds) > 0:
                 adaptive_shape = (
@@ -3566,6 +3581,9 @@ def run_disorder_average_simulation(
                                 track_pt_sector_diagnostics=(
                                     track_pt_sector_diagnostics
                                 ),
+                                track_pt_cluster_sector_diagnostics=(
+                                    track_pt_cluster_sector_diagnostics
+                                ),
                                 pt_sector_diagnostic_stride=(
                                     pt_sector_diagnostic_stride
                                 ),
@@ -3764,6 +3782,7 @@ def run_disorder_average_simulation(
                                     "pt_hot_to_cold_sector_change_delivery_count"
                                 ]
                             )
+                        if track_pt_cluster_sector_diagnostics:
                             chain_pt_cluster_sector_attempted_count_per_temperature_per_disorder_per_start_replica[
                                 disorder_index,
                                 start_index,
@@ -4277,6 +4296,9 @@ def run_disorder_average_simulation(
             result["pt_track_sector_diagnostics"] = np.bool_(
                 track_pt_sector_diagnostics
             )
+            result["pt_track_cluster_sector_diagnostics"] = np.bool_(
+                track_pt_cluster_sector_diagnostics
+            )
             result["pt_sector_diagnostic_stride"] = np.int64(
                 pt_sector_diagnostic_stride
             )
@@ -4397,6 +4419,7 @@ def run_disorder_average_simulation(
                 ] = (
                     chain_pt_hot_to_cold_sector_change_delivery_count_per_disorder_per_start_replica
                 )
+            if track_pt_cluster_sector_diagnostics:
                 result[
                     "chain_pt_cluster_sector_attempted_count_per_temperature_per_disorder_per_start_replica"
                 ] = (
@@ -4525,6 +4548,7 @@ def scan_data_error_probability(
         single_bit_proposal_fraction=1.0,
         observable_temperature_mode="all",
         track_pt_sector_diagnostics=False,
+        track_pt_cluster_sector_diagnostics=False,
         pt_sector_diagnostic_stride=1,
         cluster_update_enabled=True,
         cluster_budget_fraction_rho=0.05,
@@ -4589,6 +4613,9 @@ def scan_data_error_probability(
             single_bit_proposal_fraction=single_bit_proposal_fraction,
             observable_temperature_mode=observable_temperature_mode,
             track_pt_sector_diagnostics=track_pt_sector_diagnostics,
+            track_pt_cluster_sector_diagnostics=(
+                track_pt_cluster_sector_diagnostics
+            ),
             pt_sector_diagnostic_stride=pt_sector_diagnostic_stride,
             cluster_update_enabled=cluster_update_enabled,
             cluster_budget_fraction_rho=cluster_budget_fraction_rho,
@@ -4707,6 +4734,10 @@ def _run_single_scan_point_task(task_data):
     track_pt_sector_diagnostics = bool(
         task_data.get("track_pt_sector_diagnostics", False)
     )
+    track_pt_cluster_sector_diagnostics = bool(
+        task_data.get("track_pt_cluster_sector_diagnostics", False)
+        or track_pt_sector_diagnostics
+    )
     num_zero_syndrome_sweeps_per_cycle = task_data.get(
         "num_zero_syndrome_sweeps_per_cycle",
         1,
@@ -4767,6 +4798,7 @@ def _run_single_scan_point_task(task_data):
         single_bit_proposal_fraction=single_bit_proposal_fraction,
         observable_temperature_mode=observable_temperature_mode,
         track_pt_sector_diagnostics=track_pt_sector_diagnostics,
+        track_pt_cluster_sector_diagnostics=track_pt_cluster_sector_diagnostics,
         pt_sector_diagnostic_stride=pt_sector_diagnostic_stride,
         cluster_update_enabled=cluster_update_enabled,
         cluster_budget_fraction_rho=cluster_budget_fraction_rho,
@@ -4930,6 +4962,7 @@ def scan_multiple_code_sizes(
         single_bit_proposal_fraction=1.0,
         observable_temperature_mode="all",
         track_pt_sector_diagnostics=False,
+        track_pt_cluster_sector_diagnostics=False,
         pt_sector_diagnostic_stride=1,
         cluster_update_enabled=True,
         cluster_budget_fraction_rho=0.05,
@@ -5027,6 +5060,9 @@ def scan_multiple_code_sizes(
                 "single_bit_proposal_fraction": single_bit_proposal_fraction,
                 "observable_temperature_mode": observable_temperature_mode,
                 "track_pt_sector_diagnostics": track_pt_sector_diagnostics,
+                "track_pt_cluster_sector_diagnostics": (
+                    track_pt_cluster_sector_diagnostics
+                ),
                 "pt_sector_diagnostic_stride": pt_sector_diagnostic_stride,
                 "cluster_update_enabled": cluster_update_enabled,
                 "cluster_budget_fraction_rho": cluster_budget_fraction_rho,
