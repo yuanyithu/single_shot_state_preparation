@@ -391,9 +391,37 @@ def run_parallel_tempering_measurement(
         budget_fraction_rho=cluster_budget_fraction_rho,
         debug_assertions=cluster_update_debug,
     )
+    cluster_sector_tracking_active = False
+    cluster_sector_before_temperature_index = -1
+    cluster_sector_before_signature = -1
+    cluster_sector_attempted_per_temperature = np.zeros(
+        num_temperatures,
+        dtype=np.int64,
+    )
+    cluster_sector_nonzero_per_temperature = np.zeros(
+        num_temperatures,
+        dtype=np.int64,
+    )
+    cluster_sector_changed_per_temperature = np.zeros(
+        num_temperatures,
+        dtype=np.int64,
+    )
+
+    def _record_cluster_sector_before(temperature_index):
+        nonlocal cluster_sector_before_temperature_index
+        nonlocal cluster_sector_before_signature
+        if not cluster_sector_tracking_active:
+            return
+        temperature_index = int(temperature_index)
+        cluster_sector_before_temperature_index = temperature_index
+        cluster_sector_before_signature = _signature_for_temperature(
+            temperature_index
+        )
 
     def _run_one_sweep_for_all_temperatures():
         nonlocal ordinary_update_wall_time
+        nonlocal cluster_sector_before_temperature_index
+        nonlocal cluster_sector_before_signature
         ordinary_elapsed_per_temperature = np.empty(
             num_temperatures,
             dtype=np.float64,
@@ -482,16 +510,39 @@ def run_parallel_tempering_measurement(
             checks_touching_each_qubit=checks_touching_each_qubit,
             ordinary_elapsed_per_temperature=ordinary_elapsed_per_temperature,
             rng=rng,
+            before_update_callback=_record_cluster_sector_before,
         )
         if cluster_result["attempted"]:
-            data_weight_per_temperature[
-                cluster_result["temperature_index"]
-            ] += cluster_result["data_weight_delta"]
-            syndrome_weight_per_temperature[
-                cluster_result["temperature_index"]
-            ] = np.count_nonzero(
-                syndrome_term_bits_list[cluster_result["temperature_index"]]
+            cluster_temperature_index = int(cluster_result["temperature_index"])
+            data_weight_per_temperature[cluster_temperature_index] += (
+                cluster_result["data_weight_delta"]
             )
+            syndrome_weight_per_temperature[cluster_temperature_index] = (
+                np.count_nonzero(
+                    syndrome_term_bits_list[cluster_temperature_index]
+                )
+            )
+            if cluster_sector_tracking_active:
+                cluster_sector_attempted_per_temperature[
+                    cluster_temperature_index
+                ] += 1
+                if bool(cluster_result.get("nonzero", False)):
+                    cluster_sector_nonzero_per_temperature[
+                        cluster_temperature_index
+                    ] += 1
+                if (
+                        cluster_sector_before_temperature_index
+                        == cluster_temperature_index
+                        and cluster_sector_before_signature >= 0):
+                    after_signature = _signature_for_temperature(
+                        cluster_temperature_index
+                    )
+                    if after_signature != cluster_sector_before_signature:
+                        cluster_sector_changed_per_temperature[
+                            cluster_temperature_index
+                        ] += 1
+                cluster_sector_before_temperature_index = -1
+                cluster_sector_before_signature = -1
         ordinary_update_wall_time += float(np.sum(ordinary_elapsed_per_temperature))
 
     swap_parity_counter = 0
@@ -708,6 +759,13 @@ def run_parallel_tempering_measurement(
         )
         parity_bits = (primitive_values < 0).astype(np.int64)
         return int(parity_bits @ logical_sector_bit_weights)
+
+    def _signature_for_temperature(temperature_index):
+        return _signature_from_logical_values(
+            _compute_logical_values_without_accumulating(temperature_index)
+        )
+
+    cluster_sector_tracking_active = bool(track_logical_sector_diagnostics)
 
     for measurement_index in range(num_measurements):
         for _ in range(num_sweeps_between_measurements):
@@ -1001,6 +1059,15 @@ def run_parallel_tempering_measurement(
         )
         result["pt_hot_to_cold_sector_change_delivery_count"] = np.int64(
             hot_to_cold_sector_change_delivery_count
+        )
+        result["pt_cluster_sector_attempted_count_per_temperature"] = (
+            cluster_sector_attempted_per_temperature
+        )
+        result["pt_cluster_sector_nonzero_count_per_temperature"] = (
+            cluster_sector_nonzero_per_temperature
+        )
+        result["pt_cluster_sector_changed_count_per_temperature"] = (
+            cluster_sector_changed_per_temperature
         )
     else:
         result["pt_sector_diagnostics_enabled"] = np.bool_(False)
