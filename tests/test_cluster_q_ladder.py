@@ -62,6 +62,8 @@ class ClusterQLadderTests(unittest.TestCase):
             cluster_update_enabled=True,
             cluster_budget_fraction_rho=100.0,
             observable_temperature_mode="cold",
+            track_logical_sector_diagnostics=True,
+            logical_sector_diagnostic_stride=1,
         )
 
         self.assertTrue(bool(result["cluster_update_enabled"]))
@@ -70,6 +72,18 @@ class ClusterQLadderTests(unittest.TestCase):
         self.assertEqual(
             result["cluster_by_temperature_attempts"].shape,
             data_ladder.shape,
+        )
+        self.assertEqual(
+            result["pt_cluster_sector_attempted_count_per_temperature"].shape,
+            data_ladder.shape,
+        )
+        self.assertEqual(
+            result["pt_cluster_sector_changed_count_per_temperature"].shape,
+            data_ladder.shape,
+        )
+        self.assertGreaterEqual(
+            int(np.sum(result["pt_cluster_sector_attempted_count_per_temperature"])),
+            1,
         )
 
 

@@ -509,7 +509,8 @@ def maybe_run_cluster_update(
         disorder_data_error_bits,
         checks_touching_each_qubit,
         ordinary_elapsed_per_temperature,
-        rng):
+        rng,
+        before_update_callback=None):
     """
     Budgeted adaptive scheduler. Returns a small result dict.
     """
@@ -533,6 +534,8 @@ def maybe_run_cluster_update(
             "elapsed_time": 0.0,
         }
 
+    if before_update_callback is not None:
+        before_update_callback(temperature_index)
     result = _attempt_cluster_update(
         controller=controller,
         temperature_index=temperature_index,

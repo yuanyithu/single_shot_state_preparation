@@ -1998,6 +1998,15 @@ def _run_parallel_tempering_single_chain(
         result["pt_hot_to_cold_sector_change_delivery_count"] = (
             pt_result["pt_hot_to_cold_sector_change_delivery_count"]
         )
+        result["pt_cluster_sector_attempted_count_per_temperature"] = (
+            pt_result["pt_cluster_sector_attempted_count_per_temperature"]
+        )
+        result["pt_cluster_sector_nonzero_count_per_temperature"] = (
+            pt_result["pt_cluster_sector_nonzero_count_per_temperature"]
+        )
+        result["pt_cluster_sector_changed_count_per_temperature"] = (
+            pt_result["pt_cluster_sector_changed_count_per_temperature"]
+        )
     else:
         result["pt_sector_diagnostics_enabled"] = np.bool_(False)
     if "adaptive_pt_flow" in pt_result:
@@ -2791,6 +2800,9 @@ def run_disorder_average_simulation(
     chain_pt_sector_diagnostic_sample_count_per_disorder_per_start_replica = None
     chain_pt_hot_to_cold_sector_delivery_count_per_disorder_per_start_replica = None
     chain_pt_hot_to_cold_sector_change_delivery_count_per_disorder_per_start_replica = None
+    chain_pt_cluster_sector_attempted_count_per_temperature_per_disorder_per_start_replica = None
+    chain_pt_cluster_sector_nonzero_count_per_temperature_per_disorder_per_start_replica = None
+    chain_pt_cluster_sector_changed_count_per_temperature_per_disorder_per_start_replica = None
     pt_data_error_probability_ladder_per_disorder = None
     pt_syndrome_error_probability_ladder_per_disorder = None
     pt_enlarge_ladder_per_disorder = None
@@ -2980,6 +2992,15 @@ def run_disorder_average_simulation(
                 )
                 chain_pt_hot_to_cold_sector_change_delivery_count_per_disorder_per_start_replica = (
                     np.empty(chain_shape, dtype=np.int64)
+                )
+                chain_pt_cluster_sector_attempted_count_per_temperature_per_disorder_per_start_replica = (
+                    np.empty(sector_chain_shape, dtype=np.int64)
+                )
+                chain_pt_cluster_sector_nonzero_count_per_temperature_per_disorder_per_start_replica = (
+                    np.empty(sector_chain_shape, dtype=np.int64)
+                )
+                chain_pt_cluster_sector_changed_count_per_temperature_per_disorder_per_start_replica = (
+                    np.empty(sector_chain_shape, dtype=np.int64)
                 )
             if int(adaptive_pt_rounds) > 0:
                 adaptive_shape = (
@@ -3639,6 +3660,30 @@ def run_disorder_average_simulation(
                                     "pt_hot_to_cold_sector_change_delivery_count"
                                 ]
                             )
+                            chain_pt_cluster_sector_attempted_count_per_temperature_per_disorder_per_start_replica[
+                                disorder_index,
+                                start_index,
+                                replica_index,
+                                :,
+                            ] = measurement_result[
+                                "pt_cluster_sector_attempted_count_per_temperature"
+                            ]
+                            chain_pt_cluster_sector_nonzero_count_per_temperature_per_disorder_per_start_replica[
+                                disorder_index,
+                                start_index,
+                                replica_index,
+                                :,
+                            ] = measurement_result[
+                                "pt_cluster_sector_nonzero_count_per_temperature"
+                            ]
+                            chain_pt_cluster_sector_changed_count_per_temperature_per_disorder_per_start_replica[
+                                disorder_index,
+                                start_index,
+                                replica_index,
+                                :,
+                            ] = measurement_result[
+                                "pt_cluster_sector_changed_count_per_temperature"
+                            ]
                     else:
                         measurement_result = _run_single_disorder_measurement(
                             parity_check_matrix=parity_check_matrix,
@@ -4169,6 +4214,21 @@ def run_disorder_average_simulation(
                     "chain_pt_hot_to_cold_sector_change_delivery_count_per_disorder_per_start_replica"
                 ] = (
                     chain_pt_hot_to_cold_sector_change_delivery_count_per_disorder_per_start_replica
+                )
+                result[
+                    "chain_pt_cluster_sector_attempted_count_per_temperature_per_disorder_per_start_replica"
+                ] = (
+                    chain_pt_cluster_sector_attempted_count_per_temperature_per_disorder_per_start_replica
+                )
+                result[
+                    "chain_pt_cluster_sector_nonzero_count_per_temperature_per_disorder_per_start_replica"
+                ] = (
+                    chain_pt_cluster_sector_nonzero_count_per_temperature_per_disorder_per_start_replica
+                )
+                result[
+                    "chain_pt_cluster_sector_changed_count_per_temperature_per_disorder_per_start_replica"
+                ] = (
+                    chain_pt_cluster_sector_changed_count_per_temperature_per_disorder_per_start_replica
                 )
     return result
 
