@@ -1188,3 +1188,14 @@ run03 逐温度 cold-delivery 诊断：
 - 若 stride=1 或 measurement 高频后 cold flips 明显增加，而 departure 统计仍显示 arrival 很短，说明主要是 measurement/diagnostic cadence 漏掉 transient。
 - 若降低 swap cadence 增加 dwell sum/max、diag survived 和 cold flips，则后续可考虑 cold dwell/hold 类型调度优化。
 - 若三者仍无 cold flips，则瓶颈不是测量 cadence，而是 cold ensemble 本身不支持这些 arrived sector 稳定存在；下一步应考虑更物理的 near-cold ladder/cluster move 或重新评估 observable sector 定义。
+
+启动状态：
+
+- 提交并推送：`71c09c16b Plan exp36 cold dwell schedule probes`。
+- 远端 source：`/home/DATA1/users/yuany/.single_shot/repos/006_cold_dwell_schedule_probe_20260529/source`。
+- run base：`/home/DATA1/users/yuany/.single_shot/exp36/006_cold_dwell_schedule_probe_20260529`。
+- launcher：`data/3d_toric_code/with_measurement_noise/exp36/006_cold_dwell_schedule_probe_20260529/launch_cold_dwell_schedule_probe_20260529.sh`。
+- 三条任务均已通过 quick exact validation、preflight chunk 和 preflight merge，并进入 `Launching chunk workers: 1 workers for 1 chunks`。
+- screen：nd-1 `exp36_006_r1`，nd-2 `exp36_006_r2`，nd-3 `exp36_006_r3`。
+
+下一轮先检查三个 final NPZ；若完成，同步到本地 006 目录，生成 `006_summary.json/md`，重点比较 cold flips、arrival 的 diagnostic missed 比例、dwell sample sum/max、departure 状态、roundtrip 和 wall time。
