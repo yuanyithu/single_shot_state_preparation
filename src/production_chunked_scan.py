@@ -1162,6 +1162,12 @@ def _merge_outputs(
     mean_pt_cluster_sector_attempted_count_per_temperature_curve_tensor = None
     mean_pt_cluster_sector_nonzero_count_per_temperature_curve_tensor = None
     mean_pt_cluster_sector_changed_count_per_temperature_curve_tensor = None
+    mean_pt_cluster_sector_cold_arrival_count_per_origin_temperature_curve_tensor = None
+    mean_pt_cluster_sector_cold_survived_count_per_origin_temperature_curve_tensor = None
+    mean_pt_cluster_sector_cold_reverted_count_per_origin_temperature_curve_tensor = None
+    mean_pt_cluster_sector_cold_other_count_per_origin_temperature_curve_tensor = None
+    mean_pt_cluster_sector_pending_overwritten_count_per_origin_temperature_curve_tensor = None
+    mean_pt_cluster_sector_pending_remaining_count_per_origin_temperature_curve_tensor = None
     if has_q0_diagnostics:
         q0_mean_m_u_spread_linf_curve_matrix = np.empty(
             (num_sizes, num_points),
@@ -1251,6 +1257,42 @@ def _merge_outputs(
                         dtype=np.float64,
                     )
                 )
+                mean_pt_cluster_sector_cold_arrival_count_per_origin_temperature_curve_tensor = (
+                    np.empty(
+                        (num_sizes, num_points, pt_num_temperatures),
+                        dtype=np.float64,
+                    )
+                )
+                mean_pt_cluster_sector_cold_survived_count_per_origin_temperature_curve_tensor = (
+                    np.empty(
+                        (num_sizes, num_points, pt_num_temperatures),
+                        dtype=np.float64,
+                    )
+                )
+                mean_pt_cluster_sector_cold_reverted_count_per_origin_temperature_curve_tensor = (
+                    np.empty(
+                        (num_sizes, num_points, pt_num_temperatures),
+                        dtype=np.float64,
+                    )
+                )
+                mean_pt_cluster_sector_cold_other_count_per_origin_temperature_curve_tensor = (
+                    np.empty(
+                        (num_sizes, num_points, pt_num_temperatures),
+                        dtype=np.float64,
+                    )
+                )
+                mean_pt_cluster_sector_pending_overwritten_count_per_origin_temperature_curve_tensor = (
+                    np.empty(
+                        (num_sizes, num_points, pt_num_temperatures),
+                        dtype=np.float64,
+                    )
+                )
+                mean_pt_cluster_sector_pending_remaining_count_per_origin_temperature_curve_tensor = (
+                    np.empty(
+                        (num_sizes, num_points, pt_num_temperatures),
+                        dtype=np.float64,
+                    )
+                )
 
     num_masks = None
     q0_start_sector_labels = None
@@ -1303,6 +1345,12 @@ def _merge_outputs(
     chain_pt_cluster_sector_attempted_count_per_temperature_per_disorder_per_start_replica_tensor = None
     chain_pt_cluster_sector_nonzero_count_per_temperature_per_disorder_per_start_replica_tensor = None
     chain_pt_cluster_sector_changed_count_per_temperature_per_disorder_per_start_replica_tensor = None
+    chain_pt_cluster_sector_cold_arrival_count_per_origin_temperature_per_disorder_per_start_replica_tensor = None
+    chain_pt_cluster_sector_cold_survived_count_per_origin_temperature_per_disorder_per_start_replica_tensor = None
+    chain_pt_cluster_sector_cold_reverted_count_per_origin_temperature_per_disorder_per_start_replica_tensor = None
+    chain_pt_cluster_sector_cold_other_count_per_origin_temperature_per_disorder_per_start_replica_tensor = None
+    chain_pt_cluster_sector_pending_overwritten_count_per_origin_temperature_per_disorder_per_start_replica_tensor = None
+    chain_pt_cluster_sector_pending_remaining_count_per_origin_temperature_per_disorder_per_start_replica_tensor = None
     pt_data_error_probability_ladder_per_disorder_tensor = None
     pt_syndrome_error_probability_ladder_per_disorder_tensor = None
     pt_enlarge_ladder_per_disorder_tensor = None
@@ -1674,6 +1722,30 @@ def _merge_outputs(
                             dtype=np.int64,
                         )
                         chain_pt_cluster_sector_changed_count_per_temperature_per_disorder_per_start_replica_tensor = np.empty(
+                            pt_temperature_chain_shape,
+                            dtype=np.int64,
+                        )
+                        chain_pt_cluster_sector_cold_arrival_count_per_origin_temperature_per_disorder_per_start_replica_tensor = np.empty(
+                            pt_temperature_chain_shape,
+                            dtype=np.int64,
+                        )
+                        chain_pt_cluster_sector_cold_survived_count_per_origin_temperature_per_disorder_per_start_replica_tensor = np.empty(
+                            pt_temperature_chain_shape,
+                            dtype=np.int64,
+                        )
+                        chain_pt_cluster_sector_cold_reverted_count_per_origin_temperature_per_disorder_per_start_replica_tensor = np.empty(
+                            pt_temperature_chain_shape,
+                            dtype=np.int64,
+                        )
+                        chain_pt_cluster_sector_cold_other_count_per_origin_temperature_per_disorder_per_start_replica_tensor = np.empty(
+                            pt_temperature_chain_shape,
+                            dtype=np.int64,
+                        )
+                        chain_pt_cluster_sector_pending_overwritten_count_per_origin_temperature_per_disorder_per_start_replica_tensor = np.empty(
+                            pt_temperature_chain_shape,
+                            dtype=np.int64,
+                        )
+                        chain_pt_cluster_sector_pending_remaining_count_per_origin_temperature_per_disorder_per_start_replica_tensor = np.empty(
                             pt_temperature_chain_shape,
                             dtype=np.int64,
                         )
@@ -2264,6 +2336,30 @@ def _merge_outputs(
                                         "chain_pt_cluster_sector_changed_count_per_temperature_per_disorder_per_start_replica",
                                         chain_pt_cluster_sector_changed_count_per_temperature_per_disorder_per_start_replica_tensor,
                                     ),
+                                    (
+                                        "chain_pt_cluster_sector_cold_arrival_count_per_origin_temperature_per_disorder_per_start_replica",
+                                        chain_pt_cluster_sector_cold_arrival_count_per_origin_temperature_per_disorder_per_start_replica_tensor,
+                                    ),
+                                    (
+                                        "chain_pt_cluster_sector_cold_survived_count_per_origin_temperature_per_disorder_per_start_replica",
+                                        chain_pt_cluster_sector_cold_survived_count_per_origin_temperature_per_disorder_per_start_replica_tensor,
+                                    ),
+                                    (
+                                        "chain_pt_cluster_sector_cold_reverted_count_per_origin_temperature_per_disorder_per_start_replica",
+                                        chain_pt_cluster_sector_cold_reverted_count_per_origin_temperature_per_disorder_per_start_replica_tensor,
+                                    ),
+                                    (
+                                        "chain_pt_cluster_sector_cold_other_count_per_origin_temperature_per_disorder_per_start_replica",
+                                        chain_pt_cluster_sector_cold_other_count_per_origin_temperature_per_disorder_per_start_replica_tensor,
+                                    ),
+                                    (
+                                        "chain_pt_cluster_sector_pending_overwritten_count_per_origin_temperature_per_disorder_per_start_replica",
+                                        chain_pt_cluster_sector_pending_overwritten_count_per_origin_temperature_per_disorder_per_start_replica_tensor,
+                                    ),
+                                    (
+                                        "chain_pt_cluster_sector_pending_remaining_count_per_origin_temperature_per_disorder_per_start_replica",
+                                        chain_pt_cluster_sector_pending_remaining_count_per_origin_temperature_per_disorder_per_start_replica_tensor,
+                                    ),
                             ):
                                 if field_name in loaded_chunk_result:
                                     destination[
@@ -2606,6 +2702,39 @@ def _merge_outputs(
                             ],
                             axis=(0, 1, 2),
                         )
+                        for source_tensor, destination_tensor in (
+                                (
+                                    chain_pt_cluster_sector_cold_arrival_count_per_origin_temperature_per_disorder_per_start_replica_tensor,
+                                    mean_pt_cluster_sector_cold_arrival_count_per_origin_temperature_curve_tensor,
+                                ),
+                                (
+                                    chain_pt_cluster_sector_cold_survived_count_per_origin_temperature_per_disorder_per_start_replica_tensor,
+                                    mean_pt_cluster_sector_cold_survived_count_per_origin_temperature_curve_tensor,
+                                ),
+                                (
+                                    chain_pt_cluster_sector_cold_reverted_count_per_origin_temperature_per_disorder_per_start_replica_tensor,
+                                    mean_pt_cluster_sector_cold_reverted_count_per_origin_temperature_curve_tensor,
+                                ),
+                                (
+                                    chain_pt_cluster_sector_cold_other_count_per_origin_temperature_per_disorder_per_start_replica_tensor,
+                                    mean_pt_cluster_sector_cold_other_count_per_origin_temperature_curve_tensor,
+                                ),
+                                (
+                                    chain_pt_cluster_sector_pending_overwritten_count_per_origin_temperature_per_disorder_per_start_replica_tensor,
+                                    mean_pt_cluster_sector_pending_overwritten_count_per_origin_temperature_curve_tensor,
+                                ),
+                                (
+                                    chain_pt_cluster_sector_pending_remaining_count_per_origin_temperature_per_disorder_per_start_replica_tensor,
+                                    mean_pt_cluster_sector_pending_remaining_count_per_origin_temperature_curve_tensor,
+                                ),
+                        ):
+                            destination_tensor[
+                                lattice_index,
+                                point_index,
+                            ] = np.mean(
+                                source_tensor[lattice_index, point_index],
+                                axis=(0, 1, 2),
+                            )
 
     merged_result = {
         "lattice_size_list": np.asarray(
@@ -2915,6 +3044,36 @@ def _merge_outputs(
                     chain_pt_cluster_sector_changed_count_per_temperature_per_disorder_per_start_replica_tensor
                 )
                 merged_result[
+                    "chain_pt_cluster_sector_cold_arrival_count_per_origin_temperature_per_disorder_per_start_replica_tensor"
+                ] = (
+                    chain_pt_cluster_sector_cold_arrival_count_per_origin_temperature_per_disorder_per_start_replica_tensor
+                )
+                merged_result[
+                    "chain_pt_cluster_sector_cold_survived_count_per_origin_temperature_per_disorder_per_start_replica_tensor"
+                ] = (
+                    chain_pt_cluster_sector_cold_survived_count_per_origin_temperature_per_disorder_per_start_replica_tensor
+                )
+                merged_result[
+                    "chain_pt_cluster_sector_cold_reverted_count_per_origin_temperature_per_disorder_per_start_replica_tensor"
+                ] = (
+                    chain_pt_cluster_sector_cold_reverted_count_per_origin_temperature_per_disorder_per_start_replica_tensor
+                )
+                merged_result[
+                    "chain_pt_cluster_sector_cold_other_count_per_origin_temperature_per_disorder_per_start_replica_tensor"
+                ] = (
+                    chain_pt_cluster_sector_cold_other_count_per_origin_temperature_per_disorder_per_start_replica_tensor
+                )
+                merged_result[
+                    "chain_pt_cluster_sector_pending_overwritten_count_per_origin_temperature_per_disorder_per_start_replica_tensor"
+                ] = (
+                    chain_pt_cluster_sector_pending_overwritten_count_per_origin_temperature_per_disorder_per_start_replica_tensor
+                )
+                merged_result[
+                    "chain_pt_cluster_sector_pending_remaining_count_per_origin_temperature_per_disorder_per_start_replica_tensor"
+                ] = (
+                    chain_pt_cluster_sector_pending_remaining_count_per_origin_temperature_per_disorder_per_start_replica_tensor
+                )
+                merged_result[
                     "mean_pt_sector_flip_count_per_temperature_curve_tensor"
                 ] = mean_pt_sector_flip_count_per_temperature_curve_tensor
                 merged_result[
@@ -2942,6 +3101,36 @@ def _merge_outputs(
                     "mean_pt_cluster_sector_changed_count_per_temperature_curve_tensor"
                 ] = (
                     mean_pt_cluster_sector_changed_count_per_temperature_curve_tensor
+                )
+                merged_result[
+                    "mean_pt_cluster_sector_cold_arrival_count_per_origin_temperature_curve_tensor"
+                ] = (
+                    mean_pt_cluster_sector_cold_arrival_count_per_origin_temperature_curve_tensor
+                )
+                merged_result[
+                    "mean_pt_cluster_sector_cold_survived_count_per_origin_temperature_curve_tensor"
+                ] = (
+                    mean_pt_cluster_sector_cold_survived_count_per_origin_temperature_curve_tensor
+                )
+                merged_result[
+                    "mean_pt_cluster_sector_cold_reverted_count_per_origin_temperature_curve_tensor"
+                ] = (
+                    mean_pt_cluster_sector_cold_reverted_count_per_origin_temperature_curve_tensor
+                )
+                merged_result[
+                    "mean_pt_cluster_sector_cold_other_count_per_origin_temperature_curve_tensor"
+                ] = (
+                    mean_pt_cluster_sector_cold_other_count_per_origin_temperature_curve_tensor
+                )
+                merged_result[
+                    "mean_pt_cluster_sector_pending_overwritten_count_per_origin_temperature_curve_tensor"
+                ] = (
+                    mean_pt_cluster_sector_pending_overwritten_count_per_origin_temperature_curve_tensor
+                )
+                merged_result[
+                    "mean_pt_cluster_sector_pending_remaining_count_per_origin_temperature_curve_tensor"
+                ] = (
+                    mean_pt_cluster_sector_pending_remaining_count_per_origin_temperature_curve_tensor
                 )
             if adaptive_pt_rounds > 0:
                 merged_result[

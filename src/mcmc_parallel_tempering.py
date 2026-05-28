@@ -406,6 +406,42 @@ def run_parallel_tempering_measurement(
         num_temperatures,
         dtype=np.int64,
     )
+    cluster_sector_cold_delivery_tracking_active = False
+    cluster_sector_pending_origin_temperature_by_replica = np.full(
+        num_temperatures,
+        -1,
+        dtype=np.int64,
+    )
+    cluster_sector_pending_before_signature_by_replica = np.full(
+        num_temperatures,
+        -1,
+        dtype=np.int64,
+    )
+    cluster_sector_pending_after_signature_by_replica = np.full(
+        num_temperatures,
+        -1,
+        dtype=np.int64,
+    )
+    cluster_sector_cold_arrival_per_origin_temperature = np.zeros(
+        num_temperatures,
+        dtype=np.int64,
+    )
+    cluster_sector_cold_survived_per_origin_temperature = np.zeros(
+        num_temperatures,
+        dtype=np.int64,
+    )
+    cluster_sector_cold_reverted_per_origin_temperature = np.zeros(
+        num_temperatures,
+        dtype=np.int64,
+    )
+    cluster_sector_cold_other_per_origin_temperature = np.zeros(
+        num_temperatures,
+        dtype=np.int64,
+    )
+    cluster_sector_pending_overwritten_per_origin_temperature = np.zeros(
+        num_temperatures,
+        dtype=np.int64,
+    )
 
     def _record_cluster_sector_before(temperature_index):
         nonlocal cluster_sector_before_temperature_index
@@ -541,6 +577,35 @@ def run_parallel_tempering_measurement(
                         cluster_sector_changed_per_temperature[
                             cluster_temperature_index
                         ] += 1
+                        cluster_replica_id = int(
+                            replica_id_per_temperature[cluster_temperature_index]
+                        )
+                        if cluster_temperature_index == 0:
+                            cluster_sector_cold_arrival_per_origin_temperature[
+                                cluster_temperature_index
+                            ] += 1
+                            cluster_sector_cold_survived_per_origin_temperature[
+                                cluster_temperature_index
+                            ] += 1
+                        else:
+                            previous_pending_origin = int(
+                                cluster_sector_pending_origin_temperature_by_replica[
+                                    cluster_replica_id
+                                ]
+                            )
+                            if previous_pending_origin >= 0:
+                                cluster_sector_pending_overwritten_per_origin_temperature[
+                                    previous_pending_origin
+                                ] += 1
+                            cluster_sector_pending_origin_temperature_by_replica[
+                                cluster_replica_id
+                            ] = cluster_temperature_index
+                            cluster_sector_pending_before_signature_by_replica[
+                                cluster_replica_id
+                            ] = cluster_sector_before_signature
+                            cluster_sector_pending_after_signature_by_replica[
+                                cluster_replica_id
+                            ] = after_signature
                 cluster_sector_before_temperature_index = -1
                 cluster_sector_before_signature = -1
         ordinary_update_wall_time += float(np.sum(ordinary_elapsed_per_temperature))
@@ -597,6 +662,49 @@ def run_parallel_tempering_measurement(
             if temperature_index > replica_max_temperature_visited[replica_id]:
                 replica_max_temperature_visited[replica_id] = temperature_index
             if temperature_index == 0:
+                pending_origin = int(
+                    cluster_sector_pending_origin_temperature_by_replica[
+                        replica_id
+                    ]
+                )
+                if (
+                        cluster_sector_cold_delivery_tracking_active
+                        and pending_origin >= 0):
+                    cold_signature = _signature_for_temperature(0)
+                    pending_before_signature = int(
+                        cluster_sector_pending_before_signature_by_replica[
+                            replica_id
+                        ]
+                    )
+                    pending_after_signature = int(
+                        cluster_sector_pending_after_signature_by_replica[
+                            replica_id
+                        ]
+                    )
+                    cluster_sector_cold_arrival_per_origin_temperature[
+                        pending_origin
+                    ] += 1
+                    if cold_signature == pending_after_signature:
+                        cluster_sector_cold_survived_per_origin_temperature[
+                            pending_origin
+                        ] += 1
+                    elif cold_signature == pending_before_signature:
+                        cluster_sector_cold_reverted_per_origin_temperature[
+                            pending_origin
+                        ] += 1
+                    else:
+                        cluster_sector_cold_other_per_origin_temperature[
+                            pending_origin
+                        ] += 1
+                    cluster_sector_pending_origin_temperature_by_replica[
+                        replica_id
+                    ] = -1
+                    cluster_sector_pending_before_signature_by_replica[
+                        replica_id
+                    ] = -1
+                    cluster_sector_pending_after_signature_by_replica[
+                        replica_id
+                    ] = -1
                 previous_endpoint = int(
                     replica_last_endpoint_per_replica[replica_id]
                 )
@@ -766,6 +874,9 @@ def run_parallel_tempering_measurement(
         )
 
     cluster_sector_tracking_active = bool(track_logical_sector_diagnostics)
+    cluster_sector_cold_delivery_tracking_active = bool(
+        track_logical_sector_diagnostics
+    )
 
     for measurement_index in range(num_measurements):
         for _ in range(num_sweeps_between_measurements):
@@ -969,6 +1080,18 @@ def run_parallel_tempering_measurement(
         swap_attempt_counts,
     )
     measurement_wall_time = time.perf_counter() - measurement_started_at
+    cluster_sector_pending_remaining_per_origin_temperature = np.zeros(
+        num_temperatures,
+        dtype=np.int64,
+    )
+    for replica_id in range(num_temperatures):
+        pending_origin = int(
+            cluster_sector_pending_origin_temperature_by_replica[replica_id]
+        )
+        if pending_origin >= 0:
+            cluster_sector_pending_remaining_per_origin_temperature[
+                pending_origin
+            ] += 1
 
     result = {
         "data_error_probability_ladder": data_error_probability_ladder,
@@ -1069,6 +1192,24 @@ def run_parallel_tempering_measurement(
         result["pt_cluster_sector_changed_count_per_temperature"] = (
             cluster_sector_changed_per_temperature
         )
+        result[
+            "pt_cluster_sector_cold_arrival_count_per_origin_temperature"
+        ] = cluster_sector_cold_arrival_per_origin_temperature
+        result[
+            "pt_cluster_sector_cold_survived_count_per_origin_temperature"
+        ] = cluster_sector_cold_survived_per_origin_temperature
+        result[
+            "pt_cluster_sector_cold_reverted_count_per_origin_temperature"
+        ] = cluster_sector_cold_reverted_per_origin_temperature
+        result[
+            "pt_cluster_sector_cold_other_count_per_origin_temperature"
+        ] = cluster_sector_cold_other_per_origin_temperature
+        result[
+            "pt_cluster_sector_pending_overwritten_count_per_origin_temperature"
+        ] = cluster_sector_pending_overwritten_per_origin_temperature
+        result[
+            "pt_cluster_sector_pending_remaining_count_per_origin_temperature"
+        ] = cluster_sector_pending_remaining_per_origin_temperature
     else:
         result["pt_sector_diagnostics_enabled"] = np.bool_(False)
     if diagnostic_config["record_measurement_trajectories"]:
