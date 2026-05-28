@@ -1249,3 +1249,21 @@ run03 逐温度 cold-delivery 诊断：
 - screen：nd-1 `exp36_007_r1`，nd-2 `exp36_007_r2`，nd-3 `exp36_007_r3`。
 
 下一轮先检查 006 run03 与 007 三条 final NPZ；若完成，分别同步并生成 `006_summary.json/md` 与 `007_summary.json/md`。007 重点比较 cold-edge stride 对 cold flips、cluster changed/arrival、diagnostic missed、dwell sum/max、departure 状态和 roundtrip 的影响。
+
+### 006/007 等待期间的 summary 工具化
+
+截至本轮检查，006 run03 与 007 三条 run 均尚未生成 final NPZ；对应 screen 和 worker 仍在运行，CPU 正常。为避免后续手工统计出错，新增统一分析脚本：`src/summarize_exp36_probe.py`。
+
+功能：
+
+- 从 production final NPZ 直接提取 `min_swap/bottleneck_pair`、cold/hot sector flips、endpoint roundtrip、cluster changed/arrival、arrival survived/reverted/other、diagnostic survived/reverted/other/missed、departure survived/reverted/other、dwell sum/max 和逐温度向量。
+- 输出同名 JSON/MD summary，可用于 006、007 以及后续同结构 probe。
+- 对旧 run 自动把缺失的 `pt_cold_edge_swap_stride` 视为 `1`。
+
+验证：
+
+- `PYTHONPATH=src conda run --no-capture-output -n 12 python -m py_compile src/summarize_exp36_probe.py` 通过。
+- 用本地已有的 006 run01/run02 生成临时 summary，复现现有 partial summary 中的关键数值：run01 `min_swap=0.117131,cold flips=[0,0,0,0],roundtrip=151,changed=0`；run02 `min_swap=0.121739,cold flips=[0,0,0,0],roundtrip=30,changed=4,arrival=2,diag survived/reverted=1/1,dwell=4/2`。
+- 提交并推送：`67e705ae1 Add exp36 probe summary helper`。
+
+下一轮若发现 final NPZ 已生成，直接运行该脚本生成正式 `006_summary.json/md` 和 `007_summary.json/md`，再更新本报告结论。
