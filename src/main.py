@@ -2012,6 +2012,16 @@ def _run_parallel_tempering_single_chain(
                 "pt_cluster_sector_cold_survived_count_per_origin_temperature",
                 "pt_cluster_sector_cold_reverted_count_per_origin_temperature",
                 "pt_cluster_sector_cold_other_count_per_origin_temperature",
+                "pt_cluster_sector_cold_diagnostic_survived_count_per_origin_temperature",
+                "pt_cluster_sector_cold_diagnostic_reverted_count_per_origin_temperature",
+                "pt_cluster_sector_cold_diagnostic_other_count_per_origin_temperature",
+                "pt_cluster_sector_cold_diagnostic_missed_count_per_origin_temperature",
+                "pt_cluster_sector_cold_departure_survived_count_per_origin_temperature",
+                "pt_cluster_sector_cold_departure_reverted_count_per_origin_temperature",
+                "pt_cluster_sector_cold_departure_other_count_per_origin_temperature",
+                "pt_cluster_sector_cold_dwell_sample_sum_per_origin_temperature",
+                "pt_cluster_sector_cold_dwell_sample_max_per_origin_temperature",
+                "pt_cluster_sector_cold_active_remaining_count_per_origin_temperature",
                 "pt_cluster_sector_pending_overwritten_count_per_origin_temperature",
                 "pt_cluster_sector_pending_remaining_count_per_origin_temperature",
         ):
@@ -2816,6 +2826,16 @@ def run_disorder_average_simulation(
     chain_pt_cluster_sector_cold_survived_count_per_origin_temperature_per_disorder_per_start_replica = None
     chain_pt_cluster_sector_cold_reverted_count_per_origin_temperature_per_disorder_per_start_replica = None
     chain_pt_cluster_sector_cold_other_count_per_origin_temperature_per_disorder_per_start_replica = None
+    chain_pt_cluster_sector_cold_diagnostic_survived_count_per_origin_temperature_per_disorder_per_start_replica = None
+    chain_pt_cluster_sector_cold_diagnostic_reverted_count_per_origin_temperature_per_disorder_per_start_replica = None
+    chain_pt_cluster_sector_cold_diagnostic_other_count_per_origin_temperature_per_disorder_per_start_replica = None
+    chain_pt_cluster_sector_cold_diagnostic_missed_count_per_origin_temperature_per_disorder_per_start_replica = None
+    chain_pt_cluster_sector_cold_departure_survived_count_per_origin_temperature_per_disorder_per_start_replica = None
+    chain_pt_cluster_sector_cold_departure_reverted_count_per_origin_temperature_per_disorder_per_start_replica = None
+    chain_pt_cluster_sector_cold_departure_other_count_per_origin_temperature_per_disorder_per_start_replica = None
+    chain_pt_cluster_sector_cold_dwell_sample_sum_per_origin_temperature_per_disorder_per_start_replica = None
+    chain_pt_cluster_sector_cold_dwell_sample_max_per_origin_temperature_per_disorder_per_start_replica = None
+    chain_pt_cluster_sector_cold_active_remaining_count_per_origin_temperature_per_disorder_per_start_replica = None
     chain_pt_cluster_sector_pending_overwritten_count_per_origin_temperature_per_disorder_per_start_replica = None
     chain_pt_cluster_sector_pending_remaining_count_per_origin_temperature_per_disorder_per_start_replica = None
     pt_data_error_probability_ladder_per_disorder = None
@@ -3027,6 +3047,36 @@ def run_disorder_average_simulation(
                     np.empty(sector_chain_shape, dtype=np.int64)
                 )
                 chain_pt_cluster_sector_cold_other_count_per_origin_temperature_per_disorder_per_start_replica = (
+                    np.empty(sector_chain_shape, dtype=np.int64)
+                )
+                chain_pt_cluster_sector_cold_diagnostic_survived_count_per_origin_temperature_per_disorder_per_start_replica = (
+                    np.empty(sector_chain_shape, dtype=np.int64)
+                )
+                chain_pt_cluster_sector_cold_diagnostic_reverted_count_per_origin_temperature_per_disorder_per_start_replica = (
+                    np.empty(sector_chain_shape, dtype=np.int64)
+                )
+                chain_pt_cluster_sector_cold_diagnostic_other_count_per_origin_temperature_per_disorder_per_start_replica = (
+                    np.empty(sector_chain_shape, dtype=np.int64)
+                )
+                chain_pt_cluster_sector_cold_diagnostic_missed_count_per_origin_temperature_per_disorder_per_start_replica = (
+                    np.empty(sector_chain_shape, dtype=np.int64)
+                )
+                chain_pt_cluster_sector_cold_departure_survived_count_per_origin_temperature_per_disorder_per_start_replica = (
+                    np.empty(sector_chain_shape, dtype=np.int64)
+                )
+                chain_pt_cluster_sector_cold_departure_reverted_count_per_origin_temperature_per_disorder_per_start_replica = (
+                    np.empty(sector_chain_shape, dtype=np.int64)
+                )
+                chain_pt_cluster_sector_cold_departure_other_count_per_origin_temperature_per_disorder_per_start_replica = (
+                    np.empty(sector_chain_shape, dtype=np.int64)
+                )
+                chain_pt_cluster_sector_cold_dwell_sample_sum_per_origin_temperature_per_disorder_per_start_replica = (
+                    np.empty(sector_chain_shape, dtype=np.int64)
+                )
+                chain_pt_cluster_sector_cold_dwell_sample_max_per_origin_temperature_per_disorder_per_start_replica = (
+                    np.empty(sector_chain_shape, dtype=np.int64)
+                )
+                chain_pt_cluster_sector_cold_active_remaining_count_per_origin_temperature_per_disorder_per_start_replica = (
                     np.empty(sector_chain_shape, dtype=np.int64)
                 )
                 chain_pt_cluster_sector_pending_overwritten_count_per_origin_temperature_per_disorder_per_start_replica = (
@@ -3735,6 +3785,46 @@ def run_disorder_average_simulation(
                                         chain_pt_cluster_sector_cold_other_count_per_origin_temperature_per_disorder_per_start_replica,
                                     ),
                                     (
+                                        "pt_cluster_sector_cold_diagnostic_survived_count_per_origin_temperature",
+                                        chain_pt_cluster_sector_cold_diagnostic_survived_count_per_origin_temperature_per_disorder_per_start_replica,
+                                    ),
+                                    (
+                                        "pt_cluster_sector_cold_diagnostic_reverted_count_per_origin_temperature",
+                                        chain_pt_cluster_sector_cold_diagnostic_reverted_count_per_origin_temperature_per_disorder_per_start_replica,
+                                    ),
+                                    (
+                                        "pt_cluster_sector_cold_diagnostic_other_count_per_origin_temperature",
+                                        chain_pt_cluster_sector_cold_diagnostic_other_count_per_origin_temperature_per_disorder_per_start_replica,
+                                    ),
+                                    (
+                                        "pt_cluster_sector_cold_diagnostic_missed_count_per_origin_temperature",
+                                        chain_pt_cluster_sector_cold_diagnostic_missed_count_per_origin_temperature_per_disorder_per_start_replica,
+                                    ),
+                                    (
+                                        "pt_cluster_sector_cold_departure_survived_count_per_origin_temperature",
+                                        chain_pt_cluster_sector_cold_departure_survived_count_per_origin_temperature_per_disorder_per_start_replica,
+                                    ),
+                                    (
+                                        "pt_cluster_sector_cold_departure_reverted_count_per_origin_temperature",
+                                        chain_pt_cluster_sector_cold_departure_reverted_count_per_origin_temperature_per_disorder_per_start_replica,
+                                    ),
+                                    (
+                                        "pt_cluster_sector_cold_departure_other_count_per_origin_temperature",
+                                        chain_pt_cluster_sector_cold_departure_other_count_per_origin_temperature_per_disorder_per_start_replica,
+                                    ),
+                                    (
+                                        "pt_cluster_sector_cold_dwell_sample_sum_per_origin_temperature",
+                                        chain_pt_cluster_sector_cold_dwell_sample_sum_per_origin_temperature_per_disorder_per_start_replica,
+                                    ),
+                                    (
+                                        "pt_cluster_sector_cold_dwell_sample_max_per_origin_temperature",
+                                        chain_pt_cluster_sector_cold_dwell_sample_max_per_origin_temperature_per_disorder_per_start_replica,
+                                    ),
+                                    (
+                                        "pt_cluster_sector_cold_active_remaining_count_per_origin_temperature",
+                                        chain_pt_cluster_sector_cold_active_remaining_count_per_origin_temperature_per_disorder_per_start_replica,
+                                    ),
+                                    (
                                         "pt_cluster_sector_pending_overwritten_count_per_origin_temperature",
                                         chain_pt_cluster_sector_pending_overwritten_count_per_origin_temperature_per_disorder_per_start_replica,
                                     ),
@@ -4314,6 +4404,56 @@ def run_disorder_average_simulation(
                     "chain_pt_cluster_sector_cold_other_count_per_origin_temperature_per_disorder_per_start_replica"
                 ] = (
                     chain_pt_cluster_sector_cold_other_count_per_origin_temperature_per_disorder_per_start_replica
+                )
+                result[
+                    "chain_pt_cluster_sector_cold_diagnostic_survived_count_per_origin_temperature_per_disorder_per_start_replica"
+                ] = (
+                    chain_pt_cluster_sector_cold_diagnostic_survived_count_per_origin_temperature_per_disorder_per_start_replica
+                )
+                result[
+                    "chain_pt_cluster_sector_cold_diagnostic_reverted_count_per_origin_temperature_per_disorder_per_start_replica"
+                ] = (
+                    chain_pt_cluster_sector_cold_diagnostic_reverted_count_per_origin_temperature_per_disorder_per_start_replica
+                )
+                result[
+                    "chain_pt_cluster_sector_cold_diagnostic_other_count_per_origin_temperature_per_disorder_per_start_replica"
+                ] = (
+                    chain_pt_cluster_sector_cold_diagnostic_other_count_per_origin_temperature_per_disorder_per_start_replica
+                )
+                result[
+                    "chain_pt_cluster_sector_cold_diagnostic_missed_count_per_origin_temperature_per_disorder_per_start_replica"
+                ] = (
+                    chain_pt_cluster_sector_cold_diagnostic_missed_count_per_origin_temperature_per_disorder_per_start_replica
+                )
+                result[
+                    "chain_pt_cluster_sector_cold_departure_survived_count_per_origin_temperature_per_disorder_per_start_replica"
+                ] = (
+                    chain_pt_cluster_sector_cold_departure_survived_count_per_origin_temperature_per_disorder_per_start_replica
+                )
+                result[
+                    "chain_pt_cluster_sector_cold_departure_reverted_count_per_origin_temperature_per_disorder_per_start_replica"
+                ] = (
+                    chain_pt_cluster_sector_cold_departure_reverted_count_per_origin_temperature_per_disorder_per_start_replica
+                )
+                result[
+                    "chain_pt_cluster_sector_cold_departure_other_count_per_origin_temperature_per_disorder_per_start_replica"
+                ] = (
+                    chain_pt_cluster_sector_cold_departure_other_count_per_origin_temperature_per_disorder_per_start_replica
+                )
+                result[
+                    "chain_pt_cluster_sector_cold_dwell_sample_sum_per_origin_temperature_per_disorder_per_start_replica"
+                ] = (
+                    chain_pt_cluster_sector_cold_dwell_sample_sum_per_origin_temperature_per_disorder_per_start_replica
+                )
+                result[
+                    "chain_pt_cluster_sector_cold_dwell_sample_max_per_origin_temperature_per_disorder_per_start_replica"
+                ] = (
+                    chain_pt_cluster_sector_cold_dwell_sample_max_per_origin_temperature_per_disorder_per_start_replica
+                )
+                result[
+                    "chain_pt_cluster_sector_cold_active_remaining_count_per_origin_temperature_per_disorder_per_start_replica"
+                ] = (
+                    chain_pt_cluster_sector_cold_active_remaining_count_per_origin_temperature_per_disorder_per_start_replica
                 )
                 result[
                     "chain_pt_cluster_sector_pending_overwritten_count_per_origin_temperature_per_disorder_per_start_replica"
