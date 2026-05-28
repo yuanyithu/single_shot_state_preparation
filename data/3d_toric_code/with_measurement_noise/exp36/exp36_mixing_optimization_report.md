@@ -770,3 +770,67 @@ bottleneck 对应温度：
 | AD | nd-3 | 0.35 | 0.05 | 0 | 稍热端配合 cluster 的折中测试 |
 
 共同参数沿用 Y/Z/AA，但不传 `--disable-cluster-update`。
+
+### cluster-q ladder 与中间热端 probe 结果
+
+代码提交：
+
+- `d000b8c46 Support cluster update on sync PT ladders`
+
+远端 cluster probe 已完成并同步：
+
+- `data/3d_toric_code/with_measurement_noise/exp36/cluster_probe_20260528/AB_cluster_K17_qhot032_rho005_m512_s4/AB_cluster_K17_qhot032_rho005_m512_s4.npz`
+- `data/3d_toric_code/with_measurement_noise/exp36/cluster_probe_20260528/AC_cluster_K17_qhot032_rho020_m512_s4/AC_cluster_K17_qhot032_rho020_m512_s4.npz`
+- `data/3d_toric_code/with_measurement_noise/exp36/cluster_probe_20260528/AD_cluster_K17_qhot035_rho005_m512_s4/AD_cluster_K17_qhot035_rho005_m512_s4.npz`
+
+远端中间热端 probe 已完成并同步：
+
+- `data/3d_toric_code/with_measurement_noise/exp36/mid_qhot_probe_20260528/AE_static_K17_qhot038_m512_s4/AE_static_K17_qhot038_m512_s4.npz`
+- `data/3d_toric_code/with_measurement_noise/exp36/mid_qhot_probe_20260528/AF_static_K17_qhot040_m512_s4/AF_static_K17_qhot040_m512_s4.npz`
+
+共同参数：
+
+- `L=6,p=0.05,q=0.08`
+- `num_disorder_samples_total=1`
+- `num_start_chains=4`
+- `num_measurements_per_disorder=512`
+- `num_sweeps_between_measurements=6`
+- `num_burn_in_sweeps=150`
+- `max_effective_num_burn_in_sweeps=750`
+- `K=17`
+- `pt_sector_diagnostic_stride=4`
+- `adaptive_pt_rounds=0`
+
+结果汇总：
+
+| config | q_hot | cluster | heatbath | min swap | bottleneck pair | cold flips | hot flips mean | strict delivery | proxy delivery | roundtrip sum | hot winding acc | wall mean |
+|---|---:|---|---:|---:|---:|---|---:|---:|---:|---:|---:|---:|
+| Y | 0.32 | off | 0 | 0.196886 | 12 | `[0,0,0,0]` | 97.75 | 0 | 21 | 101 | 0.00372 | 43.50s |
+| AB | 0.32 | rho=0.05 | 0 | 0.192962 | 12 | `[0,0,0,0]` | 99.25 | 0 | 24 | 105 | 0.00372 | 40.77s |
+| AC | 0.32 | rho=0.20 | 0 | 0.174778 | 13 | `[0,0,0,0]` | 94.00 | 0 | 17 | 97 | 0.00372 | 38.14s |
+| AA | 0.35 | off | 1 | 0.123888 | 11 | `[0,0,0,0]` | 95.75 | 0 | 17 | 80 | 0.01972 | 165.67s |
+| AD | 0.35 | rho=0.05 | 0 | 0.153061 | 10 | `[2,0,0,0]` | 100.50 | 0 | 19 | 87 | 0.02215 | 139.25s |
+| AE | 0.38 | off | 0 | 0.073129 | 9 | `[0,0,0,0]` | 90.00 | 0 | 11 | 41 | 0.07420 | 66.44s |
+| AF | 0.40 | off | 0 | 0.067896 | 8 | `[0,0,0,0]` | 97.50 | 0 | 13 | 39 | 0.14256 | 77.49s |
+| R | 0.44 | off | 0 | 0.013605 | 6 | `[0,0,0,0]` | 91.50 | 0 | 3 | - | 0.38510 | 222.78s |
+
+cluster 诊断：
+
+| config | cluster attempts | nonzero moves | wall fraction | 主要非零温度范围 | 备注 |
+|---|---:|---:|---:|---|---|
+| AB | 107 | 43 | 0.052 | `k=3..7` | move fraction 最大约 `0.0017`，没有 cold flips |
+| AC | 399 | 146 | 0.171 | `k=3..9` | move fraction 最大约 `0.0064`，没有 cold flips |
+| AD | 87 | 47 | 0.081 | `k=3..10,13` | `k=13` 单次 mean move fraction `0.140`；出现 cold flips `[2,0,0,0]` |
+
+结论：
+
+- `q_hot=0.38/0.40` 不是有效折中：hot winding acceptance 确实升高到 `0.074/0.143`，但 min swap 降到 `0.073/0.068`，roundtrip 只有 `41/39`，cold flips 和 strict delivery 仍全为 0。
+- `q_hot=0.32` 的 cluster 尝试次数可以增加，但只产生很小的 cluster move，没有 cold-sector 改变。
+- `q_hot=0.35 + cluster rho=0.05` 是目前唯一在本轮看到 cold-sector 改变的配置：`[2,0,0,0]`。但 strict delivery 仍为 0，且只发生在 1 条链上，不能视为充分 mixing。
+- 当前最佳判断：若只靠现有 kernel move + PT，推荐的生产方向仍是 `q_hot=0.32` 保 transport；若以主动寻找 sector change 为目标，应继续围绕 `q_hot=0.35 + cluster` 做重复种子/更长链验证，而不是继续提高 `q_hot` 或使用 winding-plane heatbath。
+
+下一轮建议：
+
+1. 对 `q_hot=0.35 + cluster rho=0.05` 做 2 个独立 seed 重复，确认 AD 的 cold flips 是否可复现。
+2. 小样本测试 `q_hot=0.35 + cluster rho=0.10/0.20`，看高温 cluster 大 move 次数是否能提高 cold flips，但要严格记录 wall time。
+3. 如果 strict delivery 继续为 0，需要新增更细的 cluster-stage sector-change 诊断，区分 cold flips 是 cluster 本身、mid-temperature cluster 后 PT 输运，还是普通 local path 造成。
