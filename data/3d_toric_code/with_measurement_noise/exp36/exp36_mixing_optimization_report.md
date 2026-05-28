@@ -1050,3 +1050,41 @@ cluster-stage 逐温度诊断：
 | run03 | nd-3 | 0.15 | 1 | 1024 | 8 | 421000 | 测试更长生产期是否提高 cold arrival/survival |
 
 共同参数：`L=6,p=0.05,q=0.08,K=17,q_hot=0.35,num_start_chains=4,adaptive_pt_rounds=0,winding_plane_heatbath_sweeps=0`。
+
+### 004 cluster cold-delivery 最终结果
+
+输出文件：
+
+- `data/3d_toric_code/with_measurement_noise/exp36/004_cluster_cold_delivery_20260528/004_summary.json`
+- `data/3d_toric_code/with_measurement_noise/exp36/004_cluster_cold_delivery_20260528/004_summary.md`
+
+共同参数：
+
+- `L=6,p=0.05,q=0.08`
+- `K=17,q_hot=0.35`
+- `cluster rho=0.15`
+- `num_start_chains=4`
+- `adaptive_pt_rounds=0`
+- `winding_plane_heatbath_sweeps=0`
+
+结果：
+
+| run | swap sweeps | measurements | stride | min swap | bottleneck pair | cold flips | hot flips mean | roundtrip sum | cluster nonzero | changed | arrival | survived | reverted | other | pending |
+|---|---:|---:|---:|---:|---:|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| run01 | 1 | 512 | 4 | 0.104526 | 11 | `[0,0,0,0]` | 95.75 | 59 | 90 | 0 | 0 | 0 | 0 | 0 | 0 |
+| run02 | 2 | 512 | 4 | 0.120552 | 10 | `[0,0,0,0]` | 93.50 | 82 | 98 | 0 | 0 | 0 | 0 | 0 | 0 |
+| run03 | 1 | 1024 | 8 | 0.109806 | 10 | `[0,0,0,0]` | 94.50 | 143 | 215 | 38 | 30 | 13 | 10 | 7 | 2 |
+
+run03 逐温度 cold-delivery 诊断：
+
+- changed by temperature: `[0,0,0,0,0,0,0,0,0,0,2,0,30,2,2,2,0]`。
+- arrival by origin: `[0,0,0,0,0,0,0,0,0,0,2,0,24,2,1,1,0]`。
+- survived by origin: `[0,0,0,0,0,0,0,0,0,0,0,0,12,0,0,1,0]`。
+- reverted by origin: `[0,0,0,0,0,0,0,0,0,0,2,0,7,1,0,0,0]`。
+
+结论：
+
+- 三条 run 的 cold logical-sector flips 均为 `[0,0,0,0]`，因此 `rho=0.15` 仍没有给出稳健 cold mixing。
+- `swap_sweeps=2` 短链只把 roundtrip 从 `59` 提高到 `82`，但没有产生 cluster-stage sector change，也没有改善 cold flips。
+- `m=1024` 长链给出更细的物理图像：中温 cluster sector change 确实可以被 PT 带到 cold，30/38 次在 run 内到达 cold，其中 13 次到达时仍保持 cluster 后 signature；但这些事件没有变成按当前 cold-slot sector 诊断可见的持久 cold flip。
+- 下一步应追踪 cold arrival 后的驻留时间和 persistence：区分“到达 cold 后立即离开/未被诊断采到”、“在 cold 停留但后续 local update 回退”、“到达时 signature 与 cold-slot 观测定义/诊断 cadence 不一致”。继续单纯增加 cluster 预算或 swap sweep 的边际收益已经很弱。
