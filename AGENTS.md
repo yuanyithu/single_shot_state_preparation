@@ -53,7 +53,7 @@
 - `production_chunked_scan.py` 已优先调度大 L chunk；若 L=5 仍有长尾，可进一步减小 `chunk_size`。
 - Numba 是可选加速依赖：有 `numba` 时 3D 主路径会走 JIT fast path，没有时自动回退；远端节点升级/换环境后要先用小 benchmark 确认确实启用。
 - `profile_3d_q_positive.py` 是 opt-in 诊断 runner，不是生产 threshold 扫描；对比 config 时应确认 manifest 中 `disorder_seed_scope=lattice_size,p_value,q_value,disorder_index`，避免不同 config 使用不同 disorder 造成 A/B 噪声。
-- exp35 的同步放大 PT 已接入 production scan：`--pt-ladder-mode sync_enlarge --pt-q-hot ... --adaptive-pt-rounds ...` 会同时改变 `p_k/q_k`，swap 权重也同时包含 data/syndrome term；该模式必须配合 `--disable-cluster-update`。
+- exp35 的同步放大 PT 已接入 production scan：`--pt-ladder-mode sync_enlarge --pt-q-hot ... --adaptive-pt-rounds ...` 会同时改变 `p_k/q_k`，swap 权重也同时包含 data/syndrome term；cluster update 现在支持随温度变化的 `q_k` ladder，但只在所有 `p_k,q_k<0.5` 时有效。若热端超过该范围，应显式 `--disable-cluster-update`。
 - 同步放大 ladder 会按 `q_hot/q_cold` 的 odds 比例同步放大 `p`，若 `p_cold` 偏高或 `q_hot` 太大，热端 `p_k` 可能超过 `0.5` 并在 submit/preflight 报错；exp35 固定 `p=0.05,q_hot=0.44` 是可行组合。
 - 用 profiler 测 wall time 时优先设置 `--stage-signature-mode none`；逐环节 sector-change 诊断会反复计算 logical signature，开销可远大于真实 MCMC 更新。需要判断哪个环节改变 logical sector 时再单独用 `stage` 模式小样本跑。
 - `screen` 中用 `conda run` 时日志可能被 capture/buffer；新 launcher 已使用 `conda run --no-capture-output`，旧 run 若日志为空应以 `profile_summary.json/md` 和 raw JSON/NPZ 为准。

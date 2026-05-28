@@ -2641,10 +2641,6 @@ def run_disorder_average_simulation(
                     < float(pt_q_hot)
                     < 0.5):
                 raise ValueError("pt_q_hot must be in (cold q, 0.5)")
-            if cluster_update_enabled:
-                raise ValueError(
-                    "cluster update must be disabled for sync_enlarge PT"
-                )
         if int(adaptive_pt_rounds) > 0 and pt_ladder_mode != "sync_enlarge":
             raise ValueError(
                 "adaptive_pt_rounds requires sync_enlarge PT ladder"

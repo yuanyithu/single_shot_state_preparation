@@ -226,17 +226,6 @@ def run_parallel_tempering_measurement(
                 "syndrome_error_probability_ladder[0] must match "
                 "syndrome_error_probability"
             )
-    has_nonconstant_syndrome_ladder = bool(
-        np.any(
-            syndrome_error_probability_ladder
-            != syndrome_error_probability_ladder[0]
-        )
-    )
-    if has_nonconstant_syndrome_ladder and cluster_update_enabled:
-        raise ValueError(
-            "cluster update is not supported with nonconstant PT q ladder"
-        )
-
     num_checks, num_qubits = parity_check_matrix.shape
     diagnostic_config = _build_measurement_diagnostic_config(
         num_zero_syndrome_sweeps_per_cycle=(
@@ -397,6 +386,7 @@ def run_parallel_tempering_measurement(
         parity_check_matrix=parity_check_matrix,
         syndrome_error_probability=syndrome_error_probability,
         data_error_probability_ladder=data_error_probability_ladder,
+        syndrome_error_probability_ladder=syndrome_error_probability_ladder,
         enabled=cluster_update_enabled,
         budget_fraction_rho=cluster_budget_fraction_rho,
         debug_assertions=cluster_update_debug,

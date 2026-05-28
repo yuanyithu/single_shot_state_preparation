@@ -37,6 +37,7 @@ def build_cluster_controller(
         parity_check_matrix,
         syndrome_error_probability,
         data_error_probability_ladder,
+        syndrome_error_probability_ladder=None,
         enabled=True,
         budget_fraction_rho=0.05,
         debug_assertions=False):
@@ -49,11 +50,31 @@ def build_cluster_controller(
     )
     if data_error_probability_ladder.ndim != 1:
         raise ValueError("data_error_probability_ladder must be 1D")
+    if syndrome_error_probability_ladder is None:
+        syndrome_error_probability_ladder = np.full(
+            data_error_probability_ladder.shape,
+            float(syndrome_error_probability),
+            dtype=np.float64,
+        )
+    else:
+        syndrome_error_probability_ladder = np.asarray(
+            syndrome_error_probability_ladder,
+            dtype=np.float64,
+        )
+        if syndrome_error_probability_ladder.ndim != 1:
+            raise ValueError("syndrome_error_probability_ladder must be 1D")
+        if (
+                syndrome_error_probability_ladder.shape
+                != data_error_probability_ladder.shape):
+            raise ValueError(
+                "syndrome_error_probability_ladder must match data ladder shape"
+            )
 
     num_temperatures = int(data_error_probability_ladder.shape[0])
     num_checks, num_qubits = parity_check_matrix.shape
     valid_probabilities = (
-        0.0 < float(syndrome_error_probability) < 0.5
+        np.all(syndrome_error_probability_ladder > 0.0)
+        and np.all(syndrome_error_probability_ladder < 0.5)
         and np.all(data_error_probability_ladder > 0.0)
         and np.all(data_error_probability_ladder < 0.5)
     )
@@ -82,6 +103,7 @@ def build_cluster_controller(
         "budget": 0.0,
         "debug_assertions": bool(debug_assertions),
         "syndrome_error_probability": float(syndrome_error_probability),
+        "syndrome_error_probability_ladder": syndrome_error_probability_ladder,
         "data_error_probability_ladder": data_error_probability_ladder,
         "log_odds_data_per_temperature": log_odds,
         "hotness": hotness,
@@ -122,7 +144,9 @@ def _estimate_cluster_cost(controller, temperature_index):
     n = controller["num_qubits"]
     m = controller["num_checks"]
     p_value = float(controller["data_error_probability_ladder"][temperature_index])
-    q_value = float(controller["syndrome_error_probability"])
+    q_value = float(
+        controller["syndrome_error_probability_ladder"][temperature_index]
+    )
     f_est = max(1, int(math.floor(2.0 * p_value * n)))
     r_est = max(1, int(math.floor((1.0 - 2.0 * q_value) * m)))
     cluster_ops_est = r_est * f_est * f_est / 64.0
@@ -299,8 +323,10 @@ def _attempt_cluster_update(
         rng):
     start_time = time.perf_counter()
     n = controller["num_qubits"]
-    q_value = float(controller["syndrome_error_probability"])
     p_value = float(controller["data_error_probability_ladder"][temperature_index])
+    q_value = float(
+        controller["syndrome_error_probability_ladder"][temperature_index]
+    )
     a_value = q_value / (1.0 - q_value)
     b_value = p_value / (1.0 - p_value)
 
