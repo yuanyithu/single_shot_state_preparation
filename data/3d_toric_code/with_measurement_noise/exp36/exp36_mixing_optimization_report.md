@@ -952,3 +952,54 @@ cluster-stage 逐温度诊断：
   - nd-3: `exp36_003_r3`
 
 下一轮先检查三个 final NPZ；若完成，同步到 003 本地目录，生成 `003_summary.json/md` 并比较 `rho=0.10` repeat 与 `rho=0.15` 的 cold flips、cluster-stage sector changes、min swap、roundtrip 和 wall time。
+
+### 003 cluster-rho refinement 最终结果
+
+输出文件：
+
+- `data/3d_toric_code/with_measurement_noise/exp36/003_cluster_rho_refine_20260528/003_summary.json`
+- `data/3d_toric_code/with_measurement_noise/exp36/003_cluster_rho_refine_20260528/003_summary.md`
+
+共同参数：
+
+- `L=6,p=0.05,q=0.08`
+- `K=17,q_hot=0.35`
+- `num_disorder_samples_total=1`
+- `num_start_chains=4`
+- `num_measurements_per_disorder=512`
+- `num_sweeps_between_measurements=6`
+- `num_burn_in_sweeps=150`
+- `max_effective_num_burn_in_sweeps=750`
+- `pt_sector_diagnostic_stride=4`
+- `adaptive_pt_rounds=0`
+
+结果：
+
+| run | rho | min swap | bottleneck pair | cold flips | hot flips mean | strict delivery | proxy delivery | roundtrip sum | cluster nonzero | cluster-stage sector changes | cluster wall fraction |
+|---|---:|---:|---:|---|---:|---:|---:|---:|---:|---:|---:|
+| run01 | 0.10 | 0.141549 | 11 | `[0,0,0,0]` | 97.00 | 0 | 17 | 74 | 94 | 1 | 0.095 |
+| run02 | 0.10 | 0.129513 | 11 | `[0,0,0,0]` | 91.50 | 0 | 14 | 67 | 66 | 0 | 0.096 |
+| run03 | 0.15 | 0.151361 | 10 | `[0,0,0,0]` | 96.00 | 0 | 13 | 65 | 102 | 19 | 0.145 |
+
+逐温度 cluster-stage sector change：
+
+- run01 `rho=0.10`: `[0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0]`。
+- run02 `rho=0.10`: 全 0。
+- run03 `rho=0.15`: `[0,0,0,0,0,0,0,0,0,1,3,2,13,0,0,0,0]`，集中在 `k=9..12`。
+
+结论：
+
+- 两条新的 `rho=0.10` repeat 均没有 cold logical-sector flip；002 run03 的 `[10,4,2,2]` 不是稳定可复现效果。
+- `rho=0.15` 显著增加 cluster-stage sector change，但 cold flips 仍为 `[0,0,0,0]`。这说明中温 sector change 可以被制造出来，但在冷却/输运到 cold ensemble 前大多丢失。
+- 单纯增大 cluster 预算不是稳健修复，且 `rho=0.15` 的 chunk wall time 约 `600s`，明显慢于 `rho=0.10` 的约 `221-233s`。
+- 当前瓶颈已进一步定位为：`k≈9..12` 附近会发生 sector-changing cluster move，但这些改变不能稳定传到 `k=0`。下一步应优化 PT/cooling 机制，而不是继续增加 rho。
+
+### 004 建议方向
+
+目的：增强中温 sector change 向 cold 的保留与输运。
+
+候选方向：
+
+1. 在 `q_hot=0.35,rho=0.15` 的基础上增加 `pt_swap_sweeps_per_attempt=2`，测试更多相邻 swap 是否能把 `k=9..12` 的 sector change 更快带向 cold。此前 `q_hot=0.32` 上 swap sweep 没用，但那时没有大量 cluster-stage sector change；现在物理条件不同。
+2. 测试更长生产期 `m=1024`、较低诊断频率 `stride=8`，判断 cold flip 是否只是等待时间不足；保留 cluster-stage 诊断。
+3. 如果代码允许，下一步应实现 identity-tracked sector-change delivery：记录“某个 replica 在中温 cluster 后 sector 改变，随后是否到达 cold 且保持改变”，直接量化冷却保留率。
