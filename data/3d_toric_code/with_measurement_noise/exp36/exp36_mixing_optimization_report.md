@@ -1168,3 +1168,23 @@ run03 逐温度 cold-delivery 诊断：
 - 但 cold persistence 很弱：74 次 cold arrival 中只有 2 次赶上下一次 sector diagnostic 且仍 survived，68 次 missed；cold dwell sample 总数 180，平均约 2.43，最大也只有 6。
 - 离开 cold 时仍 survived 的有 20 次，但 reverted 和 other 合计 54 次；同时 cold-slot sector flips 仍为 `[0,0,0,0]`。这说明 arrival 事件多数太短，或者到达/离开 cold 的 signature 变化没有转化成按 measurement cadence 统计的稳定 cold sector sampling。
 - 下一步若继续优化 mixing，应从“增加 cold dwell / 降低 cold departure 后回退概率 / 让 cold slot 在 arrival 后多做可记录测量”入手，而不是继续只增加热端 sector proposal、swap sweep 或 cluster 预算。可测试的方向包括：arrival 后的 cold hold/measurement 诊断、减慢 swap cadence 对 persistence 的影响、或在 cold 附近加密/重排 ladder 以增加接近 cold 的停留时间。
+
+### 006 cold-dwell schedule probe 计划
+
+物理动机：005 中 run03 有 74 次 cold arrival，但 cold dwell sample 总数只有 180，平均约 2.43，最大 6；68/74 次错过下一次 sector diagnostic。006 不改变目标分布，只改变调度，测试 cold arrival 是否只是被当前 measurement/diagnostic cadence 漏掉。
+
+目录：`data/3d_toric_code/with_measurement_noise/exp36/006_cold_dwell_schedule_probe_20260529/`。
+
+共同参数：`L=6,p=0.05,q=0.08,K=17,q_hot=0.35,cluster rho=0.15,num_start_chains=4,adaptive_pt_rounds=0,winding_plane_heatbath_sweeps=0`。
+
+| run | node | swap cadence | sweeps/measurement | measurements | stride | seed | purpose |
+|---|---|---:|---:|---:|---:|---:|---|
+| run01 | nd-1 | 1 | 6 | 1024 | 1 | 425000 | 同 005 run01 生产长度，但每个 measurement 都做 sector diagnostic，判断 missed 是否主要来自 stride |
+| run02 | nd-2 | 6 | 6 | 1024 | 1 | 426000 | 降低 swap cadence，让 arrival 后更可能在 cold 停到下一次 measurement |
+| run03 | nd-3 | 1 | 1 | 2048 | 1 | 427000 | 高频 measurement，直接检查 transient arrival 是否进入 measured cold history |
+
+判据：
+
+- 若 stride=1 或 measurement 高频后 cold flips 明显增加，而 departure 统计仍显示 arrival 很短，说明主要是 measurement/diagnostic cadence 漏掉 transient。
+- 若降低 swap cadence 增加 dwell sum/max、diag survived 和 cold flips，则后续可考虑 cold dwell/hold 类型调度优化。
+- 若三者仍无 cold flips，则瓶颈不是测量 cadence，而是 cold ensemble 本身不支持这些 arrived sector 稳定存在；下一步应考虑更物理的 near-cold ladder/cluster move 或重新评估 observable sector 定义。
