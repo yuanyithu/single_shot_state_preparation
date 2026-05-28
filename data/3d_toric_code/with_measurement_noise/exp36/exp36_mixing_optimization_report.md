@@ -834,3 +834,46 @@ cluster 诊断：
 1. 对 `q_hot=0.35 + cluster rho=0.05` 做 2 个独立 seed 重复，确认 AD 的 cold flips 是否可复现。
 2. 小样本测试 `q_hot=0.35 + cluster rho=0.10/0.20`，看高温 cluster 大 move 次数是否能提高 cold flips，但要严格记录 wall time。
 3. 如果 strict delivery 继续为 0，需要新增更细的 cluster-stage sector-change 诊断，区分 cold flips 是 cluster 本身、mid-temperature cluster 后 PT 输运，还是普通 local path 造成。
+
+### 001/002 编号目录与 cluster-stage sector 诊断
+
+目录规范更新：
+
+- exp36 后续迭代实验使用编号子目录，避免 root 下继续堆叠无编号 probe。
+- 本地 smoke: `001_cluster_stage_diag_smoke_20260528/`
+- 下一轮远端实验: `002_cluster_stage_repeats_20260528/`
+
+代码改动：
+
+- 提交：`879c4261 Track cluster-stage sector changes`
+- 在 PT sector diagnostics 打开时，cluster scheduler 每次真正选中一个温度准备执行 cluster update 前，只计算该温度的 logical-sector signature。
+- cluster update 后再次计算同一温度 signature，统计：
+  - `pt_cluster_sector_attempted_count_per_temperature`
+  - `pt_cluster_sector_nonzero_count_per_temperature`
+  - `pt_cluster_sector_changed_count_per_temperature`
+- 对应穿透到 disorder-average、chunk 和 merge 输出：
+  - `chain_pt_cluster_sector_attempted_count_per_temperature_per_disorder_per_start_replica(_tensor)`
+  - `chain_pt_cluster_sector_nonzero_count_per_temperature_per_disorder_per_start_replica(_tensor)`
+  - `chain_pt_cluster_sector_changed_count_per_temperature_per_disorder_per_start_replica(_tensor)`
+  - `mean_pt_cluster_sector_*_count_per_temperature_curve_tensor`
+
+验证：
+
+- `python -m py_compile src/cluster_update.py src/mcmc_parallel_tempering.py src/main.py src/production_chunked_scan.py` 通过。
+- `PYTHONPATH=src python -m unittest discover -s tests` 通过，7 tests。
+- 本地 production smoke:
+  - `data/3d_toric_code/with_measurement_noise/exp36/001_cluster_stage_diag_smoke_20260528/cluster_stage_diag_smoke.npz`
+  - `chain_pt_cluster_sector_attempted... = [0,0,0,0,16]`
+  - `chain_pt_cluster_sector_nonzero... = [0,0,0,0,16]`
+  - `chain_pt_cluster_sector_changed... = [0,0,0,0,12]`
+  - 说明新诊断能在最终 merge NPZ 中记录 cluster 本身造成的 logical-sector 改变。
+
+002 远端计划：
+
+| run | node | q_hot | cluster rho | seed | purpose |
+|---|---|---:|---:|---:|---|
+| run01 | nd-1 | 0.35 | 0.05 | 413000 | 复现 AD 的 cold flips |
+| run02 | nd-2 | 0.35 | 0.05 | 414000 | 独立 seed 复现 |
+| run03 | nd-3 | 0.35 | 0.10 | 415000 | 检查增加 cluster 预算是否提高 sector flips |
+
+共同参数：`L=6,p=0.05,q=0.08,K=17,m=512,stride=4,num_start_chains=4,adaptive_pt_rounds=0`。
