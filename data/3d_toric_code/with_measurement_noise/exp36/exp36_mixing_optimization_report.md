@@ -1126,3 +1126,15 @@ run03 逐温度 cold-delivery 诊断：
 | run03 | nd-3 | 0.15 | 1 | 2048 | 8 | 424000 | 增加等待时间，测试 arrival/persistence 统计是否积累到更稳定信号 |
 
 共同参数：`L=6,p=0.05,q=0.08,K=17,q_hot=0.35,num_start_chains=4,adaptive_pt_rounds=0,winding_plane_heatbath_sweeps=0,cluster rho=0.15`。
+
+启动状态：
+
+- 代码提交并推送：`23621bd42 Track cluster cold persistence diagnostics`。
+- launcher 提交并推送：`03472e18d Plan exp36 cold persistence probes`。
+- 远端 source：`/home/DATA1/users/yuany/.single_shot/repos/005_cold_persistence_probe_20260529/source`。
+- run base：`/home/DATA1/users/yuany/.single_shot/exp36/005_cold_persistence_probe_20260529`。
+- launcher：`data/3d_toric_code/with_measurement_noise/exp36/005_cold_persistence_probe_20260529/launch_cold_persistence_probe_20260529.sh`。
+- 三条任务均已通过 quick exact validation、preflight chunk 和 preflight merge，并进入 `Launching chunk workers: 1 workers for 1 chunks`。
+- screen：nd-1 `exp36_005_r1`，nd-2 `exp36_005_r2`，nd-3 `exp36_005_r3`。
+
+下一轮先检查三个 final NPZ；若完成，同步到本地 005 目录并生成 `005_summary.json/md`，重点比较：cold flips、cluster changed/arrival/survived/reverted、diagnostic survived/reverted/missed、departure survived/reverted/other、cold dwell sample sum/max、roundtrip 和 wall time。
