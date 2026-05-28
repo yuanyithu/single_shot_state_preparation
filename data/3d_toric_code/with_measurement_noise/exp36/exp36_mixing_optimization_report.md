@@ -1138,3 +1138,33 @@ run03 逐温度 cold-delivery 诊断：
 - screen：nd-1 `exp36_005_r1`，nd-2 `exp36_005_r2`，nd-3 `exp36_005_r3`。
 
 下一轮先检查三个 final NPZ；若完成，同步到本地 005 目录并生成 `005_summary.json/md`，重点比较：cold flips、cluster changed/arrival/survived/reverted、diagnostic survived/reverted/missed、departure survived/reverted/other、cold dwell sample sum/max、roundtrip 和 wall time。
+
+### 005 cold-arrival persistence 最终结果
+
+输出文件：
+
+- `data/3d_toric_code/with_measurement_noise/exp36/005_cold_persistence_probe_20260529/005_summary.json`
+- `data/3d_toric_code/with_measurement_noise/exp36/005_cold_persistence_probe_20260529/005_summary.md`
+
+结果：
+
+| run | swap | m | stride | min swap | cold flips | roundtrip | changed | arrival | arr survived | arr reverted | diag survived | diag missed | dep survived | dep reverted | dep other | dwell sum/max |
+|---|---:|---:|---:|---:|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|
+| run01 | 1 | 1024 | 4 | 0.142370 | `[0,2,0,0]` | 180 | 1 | 1 | 0 | 1 | 0 | 1 | 0 | 1 | 0 | 4/4 |
+| run02 | 2 | 1024 | 4 | 0.122715 | `[0,0,0,0]` | 201 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0/0 |
+| run03 | 1 | 2048 | 8 | 0.121453 | `[0,0,0,0]` | 344 | 131 | 74 | 20 | 26 | 2 | 68 | 20 | 26 | 28 | 180/6 |
+
+逐温度要点：
+
+- run01: changed/arrival 都只在 origin `k=6` 有 1 次；到达 cold 时已 reverted，离开 cold 时仍 reverted。
+- run02: 没有 cluster-stage sector change。
+- run03: changed by temperature 为 `[0,0,0,0,0,0,0,0,0,0,5,20,2,0,104,0,0]`，arrival by origin 为 `[0,0,0,0,0,0,0,0,0,0,4,17,1,0,52,0,0]`，主要来自 `k=14`，其次 `k=11`。
+- run03: diagnostic survived by origin 为 `[0,0,0,0,0,0,0,0,0,0,0,1,0,0,1,0,0]`，diagnostic missed 为 `[0,0,0,0,0,0,0,0,0,0,4,15,1,0,48,0,0]`。
+- run03: departure survived/reverted/other by origin 分别为 `[0,0,0,0,0,0,0,0,0,0,1,7,0,0,12,0,0]`、`[0,0,0,0,0,0,0,0,0,0,2,7,1,0,16,0,0]`、`[0,0,0,0,0,0,0,0,0,0,1,3,0,0,24,0,0]`。
+
+结论：
+
+- 005 证明 004 的 `survived-at-arrival` 不是纯诊断假象：run03 中 20/74 次到达 cold 时确实保持 cluster 后 signature。
+- 但 cold persistence 很弱：74 次 cold arrival 中只有 2 次赶上下一次 sector diagnostic 且仍 survived，68 次 missed；cold dwell sample 总数 180，平均约 2.43，最大也只有 6。
+- 离开 cold 时仍 survived 的有 20 次，但 reverted 和 other 合计 54 次；同时 cold-slot sector flips 仍为 `[0,0,0,0]`。这说明 arrival 事件多数太短，或者到达/离开 cold 的 signature 变化没有转化成按 measurement cadence 统计的稳定 cold sector sampling。
+- 下一步若继续优化 mixing，应从“增加 cold dwell / 降低 cold departure 后回退概率 / 让 cold slot 在 arrival 后多做可记录测量”入手，而不是继续只增加热端 sector proposal、swap sweep 或 cluster 预算。可测试的方向包括：arrival 后的 cold hold/measurement 诊断、减慢 swap cadence 对 persistence 的影响、或在 cold 附近加密/重排 ladder 以增加接近 cold 的停留时间。
