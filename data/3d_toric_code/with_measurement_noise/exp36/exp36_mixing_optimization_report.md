@@ -877,3 +877,78 @@ cluster 诊断：
 | run03 | nd-3 | 0.35 | 0.10 | 415000 | 检查增加 cluster 预算是否提高 sector flips |
 
 共同参数：`L=6,p=0.05,q=0.08,K=17,m=512,stride=4,num_start_chains=4,adaptive_pt_rounds=0`。
+
+### 002 cluster-stage repeats 最终结果
+
+输出文件：
+
+- `data/3d_toric_code/with_measurement_noise/exp36/002_cluster_stage_repeats_20260528/002_summary.json`
+- `data/3d_toric_code/with_measurement_noise/exp36/002_cluster_stage_repeats_20260528/002_summary.md`
+
+共同参数：
+
+- `L=6,p=0.05,q=0.08`
+- `K=17,q_hot=0.35`
+- `num_disorder_samples_total=1`
+- `num_start_chains=4`
+- `num_measurements_per_disorder=512`
+- `num_sweeps_between_measurements=6`
+- `num_burn_in_sweeps=150`
+- `max_effective_num_burn_in_sweeps=750`
+- `pt_sector_diagnostic_stride=4`
+- `adaptive_pt_rounds=0`
+- `winding_repeat_factor=1`
+- `winding_plane_heatbath_sweeps=0`
+
+结果汇总：
+
+| run | rho | min swap | bottleneck pair | cold flips | hot flips mean | strict delivery | proxy delivery | roundtrip sum | cluster nonzero | cluster-stage sector changes |
+|---|---:|---:|---:|---|---:|---:|---:|---:|---:|---:|
+| AD previous | 0.05 | 0.153061 | 10 | `[2,0,0,0]` | 100.50 | 0 | 19 | 87 | 47 | - |
+| run01 | 0.05 | 0.129513 | 11 | `[0,0,0,0]` | 94.75 | 0 | 14 | 79 | 38 | 0 |
+| run02 | 0.05 | 0.121795 | 10 | `[0,0,0,0]` | 96.50 | 0 | 12 | 67 | 26 | 0 |
+| run03 | 0.10 | 0.167321 | 10 | `[10,4,2,2]` | 100.50 | 0 | 18 | 76 | 77 | 9 |
+
+cluster-stage 逐温度诊断：
+
+- run01: sector-attempt `85`、nonzero `35`、sector-changed `0`；主要发生在 `k=5,6`。
+- run02: sector-attempt `100`、nonzero `23`、sector-changed `0`；主要发生在 `k=1,3,4,5,6`。
+- run03: sector-attempt `88`、nonzero `63`、sector-changed `9`；changed by temperature 为 `[0,0,0,0,0,1,0,2,1,1,0,1,0,1,2,0,0]`。
+
+结论：
+
+- 两条新的 `rho=0.05` repeat 均没有 cold logical-sector flip，也没有 cluster-stage sector change；因此 AD 的 `[2,0,0,0]` 不是稳定可复现信号。
+- `rho=0.10` 的 run03 是当前最强 positive signal：四条 chain 都发生 cold sector flip，总数 `18`，并且新诊断直接记录到 `9` 次 cluster update 本身造成 logical-sector change。
+- strict hot-to-cold sector-change delivery 仍为 `0`，说明这不是简单的“热端 winding sector change 被 PT 带回 cold”。更合理的图像是：`q_hot=0.35,rho=0.10` 下 cluster 在中温区产生跨 sector 大更新，再经后续 PT/局部更新改变 cold 槽的 logical sector。
+- 当前还不能认为 mixing 充分。下一步应围绕 `q_hot=0.35,rho≈0.10` 做独立 seed repeat，并小幅扫描 `rho=0.15`，判断 run03 是否可复现以及 cluster 预算是否继续带来收益。
+
+### 003 cluster-rho refinement 计划
+
+目的：验证 002 run03 是否可复现，并判断 `rho=0.10` 到 `0.15` 的 cluster 预算增加是否继续提高 cold logical-sector flip。
+
+计划目录：
+
+- `data/3d_toric_code/with_measurement_noise/exp36/003_cluster_rho_refine_20260528/`
+
+远端配置：
+
+| run | node | q_hot | cluster rho | seed | purpose |
+|---|---|---:|---:|---:|---|
+| run01 | nd-1 | 0.35 | 0.10 | 416000 | 独立 seed 复现 002 run03 |
+| run02 | nd-2 | 0.35 | 0.10 | 417000 | 第二个独立 seed 复现 |
+| run03 | nd-3 | 0.35 | 0.15 | 418000 | 小幅提高 cluster 预算，检查收益与成本 |
+
+共同参数沿用 002：`L=6,p=0.05,q=0.08,K=17,m=512,stride=4,num_start_chains=4,adaptive_pt_rounds=0,winding_plane_heatbath_sweeps=0`。
+
+启动状态：
+
+- 代码同步到远端：`/home/DATA1/users/yuany/.single_shot/repos/003_cluster_rho_refine_20260528/source`。
+- run base：`/home/DATA1/users/yuany/.single_shot/exp36/003_cluster_rho_refine_20260528`。
+- launcher：`data/3d_toric_code/with_measurement_noise/exp36/003_cluster_rho_refine_20260528/launch_cluster_rho_refine_20260528.sh`。
+- 三个任务均通过 quick exact validation、preflight chunk 和 preflight merge。
+- 截至本记录，三个 screen 均在运行 chunk worker，尚未生成 final NPZ：
+  - nd-1: `exp36_003_r1`
+  - nd-2: `exp36_003_r2`
+  - nd-3: `exp36_003_r3`
+
+下一轮先检查三个 final NPZ；若完成，同步到 003 本地目录，生成 `003_summary.json/md` 并比较 `rho=0.10` repeat 与 `rho=0.15` 的 cold flips、cluster-stage sector changes、min swap、roundtrip 和 wall time。
