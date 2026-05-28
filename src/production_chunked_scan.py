@@ -476,6 +476,9 @@ def _build_submit_config_from_args(args):
         "track_pt_sector_diagnostics": bool(
             args.track_pt_sector_diagnostics
         ),
+        "track_pt_cluster_sector_diagnostics": bool(
+            args.track_pt_cluster_sector_diagnostics
+        ),
         "pt_sector_diagnostic_stride": int(args.pt_sector_diagnostic_stride),
         "cluster_update_enabled": not bool(args.disable_cluster_update),
         "cluster_budget_fraction_rho": float(args.cluster_budget_fraction_rho),
@@ -596,6 +599,9 @@ def _build_chunk_tasks(config):
                     ),
                     "track_pt_sector_diagnostics": bool(
                         config.get("track_pt_sector_diagnostics", False)
+                    ),
+                    "track_pt_cluster_sector_diagnostics": bool(
+                        config.get("track_pt_cluster_sector_diagnostics", False)
                     ),
                     "pt_sector_diagnostic_stride": int(
                         config.get("pt_sector_diagnostic_stride", 1)
@@ -752,6 +758,9 @@ def _build_manifest(
             "observable_temperature_mode": config["observable_temperature_mode"],
             "track_pt_sector_diagnostics": bool(
                 config.get("track_pt_sector_diagnostics", False)
+            ),
+            "track_pt_cluster_sector_diagnostics": bool(
+                config.get("track_pt_cluster_sector_diagnostics", False)
             ),
             "pt_sector_diagnostic_stride": int(
                 config.get("pt_sector_diagnostic_stride", 1)
@@ -920,6 +929,10 @@ def _run_chunk_task(task_data):
             track_pt_sector_diagnostics=bool(
                 task_data.get("track_pt_sector_diagnostics", False)
             ),
+            track_pt_cluster_sector_diagnostics=bool(
+                task_data.get("track_pt_cluster_sector_diagnostics", False)
+                or task_data.get("track_pt_sector_diagnostics", False)
+            ),
             pt_sector_diagnostic_stride=int(
                 task_data.get("pt_sector_diagnostic_stride", 1)
             ),
@@ -1003,6 +1016,10 @@ def _run_chunk_task(task_data):
             ),
             track_pt_sector_diagnostics_config=np.bool_(
                 task_data.get("track_pt_sector_diagnostics", False)
+            ),
+            track_pt_cluster_sector_diagnostics_config=np.bool_(
+                task_data.get("track_pt_cluster_sector_diagnostics", False)
+                or task_data.get("track_pt_sector_diagnostics", False)
             ),
             pt_sector_diagnostic_stride_config=np.int64(
                 task_data.get("pt_sector_diagnostic_stride", 1)
@@ -1180,6 +1197,10 @@ def _merge_outputs(
     track_pt_sector_diagnostics = bool(
         config.get("track_pt_sector_diagnostics", False)
     )
+    track_pt_cluster_sector_diagnostics = bool(
+        config.get("track_pt_cluster_sector_diagnostics", False)
+        or track_pt_sector_diagnostics
+    )
     pt_sector_diagnostic_stride = int(
         config.get("pt_sector_diagnostic_stride", 1)
     )
@@ -1299,6 +1320,7 @@ def _merge_outputs(
                 mean_pt_hot_to_cold_sector_change_delivery_count_curve_matrix = (
                     np.empty((num_sizes, num_points), dtype=np.float64)
                 )
+            if track_pt_cluster_sector_diagnostics:
                 mean_pt_cluster_sector_attempted_count_per_temperature_curve_tensor = (
                     np.empty(
                         (num_sizes, num_points, pt_num_temperatures),
@@ -1843,6 +1865,7 @@ def _merge_outputs(
                             pt_temperature_chain_shape[:-1],
                             dtype=np.int64,
                         )
+                    if track_pt_cluster_sector_diagnostics:
                         chain_pt_cluster_sector_attempted_count_per_temperature_per_disorder_per_start_replica_tensor = np.empty(
                             pt_temperature_chain_shape,
                             dtype=np.int64,
@@ -2493,6 +2516,7 @@ def _merge_outputs(
                                     :,
                                     :,
                                 ] = 0
+                        if track_pt_cluster_sector_diagnostics:
                             for field_name, destination in (
                                     (
                                         "chain_pt_cluster_sector_attempted_count_per_temperature_per_disorder_per_start_replica",
@@ -2882,6 +2906,7 @@ def _merge_outputs(
                                 point_index,
                             ]
                         ))
+                    if track_pt_cluster_sector_diagnostics:
                         mean_pt_cluster_sector_attempted_count_per_temperature_curve_tensor[
                             lattice_index,
                             point_index,
@@ -3247,6 +3272,9 @@ def _merge_outputs(
             merged_result["pt_track_sector_diagnostics"] = np.bool_(
                 track_pt_sector_diagnostics
             )
+            merged_result["pt_track_cluster_sector_diagnostics"] = np.bool_(
+                track_pt_cluster_sector_diagnostics
+            )
             merged_result["pt_sector_diagnostic_stride"] = np.int64(
                 pt_sector_diagnostic_stride
             )
@@ -3281,6 +3309,7 @@ def _merge_outputs(
                 ] = (
                     chain_pt_hot_to_cold_sector_change_delivery_count_per_disorder_per_start_replica_tensor
                 )
+            if track_pt_cluster_sector_diagnostics:
                 merged_result[
                     "chain_pt_cluster_sector_attempted_count_per_temperature_per_disorder_per_start_replica_tensor"
                 ] = (
@@ -3390,6 +3419,7 @@ def _merge_outputs(
                 ] = (
                     mean_pt_hot_to_cold_sector_change_delivery_count_curve_matrix
                 )
+            if track_pt_cluster_sector_diagnostics:
                 merged_result[
                     "mean_pt_cluster_sector_attempted_count_per_temperature_curve_tensor"
                 ] = (
@@ -3559,6 +3589,9 @@ def _merge_outputs(
         ),
         track_pt_sector_diagnostics_config=np.bool_(
             track_pt_sector_diagnostics
+        ),
+        track_pt_cluster_sector_diagnostics_config=np.bool_(
+            track_pt_cluster_sector_diagnostics
         ),
         pt_sector_diagnostic_stride_config=np.int64(
             pt_sector_diagnostic_stride
@@ -3978,6 +4011,9 @@ def _run_chunk_command(args):
         "track_pt_sector_diagnostics": bool(
             args.track_pt_sector_diagnostics
         ),
+        "track_pt_cluster_sector_diagnostics": bool(
+            args.track_pt_cluster_sector_diagnostics
+        ),
         "pt_sector_diagnostic_stride": int(args.pt_sector_diagnostic_stride),
         "cluster_update_enabled": not bool(args.disable_cluster_update),
         "cluster_budget_fraction_rho": float(args.cluster_budget_fraction_rho),
@@ -4204,6 +4240,15 @@ def _build_parser():
         ),
     )
     common_submit_parser.add_argument(
+        "--track-pt-cluster-sector-diagnostics",
+        action="store_true",
+        help=(
+            "Record cluster-sector change, cold-arrival, and cold-persistence "
+            "diagnostics without the full all-temperature logical-sector "
+            "histograms. Full PT sector diagnostics imply this option."
+        ),
+    )
+    common_submit_parser.add_argument(
         "--pt-sector-diagnostic-stride",
         type=int,
         default=1,
@@ -4416,6 +4461,10 @@ def _build_parser():
     )
     run_chunk_parser.add_argument(
         "--track-pt-sector-diagnostics",
+        action="store_true",
+    )
+    run_chunk_parser.add_argument(
+        "--track-pt-cluster-sector-diagnostics",
         action="store_true",
     )
     run_chunk_parser.add_argument(

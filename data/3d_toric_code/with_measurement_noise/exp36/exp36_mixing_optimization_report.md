@@ -1315,3 +1315,67 @@ run03 逐温度 cold-delivery 诊断：
 - 006 run03 与 007 run03 仍在 nd-3 运行，尚无 final NPZ。
 
 下一轮先检查 006 run03、007 run03 和 008 run01/run02 final NPZ；若完成，同步到本地并用 `src/summarize_exp36_probe.py` 生成正式 summary，再比较 near-cold ladder 加密对 roundtrip、min swap、cluster arrival/persistence 和 cold flips 的影响。
+
+### 007/008 最终结果与轻量 cluster-sector 诊断
+
+远端状态更新：
+
+- 007 run03 已完成并同步；007 正式 summary 输出到 `data/3d_toric_code/with_measurement_noise/exp36/007_cold_edge_hold_probe_20260529/007_summary.json/md`。
+- 008 run01/run02 均已完成并同步；008 正式 summary 输出到 `data/3d_toric_code/with_measurement_noise/exp36/008_near_cold_ladder_probe_20260529/008_summary.json/md`。
+- 006 run03 `run03_measure1_m2048_seed427000` 仍在 nd-3 的 screen `exp36_006_r3` 运行，尚无 final NPZ；006 仍保持 partial 结论。
+
+007 cold-edge hold 结果：
+
+| run | cold-edge stride | min swap | cold flips | roundtrip | changed | arrival | arr survived | arr reverted | diag survived | diag missed | dep survived | dep reverted | dep other | dwell sum/max |
+|---|---:|---:|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|
+| run01 | 1 | 0.142660 | `[0,0,0,0]` | 159 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0/0 |
+| run02 | 2 | 0.120177 | `[0,0,0,0]` | 156 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0/0 |
+| run03 | 4 | 0.115535 | `[0,0,0,0]` | 144 | 58 | 33 | 9 | 11 | 9 | 0 | 9 | 11 | 13 | 400/40 |
+
+007 结论：
+
+- `cold-edge stride=4` 确实显著增加 cold dwell：`33` 次 arrival 全部被 diagnostic 捕获，`diag missed=0`，`dwell max=40`，相比 005 run03 的 `diag missed=68,dwell max=6` 有明显改善。
+- 但 cold flips 仍为 `[0,0,0,0]`。这说明 005 中的主要问题不只是 measurement cadence 漏掉 transient；即使 cold 端停留和诊断捕获大幅改善，这些 arrived sector-changing configurations 仍没有转化成稳定的 cold-slot logical sector sampling。
+- cold-edge hold 的 transport 损伤不算灾难性：roundtrip 从 159/156 降到 144，min swap 从 0.142/0.120 降到 0.116。但它解决的是“看到 arrival”，不是“让 cold sector 真的翻转”。
+
+008 near-cold ladder 加密结果：
+
+| run | spacing power | min swap | bottleneck pair | cold flips | roundtrip | changed | arrival | dwell sum/max |
+|---|---:|---:|---:|---|---:|---:|---:|---|
+| run01 | 1.5 | 0.051857 | 12 | `[0,0,0,0]` | 95 | 0 | 0 | 0/0 |
+| run02 | 2.0 | 0.015738 | 13 | `[0,0,0,0]` | 41 | 0 | 0 | 0/0 |
+
+008 ladder 细节：
+
+- `power=1.5` 的 q ladder 为 `[0.08,0.083898,0.091239,0.101124,0.113318,0.127677,0.144049,0.162225,0.181927,0.202818,0.224508,0.246589,0.268653,0.290324,0.311273,0.331232,0.35]`；mean swap bottleneck 在 hot-side pair 12，`min swap=0.051857`。
+- `power=2.0` 的 q ladder 为 `[0.08,0.080966,0.083898,0.088888,0.096079,0.105649,0.117778,0.132611,0.150211,0.170515,0.193292,0.218126,0.244435,0.271515,0.298607,0.324981,0.35]`；hot-side bottleneck 更严重，`min swap=0.015738`。
+- near-cold 加密把 cold 端 swap 抬高到接近 1，但压缩了 hot-side 温度分辨率，roundtrip 降到 `95/41`，且没有产生 cluster-stage sector change 或 cold flip。
+
+008 结论：单纯把温度点向 cold 端重排不是有效方向；`power=2.0` 明显过强，`power=1.5` 也把 min swap 降到 `0.052`，没有改善 cold sector mixing。
+
+程序改动：新增轻量 cluster-sector diagnostics 模式。
+
+- 新开关：`track_pt_cluster_sector_diagnostics` / CLI `--track-pt-cluster-sector-diagnostics`。
+- 旧的 `--track-pt-sector-diagnostics` 保持旧行为，并自动包含 cluster-sector 字段。
+- 新开关只记录 cluster-stage sector change、cold arrival、arrival survived/reverted/other、cold diagnostic capture、departure 状态和 dwell 信息，不再计算/保存全温度 sector histogram、sector flip count 和 hot-to-cold full-sector delivery 字段。
+- 目的：支持后续长链只追踪 cluster delivery/persistence，避免全温度 logical signature histogram 的主要开销。
+
+验证：
+
+- `PYTHONPATH=src conda run --no-capture-output -n 12 python -m py_compile src/mcmc_parallel_tempering.py src/main.py src/production_chunked_scan.py src/summarize_exp36_probe.py` 通过。
+- `PYTHONPATH=src conda run --no-capture-output -n 12 python -m unittest discover -s tests` 通过，11 tests。
+- `run-chunk --help` 已确认包含 `--track-pt-cluster-sector-diagnostics`。
+- 本地 production smoke：`data/3d_toric_code/with_measurement_noise/exp36/009_cluster_lightdiag_probe_20260529/local_cluster_lightdiag_smoke/local_cluster_lightdiag_smoke.npz`。
+  - `pt_track_sector_diagnostics=False`。
+  - `pt_track_cluster_sector_diagnostics=True`。
+  - final NPZ 含 `chain_pt_cluster_sector_attempted_count_per_temperature_per_disorder_per_start_replica_tensor`，shape `(1,1,1,1,1,5)`，attempted sum `4`。
+  - final NPZ 不含 `chain_pt_sector_histogram_per_temperature_per_disorder_per_start_replica_tensor`、`chain_pt_sector_flip_count_per_temperature_per_disorder_per_start_replica_tensor` 和 hot-to-cold sector delivery tensor，确认 cluster-only 模式生效。
+
+下一步 009 计划：
+
+- 先等待 006 run03 完成；它会直接回答“高频 measurement 是否能看到 transient cold sector history”。
+- nd-1/nd-2 当前空闲，可启动 009 轻量 cluster-delivery 长链，不再开 full sector diagnostics：`L=6,p=0.05,q=0.08,K=17,q_hot=0.35,cluster rho=0.15,num_start_chains=4,adaptive_pt_rounds=0,winding_plane_heatbath_sweeps=0,pt_sector_diagnostic_stride=1,track_pt_cluster_sector_diagnostics=True`。
+- 推荐 009 两条并行方向：
+  - run01：`pt_cold_edge_swap_stride=4,m=2048,sweeps_between_measurements=6`，复现 007 run03 并用更长链检查 cold flips 是否只是等待时间不足。
+  - run02：`pt_cold_edge_swap_stride=4,pt_ladder_spacing_power=1.0,m=2048` 作为同参数独立 seed；若仍 cold flips 全 0，则应停止继续调度类优化，转向能改变 cold 附近自由能壁垒的 proposal 设计。
+- 不建议继续 `pt_ladder_spacing_power>1`；008 已显示它主要制造 hot-side bottleneck。
