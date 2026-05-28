@@ -1199,3 +1199,41 @@ run03 逐温度 cold-delivery 诊断：
 - screen：nd-1 `exp36_006_r1`，nd-2 `exp36_006_r2`，nd-3 `exp36_006_r3`。
 
 下一轮先检查三个 final NPZ；若完成，同步到本地 006 目录，生成 `006_summary.json/md`，重点比较 cold flips、arrival 的 diagnostic missed 比例、dwell sample sum/max、departure 状态、roundtrip 和 wall time。
+
+### 007 cold-edge hold 调度实现与计划
+
+006 截至本轮检查时：run01/run02 已完成，run03 `run03_measure1_m2048_seed427000` 仍在 nd-3 运行，CPU 正常，无 final NPZ。因此 006 尚不能给最终结论；已有 partial 结果仍是：run01 `stride=1` 无 cluster-stage sector change、cold flips `[0,0,0,0]`；run02 `swap cadence=6` 有 `changed=4,arrival=2,diag survived/reverted=1/1`，但 roundtrip 降到 `30`，cold flips 仍为 `[0,0,0,0]`。
+
+物理动机：005 run03 显示 `74` 次 cold arrival 里只有 `2` 次赶上下一次 sector diagnostic，cold dwell 平均约 `2.43`、最大 `6`。006 run02 用全局降低 swap cadence 的方法虽然让 arrival 被 diagnostic 捕获，但也把 roundtrip 明显压低。更有针对性的调度是只降低 cold edge `(k=0,k=1)` 的 swap 频率，让到达 cold 的 replica 多停留，同时不直接降低中温/热端的 temperature-index diffusion。
+
+代码改动：新增 `pt_cold_edge_swap_stride` / CLI `--pt-cold-edge-swap-stride`。
+
+- `N=1` 保持旧行为。
+- `N>1` 时，当 alternating swap sweep 本来会尝试 pair `0-1`，只每 `N` 次 eligible sweep 尝试一次；其它温度对仍按原 cadence 尝试。
+- 这个调度固定且与 Markov 状态无关；每个被执行的 swap 仍使用原 Metropolis ratio，因此不改变目标分布，只改变不同局部 reversible kernels 的施加频率。
+- 生产 chunk、manifest 和 final NPZ 均保存 `pt_cold_edge_swap_stride`。
+
+验证：
+
+- `PYTHONPATH=src conda run --no-capture-output -n 12 python -m py_compile src/mcmc_parallel_tempering.py src/main.py src/production_chunked_scan.py` 通过。
+- `PYTHONPATH=src conda run --no-capture-output -n 12 python -m unittest discover -s tests` 通过，8 tests。
+- 本地 production smoke：`data/3d_toric_code/with_measurement_noise/exp36/007_cold_edge_hold_probe_20260529/local_cold_edge_stride_smoke/local_cold_edge_stride_smoke.npz`。
+  - `pt_cold_edge_swap_stride=2`。
+  - pair attempts 为 `[2,4,4,4]`，确认只稀释 cold edge，其它 pair 未稀释。
+
+007 远端计划：
+
+目录：`data/3d_toric_code/with_measurement_noise/exp36/007_cold_edge_hold_probe_20260529/`。
+
+共同参数：`L=6,p=0.05,q=0.08,K=17,q_hot=0.35,cluster rho=0.15,num_start_chains=4,adaptive_pt_rounds=0,winding_plane_heatbath_sweeps=0,num_measurements=1024,num_sweeps_between_measurements=6,pt_sector_diagnostic_stride=1`。
+
+| run | node | cold-edge stride | seed | purpose |
+|---|---|---:|---:|---|
+| run01 | nd-1 | 1 | 428000 | 新代码基线，对照 006 run01 |
+| run02 | nd-2 | 2 | 429000 | 轻度增加 cold dwell |
+| run03 | nd-3 | 4 | 430000 | 更强 cold hold，观察 transport 损伤 |
+
+判据：
+
+- 若 stride `2/4` 明显增加 `cold_dwell_sample_sum/max`、`diagnostic survived` 和 cold flips，同时 roundtrip 仍可接受，则 cold-edge dwell 是有效调度方向。
+- 若 roundtrip 明显下降且 cold flips 仍为 0，则说明简单 cold hold 不能解决 cold persistence，应改为 near-cold ladder 加密或重新设计中温 sector change 到 cold 的保留机制。

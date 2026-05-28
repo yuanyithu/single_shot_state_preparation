@@ -325,6 +325,8 @@ def _build_submit_config_from_args(args):
         raise ValueError("--pt-sector-diagnostic-stride must be >= 1")
     if int(args.pt_swap_sweeps_per_attempt) < 1:
         raise ValueError("--pt-swap-sweeps-per-attempt must be >= 1")
+    if int(args.pt_cold_edge_swap_stride) < 1:
+        raise ValueError("--pt-cold-edge-swap-stride must be >= 1")
     if int(args.winding_plane_heatbath_sweeps) < 0:
         raise ValueError("--winding-plane-heatbath-sweeps must be >= 0")
     if args.pt_ladder_mode not in ("data_only", "sync_enlarge"):
@@ -446,6 +448,7 @@ def _build_submit_config_from_args(args):
             args.pt_swap_attempt_every_num_sweeps
         ),
         "pt_swap_sweeps_per_attempt": int(args.pt_swap_sweeps_per_attempt),
+        "pt_cold_edge_swap_stride": int(args.pt_cold_edge_swap_stride),
         "num_zero_syndrome_sweeps_per_cycle": int(
             args.num_zero_syndrome_sweeps_per_cycle
         ),
@@ -556,6 +559,9 @@ def _build_chunk_tasks(config):
                     ),
                     "pt_swap_sweeps_per_attempt": int(
                         config["pt_swap_sweeps_per_attempt"]
+                    ),
+                    "pt_cold_edge_swap_stride": int(
+                        config.get("pt_cold_edge_swap_stride", 1)
                     ),
                     "num_zero_syndrome_sweeps_per_cycle": int(
                         config["num_zero_syndrome_sweeps_per_cycle"]
@@ -709,6 +715,9 @@ def _build_manifest(
             ),
             "pt_swap_sweeps_per_attempt": (
                 config["pt_swap_sweeps_per_attempt"]
+            ),
+            "pt_cold_edge_swap_stride": int(
+                config.get("pt_cold_edge_swap_stride", 1)
             ),
             "num_zero_syndrome_sweeps_per_cycle": (
                 config["num_zero_syndrome_sweeps_per_cycle"]
@@ -872,6 +881,9 @@ def _run_chunk_task(task_data):
             pt_swap_sweeps_per_attempt=(
                 task_data["pt_swap_sweeps_per_attempt"]
             ),
+            pt_cold_edge_swap_stride=int(
+                task_data.get("pt_cold_edge_swap_stride", 1)
+            ),
             num_zero_syndrome_sweeps_per_cycle=(
                 task_data["num_zero_syndrome_sweeps_per_cycle"]
             ),
@@ -913,6 +925,7 @@ def _run_chunk_task(task_data):
             None,
         )
         simulation_result_for_save.pop("pt_swap_sweeps_per_attempt", None)
+        simulation_result_for_save.pop("pt_cold_edge_swap_stride", None)
         section_stats = _extract_section_stats(simulation_result_for_save)
 
         np.savez(
@@ -946,6 +959,9 @@ def _run_chunk_task(task_data):
             ),
             pt_swap_sweeps_per_attempt=np.int64(
                 task_data["pt_swap_sweeps_per_attempt"]
+            ),
+            pt_cold_edge_swap_stride=np.int64(
+                task_data.get("pt_cold_edge_swap_stride", 1)
             ),
             num_zero_syndrome_sweeps_per_cycle=np.int64(
                 task_data["num_zero_syndrome_sweeps_per_cycle"]
@@ -1090,6 +1106,11 @@ def _validate_chunk_payload(loaded_chunk_result, task_data):
                 int(loaded_chunk_result["pt_swap_sweeps_per_attempt"])
                 != int(task_data.get("pt_swap_sweeps_per_attempt", 1))):
             raise ValueError("chunk pt_swap_sweeps_per_attempt mismatch")
+    if "pt_cold_edge_swap_stride" in loaded_chunk_result:
+        if (
+                int(loaded_chunk_result["pt_cold_edge_swap_stride"])
+                != int(task_data.get("pt_cold_edge_swap_stride", 1))):
+            raise ValueError("chunk pt_cold_edge_swap_stride mismatch")
     if "winding_plane_heatbath_sweeps" in loaded_chunk_result:
         if (
                 int(loaded_chunk_result["winding_plane_heatbath_sweeps"])
@@ -3488,6 +3509,9 @@ def _merge_outputs(
         pt_swap_sweeps_per_attempt=np.int64(
             config["pt_swap_sweeps_per_attempt"]
         ),
+        pt_cold_edge_swap_stride=np.int64(
+            config.get("pt_cold_edge_swap_stride", 1)
+        ),
         num_zero_syndrome_sweeps_per_cycle=np.int64(
             config["num_zero_syndrome_sweeps_per_cycle"]
         ),
@@ -3853,6 +3877,8 @@ def _submit_run(args):
 def _run_chunk_command(args):
     if int(args.pt_swap_sweeps_per_attempt) < 1:
         raise ValueError("--pt-swap-sweeps-per-attempt must be >= 1")
+    if int(args.pt_cold_edge_swap_stride) < 1:
+        raise ValueError("--pt-cold-edge-swap-stride must be >= 1")
     task_data = {
         "lattice_index": int(args.lattice_index),
         "point_index": int(args.point_index),
@@ -3891,6 +3917,7 @@ def _run_chunk_command(args):
             args.pt_swap_attempt_every_num_sweeps
         ),
         "pt_swap_sweeps_per_attempt": int(args.pt_swap_sweeps_per_attempt),
+        "pt_cold_edge_swap_stride": int(args.pt_cold_edge_swap_stride),
         "num_zero_syndrome_sweeps_per_cycle": int(
             args.num_zero_syndrome_sweeps_per_cycle
         ),
@@ -4063,6 +4090,16 @@ def _build_parser():
         help=(
             "Number of alternating adjacent PT swap sweeps to run whenever "
             "the swap cadence fires. The default 1 preserves old behavior."
+        ),
+    )
+    common_submit_parser.add_argument(
+        "--pt-cold-edge-swap-stride",
+        type=int,
+        default=1,
+        help=(
+            "Attempt the cold adjacent PT edge (temperature pair 0-1) only "
+            "once every N eligible alternating swap sweeps. The default 1 "
+            "preserves old behavior."
         ),
     )
     common_submit_parser.add_argument(
@@ -4283,6 +4320,11 @@ def _build_parser():
     )
     run_chunk_parser.add_argument(
         "--pt-swap-sweeps-per-attempt",
+        type=int,
+        default=1,
+    )
+    run_chunk_parser.add_argument(
+        "--pt-cold-edge-swap-stride",
         type=int,
         default=1,
     )

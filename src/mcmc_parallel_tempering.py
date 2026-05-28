@@ -60,7 +60,8 @@ def _attempt_replica_swaps(
         swap_attempt_counts,
         syndrome_weight_per_temperature=None,
         log_odds_syndrome_per_temperature=None,
-        replica_id_per_temperature=None):
+        replica_id_per_temperature=None,
+        suppressed_pair_indices=None):
     """
     对相邻温度对做一次 alternating even/odd swap 扫描。
 
@@ -74,6 +75,8 @@ def _attempt_replica_swaps(
     num_temperatures = len(chain_bits_list)
     offset = parity_index % 2
     for i in range(offset, num_temperatures - 1, 2):
+        if suppressed_pair_indices is not None and i in suppressed_pair_indices:
+            continue
         j = i + 1
         data_weight_i = int(data_weight_per_temperature[i])
         data_weight_j = int(data_weight_per_temperature[j])
@@ -151,6 +154,7 @@ def run_parallel_tempering_measurement(
         winding_plane_heatbath_sweeps=0,
         swap_attempt_every_num_sweeps=1,
         swap_sweeps_per_attempt=1,
+        cold_edge_swap_stride=1,
         return_diagnostics=False,
         record_all_temperature_trajectories=False,
         cluster_update_enabled=True,
@@ -200,6 +204,9 @@ def run_parallel_tempering_measurement(
     swap_sweeps_per_attempt = int(swap_sweeps_per_attempt)
     if swap_sweeps_per_attempt < 1:
         raise ValueError("swap_sweeps_per_attempt must be >= 1")
+    cold_edge_swap_stride = int(cold_edge_swap_stride)
+    if cold_edge_swap_stride < 1:
+        raise ValueError("cold_edge_swap_stride must be >= 1")
     if syndrome_error_probability_ladder is None:
         syndrome_error_probability_ladder = np.full(
             num_temperatures,
@@ -742,9 +749,11 @@ def run_parallel_tempering_measurement(
         ordinary_update_wall_time += float(np.sum(ordinary_elapsed_per_temperature))
 
     swap_parity_counter = 0
+    cold_edge_swap_eligible_counter = 0
 
     def _maybe_attempt_swap(sweep_counter):
         nonlocal swap_parity_counter
+        nonlocal cold_edge_swap_eligible_counter
         nonlocal pt_swap_wall_time
         if num_temperatures < 2:
             return
@@ -754,6 +763,11 @@ def run_parallel_tempering_measurement(
             return
         swap_started_at = time.perf_counter()
         for _ in range(swap_sweeps_per_attempt):
+            suppressed_pair_indices = None
+            if cold_edge_swap_stride > 1 and swap_parity_counter % 2 == 0:
+                if cold_edge_swap_eligible_counter % cold_edge_swap_stride != 0:
+                    suppressed_pair_indices = (0,)
+                cold_edge_swap_eligible_counter += 1
             _attempt_replica_swaps(
                 chain_bits_list=chain_bits_list,
                 data_term_bits_list=data_term_bits_list,
@@ -771,6 +785,7 @@ def run_parallel_tempering_measurement(
                     log_odds_syndrome_per_temperature
                 ),
                 replica_id_per_temperature=replica_id_per_temperature,
+                suppressed_pair_indices=suppressed_pair_indices,
             )
             record_adaptive_pt_flow(
                 flow_tracker=flow_tracker,
@@ -1365,6 +1380,7 @@ def run_parallel_tempering_measurement(
         "swap_attempt_counts": swap_attempt_counts,
         "swap_acceptance_rates": swap_acceptance_rates,
         "pt_swap_sweeps_per_attempt": np.int64(swap_sweeps_per_attempt),
+        "pt_cold_edge_swap_stride": np.int64(cold_edge_swap_stride),
         "pt_transport_position_sample_count": np.int64(
             transport_position_sample_count
         ),
