@@ -699,3 +699,74 @@ V/W/X 共同参数：
 | AA | nd-3 | 0.35 | 1 | 1 | 稍热端配合 heatbath 的折中测试 |
 
 共同参数沿用 V/W/X：`L=6,p=0.05,q=0.08,K=17,m=512,stride=4,disable_cluster_update`。
+
+### winding-plane heatbath 远端结果与 cluster-q ladder 修复
+
+Y/Z/AA 已完成并同步到本地：
+
+- `data/3d_toric_code/with_measurement_noise/exp36/winding_heatbath_probe_20260528/Y_hb0_K17_qhot032_m512_s4/Y_hb0_K17_qhot032_m512_s4.npz`
+- `data/3d_toric_code/with_measurement_noise/exp36/winding_heatbath_probe_20260528/Z_hb1_K17_qhot032_m512_s4/Z_hb1_K17_qhot032_m512_s4.npz`
+- `data/3d_toric_code/with_measurement_noise/exp36/winding_heatbath_probe_20260528/AA_hb1_K17_qhot035_m512_s4/AA_hb1_K17_qhot035_m512_s4.npz`
+
+共同参数：
+
+- `L=6,p=0.05,q=0.08`
+- `num_disorder_samples_total=1`
+- `num_start_chains=4`
+- `num_measurements_per_disorder=512`
+- `num_sweeps_between_measurements=6`
+- `num_burn_in_sweeps=150`
+- `max_effective_num_burn_in_sweeps=750`
+- `K=17`
+- `pt_sector_diagnostic_stride=4`
+- `adaptive_pt_rounds=0`
+- `cluster_update=False`
+
+结果：
+
+| config | q_hot | heatbath sweeps | min swap | bottleneck pair | cold flips | hot flips mean | strict delivery | proxy delivery | roundtrip sum | roundtrip per chain | heatbath hot changed mean | wall mean |
+|---|---:|---:|---:|---:|---|---:|---:|---:|---:|---|---:|---:|
+| Y | 0.32 | 0 | 0.196886 | 12 | `[0,0,0,0]` | 97.75 | 0 | 21 | 101 | `[31,24,23,23]` | 0.00 | 43.50s |
+| Z | 0.32 | 1 | 0.210230 | 12 | `[0,0,0,0]` | 96.50 | 0 | 26 | 116 | `[23,27,36,30]` | 195.75 | 64.10s |
+| AA | 0.35 | 1 | 0.123888 | 11 | `[0,0,0,0]` | 95.75 | 0 | 17 | 80 | `[16,22,22,20]` | 997.75 | 165.67s |
+
+bottleneck 对应温度：
+
+- Y/Z: pair `12-13`，`(p,q)=(0.228076,0.266725)->(0.243638,0.280969)`。
+- AA: pair `11-12`，`(p,q)=(0.241217,0.278765)->(0.258878,0.294745)`。
+
+定量结论：
+
+- heatbath 在热端确实强烈改变 winding-plane 子空间：Z hot changed mean `195.75`，AA hot changed mean `997.75`。
+- 但 cold sector flips 仍全为 0，strict delivery 仍全为 0；因此它没有把热端/中温 sector 热化转化为 cold logical sector 改变。
+- q_hot=0.35 配 heatbath 的代价明显偏大，wall mean `165.67s`，roundtrip 反而少于 q_hot=0.32。
+- 当前证据支持：主要瓶颈不是热端没有 sector-changing move，也不是 replica 不能 round trip，而是回到 cold ensemble 时 nontrivial sector 被自由能壁垒压回原 sector。
+
+下一步程序改动：
+
+- 修复 q>0 cluster update，使其支持随温度变化的 `q_k` ladder。
+- 原 cluster update 只接收标量 `q`，因此 production 对 `sync_enlarge` 强制 `--disable-cluster-update`；现在 `build_cluster_controller` 接收 `syndrome_error_probability_ladder`，每个温度用自己的 `p_k,q_k` 构造 active pins/checks。
+- 该 move 保持目标分布不变，物理作用是给每个温度加入全局 FK/cluster 型大尺度更新，可能比固定 winding sheet 更容易产生跨 logical sector 的大块变化。
+- 限制：该 cluster 公式需要所有 `p_k,q_k<0.5`，因此本轮只测试 `q_hot=0.32/0.35`；若未来热端越过 0.5，仍需显式关闭 cluster 或另写适用于高温端的 move。
+
+验证：
+
+- `python -m py_compile src/cluster_update.py src/mcmc_parallel_tempering.py src/main.py src/production_chunked_scan.py` 通过。
+- `PYTHONPATH=src python -m unittest discover -s tests` 通过，7 tests。
+- 新增测试 `tests/test_cluster_q_ladder.py` 验证 `sync_enlarge` + cluster 可以运行并产生 cluster attempts。
+- 本地 production smoke：
+  - `data/3d_toric_code/with_measurement_noise/exp36/cluster_sync_smoke_20260528/cluster_sync_smoke.npz`
+  - `cluster_update_config_enabled=True`
+  - `cluster_update_enabled=True`
+  - `cluster_num_attempts=1`
+  - `pt_syndrome_error_probability_ladder=[0.08,0.13938655,0.20475691,0.26672472,0.32]`
+
+下一轮远端 probe：
+
+| config | node | q_hot | cluster rho | heatbath sweeps | purpose |
+|---|---|---:|---:|---:|---|
+| AB | nd-1 | 0.32 | 0.05 | 0 | cluster-q ladder 基线测试 |
+| AC | nd-2 | 0.32 | 0.20 | 0 | 提高 cluster 预算是否增加 sector 改变 |
+| AD | nd-3 | 0.35 | 0.05 | 0 | 稍热端配合 cluster 的折中测试 |
+
+共同参数沿用 Y/Z/AA，但不传 `--disable-cluster-update`。

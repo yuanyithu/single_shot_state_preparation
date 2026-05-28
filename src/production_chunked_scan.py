@@ -352,10 +352,6 @@ def _build_submit_config_from_args(args):
                 < float(args.pt_q_hot)
                 < 0.5):
             raise ValueError("--pt-q-hot must be in (cold q, 0.5)")
-        if not bool(args.disable_cluster_update):
-            raise ValueError(
-                "sync_enlarge PT requires --disable-cluster-update"
-            )
         pt_enlarge_ladder = sync_pt_enlarge_ladder(
             q_cold=float(args.syndrome_error_probability),
             q_hot=float(args.pt_q_hot),
