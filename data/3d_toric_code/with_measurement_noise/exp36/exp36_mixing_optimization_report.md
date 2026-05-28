@@ -1003,3 +1003,50 @@ cluster-stage 逐温度诊断：
 1. 在 `q_hot=0.35,rho=0.15` 的基础上增加 `pt_swap_sweeps_per_attempt=2`，测试更多相邻 swap 是否能把 `k=9..12` 的 sector change 更快带向 cold。此前 `q_hot=0.32` 上 swap sweep 没用，但那时没有大量 cluster-stage sector change；现在物理条件不同。
 2. 测试更长生产期 `m=1024`、较低诊断频率 `stride=8`，判断 cold flip 是否只是等待时间不足；保留 cluster-stage 诊断。
 3. 如果代码允许，下一步应实现 identity-tracked sector-change delivery：记录“某个 replica 在中温 cluster 后 sector 改变，随后是否到达 cold 且保持改变”，直接量化冷却保留率。
+
+### 004 cluster cold-delivery 诊断实现与计划
+
+代码改动：
+
+- 提交：`4e5832423 Track cluster sector cold delivery`
+- 在已有 cluster-stage sector change 诊断基础上，新增 identity-tracked cold-delivery 统计。
+- 当某个温度 `k>0` 的 cluster update 直接改变 logical-sector signature 时，记录当前 temperature slot 上的 `replica_id`、change 前后 signature 和 origin temperature。
+- 该 replica 后续首次到达 cold slot `k=0` 时，按 cold signature 分类：
+  - `cold_arrival`: 该 pending sector-change replica 到达 cold。
+  - `cold_survived`: 到达 cold 时 signature 等于 cluster 后 signature。
+  - `cold_reverted`: 到达 cold 时 signature 回到 cluster 前 signature。
+  - `cold_other`: 到达 cold 时 signature 既不是 cluster 前，也不是 cluster 后。
+  - `pending_overwritten`: 同一 replica 在到达 cold 前又发生新的 cluster-sector change，旧 pending 被覆盖。
+  - `pending_remaining`: run 结束时仍未到达 cold 的 pending change。
+
+新增输出字段：
+
+- `pt_cluster_sector_cold_arrival_count_per_origin_temperature`
+- `pt_cluster_sector_cold_survived_count_per_origin_temperature`
+- `pt_cluster_sector_cold_reverted_count_per_origin_temperature`
+- `pt_cluster_sector_cold_other_count_per_origin_temperature`
+- `pt_cluster_sector_pending_overwritten_count_per_origin_temperature`
+- `pt_cluster_sector_pending_remaining_count_per_origin_temperature`
+- 以上字段也穿透到 disorder-average、chunk 和 production merge tensor/mean curve。
+
+验证：
+
+- `python -m py_compile src/mcmc_parallel_tempering.py src/main.py src/production_chunked_scan.py` 通过。
+- `PYTHONPATH=src conda run --no-capture-output -n 12 python -m unittest discover -s tests` 通过，7 tests。
+- 本地 production smoke：
+  - `data/3d_toric_code/with_measurement_noise/exp36/004_cluster_delivery_diag_smoke_20260528/cluster_delivery_diag_smoke.npz`
+  - final NPZ 中新增 `chain_pt_cluster_sector_cold_*_tensor` 和 `mean_pt_cluster_sector_cold_*_curve_tensor` 字段均存在，shape 为 `(1,1,1,1,1,5)` / `(1,1,5)`。
+
+004 远端计划：
+
+- 目录：`data/3d_toric_code/with_measurement_noise/exp36/004_cluster_cold_delivery_20260528/`
+- 远端 source：`/home/DATA1/users/yuany/.single_shot/repos/004_cluster_cold_delivery_20260528/source`
+- run base：`/home/DATA1/users/yuany/.single_shot/exp36/004_cluster_cold_delivery_20260528`
+
+| run | node | rho | swap sweeps | measurements | stride | seed | purpose |
+|---|---|---:|---:|---:|---:|---:|---|
+| run01 | nd-1 | 0.15 | 1 | 512 | 4 | 419000 | 003 run03 同类复现，新诊断基线 |
+| run02 | nd-2 | 0.15 | 2 | 512 | 4 | 420000 | 测试更多 swap 是否提高 cold arrival/survival |
+| run03 | nd-3 | 0.15 | 1 | 1024 | 8 | 421000 | 测试更长生产期是否提高 cold arrival/survival |
+
+共同参数：`L=6,p=0.05,q=0.08,K=17,q_hot=0.35,num_start_chains=4,adaptive_pt_rounds=0,winding_plane_heatbath_sweeps=0`。
