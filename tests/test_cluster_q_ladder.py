@@ -81,6 +81,20 @@ class ClusterQLadderTests(unittest.TestCase):
             result["pt_cluster_sector_changed_count_per_temperature"].shape,
             data_ladder.shape,
         )
+        for key in (
+                "pt_cluster_sector_cold_diagnostic_survived_count_per_origin_temperature",
+                "pt_cluster_sector_cold_diagnostic_reverted_count_per_origin_temperature",
+                "pt_cluster_sector_cold_diagnostic_other_count_per_origin_temperature",
+                "pt_cluster_sector_cold_diagnostic_missed_count_per_origin_temperature",
+                "pt_cluster_sector_cold_departure_survived_count_per_origin_temperature",
+                "pt_cluster_sector_cold_departure_reverted_count_per_origin_temperature",
+                "pt_cluster_sector_cold_departure_other_count_per_origin_temperature",
+                "pt_cluster_sector_cold_dwell_sample_sum_per_origin_temperature",
+                "pt_cluster_sector_cold_dwell_sample_max_per_origin_temperature",
+                "pt_cluster_sector_cold_active_remaining_count_per_origin_temperature",
+        ):
+            self.assertIn(key, result)
+            self.assertEqual(result[key].shape, data_ladder.shape)
         self.assertGreaterEqual(
             int(np.sum(result["pt_cluster_sector_attempted_count_per_temperature"])),
             1,

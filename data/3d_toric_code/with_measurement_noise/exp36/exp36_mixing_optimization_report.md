@@ -1088,3 +1088,41 @@ run03 逐温度 cold-delivery 诊断：
 - `swap_sweeps=2` 短链只把 roundtrip 从 `59` 提高到 `82`，但没有产生 cluster-stage sector change，也没有改善 cold flips。
 - `m=1024` 长链给出更细的物理图像：中温 cluster sector change 确实可以被 PT 带到 cold，30/38 次在 run 内到达 cold，其中 13 次到达时仍保持 cluster 后 signature；但这些事件没有变成按当前 cold-slot sector 诊断可见的持久 cold flip。
 - 下一步应追踪 cold arrival 后的驻留时间和 persistence：区分“到达 cold 后立即离开/未被诊断采到”、“在 cold 停留但后续 local update 回退”、“到达时 signature 与 cold-slot 观测定义/诊断 cadence 不一致”。继续单纯增加 cluster 预算或 swap sweep 的边际收益已经很弱。
+
+### 005 cold-arrival persistence 诊断实现与计划
+
+目的：解释 004 run03 中 `30` 次 cluster-sector change 到达 cold、`13` 次首次到达时仍 survived，但 cold-slot sector flip 仍为 0 的原因。
+
+代码改动：
+
+- 在 pending cluster-sector change 首次到达 cold 并完成 `arrival/survived/reverted/other` 分类后，不再只清空事件；额外记录一个 cold-dwell tracking window。
+- 该 window 按 replica 追踪：origin temperature、cluster 前后 signature、cold 内最近一次 signature、cold 内 transport-position sample 数、是否被下一次 sector diagnostic 采到。
+- 当该 replica 离开 cold，或 run 结束时仍在 cold，统计：
+  - `pt_cluster_sector_cold_diagnostic_survived/reverted/other/missed_count_per_origin_temperature`：到达 cold 后第一次 sector diagnostic 看到的状态；若离开 cold 前没有诊断样本则记为 missed。
+  - `pt_cluster_sector_cold_departure_survived/reverted/other_count_per_origin_temperature`：离开 cold 时的状态。
+  - `pt_cluster_sector_cold_dwell_sample_sum/max_per_origin_temperature`：arrival 后在 cold 的 transport-position sample 数总和/最大值。
+  - `pt_cluster_sector_cold_active_remaining_count_per_origin_temperature`：run 结束时仍在 cold dwell window 中的事件数。
+- 这些字段已穿透到 disorder-average、chunk 和 production merge tensor/mean curve；旧 chunk 缺字段时 merge 仍填 0。
+- 该改动只增加诊断输出，不改变 Markov chain proposal、acceptance 或 swap 决策。
+
+验证：
+
+- `python -m py_compile src/mcmc_parallel_tempering.py src/main.py src/production_chunked_scan.py` 通过。
+- `PYTHONPATH=src conda run --no-capture-output -n 12 python -m unittest discover -s tests` 通过，7 tests；`tests/test_cluster_q_ladder.py` 已检查新增字段 shape。
+- 本地 production smoke：
+  - `data/3d_toric_code/with_measurement_noise/exp36/005_cold_persistence_diag_smoke_20260528/cold_persistence_diag_smoke.npz`
+  - final NPZ 中新增 `chain_pt_cluster_sector_cold_diagnostic_*_tensor`、`chain_pt_cluster_sector_cold_departure_*_tensor`、`chain_pt_cluster_sector_cold_dwell_*_tensor` 与对应 mean curve 字段均存在，shape 为 `(1,1,1,1,1,5)` / `(1,1,5)`。
+  - smoke 太短，没有 cold-arrival 事件，因此新增字段数值全 0 是预期。
+
+005 远端计划：
+
+- 目录：`data/3d_toric_code/with_measurement_noise/exp36/005_cold_persistence_probe_20260529/`
+- 目标：重复 004 的 `rho=0.15,q_hot=0.35` 情形，但用新 persistence 字段定量区分 cold arrival 后是否被 diagnostic 采到、离开 cold 前是否已经回退。
+
+| run | node | rho | swap sweeps | measurements | stride | seed | purpose |
+|---|---|---:|---:|---:|---:|---:|---|
+| run01 | nd-1 | 0.15 | 1 | 1024 | 4 | 422000 | 比 004 run03 更细诊断频率，追踪 arrival 后是否被采到 |
+| run02 | nd-2 | 0.15 | 2 | 1024 | 4 | 423000 | 检查更多 swap 是否缩短或延长 cold dwell，并影响 departure 状态 |
+| run03 | nd-3 | 0.15 | 1 | 2048 | 8 | 424000 | 增加等待时间，测试 arrival/persistence 统计是否积累到更稳定信号 |
+
+共同参数：`L=6,p=0.05,q=0.08,K=17,q_hot=0.35,num_start_chains=4,adaptive_pt_rounds=0,winding_plane_heatbath_sweeps=0,cluster rho=0.15`。

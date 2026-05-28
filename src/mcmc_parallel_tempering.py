@@ -438,10 +438,141 @@ def run_parallel_tempering_measurement(
         num_temperatures,
         dtype=np.int64,
     )
+    cluster_sector_cold_diagnostic_survived_per_origin_temperature = np.zeros(
+        num_temperatures,
+        dtype=np.int64,
+    )
+    cluster_sector_cold_diagnostic_reverted_per_origin_temperature = np.zeros(
+        num_temperatures,
+        dtype=np.int64,
+    )
+    cluster_sector_cold_diagnostic_other_per_origin_temperature = np.zeros(
+        num_temperatures,
+        dtype=np.int64,
+    )
+    cluster_sector_cold_diagnostic_missed_per_origin_temperature = np.zeros(
+        num_temperatures,
+        dtype=np.int64,
+    )
+    cluster_sector_cold_departure_survived_per_origin_temperature = np.zeros(
+        num_temperatures,
+        dtype=np.int64,
+    )
+    cluster_sector_cold_departure_reverted_per_origin_temperature = np.zeros(
+        num_temperatures,
+        dtype=np.int64,
+    )
+    cluster_sector_cold_departure_other_per_origin_temperature = np.zeros(
+        num_temperatures,
+        dtype=np.int64,
+    )
+    cluster_sector_cold_dwell_sample_sum_per_origin_temperature = np.zeros(
+        num_temperatures,
+        dtype=np.int64,
+    )
+    cluster_sector_cold_dwell_sample_max_per_origin_temperature = np.zeros(
+        num_temperatures,
+        dtype=np.int64,
+    )
+    cluster_sector_cold_active_remaining_per_origin_temperature = np.zeros(
+        num_temperatures,
+        dtype=np.int64,
+    )
     cluster_sector_pending_overwritten_per_origin_temperature = np.zeros(
         num_temperatures,
         dtype=np.int64,
     )
+    cluster_sector_cold_dwell_origin_temperature_by_replica = np.full(
+        num_temperatures,
+        -1,
+        dtype=np.int64,
+    )
+    cluster_sector_cold_dwell_before_signature_by_replica = np.full(
+        num_temperatures,
+        -1,
+        dtype=np.int64,
+    )
+    cluster_sector_cold_dwell_after_signature_by_replica = np.full(
+        num_temperatures,
+        -1,
+        dtype=np.int64,
+    )
+    cluster_sector_cold_dwell_last_signature_by_replica = np.full(
+        num_temperatures,
+        -1,
+        dtype=np.int64,
+    )
+    cluster_sector_cold_dwell_sample_count_by_replica = np.zeros(
+        num_temperatures,
+        dtype=np.int64,
+    )
+    cluster_sector_cold_dwell_diagnostic_seen_by_replica = np.zeros(
+        num_temperatures,
+        dtype=np.bool_,
+    )
+
+    def _cluster_sector_signature_state(signature, before_signature, after_signature):
+        if signature == after_signature:
+            return 1
+        if signature == before_signature:
+            return 2
+        return 3
+
+    def _finish_cluster_sector_cold_dwell(replica_id, departed):
+        replica_id = int(replica_id)
+        origin = int(
+            cluster_sector_cold_dwell_origin_temperature_by_replica[replica_id]
+        )
+        if origin < 0:
+            return
+        sample_count = int(
+            cluster_sector_cold_dwell_sample_count_by_replica[replica_id]
+        )
+        cluster_sector_cold_dwell_sample_sum_per_origin_temperature[
+            origin
+        ] += sample_count
+        if sample_count > int(
+                cluster_sector_cold_dwell_sample_max_per_origin_temperature[
+                    origin
+                ]):
+            cluster_sector_cold_dwell_sample_max_per_origin_temperature[
+                origin
+            ] = sample_count
+        if not bool(
+                cluster_sector_cold_dwell_diagnostic_seen_by_replica[
+                    replica_id
+                ]):
+            cluster_sector_cold_diagnostic_missed_per_origin_temperature[
+                origin
+            ] += 1
+        if departed:
+            state = _cluster_sector_signature_state(
+                int(cluster_sector_cold_dwell_last_signature_by_replica[replica_id]),
+                int(cluster_sector_cold_dwell_before_signature_by_replica[replica_id]),
+                int(cluster_sector_cold_dwell_after_signature_by_replica[replica_id]),
+            )
+            if state == 1:
+                cluster_sector_cold_departure_survived_per_origin_temperature[
+                    origin
+                ] += 1
+            elif state == 2:
+                cluster_sector_cold_departure_reverted_per_origin_temperature[
+                    origin
+                ] += 1
+            else:
+                cluster_sector_cold_departure_other_per_origin_temperature[
+                    origin
+                ] += 1
+        else:
+            cluster_sector_cold_active_remaining_per_origin_temperature[
+                origin
+            ] += 1
+        cluster_sector_cold_dwell_origin_temperature_by_replica[replica_id] = -1
+        cluster_sector_cold_dwell_before_signature_by_replica[replica_id] = -1
+        cluster_sector_cold_dwell_after_signature_by_replica[replica_id] = -1
+        cluster_sector_cold_dwell_last_signature_by_replica[replica_id] = -1
+        cluster_sector_cold_dwell_sample_count_by_replica[replica_id] = 0
+        cluster_sector_cold_dwell_diagnostic_seen_by_replica[replica_id] = False
 
     def _record_cluster_sector_before(temperature_index):
         nonlocal cluster_sector_before_temperature_index
@@ -657,11 +788,28 @@ def run_parallel_tempering_measurement(
         hot_index = num_temperatures - 1
         for temperature_index in range(num_temperatures):
             replica_id = int(replica_id_per_temperature[temperature_index])
+            active_cold_dwell_origin = int(
+                cluster_sector_cold_dwell_origin_temperature_by_replica[
+                    replica_id
+                ]
+            )
+            if (
+                    cluster_sector_cold_delivery_tracking_active
+                    and active_cold_dwell_origin >= 0
+                    and temperature_index != 0):
+                cluster_sector_cold_dwell_last_signature_by_replica[
+                    replica_id
+                ] = _signature_for_temperature(temperature_index)
+                _finish_cluster_sector_cold_dwell(
+                    replica_id=replica_id,
+                    departed=True,
+                )
             if temperature_index < replica_min_temperature_visited[replica_id]:
                 replica_min_temperature_visited[replica_id] = temperature_index
             if temperature_index > replica_max_temperature_visited[replica_id]:
                 replica_max_temperature_visited[replica_id] = temperature_index
             if temperature_index == 0:
+                cold_signature = -1
                 pending_origin = int(
                     cluster_sector_pending_origin_temperature_by_replica[
                         replica_id
@@ -696,6 +844,24 @@ def run_parallel_tempering_measurement(
                         cluster_sector_cold_other_per_origin_temperature[
                             pending_origin
                         ] += 1
+                    cluster_sector_cold_dwell_origin_temperature_by_replica[
+                        replica_id
+                    ] = pending_origin
+                    cluster_sector_cold_dwell_before_signature_by_replica[
+                        replica_id
+                    ] = pending_before_signature
+                    cluster_sector_cold_dwell_after_signature_by_replica[
+                        replica_id
+                    ] = pending_after_signature
+                    cluster_sector_cold_dwell_last_signature_by_replica[
+                        replica_id
+                    ] = cold_signature
+                    cluster_sector_cold_dwell_sample_count_by_replica[
+                        replica_id
+                    ] = 0
+                    cluster_sector_cold_dwell_diagnostic_seen_by_replica[
+                        replica_id
+                    ] = False
                     cluster_sector_pending_origin_temperature_by_replica[
                         replica_id
                     ] = -1
@@ -705,6 +871,19 @@ def run_parallel_tempering_measurement(
                     cluster_sector_pending_after_signature_by_replica[
                         replica_id
                     ] = -1
+                if (
+                        cluster_sector_cold_delivery_tracking_active
+                        and cluster_sector_cold_dwell_origin_temperature_by_replica[
+                            replica_id
+                        ] >= 0):
+                    if cold_signature < 0:
+                        cold_signature = _signature_for_temperature(0)
+                    cluster_sector_cold_dwell_last_signature_by_replica[
+                        replica_id
+                    ] = cold_signature
+                    cluster_sector_cold_dwell_sample_count_by_replica[
+                        replica_id
+                    ] += 1
                 previous_endpoint = int(
                     replica_last_endpoint_per_replica[replica_id]
                 )
@@ -991,6 +1170,46 @@ def run_parallel_tempering_measurement(
                 cold_replica_id = int(replica_id_per_temperature[0])
                 hot_signature = int(sector_signatures[-1])
                 cold_signature = int(sector_signatures[0])
+                cold_dwell_origin = int(
+                    cluster_sector_cold_dwell_origin_temperature_by_replica[
+                        cold_replica_id
+                    ]
+                )
+                if (
+                        cluster_sector_cold_delivery_tracking_active
+                        and cold_dwell_origin >= 0
+                        and not bool(
+                            cluster_sector_cold_dwell_diagnostic_seen_by_replica[
+                                cold_replica_id
+                            ])):
+                    cold_dwell_state = _cluster_sector_signature_state(
+                        cold_signature,
+                        int(
+                            cluster_sector_cold_dwell_before_signature_by_replica[
+                                cold_replica_id
+                            ]
+                        ),
+                        int(
+                            cluster_sector_cold_dwell_after_signature_by_replica[
+                                cold_replica_id
+                            ]
+                        ),
+                    )
+                    if cold_dwell_state == 1:
+                        cluster_sector_cold_diagnostic_survived_per_origin_temperature[
+                            cold_dwell_origin
+                        ] += 1
+                    elif cold_dwell_state == 2:
+                        cluster_sector_cold_diagnostic_reverted_per_origin_temperature[
+                            cold_dwell_origin
+                        ] += 1
+                    else:
+                        cluster_sector_cold_diagnostic_other_per_origin_temperature[
+                            cold_dwell_origin
+                        ] += 1
+                    cluster_sector_cold_dwell_diagnostic_seen_by_replica[
+                        cold_replica_id
+                    ] = True
                 previous_cold_signature = int(
                     sector_last_cold_signature_by_replica[cold_replica_id]
                 )
@@ -1092,6 +1311,17 @@ def run_parallel_tempering_measurement(
             cluster_sector_pending_remaining_per_origin_temperature[
                 pending_origin
             ] += 1
+        if (
+                cluster_sector_cold_delivery_tracking_active
+                and int(
+                    cluster_sector_cold_dwell_origin_temperature_by_replica[
+                        replica_id
+                    ]
+                ) >= 0):
+            _finish_cluster_sector_cold_dwell(
+                replica_id=replica_id,
+                departed=False,
+            )
 
     result = {
         "data_error_probability_ladder": data_error_probability_ladder,
@@ -1204,6 +1434,36 @@ def run_parallel_tempering_measurement(
         result[
             "pt_cluster_sector_cold_other_count_per_origin_temperature"
         ] = cluster_sector_cold_other_per_origin_temperature
+        result[
+            "pt_cluster_sector_cold_diagnostic_survived_count_per_origin_temperature"
+        ] = cluster_sector_cold_diagnostic_survived_per_origin_temperature
+        result[
+            "pt_cluster_sector_cold_diagnostic_reverted_count_per_origin_temperature"
+        ] = cluster_sector_cold_diagnostic_reverted_per_origin_temperature
+        result[
+            "pt_cluster_sector_cold_diagnostic_other_count_per_origin_temperature"
+        ] = cluster_sector_cold_diagnostic_other_per_origin_temperature
+        result[
+            "pt_cluster_sector_cold_diagnostic_missed_count_per_origin_temperature"
+        ] = cluster_sector_cold_diagnostic_missed_per_origin_temperature
+        result[
+            "pt_cluster_sector_cold_departure_survived_count_per_origin_temperature"
+        ] = cluster_sector_cold_departure_survived_per_origin_temperature
+        result[
+            "pt_cluster_sector_cold_departure_reverted_count_per_origin_temperature"
+        ] = cluster_sector_cold_departure_reverted_per_origin_temperature
+        result[
+            "pt_cluster_sector_cold_departure_other_count_per_origin_temperature"
+        ] = cluster_sector_cold_departure_other_per_origin_temperature
+        result[
+            "pt_cluster_sector_cold_dwell_sample_sum_per_origin_temperature"
+        ] = cluster_sector_cold_dwell_sample_sum_per_origin_temperature
+        result[
+            "pt_cluster_sector_cold_dwell_sample_max_per_origin_temperature"
+        ] = cluster_sector_cold_dwell_sample_max_per_origin_temperature
+        result[
+            "pt_cluster_sector_cold_active_remaining_count_per_origin_temperature"
+        ] = cluster_sector_cold_active_remaining_per_origin_temperature
         result[
             "pt_cluster_sector_pending_overwritten_count_per_origin_temperature"
         ] = cluster_sector_pending_overwritten_per_origin_temperature
