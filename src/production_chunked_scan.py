@@ -329,13 +329,24 @@ def _build_submit_config_from_args(args):
         raise ValueError("--pt-cold-edge-swap-stride must be >= 1")
     if int(args.winding_plane_heatbath_sweeps) < 0:
         raise ValueError("--winding-plane-heatbath-sweeps must be >= 0")
+    pt_ladder_spacing_power = float(args.pt_ladder_spacing_power)
+    if (
+            not np.isfinite(pt_ladder_spacing_power)
+            or pt_ladder_spacing_power <= 0.0):
+        raise ValueError("--pt-ladder-spacing-power must be finite and positive")
     if args.pt_ladder_mode not in ("data_only", "sync_enlarge"):
         raise ValueError("pt_ladder_mode must be data_only or sync_enlarge")
+    if args.pt_ladder_mode != "sync_enlarge" and pt_ladder_spacing_power != 1.0:
+        raise ValueError(
+            "--pt-ladder-spacing-power is only supported with "
+            "--pt-ladder-mode sync_enlarge"
+        )
     pt_requested = (
         args.pt_p_hot is not None
         or args.pt_num_temperatures is not None
         or args.pt_ladder_mode != "data_only"
         or args.pt_q_hot is not None
+        or pt_ladder_spacing_power != 1.0
         or int(args.adaptive_pt_rounds) > 0
     )
     if pt_requested and args.pt_num_temperatures is None:
@@ -358,6 +369,7 @@ def _build_submit_config_from_args(args):
             q_cold=float(args.syndrome_error_probability),
             q_hot=float(args.pt_q_hot),
             num_temperatures=int(args.pt_num_temperatures),
+            spacing_power=pt_ladder_spacing_power,
         )
         for data_error_probability in data_error_probability_list:
             sync_pt_ladders_from_enlarge(
@@ -440,6 +452,7 @@ def _build_submit_config_from_args(args):
         "pt_q_hot": (
             None if args.pt_q_hot is None else float(args.pt_q_hot)
         ),
+        "pt_ladder_spacing_power": pt_ladder_spacing_power,
         "adaptive_pt_rounds": int(args.adaptive_pt_rounds),
         "adaptive_pt_calibration_sweeps": int(
             args.adaptive_pt_calibration_sweeps
@@ -550,6 +563,9 @@ def _build_chunk_tasks(config):
                     "pt_ladder_mode": config["pt_ladder_mode"],
                     "pt_ladder_semantics": config["pt_ladder_semantics"],
                     "pt_q_hot": config["pt_q_hot"],
+                    "pt_ladder_spacing_power": float(
+                        config.get("pt_ladder_spacing_power", 1.0)
+                    ),
                     "adaptive_pt_rounds": config["adaptive_pt_rounds"],
                     "adaptive_pt_calibration_sweeps": (
                         config["adaptive_pt_calibration_sweeps"]
@@ -706,6 +722,9 @@ def _build_manifest(
             "pt_ladder_mode": config["pt_ladder_mode"],
             "pt_ladder_semantics": config["pt_ladder_semantics"],
             "pt_q_hot": config["pt_q_hot"],
+            "pt_ladder_spacing_power": float(
+                config.get("pt_ladder_spacing_power", 1.0)
+            ),
             "adaptive_pt_rounds": config["adaptive_pt_rounds"],
             "adaptive_pt_calibration_sweeps": (
                 config["adaptive_pt_calibration_sweeps"]
@@ -871,6 +890,9 @@ def _run_chunk_task(task_data):
             pt_num_temperatures=task_data["pt_num_temperatures"],
             pt_ladder_mode=task_data["pt_ladder_mode"],
             pt_q_hot=task_data["pt_q_hot"],
+            pt_ladder_spacing_power=float(
+                task_data.get("pt_ladder_spacing_power", 1.0)
+            ),
             adaptive_pt_rounds=task_data["adaptive_pt_rounds"],
             adaptive_pt_calibration_sweeps=(
                 task_data["adaptive_pt_calibration_sweeps"]
@@ -926,6 +948,7 @@ def _run_chunk_task(task_data):
         )
         simulation_result_for_save.pop("pt_swap_sweeps_per_attempt", None)
         simulation_result_for_save.pop("pt_cold_edge_swap_stride", None)
+        simulation_result_for_save.pop("pt_ladder_spacing_power", None)
         section_stats = _extract_section_stats(simulation_result_for_save)
 
         np.savez(
@@ -995,6 +1018,12 @@ def _run_chunk_task(task_data):
                 np.nan
                 if task_data["pt_q_hot"] is None
                 else task_data["pt_q_hot"]
+            ),
+            pt_ladder_spacing_power=np.float64(
+                task_data.get("pt_ladder_spacing_power", 1.0)
+            ),
+            pt_ladder_spacing_power_config=np.float64(
+                task_data.get("pt_ladder_spacing_power", 1.0)
             ),
             adaptive_pt_rounds_config=np.int64(task_data["adaptive_pt_rounds"]),
             adaptive_pt_calibration_sweeps_config=np.int64(
@@ -3097,6 +3126,9 @@ def _merge_outputs(
                     ),
                 )
             )
+            merged_result["pt_ladder_spacing_power"] = np.float64(
+                config.get("pt_ladder_spacing_power", 1.0)
+            )
             merged_result["adaptive_pt_rounds"] = np.int64(
                 adaptive_pt_rounds
             )
@@ -3543,6 +3575,9 @@ def _merge_outputs(
             if config.get("pt_q_hot") is None
             else config["pt_q_hot"]
         ),
+        pt_ladder_spacing_power_config=np.float64(
+            config.get("pt_ladder_spacing_power", 1.0)
+        ),
         adaptive_pt_rounds_config=np.int64(adaptive_pt_rounds),
         adaptive_pt_calibration_sweeps_config=np.int64(
             config.get("adaptive_pt_calibration_sweeps", 128)
@@ -3879,6 +3914,16 @@ def _run_chunk_command(args):
         raise ValueError("--pt-swap-sweeps-per-attempt must be >= 1")
     if int(args.pt_cold_edge_swap_stride) < 1:
         raise ValueError("--pt-cold-edge-swap-stride must be >= 1")
+    pt_ladder_spacing_power = float(args.pt_ladder_spacing_power)
+    if (
+            not np.isfinite(pt_ladder_spacing_power)
+            or pt_ladder_spacing_power <= 0.0):
+        raise ValueError("--pt-ladder-spacing-power must be finite and positive")
+    if args.pt_ladder_mode != "sync_enlarge" and pt_ladder_spacing_power != 1.0:
+        raise ValueError(
+            "--pt-ladder-spacing-power is only supported with "
+            "--pt-ladder-mode sync_enlarge"
+        )
     task_data = {
         "lattice_index": int(args.lattice_index),
         "point_index": int(args.point_index),
@@ -3909,6 +3954,7 @@ def _run_chunk_command(args):
         "pt_q_hot": (
             None if args.pt_q_hot is None else float(args.pt_q_hot)
         ),
+        "pt_ladder_spacing_power": pt_ladder_spacing_power,
         "adaptive_pt_rounds": int(args.adaptive_pt_rounds),
         "adaptive_pt_calibration_sweeps": int(
             args.adaptive_pt_calibration_sweeps
@@ -4067,6 +4113,16 @@ def _build_parser():
         "--pt-q-hot",
         type=float,
         default=None,
+    )
+    common_submit_parser.add_argument(
+        "--pt-ladder-spacing-power",
+        type=float,
+        default=1.0,
+        help=(
+            "Shape sync_enlarge PT heat-scale positions as x**power. Values "
+            ">1 place more temperatures near the cold endpoint while keeping "
+            "the same q_hot. The default 1.0 preserves uniform log spacing."
+        ),
     )
     common_submit_parser.add_argument(
         "--adaptive-pt-rounds",
@@ -4302,6 +4358,11 @@ def _build_parser():
         "--pt-q-hot",
         type=float,
         default=None,
+    )
+    run_chunk_parser.add_argument(
+        "--pt-ladder-spacing-power",
+        type=float,
+        default=1.0,
     )
     run_chunk_parser.add_argument(
         "--adaptive-pt-rounds",

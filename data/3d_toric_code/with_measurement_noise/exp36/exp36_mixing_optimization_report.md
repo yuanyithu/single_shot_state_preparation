@@ -1267,3 +1267,38 @@ run03 逐温度 cold-delivery 诊断：
 - 提交并推送：`67e705ae1 Add exp36 probe summary helper`。
 
 下一轮若发现 final NPZ 已生成，直接运行该脚本生成正式 `006_summary.json/md` 和 `007_summary.json/md`，再更新本报告结论。
+
+### 008 near-cold ladder 加密实现与计划
+
+006/007 状态更新：
+
+- 006 run03 `run03_measure1_m2048_seed427000` 仍在 nd-3 运行，尚无 final NPZ。
+- 007 run01/run02 已完成并同步到本地；run03 `cold_edge_stride=4` 仍在 nd-3 运行。
+- 007 partial summary：run01 `cold_edge_stride=1` 与 run02 `cold_edge_stride=2` 均无 cluster-stage sector change，cold flips 都为 `[0,0,0,0]`；roundtrip 分别为 `159` 和 `156`，min swap 分别为 `0.142660` 和 `0.120177`。因此目前尚不能证明 cold-edge stride=2 有帮助；需要等待 stride=4 或更多 seed。
+
+物理动机：005 显示中温 cluster-sector change 能到达 cold，但 persistence 很弱；006 的全局降低 swap cadence 会损伤 roundtrip；007 的轻度 cold-edge hold 暂时没有产生 sector-change 事件。下一步测试一个不同方向：不改变目标分布，只重排 `sync_enlarge` ladder 的温度点，让 cold/near-cold 更密，增加 sector-changing replica 从中温冷却到 cold 时经过的缓冲层数。
+
+程序改动：新增 `pt_ladder_spacing_power` / CLI `--pt-ladder-spacing-power`。
+
+- 默认 `1.0` 保持旧 uniform log heat-scale spacing。
+- `power>1` 使用 `x**power` 作为 log heat-scale normalized index：cold 端间距更小，hot 端更大，cold endpoint 和 `q_hot` 不变。
+- 仅支持 `--pt-ladder-mode sync_enlarge`；生产 chunk、manifest 和 final NPZ 均保存该参数。
+
+验证：
+
+- `PYTHONPATH=src conda run --no-capture-output -n 12 python -m py_compile src/mcmc_diagnostics.py src/main.py src/production_chunked_scan.py src/summarize_exp36_probe.py` 通过。
+- `PYTHONPATH=src conda run --no-capture-output -n 12 python -m unittest discover -s tests` 通过，10 tests。
+- 本地 smoke：`data/3d_toric_code/with_measurement_noise/exp36/008_near_cold_ladder_probe_20260529/local_ladder_spacing_smoke/local_ladder_spacing_smoke.npz`。
+  - final NPZ 保存 `pt_ladder_spacing_power=2.0` 和 `pt_ladder_spacing_power_config=2.0`。
+  - smoke 的 `q` ladder 为 `[0.08,0.09607933,0.15021112,0.24443533,0.35]`；首个 log-odds gap 明显小于 uniform ladder，确认 near-cold 加密生效。
+
+008 远端计划：先只用空闲的 nd-1/nd-2，不挤占 nd-3 上仍在跑的 006/007。
+
+共同参数：`L=6,p=0.05,q=0.08,K=17,q_hot=0.35,cluster rho=0.15,num_start_chains=4,adaptive_pt_rounds=0,winding_plane_heatbath_sweeps=0,num_measurements=1024,num_sweeps_between_measurements=6,pt_sector_diagnostic_stride=1,pt_cold_edge_swap_stride=1`。
+
+| run | node | spacing power | seed | purpose |
+|---|---|---:|---:|---|
+| run01 | nd-1 | 1.5 | 431000 | 轻度 near-cold 加密，观察 persistence 是否改善 |
+| run02 | nd-2 | 2.0 | 432000 | 更强 near-cold 加密，观察 hot-side 稀疏化是否损伤 transport |
+
+判据：若 `power=1.5/2.0` 增加 cluster changed 后的 cold arrival、diagnostic survived、dwell sum/max 或 cold flips，且 roundtrip/min swap 没有崩溃，则 near-cold ladder 加密值得继续；若 roundtrip 下降而 cold flips 仍为 0，则说明单纯重排温度点不足以解决 cold persistence。
