@@ -61,6 +61,36 @@ class SyncParallelTemperingLadderTests(unittest.TestCase):
                 num_temperatures=9,
             )
 
+    def test_sync_ladder_spacing_power_densifies_cold_end(self):
+        uniform = sync_pt_enlarge_ladder(
+            q_cold=0.08,
+            q_hot=0.35,
+            num_temperatures=17,
+        )
+        shaped = sync_pt_enlarge_ladder(
+            q_cold=0.08,
+            q_hot=0.35,
+            num_temperatures=17,
+            spacing_power=2.0,
+        )
+
+        self.assertAlmostEqual(float(shaped[0]), float(uniform[0]))
+        self.assertAlmostEqual(float(shaped[-1]), float(uniform[-1]))
+        uniform_log_gaps = np.diff(np.log(uniform))
+        shaped_log_gaps = np.diff(np.log(shaped))
+        self.assertLess(float(shaped_log_gaps[0]), float(uniform_log_gaps[0]))
+        self.assertGreater(float(shaped_log_gaps[-1]), float(uniform_log_gaps[-1]))
+        self.assertTrue(np.all(shaped_log_gaps >= -1e-12))
+
+    def test_sync_ladder_rejects_invalid_spacing_power(self):
+        with self.assertRaisesRegex(ValueError, "spacing_power"):
+            sync_pt_enlarge_ladder(
+                q_cold=0.08,
+                q_hot=0.35,
+                num_temperatures=17,
+                spacing_power=0.0,
+            )
+
     def test_adaptive_ladder_caps_degenerate_large_gap(self):
         initial_heat_scale = sync_pt_enlarge_ladder(
             q_cold=0.08,

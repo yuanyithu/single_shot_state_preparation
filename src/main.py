@@ -1737,7 +1737,8 @@ def _build_pt_ladders(
         pt_num_temperatures,
         pt_ladder_mode="data_only",
         pt_q_hot=None,
-        pt_enlarge_ladder=None):
+        pt_enlarge_ladder=None,
+        pt_ladder_spacing_power=1.0):
     pt_ladder_mode = str(pt_ladder_mode)
     if pt_ladder_mode not in ("data_only", "sync_enlarge"):
         raise ValueError("pt_ladder_mode must be data_only or sync_enlarge")
@@ -1755,6 +1756,7 @@ def _build_pt_ladders(
                 q_cold=syndrome_error_probability,
                 q_hot=float(pt_q_hot),
                 num_temperatures=int(pt_num_temperatures),
+                spacing_power=pt_ladder_spacing_power,
             )
         data_ladder, syndrome_ladder = sync_pt_ladders_from_enlarge(
             p_cold=data_error_probability,
@@ -2599,6 +2601,7 @@ def run_disorder_average_simulation(
         pt_num_temperatures=None,
         pt_ladder_mode="data_only",
         pt_q_hot=None,
+        pt_ladder_spacing_power=1.0,
         adaptive_pt_rounds=0,
         adaptive_pt_calibration_sweeps=128,
         pt_swap_attempt_every_num_sweeps=1,
@@ -2671,6 +2674,11 @@ def run_disorder_average_simulation(
         elif pt_ladder_mode == "sync_enlarge":
             if pt_q_hot is None:
                 raise ValueError("pt_q_hot is required for sync_enlarge PT")
+            pt_ladder_spacing_power = float(pt_ladder_spacing_power)
+            if (
+                    not np.isfinite(pt_ladder_spacing_power)
+                    or pt_ladder_spacing_power <= 0.0):
+                raise ValueError("pt_ladder_spacing_power must be positive")
             if not (
                     float(syndrome_error_probability)
                     < float(pt_q_hot)
@@ -2945,6 +2953,7 @@ def run_disorder_average_simulation(
                 pt_num_temperatures=pt_num_temperatures,
                 pt_ladder_mode=pt_ladder_mode,
                 pt_q_hot=pt_q_hot,
+                pt_ladder_spacing_power=pt_ladder_spacing_power,
             )
             pt_data_error_probability_ladder_per_disorder = np.empty(
                 (num_disorder_samples, int(pt_num_temperatures)),
@@ -3344,6 +3353,7 @@ def run_disorder_average_simulation(
                         pt_ladder_mode=pt_ladder_mode,
                         pt_q_hot=pt_q_hot,
                         pt_enlarge_ladder=new_pt_enlarge_ladder,
+                        pt_ladder_spacing_power=pt_ladder_spacing_power,
                     )
                     round_summaries.append({
                         "round_index": int(adaptive_round_index + 1),
@@ -4218,6 +4228,9 @@ def run_disorder_average_simulation(
             result["pt_q_hot"] = np.float64(
                 syndrome_error_probability if pt_q_hot is None else pt_q_hot
             )
+            result["pt_ladder_spacing_power"] = np.float64(
+                pt_ladder_spacing_power
+            )
             result["pt_num_temperatures"] = np.int64(pt_num_temperatures)
             result["pt_ladder_mode"] = np.array(pt_ladder_mode)
             result["pt_ladder_semantics"] = np.array(
@@ -4500,6 +4513,7 @@ def scan_data_error_probability(
         pt_num_temperatures=None,
         pt_ladder_mode="data_only",
         pt_q_hot=None,
+        pt_ladder_spacing_power=1.0,
         adaptive_pt_rounds=0,
         adaptive_pt_calibration_sweeps=128,
         pt_swap_attempt_every_num_sweeps=1,
@@ -4559,6 +4573,7 @@ def scan_data_error_probability(
             pt_num_temperatures=pt_num_temperatures,
             pt_ladder_mode=pt_ladder_mode,
             pt_q_hot=pt_q_hot,
+            pt_ladder_spacing_power=pt_ladder_spacing_power,
             adaptive_pt_rounds=adaptive_pt_rounds,
             adaptive_pt_calibration_sweeps=adaptive_pt_calibration_sweeps,
             pt_swap_attempt_every_num_sweeps=(
@@ -4610,6 +4625,7 @@ def scan_data_error_probability(
         ),
         "pt_swap_sweeps_per_attempt": np.int64(pt_swap_sweeps_per_attempt),
         "pt_cold_edge_swap_stride": np.int64(pt_cold_edge_swap_stride),
+        "pt_ladder_spacing_power": np.float64(pt_ladder_spacing_power),
         "num_zero_syndrome_sweeps_per_cycle": np.int64(
             num_zero_syndrome_sweeps_per_cycle
         ),
@@ -4658,6 +4674,7 @@ def _run_single_scan_point_task(task_data):
     pt_num_temperatures = task_data.get("pt_num_temperatures")
     pt_ladder_mode = task_data.get("pt_ladder_mode", "data_only")
     pt_q_hot = task_data.get("pt_q_hot")
+    pt_ladder_spacing_power = task_data.get("pt_ladder_spacing_power", 1.0)
     adaptive_pt_rounds = task_data.get("adaptive_pt_rounds", 0)
     adaptive_pt_calibration_sweeps = task_data.get(
         "adaptive_pt_calibration_sweeps",
@@ -4734,6 +4751,7 @@ def _run_single_scan_point_task(task_data):
         pt_num_temperatures=pt_num_temperatures,
         pt_ladder_mode=pt_ladder_mode,
         pt_q_hot=pt_q_hot,
+        pt_ladder_spacing_power=pt_ladder_spacing_power,
         adaptive_pt_rounds=adaptive_pt_rounds,
         adaptive_pt_calibration_sweeps=adaptive_pt_calibration_sweeps,
         pt_swap_attempt_every_num_sweeps=(
@@ -4900,6 +4918,7 @@ def scan_multiple_code_sizes(
         pt_num_temperatures=None,
         pt_ladder_mode="data_only",
         pt_q_hot=None,
+        pt_ladder_spacing_power=1.0,
         adaptive_pt_rounds=0,
         adaptive_pt_calibration_sweeps=128,
         pt_swap_attempt_every_num_sweeps=1,
@@ -4988,6 +5007,7 @@ def scan_multiple_code_sizes(
                 "pt_num_temperatures": pt_num_temperatures,
                 "pt_ladder_mode": pt_ladder_mode,
                 "pt_q_hot": pt_q_hot,
+                "pt_ladder_spacing_power": pt_ladder_spacing_power,
                 "adaptive_pt_rounds": adaptive_pt_rounds,
                 "adaptive_pt_calibration_sweeps": (
                     adaptive_pt_calibration_sweeps
@@ -5190,6 +5210,7 @@ def scan_multiple_code_sizes(
         ),
         "pt_swap_sweeps_per_attempt": np.int64(pt_swap_sweeps_per_attempt),
         "pt_cold_edge_swap_stride": np.int64(pt_cold_edge_swap_stride),
+        "pt_ladder_spacing_power": np.float64(pt_ladder_spacing_power),
         "num_zero_syndrome_sweeps_per_cycle": np.int64(
             num_zero_syndrome_sweeps_per_cycle
         ),

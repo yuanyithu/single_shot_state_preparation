@@ -47,10 +47,13 @@ def equal_log_odds_ladder(p_cold, p_hot, num_temperatures):
     return np.exp(log_odds_values) / (1.0 + np.exp(log_odds_values))
 
 
-def sync_pt_enlarge_ladder(q_cold, q_hot, num_temperatures):
+def sync_pt_enlarge_ladder(q_cold, q_hot, num_temperatures, spacing_power=1.0):
     num_temperatures = int(num_temperatures)
     if num_temperatures < 1:
         raise ValueError("num_temperatures must be >= 1")
+    spacing_power = float(spacing_power)
+    if not np.isfinite(spacing_power) or spacing_power <= 0.0:
+        raise ValueError("spacing_power must be finite and positive")
     if num_temperatures == 1:
         return np.asarray([1.0], dtype=np.float64)
     q_cold_coupling = probability_to_coupling(q_cold)
@@ -59,8 +62,10 @@ def sync_pt_enlarge_ladder(q_cold, q_hot, num_temperatures):
     if not (0.0 < beta_hot < 1.0):
         raise ValueError("q_hot must be greater than q_cold and below 0.5")
     hot_enlarge = 1.0 / beta_hot
+    normalized_index = np.linspace(0.0, 1.0, num_temperatures)
+    shaped_index = normalized_index ** spacing_power
     return np.exp(
-        np.linspace(0.0, np.log(hot_enlarge), num_temperatures)
+        shaped_index * np.log(hot_enlarge)
     ).astype(np.float64)
 
 
