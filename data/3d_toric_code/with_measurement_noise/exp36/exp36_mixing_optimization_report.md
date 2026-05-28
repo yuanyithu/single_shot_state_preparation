@@ -1237,3 +1237,15 @@ run03 逐温度 cold-delivery 诊断：
 
 - 若 stride `2/4` 明显增加 `cold_dwell_sample_sum/max`、`diagnostic survived` 和 cold flips，同时 roundtrip 仍可接受，则 cold-edge dwell 是有效调度方向。
 - 若 roundtrip 明显下降且 cold flips 仍为 0，则说明简单 cold hold 不能解决 cold persistence，应改为 near-cold ladder 加密或重新设计中温 sector change 到 cold 的保留机制。
+
+启动状态：
+
+- 代码提交并推送：`f05c1a818 Add exp36 cold-edge PT hold scheduling`。
+- launcher 提交并推送：`a3dccc37e Record exp36 cold-edge hold launch`。
+- 远端 source：`/home/DATA1/users/yuany/.single_shot/repos/007_cold_edge_hold_probe_20260529/source`。
+- run base：`/home/DATA1/users/yuany/.single_shot/exp36/007_cold_edge_hold_probe_20260529`。
+- launcher：`data/3d_toric_code/with_measurement_noise/exp36/007_cold_edge_hold_probe_20260529/launch_cold_edge_hold_probe_20260529.sh`。
+- 三条任务均通过 quick exact validation、preflight chunk 和 preflight merge，并进入 `Launching chunk workers: 1 workers for 1 chunks`。
+- screen：nd-1 `exp36_007_r1`，nd-2 `exp36_007_r2`，nd-3 `exp36_007_r3`。
+
+下一轮先检查 006 run03 与 007 三条 final NPZ；若完成，分别同步并生成 `006_summary.json/md` 与 `007_summary.json/md`。007 重点比较 cold-edge stride 对 cold flips、cluster changed/arrival、diagnostic missed、dwell sum/max、departure 状态和 roundtrip 的影响。
