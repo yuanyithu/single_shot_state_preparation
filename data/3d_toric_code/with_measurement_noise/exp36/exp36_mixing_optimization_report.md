@@ -1302,3 +1302,16 @@ run03 逐温度 cold-delivery 诊断：
 | run02 | nd-2 | 2.0 | 432000 | 更强 near-cold 加密，观察 hot-side 稀疏化是否损伤 transport |
 
 判据：若 `power=1.5/2.0` 增加 cluster changed 后的 cold arrival、diagnostic survived、dwell sum/max 或 cold flips，且 roundtrip/min swap 没有崩溃，则 near-cold ladder 加密值得继续；若 roundtrip 下降而 cold flips 仍为 0，则说明单纯重排温度点不足以解决 cold persistence。
+
+启动状态：
+
+- 代码与计划提交并推送：`f01bcee30 Add exp36 near-cold PT ladder spacing`。
+- launcher 提交并推送：`6a676a422 Record exp36 near-cold ladder launch`。
+- 远端 source：`/home/DATA1/users/yuany/.single_shot/repos/008_near_cold_ladder_probe_20260529/source`。
+- run base：`/home/DATA1/users/yuany/.single_shot/exp36/008_near_cold_ladder_probe_20260529`。
+- launcher：`data/3d_toric_code/with_measurement_noise/exp36/008_near_cold_ladder_probe_20260529/launch_near_cold_ladder_probe_20260529.sh`。
+- run01 `spacing_power=1.5` 已在 nd-1 的 screen `exp36_008_r1` 启动；manifest 记录 `git_commit_sha=f01bcee30`，已通过 quick exact validation、preflight chunk 和 preflight merge，进入 `Launching chunk workers: 1 workers for 1 chunks`。
+- run02 `spacing_power=2.0` 已在 nd-2 的 screen `exp36_008_r2` 启动；manifest 同样记录 `git_commit_sha=f01bcee30`，已进入 chunk worker。
+- 006 run03 与 007 run03 仍在 nd-3 运行，尚无 final NPZ。
+
+下一轮先检查 006 run03、007 run03 和 008 run01/run02 final NPZ；若完成，同步到本地并用 `src/summarize_exp36_probe.py` 生成正式 summary，再比较 near-cold ladder 加密对 roundtrip、min swap、cluster arrival/persistence 和 cold flips 的影响。
