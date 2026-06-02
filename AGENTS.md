@@ -7,6 +7,26 @@
 
 
 
+## 物理图像与 L·T·S 分解（核心概念对齐）
+
+模拟对象是 3D toric code 纠 X 错误的统计力学模型。MCMC 更新的是 edge 上的 X-error 构型 `c ∈ C_1 = F_2^n`（`n = 3L³`，逻辑比特数 `k = 3`）。固定 disorder `(s, η)`：`s` 是带测量噪声的 syndrome，`η` 是真实 data error。目标是采样该 disorder 下的 Gibbs 热态
+
+`π(c) ∝ exp[ −K_p·|c ⊕ η| − K_q·|H_Z c ⊕ s| ]`，其中 `K_p = log((1−p)/p)`、`K_q = log((1−q)/q)`。
+
+把 `c`（更一般地辛空间 `F_2^{2n}` 里任意 Pauli，在一组固定基下）唯一分解为 `c = T ⊕ L ⊕ S`：
+
+- **S（stabilizer）**：`S ∈ im(H_X^T)`，`H_Z S = 0` 且逻辑平凡 = vertex star / contractible loop。改 S 不动 syndrome、不动逻辑类，只在固定 (syndrome, 逻辑类) 的 coset 内做微观重排。`dim = n − ρ − k`。
+- **L（logical）**：逻辑算符代表元 = winding / Wilson loop（非平凡 1-cycle）。`H_Z L = 0`，改 L 不动 syndrome，但要翻一整条长度 `~L` 的非收缩环，data 权重变 `~K_p·L`。`dim = k`。**测的 Wilson loop 可观测量就是 L 的指示量。**
+- **T（destabilizer / syndrome）**：与 stabilizer 对偶、携带 syndrome 的代表元，`H_Z|_T` 单射。改 T 会改变 `H_Z c`，`q>0` 花 `K_q` 能量，`q=0` 被硬约束 `H_Z c = s` 钉死。`dim = ρ = rank(H_Z)`。代码里的线性 section `r(σ)`（syndrome→代表链）就是 T 空间的一组代表元。
+
+MCMC 三类 move ↔ 该分解：single-bit 翻转一般同时动 **T 与 S**（采样 syndrome 涨落 T 的主力）；contractible 零-syndrome move / cluster update 只动 **S**；**winding 零-syndrome move 只动 L，即"逻辑扇区翻转 / sector flip"**。
+
+观测量 `O_u = (−1)^<z_u, c + η + r(H_Z c) + r(H_Z η)>`：`c + r(H_Z c)` 去掉 c 的 T 分量（落进 `S⊕L`），与逻辑代表 `z_u` 配对又滤掉 S（`<z_u, S> = 0`），故 `O_u` 读出的是 **c 相对 η 的 L 分量（逻辑类）**。`q_top = mean_u(m_u²)` = 该逻辑类分布的纯度：`→1` 有序/可纠错，`→0` 无序/不可纠错。
+
+**「sector 不翻转」= L 被冻结**：S、T 一直在被正常采样，但链从不在不同逻辑类之间移动。这是有序相里的破缺遍历性，与低温 Ising 单自旋翻转卡在某磁化扇区同构——翻 L 要插入 `~K_p·L` 的畴壁/winding，小 p（深有序相）+ 大 L 时势垒巨大（接受率 `~(p/(1−p))^L`，p=0.05 时 L=5 约 4e-7、L=6 约 2e-8），local + PT 在有限时间跨不过去 → `winding 接受率 ≈ 0` → `q_top` 被假性钉在 1、看不到相变 crossing。因此收敛诊断必须把**冷端 winding 接受率 / 逐温度 winding 是否传到冷档**作为硬判据；"不同冻结起点互相一致"不能当收敛证据（共冻 ≠ 收敛）。
+
+
+
 文件结构：
 
 - `src/main.py`：主入口，组织单尺寸/多尺寸扫描与结果保存
@@ -33,7 +53,7 @@
     - 当登录到nd-0之后进一步使用命令`ssh nd-3`或`ssh nd-1`或`ssh nd-2`可以登录到计算节点，计算节点与存储节点共享存储，计算应在这个节点开展
     - 运行python请使用名为`11`的conda环境，运行请开启`screen`后台运行
 - 快速测试技巧：可以不做disorder sample，只看一个disorder固定为0的内部有没有相变
-- 每次实验放在一个文件夹下，文件夹命名规则类似`exp1_极简实验内容_20260501_日内时间戳`。
+- 每次实验放在一个文件夹下，文件夹命名规则类似`exp1_极简实验内容_20260501_日内时间戳`。每次实验按顺序编号命名
 - exp36 起的迭代优化实验统一使用带序号子文件夹，例如 `001_cluster_stage_diag_smoke_20260528/`、`002_cluster_stage_repeats_20260528/`；同一轮远端多节点结果放在该编号目录下的不同 run 子目录。
 - 每次实验如果分多节点分批次运行，请全部放在一个文件夹下的不同子文件夹，用来保存每个节点的运行代码，每个节点的运行数据
 - 本地实验、smoke、profile 和 sanity check 只要会产生需要查看或留档的数据，都必须输出到本项目的 `data/` 目录下；不要把结果放到项目外的 `/tmp`、系统临时目录或其他不可见位置。临时 cache 可以例外，但最终 JSON/NPZ/PNG/MD/CSV 产物必须在 `project D/data/` 内。
@@ -58,3 +78,4 @@
 - 同步放大 ladder 会按 `q_hot/q_cold` 的 odds 比例同步放大 `p`，若 `p_cold` 偏高或 `q_hot` 太大，热端 `p_k` 可能超过 `0.5` 并在 submit/preflight 报错；exp35 固定 `p=0.05,q_hot=0.44` 是可行组合。
 - 用 profiler 测 wall time 时优先设置 `--stage-signature-mode none`；逐环节 sector-change 诊断会反复计算 logical signature，开销可远大于真实 MCMC 更新。需要判断哪个环节改变 logical sector 时再单独用 `stage` 模式小样本跑。
 - `screen` 中用 `conda run` 时日志可能被 capture/buffer；新 launcher 已使用 `conda run --no-capture-output`，旧 run 若日志为空应以 `profile_summary.json/md` 和 raw JSON/NPZ 为准。
+- q>0 的 `q_positive_initial_chain_mode=sector` 只能用 zero-syndrome sector representatives 生成不同初态；不要对带 measurement noise 的 observed syndrome 求 section representative，因为它不一定属于 `im(H_Z)`，会导致 section/decoder 路径卡住或产生无意义初态。q=0 多起点路径才需要 syndrome representative。
