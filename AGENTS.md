@@ -65,7 +65,7 @@ MCMC 三类 move ↔ 该分解：single-bit 翻转一般同时动 **T 与 S**（
 - 新 run 若曲线明显偏离，应先检查 manifest 中的 `common_random_disorder_across_p`、`num_start_chains`、`q0_num_start_chains`、`pt_num_temperatures`、burn-in 设置、Numba 是否启用和 commit SHA。
 - `r` 的数学定义已经从"线性截面"修正为"任意 section"；代码里优先走 `ldpc.BpLsdDecoder` 风格的 syndrome-to-chain 代表元映射，失败再回退到高斯消元。
 - 逻辑观测量必须按修正公式 `(-1)^<z_u, c + eta + r(H_Z c) + r(H_Z eta)>` 计算；不要恢复旧的 `r^T`/factorized mask 线性化路径。
-- 旧的 `q!=0` 数值结果基于错误的线性化 observable 公式，已经失效，后续分析不要沿用。
+- 旧的 `q!=0` 数值结果基于错误的线性化 observable 公式，已经失效，后续分析不要沿用；exp37 的 `020/028` 还用了旧 `x+r(Hx)` sector 标签，也只保留作审计。`p=0.05,q=0.08..0.23,L=3,4,5` 的 corrected AIS 最终表以 `exp37/032_final_corrected_qgrid_20260603` 为准。早期 AIS NPZ 可能没有 `delta_f_stderr_per_disorder`，优先用 `032` 或重新跑修正后的聚合代码。
 
 服务器/性能运行坑：
 - 远端 `conda run -n 11 python - <<'PY' ...` 可能吞掉 stdin 或产生空输出；复杂脚本优先写到临时 `.py` 文件再 `conda run -n 11 python script.py`。
