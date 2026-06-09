@@ -1,5 +1,7 @@
 # exp39/007 — 3D toric code single-shot 测量错误相边界 q_c(p)
 
+> ⚠️ **2026-06-10 纠正**：本文用的 **Δf-gap crossing 系统性偏高**（even-moment，测「有没有某类主导」而非可纠错性；008 q≈0 FSS 外推 0.40≠真值 0.233）。已用 **sign-aware w0=P(真类) crossing** 在同数据零成本重算 → `analyze_boundary_w0.py` / `boundary_corrected_w0.png`：**修正后 q_c(p)≈0.025–0.034（约为 Δf 值的一半，与 q_top 一致）**。下文 Δf 数值（q_c≈0.05–0.06）仅作记录，**不代表真阈值**；且 w0 的 L=3,4,5 crossing 仍是有限尺寸高估（真值更低，需大 L + data collapse）。详见记忆 `qtop-saturates-use-deltaf-for-crossing`。
+
 **问题**：带测量噪声 q + Pauli-X 噪声 p 的 3D toric code 单次态制备，相边界 q_c(p)（可纠错↔不可纠错）长什么样。
 
 **方法**：固定 p 扫 q，对 L=3,4,5 算**扇区自由能 gap Δf**（主导逻辑扇区→最近竞争扇区的自由能差 = 逻辑保护/翻错能垒，**不饱和**，优于在有序相饱和到 1 的 q_top）。Δf(q) 的 L=3,4,5 曲线在 q_c 处换序（有序侧 q<q_c 大 L 更高、无序侧反），即有限尺寸 crossing。q_c(p) 拼成相边界。全程 TI / `projection_mode=linear`（正确观测量，见 `qtop_vs_deltaf_math.md` 与记忆 `exp37-decoder-sector-bug`）。
