@@ -22,6 +22,9 @@ description: threshold/相边界 crossing 分析规范(估计量选择、观测�
 
 ## 统计约定
 
+- **"首个变号"估计量在低统计下向低偏置**(exp40/004 实测):crossing 前各 L 曲线近简并,噪声会在真 crossing 之前制造假变号;48 disorder 时 p=0.11 的 q_c 被拉低到 0.026,384 disorder 修正为 0.043。**48 disorder 只够探路,定值至少 256–384**。
+- crossing 浅(曲线近平行)时 CI 不随 √N 收缩;此时加 disorder 收益递减,**收紧 q_c 要加大 L**(扇形斜率差变大)。
+
 - disorder bootstrap(成对重采样 disorder 索引,两条 L 曲线用同一组索引),生产 N≥6000;**必须报告 boot_frac**(bootstrap 样本中找到 crossing 的比例),boot_frac<0.9 说明该点统计不足。
 - 误差棒 = disorder SEM(`std/sqrt(ndis)`);MCMC 内部误差(blocks/TI stderr)远小于 disorder 涨落,disorder 数是约束(48 太少,256–384 才能把 crossing CI 收到 ~0.008)。
 - 多 seed 块合并:同一 (p, q grid) 的不同 seed_base 块沿 disorder 轴 concat(校验 q grid / L list 完全一致);不同 q grid 的源沿 q 轴合并去重(`load_source` 模式)。
