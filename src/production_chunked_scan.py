@@ -327,6 +327,8 @@ def _build_submit_config_from_args(args):
         raise ValueError("--pt-swap-sweeps-per-attempt must be >= 1")
     if int(args.pt_cold_edge_swap_stride) < 1:
         raise ValueError("--pt-cold-edge-swap-stride must be >= 1")
+    if int(args.q_top_block_count) < 0:
+        raise ValueError("--q-top-block-count must be >= 0")
     if int(args.winding_plane_heatbath_sweeps) < 0:
         raise ValueError("--winding-plane-heatbath-sweeps must be >= 0")
     pt_ladder_spacing_power = float(args.pt_ladder_spacing_power)
@@ -473,6 +475,10 @@ def _build_submit_config_from_args(args):
             args.single_bit_proposal_fraction
         ),
         "observable_temperature_mode": str(args.observable_temperature_mode),
+        "q_top_block_count": int(args.q_top_block_count),
+        "q_positive_initial_chain_mode": str(
+            args.q_positive_initial_chain_mode
+        ),
         "track_pt_sector_diagnostics": bool(
             args.track_pt_sector_diagnostics
         ),
@@ -596,6 +602,10 @@ def _build_chunk_tasks(config):
                     ),
                     "observable_temperature_mode": str(
                         config["observable_temperature_mode"]
+                    ),
+                    "q_top_block_count": int(config["q_top_block_count"]),
+                    "q_positive_initial_chain_mode": str(
+                        config["q_positive_initial_chain_mode"]
                     ),
                     "track_pt_sector_diagnostics": bool(
                         config.get("track_pt_sector_diagnostics", False)
@@ -756,6 +766,10 @@ def _build_manifest(
                 config["single_bit_proposal_fraction"]
             ),
             "observable_temperature_mode": config["observable_temperature_mode"],
+            "q_top_block_count": config["q_top_block_count"],
+            "q_positive_initial_chain_mode": (
+                config["q_positive_initial_chain_mode"]
+            ),
             "track_pt_sector_diagnostics": bool(
                 config.get("track_pt_sector_diagnostics", False)
             ),
@@ -947,6 +961,10 @@ def _run_chunk_task(task_data):
             precomputed_data_uniform_values_per_disorder=(
                 precomputed_data_uniform_values_per_disorder
             ),
+            q_top_block_count=int(task_data["q_top_block_count"]),
+            q_positive_initial_chain_mode=str(
+                task_data["q_positive_initial_chain_mode"]
+            ),
         )
         simulation_result_for_save = dict(simulation_result)
         simulation_result_for_save.pop(
@@ -1013,6 +1031,12 @@ def _run_chunk_task(task_data):
             ),
             observable_temperature_mode=np.array(
                 task_data["observable_temperature_mode"]
+            ),
+            q_top_block_count_config=np.int64(
+                task_data["q_top_block_count"]
+            ),
+            q_positive_initial_chain_mode_config=np.array(
+                task_data["q_positive_initial_chain_mode"]
             ),
             track_pt_sector_diagnostics_config=np.bool_(
                 task_data.get("track_pt_sector_diagnostics", False)
@@ -1162,6 +1186,18 @@ def _validate_chunk_payload(loaded_chunk_result, task_data):
                 int(loaded_chunk_result["winding_plane_heatbath_sweeps"])
                 != int(task_data.get("winding_plane_heatbath_sweeps", 0))):
             raise ValueError("chunk winding_plane_heatbath_sweeps mismatch")
+    if "q_top_block_count_config" in loaded_chunk_result:
+        if (
+                int(loaded_chunk_result["q_top_block_count_config"])
+                != int(task_data.get("q_top_block_count", 8))):
+            raise ValueError("chunk q_top_block_count mismatch")
+    if "q_positive_initial_chain_mode" in loaded_chunk_result:
+        if (
+                str(np.asarray(
+                    loaded_chunk_result["q_positive_initial_chain_mode"]
+                ).item())
+                != str(task_data.get("q_positive_initial_chain_mode", "sector"))):
+            raise ValueError("chunk q_positive_initial_chain_mode mismatch")
 
 
 def _merge_outputs(
@@ -1181,6 +1217,17 @@ def _merge_outputs(
     has_q_positive_diagnostics = config["syndrome_error_probability"] > 0.0
     num_start_chains = int(config["num_start_chains"])
     num_replicas_per_start = int(config["num_replicas_per_start"])
+    q_top_block_count = int(config.get("q_top_block_count", 0))
+    if q_top_block_count < 0:
+        raise ValueError("q_top_block_count must be >= 0")
+    resolved_q_top_block_count = min(
+        q_top_block_count,
+        int(config["num_measurements_per_disorder"]),
+    )
+    has_q_top_block_diagnostics = (
+        has_q_positive_diagnostics
+        and resolved_q_top_block_count > 0
+    )
     pt_enabled = (
         config["pt_num_temperatures"] is not None
         and (
@@ -1455,6 +1502,24 @@ def _merge_outputs(
     chain_pt_swap_wall_time_per_disorder_per_start_replica_tensor = None
     chain_observable_wall_time_per_disorder_per_start_replica_tensor = None
     chain_measurement_wall_time_per_disorder_per_start_replica_tensor = None
+    chain_q_top_block_m_u_values_per_disorder_per_start_replica_tensor = None
+    chain_q_top_block_values_per_disorder_per_start_replica_tensor = None
+    chain_q_top_block_drift_per_disorder_per_start_replica_tensor = None
+    chain_q_top_block_range_per_disorder_per_start_replica_tensor = None
+    chain_q_top_last_half_minus_full_per_disorder_per_start_replica_tensor = None
+    chain_cold_sector_histogram_counts_per_disorder_per_start_replica_tensor = None
+    chain_cold_sector_histogram_block_counts_per_disorder_per_start_replica_tensor = None
+    chain_cold_sector_histogram_first_half_counts_per_disorder_per_start_replica_tensor = None
+    chain_cold_sector_histogram_second_half_counts_per_disorder_per_start_replica_tensor = None
+    chain_cold_sector_histogram_first_second_tv_per_disorder_per_start_replica_tensor = None
+    chain_cold_sector_histogram_adjacent_block_tv_per_disorder_per_start_replica_tensor = None
+    cold_sector_histogram_counts_per_disorder_tensor = None
+    cold_sector_histogram_block_counts_per_disorder_tensor = None
+    q_top_block_m_u_values_per_disorder_tensor = None
+    q_top_block_values_per_disorder_tensor = None
+    q_top_block_drift_per_disorder_tensor = None
+    q_top_block_range_per_disorder_tensor = None
+    q_top_last_half_minus_full_per_disorder_tensor = None
     q_top_spread_per_disorder_tensor = None
     m_u_spread_linf_per_disorder_tensor = None
     max_r_hat_per_disorder_tensor = None
@@ -1699,6 +1764,203 @@ def _merge_outputs(
                         dtype=np.float64,
                     )
                 )
+                if has_q_top_block_diagnostics:
+                    chain_q_top_block_m_u_values_per_disorder_per_start_replica_tensor = (
+                        np.empty(
+                            (
+                                num_sizes,
+                                num_points,
+                                num_disorder_samples_total,
+                                num_start_chains,
+                                num_replicas_per_start,
+                                resolved_q_top_block_count,
+                                num_masks,
+                            ),
+                            dtype=np.float64,
+                        )
+                    )
+                    chain_q_top_block_values_per_disorder_per_start_replica_tensor = (
+                        np.empty(
+                            (
+                                num_sizes,
+                                num_points,
+                                num_disorder_samples_total,
+                                num_start_chains,
+                                num_replicas_per_start,
+                                resolved_q_top_block_count,
+                            ),
+                            dtype=np.float64,
+                        )
+                    )
+                    chain_q_top_block_drift_per_disorder_per_start_replica_tensor = (
+                        np.empty(
+                            (
+                                num_sizes,
+                                num_points,
+                                num_disorder_samples_total,
+                                num_start_chains,
+                                num_replicas_per_start,
+                            ),
+                            dtype=np.float64,
+                        )
+                    )
+                    chain_q_top_block_range_per_disorder_per_start_replica_tensor = (
+                        np.empty(
+                            (
+                                num_sizes,
+                                num_points,
+                                num_disorder_samples_total,
+                                num_start_chains,
+                                num_replicas_per_start,
+                            ),
+                            dtype=np.float64,
+                        )
+                    )
+                    chain_q_top_last_half_minus_full_per_disorder_per_start_replica_tensor = (
+                        np.empty(
+                            (
+                                num_sizes,
+                                num_points,
+                                num_disorder_samples_total,
+                                num_start_chains,
+                                num_replicas_per_start,
+                            ),
+                            dtype=np.float64,
+                        )
+                    )
+                    num_cold_sector_bins = 1 << num_masks
+                    chain_cold_sector_histogram_counts_per_disorder_per_start_replica_tensor = (
+                        np.empty(
+                            (
+                                num_sizes,
+                                num_points,
+                                num_disorder_samples_total,
+                                num_start_chains,
+                                num_replicas_per_start,
+                                num_cold_sector_bins,
+                            ),
+                            dtype=np.int64,
+                        )
+                    )
+                    chain_cold_sector_histogram_block_counts_per_disorder_per_start_replica_tensor = (
+                        np.empty(
+                            (
+                                num_sizes,
+                                num_points,
+                                num_disorder_samples_total,
+                                num_start_chains,
+                                num_replicas_per_start,
+                                resolved_q_top_block_count,
+                                num_cold_sector_bins,
+                            ),
+                            dtype=np.int64,
+                        )
+                    )
+                    chain_cold_sector_histogram_first_half_counts_per_disorder_per_start_replica_tensor = (
+                        np.empty(
+                            (
+                                num_sizes,
+                                num_points,
+                                num_disorder_samples_total,
+                                num_start_chains,
+                                num_replicas_per_start,
+                                num_cold_sector_bins,
+                            ),
+                            dtype=np.int64,
+                        )
+                    )
+                    chain_cold_sector_histogram_second_half_counts_per_disorder_per_start_replica_tensor = (
+                        np.empty(
+                            (
+                                num_sizes,
+                                num_points,
+                                num_disorder_samples_total,
+                                num_start_chains,
+                                num_replicas_per_start,
+                                num_cold_sector_bins,
+                            ),
+                            dtype=np.int64,
+                        )
+                    )
+                    chain_cold_sector_histogram_first_second_tv_per_disorder_per_start_replica_tensor = (
+                        np.empty(
+                            (
+                                num_sizes,
+                                num_points,
+                                num_disorder_samples_total,
+                                num_start_chains,
+                                num_replicas_per_start,
+                            ),
+                            dtype=np.float64,
+                        )
+                    )
+                    chain_cold_sector_histogram_adjacent_block_tv_per_disorder_per_start_replica_tensor = (
+                        np.empty(
+                            (
+                                num_sizes,
+                                num_points,
+                                num_disorder_samples_total,
+                                num_start_chains,
+                                num_replicas_per_start,
+                                max(resolved_q_top_block_count - 1, 0),
+                            ),
+                            dtype=np.float64,
+                        )
+                    )
+                    cold_sector_histogram_counts_per_disorder_tensor = (
+                        np.empty(
+                            (
+                                num_sizes,
+                                num_points,
+                                num_disorder_samples_total,
+                                num_cold_sector_bins,
+                            ),
+                            dtype=np.int64,
+                        )
+                    )
+                    cold_sector_histogram_block_counts_per_disorder_tensor = (
+                        np.empty(
+                            (
+                                num_sizes,
+                                num_points,
+                                num_disorder_samples_total,
+                                resolved_q_top_block_count,
+                                num_cold_sector_bins,
+                            ),
+                            dtype=np.int64,
+                        )
+                    )
+                    q_top_block_m_u_values_per_disorder_tensor = np.empty(
+                        (
+                            num_sizes,
+                            num_points,
+                            num_disorder_samples_total,
+                            resolved_q_top_block_count,
+                            num_masks,
+                        ),
+                        dtype=np.float64,
+                    )
+                    q_top_block_values_per_disorder_tensor = np.empty(
+                        (
+                            num_sizes,
+                            num_points,
+                            num_disorder_samples_total,
+                            resolved_q_top_block_count,
+                        ),
+                        dtype=np.float64,
+                    )
+                    q_top_block_drift_per_disorder_tensor = np.empty(
+                        (num_sizes, num_points, num_disorder_samples_total),
+                        dtype=np.float64,
+                    )
+                    q_top_block_range_per_disorder_tensor = np.empty(
+                        (num_sizes, num_points, num_disorder_samples_total),
+                        dtype=np.float64,
+                    )
+                    q_top_last_half_minus_full_per_disorder_tensor = np.empty(
+                        (num_sizes, num_points, num_disorder_samples_total),
+                        dtype=np.float64,
+                    )
                 q_top_spread_per_disorder_tensor = np.empty(
                     (num_sizes, num_points, num_disorder_samples_total),
                     dtype=np.float64,
@@ -2143,6 +2405,301 @@ def _merge_outputs(
                     ] = loaded_chunk_result[
                         "chain_measurement_wall_time_per_disorder_per_start_replica"
                     ]
+                    if has_q_top_block_diagnostics:
+                        if (
+                                "chain_q_top_block_m_u_values_per_disorder_per_start_replica"
+                                in loaded_chunk_result):
+                            chain_q_top_block_m_u_values_per_disorder_per_start_replica_tensor[
+                                lattice_index,
+                                point_index,
+                                start_index:stop_index,
+                                :,
+                                :,
+                                :,
+                                :,
+                            ] = loaded_chunk_result[
+                                "chain_q_top_block_m_u_values_per_disorder_per_start_replica"
+                            ]
+                            chain_q_top_block_values_per_disorder_per_start_replica_tensor[
+                                lattice_index,
+                                point_index,
+                                start_index:stop_index,
+                                :,
+                                :,
+                                :,
+                            ] = loaded_chunk_result[
+                                "chain_q_top_block_values_per_disorder_per_start_replica"
+                            ]
+                            chain_q_top_block_drift_per_disorder_per_start_replica_tensor[
+                                lattice_index,
+                                point_index,
+                                start_index:stop_index,
+                                :,
+                                :,
+                            ] = loaded_chunk_result[
+                                "chain_q_top_block_drift_per_disorder_per_start_replica"
+                            ]
+                            chain_q_top_block_range_per_disorder_per_start_replica_tensor[
+                                lattice_index,
+                                point_index,
+                                start_index:stop_index,
+                                :,
+                                :,
+                            ] = loaded_chunk_result[
+                                "chain_q_top_block_range_per_disorder_per_start_replica"
+                            ]
+                            chain_q_top_last_half_minus_full_per_disorder_per_start_replica_tensor[
+                                lattice_index,
+                                point_index,
+                                start_index:stop_index,
+                                :,
+                                :,
+                            ] = loaded_chunk_result[
+                                "chain_q_top_last_half_minus_full_per_disorder_per_start_replica"
+                            ]
+                            chain_cold_sector_histogram_counts_per_disorder_per_start_replica_tensor[
+                                lattice_index,
+                                point_index,
+                                start_index:stop_index,
+                                :,
+                                :,
+                                :,
+                            ] = loaded_chunk_result[
+                                "chain_cold_sector_histogram_counts_per_disorder_per_start_replica"
+                            ]
+                            chain_cold_sector_histogram_block_counts_per_disorder_per_start_replica_tensor[
+                                lattice_index,
+                                point_index,
+                                start_index:stop_index,
+                                :,
+                                :,
+                                :,
+                                :,
+                            ] = loaded_chunk_result[
+                                "chain_cold_sector_histogram_block_counts_per_disorder_per_start_replica"
+                            ]
+                            chain_cold_sector_histogram_first_half_counts_per_disorder_per_start_replica_tensor[
+                                lattice_index,
+                                point_index,
+                                start_index:stop_index,
+                                :,
+                                :,
+                                :,
+                            ] = loaded_chunk_result[
+                                "chain_cold_sector_histogram_first_half_counts_per_disorder_per_start_replica"
+                            ]
+                            chain_cold_sector_histogram_second_half_counts_per_disorder_per_start_replica_tensor[
+                                lattice_index,
+                                point_index,
+                                start_index:stop_index,
+                                :,
+                                :,
+                                :,
+                            ] = loaded_chunk_result[
+                                "chain_cold_sector_histogram_second_half_counts_per_disorder_per_start_replica"
+                            ]
+                            chain_cold_sector_histogram_first_second_tv_per_disorder_per_start_replica_tensor[
+                                lattice_index,
+                                point_index,
+                                start_index:stop_index,
+                                :,
+                                :,
+                            ] = loaded_chunk_result[
+                                "chain_cold_sector_histogram_first_second_tv_per_disorder_per_start_replica"
+                            ]
+                            chain_cold_sector_histogram_adjacent_block_tv_per_disorder_per_start_replica_tensor[
+                                lattice_index,
+                                point_index,
+                                start_index:stop_index,
+                                :,
+                                :,
+                                :,
+                            ] = loaded_chunk_result[
+                                "chain_cold_sector_histogram_adjacent_block_tv_per_disorder_per_start_replica"
+                            ]
+                            q_top_block_m_u_values_per_disorder_tensor[
+                                lattice_index,
+                                point_index,
+                                start_index:stop_index,
+                                :,
+                                :,
+                            ] = loaded_chunk_result[
+                                "q_top_block_m_u_values_per_disorder"
+                            ]
+                            q_top_block_values_per_disorder_tensor[
+                                lattice_index,
+                                point_index,
+                                start_index:stop_index,
+                                :,
+                            ] = loaded_chunk_result[
+                                "q_top_block_values_per_disorder"
+                            ]
+                            q_top_block_drift_per_disorder_tensor[
+                                lattice_index,
+                                point_index,
+                                start_index:stop_index,
+                            ] = loaded_chunk_result[
+                                "q_top_block_drift_per_disorder"
+                            ]
+                            q_top_block_range_per_disorder_tensor[
+                                lattice_index,
+                                point_index,
+                                start_index:stop_index,
+                            ] = loaded_chunk_result[
+                                "q_top_block_range_per_disorder"
+                            ]
+                            q_top_last_half_minus_full_per_disorder_tensor[
+                                lattice_index,
+                                point_index,
+                                start_index:stop_index,
+                            ] = loaded_chunk_result[
+                                "q_top_last_half_minus_full_per_disorder"
+                            ]
+                            cold_sector_histogram_counts_per_disorder_tensor[
+                                lattice_index,
+                                point_index,
+                                start_index:stop_index,
+                                :,
+                            ] = loaded_chunk_result[
+                                "cold_sector_histogram_counts_per_disorder"
+                            ]
+                            cold_sector_histogram_block_counts_per_disorder_tensor[
+                                lattice_index,
+                                point_index,
+                                start_index:stop_index,
+                                :,
+                                :,
+                            ] = loaded_chunk_result[
+                                "cold_sector_histogram_block_counts_per_disorder"
+                            ]
+                        else:
+                            chain_q_top_block_m_u_values_per_disorder_per_start_replica_tensor[
+                                lattice_index,
+                                point_index,
+                                start_index:stop_index,
+                                :,
+                                :,
+                                :,
+                                :,
+                            ] = np.nan
+                            chain_q_top_block_values_per_disorder_per_start_replica_tensor[
+                                lattice_index,
+                                point_index,
+                                start_index:stop_index,
+                                :,
+                                :,
+                                :,
+                            ] = np.nan
+                            chain_q_top_block_drift_per_disorder_per_start_replica_tensor[
+                                lattice_index,
+                                point_index,
+                                start_index:stop_index,
+                                :,
+                                :,
+                            ] = np.nan
+                            chain_q_top_block_range_per_disorder_per_start_replica_tensor[
+                                lattice_index,
+                                point_index,
+                                start_index:stop_index,
+                                :,
+                                :,
+                            ] = np.nan
+                            chain_q_top_last_half_minus_full_per_disorder_per_start_replica_tensor[
+                                lattice_index,
+                                point_index,
+                                start_index:stop_index,
+                                :,
+                                :,
+                            ] = np.nan
+                            chain_cold_sector_histogram_counts_per_disorder_per_start_replica_tensor[
+                                lattice_index,
+                                point_index,
+                                start_index:stop_index,
+                                :,
+                                :,
+                                :,
+                            ] = -1
+                            chain_cold_sector_histogram_block_counts_per_disorder_per_start_replica_tensor[
+                                lattice_index,
+                                point_index,
+                                start_index:stop_index,
+                                :,
+                                :,
+                                :,
+                                :,
+                            ] = -1
+                            chain_cold_sector_histogram_first_half_counts_per_disorder_per_start_replica_tensor[
+                                lattice_index,
+                                point_index,
+                                start_index:stop_index,
+                                :,
+                                :,
+                                :,
+                            ] = -1
+                            chain_cold_sector_histogram_second_half_counts_per_disorder_per_start_replica_tensor[
+                                lattice_index,
+                                point_index,
+                                start_index:stop_index,
+                                :,
+                                :,
+                                :,
+                            ] = -1
+                            chain_cold_sector_histogram_first_second_tv_per_disorder_per_start_replica_tensor[
+                                lattice_index,
+                                point_index,
+                                start_index:stop_index,
+                                :,
+                                :,
+                            ] = np.nan
+                            chain_cold_sector_histogram_adjacent_block_tv_per_disorder_per_start_replica_tensor[
+                                lattice_index,
+                                point_index,
+                                start_index:stop_index,
+                                :,
+                                :,
+                                :,
+                            ] = np.nan
+                            q_top_block_m_u_values_per_disorder_tensor[
+                                lattice_index,
+                                point_index,
+                                start_index:stop_index,
+                                :,
+                                :,
+                            ] = np.nan
+                            q_top_block_values_per_disorder_tensor[
+                                lattice_index,
+                                point_index,
+                                start_index:stop_index,
+                                :,
+                            ] = np.nan
+                            q_top_block_drift_per_disorder_tensor[
+                                lattice_index,
+                                point_index,
+                                start_index:stop_index,
+                            ] = np.nan
+                            q_top_block_range_per_disorder_tensor[
+                                lattice_index,
+                                point_index,
+                                start_index:stop_index,
+                            ] = np.nan
+                            q_top_last_half_minus_full_per_disorder_tensor[
+                                lattice_index,
+                                point_index,
+                                start_index:stop_index,
+                            ] = np.nan
+                            cold_sector_histogram_counts_per_disorder_tensor[
+                                lattice_index,
+                                point_index,
+                                start_index:stop_index,
+                                :,
+                            ] = -1
+                            cold_sector_histogram_block_counts_per_disorder_tensor[
+                                lattice_index,
+                                point_index,
+                                start_index:stop_index,
+                                :,
+                                :,
+                            ] = -1
                     q_top_spread_per_disorder_tensor[
                         lattice_index,
                         point_index,
@@ -3094,6 +3651,81 @@ def _merge_outputs(
         merged_result[
             "chain_measurement_wall_time_per_disorder_per_start_replica_tensor"
         ] = chain_measurement_wall_time_per_disorder_per_start_replica_tensor
+        merged_result["q_top_block_count"] = np.int64(
+            resolved_q_top_block_count
+        )
+        merged_result["q_positive_initial_chain_mode"] = np.array(
+            config.get("q_positive_initial_chain_mode", "sector")
+        )
+        if has_q_top_block_diagnostics:
+            merged_result[
+                "chain_q_top_block_m_u_values_per_disorder_per_start_replica_tensor"
+            ] = chain_q_top_block_m_u_values_per_disorder_per_start_replica_tensor
+            merged_result[
+                "chain_q_top_block_values_per_disorder_per_start_replica_tensor"
+            ] = chain_q_top_block_values_per_disorder_per_start_replica_tensor
+            merged_result[
+                "chain_q_top_block_drift_per_disorder_per_start_replica_tensor"
+            ] = chain_q_top_block_drift_per_disorder_per_start_replica_tensor
+            merged_result[
+                "chain_q_top_block_range_per_disorder_per_start_replica_tensor"
+            ] = chain_q_top_block_range_per_disorder_per_start_replica_tensor
+            merged_result[
+                "chain_q_top_last_half_minus_full_per_disorder_per_start_replica_tensor"
+            ] = (
+                chain_q_top_last_half_minus_full_per_disorder_per_start_replica_tensor
+            )
+            merged_result[
+                "chain_cold_sector_histogram_counts_per_disorder_per_start_replica_tensor"
+            ] = (
+                chain_cold_sector_histogram_counts_per_disorder_per_start_replica_tensor
+            )
+            merged_result[
+                "chain_cold_sector_histogram_block_counts_per_disorder_per_start_replica_tensor"
+            ] = (
+                chain_cold_sector_histogram_block_counts_per_disorder_per_start_replica_tensor
+            )
+            merged_result[
+                "chain_cold_sector_histogram_first_half_counts_per_disorder_per_start_replica_tensor"
+            ] = (
+                chain_cold_sector_histogram_first_half_counts_per_disorder_per_start_replica_tensor
+            )
+            merged_result[
+                "chain_cold_sector_histogram_second_half_counts_per_disorder_per_start_replica_tensor"
+            ] = (
+                chain_cold_sector_histogram_second_half_counts_per_disorder_per_start_replica_tensor
+            )
+            merged_result[
+                "chain_cold_sector_histogram_first_second_tv_per_disorder_per_start_replica_tensor"
+            ] = (
+                chain_cold_sector_histogram_first_second_tv_per_disorder_per_start_replica_tensor
+            )
+            merged_result[
+                "chain_cold_sector_histogram_adjacent_block_tv_per_disorder_per_start_replica_tensor"
+            ] = (
+                chain_cold_sector_histogram_adjacent_block_tv_per_disorder_per_start_replica_tensor
+            )
+            merged_result["q_top_block_m_u_values_per_disorder_tensor"] = (
+                q_top_block_m_u_values_per_disorder_tensor
+            )
+            merged_result["q_top_block_values_per_disorder_tensor"] = (
+                q_top_block_values_per_disorder_tensor
+            )
+            merged_result["q_top_block_drift_per_disorder_tensor"] = (
+                q_top_block_drift_per_disorder_tensor
+            )
+            merged_result["q_top_block_range_per_disorder_tensor"] = (
+                q_top_block_range_per_disorder_tensor
+            )
+            merged_result["q_top_last_half_minus_full_per_disorder_tensor"] = (
+                q_top_last_half_minus_full_per_disorder_tensor
+            )
+            merged_result["cold_sector_histogram_counts_per_disorder_tensor"] = (
+                cold_sector_histogram_counts_per_disorder_tensor
+            )
+            merged_result[
+                "cold_sector_histogram_block_counts_per_disorder_tensor"
+            ] = cold_sector_histogram_block_counts_per_disorder_tensor
         merged_result["q_top_spread_per_disorder_tensor"] = (
             q_top_spread_per_disorder_tensor
         )
@@ -3587,6 +4219,12 @@ def _merge_outputs(
         observable_temperature_mode=np.array(
             config["observable_temperature_mode"]
         ),
+        q_top_block_count_config=np.int64(
+            config.get("q_top_block_count", 0)
+        ),
+        q_positive_initial_chain_mode_config=np.array(
+            config.get("q_positive_initial_chain_mode", "sector")
+        ),
         track_pt_sector_diagnostics_config=np.bool_(
             track_pt_sector_diagnostics
         ),
@@ -3947,6 +4585,8 @@ def _run_chunk_command(args):
         raise ValueError("--pt-swap-sweeps-per-attempt must be >= 1")
     if int(args.pt_cold_edge_swap_stride) < 1:
         raise ValueError("--pt-cold-edge-swap-stride must be >= 1")
+    if int(args.q_top_block_count) < 0:
+        raise ValueError("--q-top-block-count must be >= 0")
     pt_ladder_spacing_power = float(args.pt_ladder_spacing_power)
     if (
             not np.isfinite(pt_ladder_spacing_power)
@@ -4008,6 +4648,10 @@ def _run_chunk_command(args):
             args.single_bit_proposal_fraction
         ),
         "observable_temperature_mode": str(args.observable_temperature_mode),
+        "q_top_block_count": int(args.q_top_block_count),
+        "q_positive_initial_chain_mode": str(
+            args.q_positive_initial_chain_mode
+        ),
         "track_pt_sector_diagnostics": bool(
             args.track_pt_sector_diagnostics
         ),
@@ -4229,6 +4873,24 @@ def _build_parser():
         help=(
             "For parallel tempering, accumulate logical observables at all "
             "temperatures or only at the cold target temperature."
+        ),
+    )
+    common_submit_parser.add_argument(
+        "--q-top-block-count",
+        type=int,
+        default=8,
+        help=(
+            "Number of cold-measurement blocks used for lightweight q_top "
+            "window diagnostics. Use 0 to disable."
+        ),
+    )
+    common_submit_parser.add_argument(
+        "--q-positive-initial-chain-mode",
+        choices=("sector", "all_zero", "random_high_weight"),
+        default="sector",
+        help=(
+            "Initial chain family for q>0 multi-start runs. The default "
+            "sector keeps the existing start-sector representatives."
         ),
     )
     common_submit_parser.add_argument(
@@ -4458,6 +5120,16 @@ def _build_parser():
         "--observable-temperature-mode",
         choices=("all", "cold"),
         default="all",
+    )
+    run_chunk_parser.add_argument(
+        "--q-top-block-count",
+        type=int,
+        default=8,
+    )
+    run_chunk_parser.add_argument(
+        "--q-positive-initial-chain-mode",
+        choices=("sector", "all_zero", "random_high_weight"),
+        default="sector",
     )
     run_chunk_parser.add_argument(
         "--track-pt-sector-diagnostics",

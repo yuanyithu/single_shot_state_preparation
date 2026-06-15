@@ -50,6 +50,44 @@ def _chain_scalar_tensor(data, key):
     return arr[0, 0, 0, :, 0]
 
 
+def _first_point_scalar(data, key, default=None, cast=float):
+    if key not in data:
+        return default
+    arr = np.asarray(data[key])
+    if arr.size == 0:
+        return default
+    value = arr.reshape(-1)[0]
+    if cast is None:
+        return value
+    return cast(value)
+
+
+def _first_disorder_scalar(data, key, default=None, cast=float):
+    if key not in data:
+        return default
+    arr = np.asarray(data[key])
+    if arr.size == 0:
+        return default
+    value = arr[0, 0, 0]
+    if cast is None:
+        return value
+    return cast(value)
+
+
+def _chain_block_tensor(data, key):
+    arr = _array(data, key, dtype=np.float64)
+    if arr.size == 0:
+        return arr
+    return arr[0, 0, 0, :, 0, :]
+
+
+def _disorder_block_vector(data, key):
+    arr = _array(data, key, dtype=np.float64)
+    if arr.size == 0:
+        return arr
+    return arr[0, 0, 0, :]
+
+
 def _sum_key(data, key):
     return int(np.sum(_chain_temperature_tensor(data, key)))
 
@@ -102,6 +140,65 @@ def summarize_npz(path, run_name=None):
         if cluster_nonzero == 0 and "cluster_by_temperature_nonzero_moves" in data:
             cluster_nonzero = int(np.sum(data["cluster_by_temperature_nonzero_moves"]))
 
+        chain_q_top_values = _chain_scalar_tensor(
+            data,
+            "chain_q_top_values_per_disorder_per_start_replica_tensor",
+        )
+        chain_ordinary_wall = _chain_scalar_tensor(
+            data,
+            "chain_ordinary_update_wall_time_per_disorder_per_start_replica_tensor",
+        )
+        chain_pt_swap_wall = _chain_scalar_tensor(
+            data,
+            "chain_pt_swap_wall_time_per_disorder_per_start_replica_tensor",
+        )
+        chain_observable_wall = _chain_scalar_tensor(
+            data,
+            "chain_observable_wall_time_per_disorder_per_start_replica_tensor",
+        )
+        chain_measurement_wall = _chain_scalar_tensor(
+            data,
+            "chain_measurement_wall_time_per_disorder_per_start_replica_tensor",
+        )
+        q_top_block_values = _disorder_block_vector(
+            data,
+            "q_top_block_values_per_disorder_tensor",
+        )
+        chain_q_top_block_values = _chain_block_tensor(
+            data,
+            "chain_q_top_block_values_per_disorder_per_start_replica_tensor",
+        )
+        chain_q_top_block_drift = _chain_scalar_tensor(
+            data,
+            "chain_q_top_block_drift_per_disorder_per_start_replica_tensor",
+        )
+        chain_q_top_block_range = _chain_scalar_tensor(
+            data,
+            "chain_q_top_block_range_per_disorder_per_start_replica_tensor",
+        )
+        chain_q_top_last_half_minus_full = _chain_scalar_tensor(
+            data,
+            "chain_q_top_last_half_minus_full_per_disorder_per_start_replica_tensor",
+        )
+        q_top_spread = _first_disorder_scalar(
+            data,
+            "q_top_spread_per_disorder_tensor",
+        )
+        max_r_hat = _first_point_scalar(data, "max_r_hat_curve_matrix")
+        min_ess = _first_point_scalar(
+            data,
+            "min_effective_sample_size_curve_matrix",
+        )
+        target_gate_pass = None
+        if q_top_spread is not None and max_r_hat is not None and min_ess is not None:
+            target_gate_pass = bool(
+                np.isfinite(max_r_hat)
+                and max_r_hat <= 1.05
+                and np.isfinite(min_ess)
+                and min_ess >= 100.0
+                and q_top_spread <= 0.02
+            )
+
         row = {
             "run": run_name or path.parent.name,
             "path": str(path),
@@ -147,6 +244,85 @@ def summarize_npz(path, run_name=None):
                 "cluster_budget_fraction_rho",
                 None,
                 float,
+            ),
+            "q_top": _first_point_scalar(data, "q_top_curve_matrix"),
+            "q_top_std": _first_point_scalar(data, "q_top_std_curve_matrix"),
+            "chain_q_top_values": (
+                chain_q_top_values.astype(float).tolist()
+                if chain_q_top_values.size
+                else []
+            ),
+            "q_top_spread": q_top_spread,
+            "mean_q_top_spread": _first_point_scalar(
+                data,
+                "mean_q_top_spread_curve_matrix",
+            ),
+            "max_r_hat": max_r_hat,
+            "min_effective_sample_size": min_ess,
+            "target_gate_pass": target_gate_pass,
+            "ordinary_wall_time_sum": (
+                float(np.sum(chain_ordinary_wall))
+                if chain_ordinary_wall.size
+                else None
+            ),
+            "pt_swap_wall_time_sum": (
+                float(np.sum(chain_pt_swap_wall))
+                if chain_pt_swap_wall.size
+                else None
+            ),
+            "observable_wall_time_sum": (
+                float(np.sum(chain_observable_wall))
+                if chain_observable_wall.size
+                else None
+            ),
+            "measurement_wall_time_sum": (
+                float(np.sum(chain_measurement_wall))
+                if chain_measurement_wall.size
+                else None
+            ),
+            "cluster_wall_time_sum": _scalar(
+                data,
+                "cluster_total_wall_time",
+                0.0,
+                float,
+            ),
+            "q_top_block_count": _scalar(data, "q_top_block_count", 0, int),
+            "q_top_block_values": (
+                q_top_block_values.astype(float).tolist()
+                if q_top_block_values.size
+                else []
+            ),
+            "q_top_block_drift": _first_disorder_scalar(
+                data,
+                "q_top_block_drift_per_disorder_tensor",
+            ),
+            "q_top_block_range": _first_disorder_scalar(
+                data,
+                "q_top_block_range_per_disorder_tensor",
+            ),
+            "q_top_last_half_minus_full": _first_disorder_scalar(
+                data,
+                "q_top_last_half_minus_full_per_disorder_tensor",
+            ),
+            "chain_q_top_block_values": (
+                chain_q_top_block_values.astype(float).tolist()
+                if chain_q_top_block_values.size
+                else []
+            ),
+            "chain_q_top_block_drift": (
+                chain_q_top_block_drift.astype(float).tolist()
+                if chain_q_top_block_drift.size
+                else []
+            ),
+            "chain_q_top_block_range": (
+                chain_q_top_block_range.astype(float).tolist()
+                if chain_q_top_block_range.size
+                else []
+            ),
+            "chain_q_top_last_half_minus_full": (
+                chain_q_top_last_half_minus_full.astype(float).tolist()
+                if chain_q_top_last_half_minus_full.size
+                else []
             ),
             "min_swap": min_swap,
             "bottleneck_pair": bottleneck_pair,
@@ -250,7 +426,41 @@ def summarize_npz(path, run_name=None):
 def _format_float(value):
     if value is None:
         return ""
+    try:
+        if not np.isfinite(float(value)):
+            return ""
+    except (TypeError, ValueError):
+        return ""
     return f"{float(value):.6f}"
+
+
+def _format_compact_float(value):
+    if value is None:
+        return ""
+    try:
+        if not np.isfinite(float(value)):
+            return ""
+    except (TypeError, ValueError):
+        return ""
+    return f"{float(value):.4g}"
+
+
+def _format_float_list(values, max_items=8):
+    if not values:
+        return "[]"
+    formatted_values = [
+        _format_compact_float(value)
+        for value in list(values)[:max_items]
+    ]
+    if len(values) > max_items:
+        formatted_values.append("...")
+    return "[" + ", ".join(formatted_values) + "]"
+
+
+def _format_gate(value):
+    if value is None:
+        return ""
+    return "pass" if value else "fail"
 
 
 def build_summary(experiment, rows, status=None, conclusion=None):
@@ -282,6 +492,50 @@ def write_markdown(summary, output_path):
         parts = [f"{key}={value}" for key, value in common.items()]
         lines.append("共同参数：`" + ",".join(parts) + "`。")
         lines.append("")
+    lines.append("## 目标指标")
+    lines.append("")
+    target_header = (
+        "| run | q_top | chain q_top | spread | Rhat | ESS | gate | "
+        "block q_top | block range | last-half-full | wall s | ordinary | "
+        "swap | observable | cluster |"
+    )
+    lines.append(target_header)
+    lines.append("|---|---:|---|---:|---:|---:|---|---|---:|---:|---:|---:|---:|---:|---:|")
+    for row in summary["rows"]:
+        lines.append(
+            "| {run} | {q_top} | {chains} | {spread} | {rhat} | {ess} | {gate} | {blocks} | {block_range} | {half} | {wall} | {ordinary} | {swap} | {observable} | {cluster} |".format(
+                run=row["run"],
+                q_top=_format_float(row.get("q_top")),
+                chains=_format_float_list(row.get("chain_q_top_values", [])),
+                spread=_format_float(row.get("q_top_spread")),
+                rhat=_format_float(row.get("max_r_hat")),
+                ess=_format_compact_float(
+                    row.get("min_effective_sample_size")
+                ),
+                gate=_format_gate(row.get("target_gate_pass")),
+                blocks=_format_float_list(row.get("q_top_block_values", [])),
+                block_range=_format_float(row.get("q_top_block_range")),
+                half=_format_float(
+                    row.get("q_top_last_half_minus_full")
+                ),
+                wall=_format_compact_float(
+                    row.get("measurement_wall_time_sum")
+                ),
+                ordinary=_format_compact_float(
+                    row.get("ordinary_wall_time_sum")
+                ),
+                swap=_format_compact_float(row.get("pt_swap_wall_time_sum")),
+                observable=_format_compact_float(
+                    row.get("observable_wall_time_sum")
+                ),
+                cluster=_format_compact_float(
+                    row.get("cluster_wall_time_sum")
+                ),
+            )
+        )
+    lines.append("")
+    lines.append("## 解释指标")
+    lines.append("")
     header = (
         "| run | cold edge | swap every | sweeps/meas | m | stride | min swap | "
         "cold flips | roundtrip | changed | arrival | arr survived | arr reverted | "

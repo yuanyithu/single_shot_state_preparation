@@ -1653,6 +1653,32 @@ def _build_q0_initial_chain_bits_per_start(
     return initial_chain_bits_per_start, start_sector_labels
 
 
+def _build_zero_syndrome_sector_initial_chain_bits_per_start(
+        zero_syndrome_move_data,
+        num_start_chains,
+        num_qubits):
+    if zero_syndrome_move_data is None:
+        raise ValueError("zero_syndrome_move_data is required")
+    start_sector_generators = zero_syndrome_move_data[
+        "start_sector_generators"
+    ]
+    start_sector_labels = _build_q0_start_sector_labels(
+        q0_num_start_chains=num_start_chains,
+        num_start_sector_generators=start_sector_generators.shape[0],
+    )
+    initial_chain_bits_per_start = np.zeros(
+        (int(num_start_chains), int(num_qubits)),
+        dtype=bool,
+    )
+    for start_index, label in enumerate(start_sector_labels):
+        for generator_index, bit in enumerate(label):
+            if bit == "1":
+                initial_chain_bits_per_start[start_index] ^= (
+                    start_sector_generators[generator_index]
+                )
+    return initial_chain_bits_per_start, start_sector_labels
+
+
 def _compute_q0_diagnostic_spreads(
         q0_m_u_values_per_start,
         q0_q_top_values_per_start):
@@ -1666,6 +1692,228 @@ def _compute_q0_diagnostic_spreads(
         - np.min(q0_q_top_values_per_start)
     )
     return q0_m_u_spread_linf, q0_q_top_spread
+
+
+def _compute_q_top_block_summary(
+        logical_observable_values_per_measurement,
+        q_top_block_count):
+    logical_observable_values_per_measurement = np.asarray(
+        logical_observable_values_per_measurement,
+        dtype=np.int8,
+    )
+    if logical_observable_values_per_measurement.ndim != 2:
+        raise ValueError(
+            "logical_observable_values_per_measurement must have shape "
+            "(num_measurements, num_masks)"
+        )
+    num_measurements, num_masks = (
+        logical_observable_values_per_measurement.shape
+    )
+    q_top_block_count = int(q_top_block_count)
+    if q_top_block_count < 0:
+        raise ValueError("q_top_block_count must be >= 0")
+    if q_top_block_count == 0 or num_measurements == 0:
+        return None
+    resolved_block_count = min(q_top_block_count, num_measurements)
+    measurement_blocks = np.array_split(
+        np.arange(num_measurements, dtype=np.int64),
+        resolved_block_count,
+    )
+    block_logical_observable_mean_values = np.empty(
+        (resolved_block_count, num_masks),
+        dtype=np.float64,
+    )
+    block_q_top_values = np.empty(resolved_block_count, dtype=np.float64)
+    for block_index, block_measurement_indices in enumerate(
+            measurement_blocks):
+        block_logical_observable_values = (
+            logical_observable_values_per_measurement[
+                block_measurement_indices
+            ]
+        )
+        block_m_u_values = np.mean(
+            block_logical_observable_values,
+            axis=0,
+        ).astype(np.float64, copy=False)
+        block_logical_observable_mean_values[block_index] = (
+            block_m_u_values
+        )
+        block_q_top_values[block_index] = float(
+            np.mean(block_m_u_values ** 2)
+        )
+    full_m_u_values = np.mean(
+        logical_observable_values_per_measurement,
+        axis=0,
+    ).astype(np.float64, copy=False)
+    full_q_top_value = float(np.mean(full_m_u_values ** 2))
+    last_half_start_index = num_measurements // 2
+    if last_half_start_index >= num_measurements:
+        last_half_start_index = 0
+    last_half_m_u_values = np.mean(
+        logical_observable_values_per_measurement[last_half_start_index:],
+        axis=0,
+    ).astype(np.float64, copy=False)
+    last_half_q_top_value = float(np.mean(last_half_m_u_values ** 2))
+    return {
+        "block_count": int(resolved_block_count),
+        "block_logical_observable_mean_values": (
+            block_logical_observable_mean_values
+        ),
+        "block_q_top_values": block_q_top_values,
+        "block_q_top_drift": float(
+            block_q_top_values[-1] - block_q_top_values[0]
+        ),
+        "block_q_top_range": float(
+            np.max(block_q_top_values) - np.min(block_q_top_values)
+        ),
+        "block_q_top_last_half_minus_full": float(
+            last_half_q_top_value - full_q_top_value
+        ),
+        "full_q_top_value": float(full_q_top_value),
+        "last_half_q_top_value": float(last_half_q_top_value),
+        "last_half_m_u_values": last_half_m_u_values,
+    }
+
+
+def _total_variation_distance_from_counts(left_counts, right_counts):
+    left_counts = np.asarray(left_counts, dtype=np.float64)
+    right_counts = np.asarray(right_counts, dtype=np.float64)
+    left_total = float(np.sum(left_counts))
+    right_total = float(np.sum(right_counts))
+    if left_total <= 0.0 or right_total <= 0.0:
+        return np.nan
+    left_probabilities = left_counts / left_total
+    right_probabilities = right_counts / right_total
+    return float(0.5 * np.sum(np.abs(
+        left_probabilities - right_probabilities
+    )))
+
+
+def _compute_cold_sector_histogram_summary(
+        logical_observable_values_per_measurement,
+        sector_histogram_block_count):
+    logical_observable_values_per_measurement = np.asarray(
+        logical_observable_values_per_measurement,
+        dtype=np.int8,
+    )
+    if logical_observable_values_per_measurement.ndim != 2:
+        raise ValueError(
+            "logical_observable_values_per_measurement must have shape "
+            "(num_measurements, num_masks)"
+        )
+    num_measurements, num_masks = (
+        logical_observable_values_per_measurement.shape
+    )
+    if num_masks >= 20:
+        raise ValueError(
+            "cold sector histogram would be too large for num_masks >= 20"
+        )
+    sector_histogram_block_count = int(sector_histogram_block_count)
+    if sector_histogram_block_count < 0:
+        raise ValueError("sector_histogram_block_count must be >= 0")
+    if sector_histogram_block_count == 0 or num_measurements == 0:
+        return None
+
+    resolved_block_count = min(
+        sector_histogram_block_count,
+        num_measurements,
+    )
+    num_sector_bins = 1 << num_masks
+    bit_weights = (1 << np.arange(num_masks, dtype=np.int64))
+    sector_indices = np.sum(
+        (logical_observable_values_per_measurement < 0).astype(np.int64)
+        * bit_weights,
+        axis=1,
+    )
+    full_counts = np.bincount(
+        sector_indices,
+        minlength=num_sector_bins,
+    ).astype(np.int64, copy=False)
+
+    measurement_blocks = np.array_split(
+        np.arange(num_measurements, dtype=np.int64),
+        resolved_block_count,
+    )
+    block_counts = np.empty(
+        (resolved_block_count, num_sector_bins),
+        dtype=np.int64,
+    )
+    for block_index, block_measurement_indices in enumerate(
+            measurement_blocks):
+        block_counts[block_index] = np.bincount(
+            sector_indices[block_measurement_indices],
+            minlength=num_sector_bins,
+        ).astype(np.int64, copy=False)
+
+    half_index = num_measurements // 2
+    first_half_counts = np.bincount(
+        sector_indices[:half_index],
+        minlength=num_sector_bins,
+    ).astype(np.int64, copy=False)
+    second_half_counts = np.bincount(
+        sector_indices[half_index:],
+        minlength=num_sector_bins,
+    ).astype(np.int64, copy=False)
+    adjacent_block_tv_distances = np.empty(
+        max(resolved_block_count - 1, 0),
+        dtype=np.float64,
+    )
+    for block_index in range(resolved_block_count - 1):
+        adjacent_block_tv_distances[block_index] = (
+            _total_variation_distance_from_counts(
+                block_counts[block_index],
+                block_counts[block_index + 1],
+            )
+        )
+
+    return {
+        "block_count": int(resolved_block_count),
+        "num_sector_bins": int(num_sector_bins),
+        "full_counts": full_counts,
+        "block_counts": block_counts,
+        "first_half_counts": first_half_counts,
+        "second_half_counts": second_half_counts,
+        "first_second_tv_distance": (
+            _total_variation_distance_from_counts(
+                first_half_counts,
+                second_half_counts,
+            )
+        ),
+        "adjacent_block_tv_distances": adjacent_block_tv_distances,
+    }
+
+
+def _build_q_positive_start_sector_labels(
+        q_positive_initial_chain_mode,
+        q_positive_num_start_chains,
+        num_start_sector_generators):
+    q_positive_initial_chain_mode = str(q_positive_initial_chain_mode)
+    q_positive_num_start_chains = int(q_positive_num_start_chains)
+    if q_positive_num_start_chains < 1:
+        raise ValueError("num_start_chains must be >= 1")
+    if q_positive_initial_chain_mode == "sector":
+        return _build_q0_start_sector_labels(
+            q0_num_start_chains=q_positive_num_start_chains,
+            num_start_sector_generators=num_start_sector_generators,
+        )
+    if q_positive_initial_chain_mode == "all_zero":
+        return np.array(
+            [
+                f"all_zero_{start_index:02d}"
+                for start_index in range(q_positive_num_start_chains)
+            ],
+        )
+    if q_positive_initial_chain_mode == "random_high_weight":
+        return np.array(
+            [
+                f"random_high_weight_{start_index:02d}"
+                for start_index in range(q_positive_num_start_chains)
+            ],
+        )
+    raise ValueError(
+        "q_positive_initial_chain_mode must be sector, all_zero, "
+        "or random_high_weight"
+    )
 
 
 def _section_stats_result(section_data):
@@ -2620,6 +2868,8 @@ def run_disorder_average_simulation(
         winding_plane_heatbath_sweeps=0,
         single_bit_proposal_fraction=1.0,
         observable_temperature_mode="all",
+        q_top_block_count=8,
+        q_positive_initial_chain_mode="sector",
         track_pt_sector_diagnostics=False,
         track_pt_cluster_sector_diagnostics=False,
         pt_sector_diagnostic_stride=1,
@@ -2639,6 +2889,20 @@ def run_disorder_average_simulation(
     num_replicas_per_start = int(num_replicas_per_start)
     if num_replicas_per_start < 1:
         raise ValueError("num_replicas_per_start must be >= 1")
+    q_top_block_count = int(q_top_block_count)
+    if q_top_block_count < 0:
+        raise ValueError("q_top_block_count must be >= 0")
+    resolved_q_top_block_count = min(
+        q_top_block_count,
+        int(num_measurements_per_disorder),
+    )
+    q_positive_initial_chain_mode = str(q_positive_initial_chain_mode)
+    if q_positive_initial_chain_mode not in (
+            "sector", "all_zero", "random_high_weight"):
+        raise ValueError(
+            "q_positive_initial_chain_mode must be sector, all_zero, "
+            "or random_high_weight"
+        )
     diagnostic_config = _build_measurement_diagnostic_config(
         num_zero_syndrome_sweeps_per_cycle=(
             num_zero_syndrome_sweeps_per_cycle
@@ -2818,6 +3082,24 @@ def run_disorder_average_simulation(
     chain_pt_swap_wall_time_per_disorder_per_start_replica = None
     chain_observable_wall_time_per_disorder_per_start_replica = None
     chain_measurement_wall_time_per_disorder_per_start_replica = None
+    chain_q_top_block_m_u_values_per_disorder_per_start_replica = None
+    chain_q_top_block_values_per_disorder_per_start_replica = None
+    chain_q_top_block_drift_per_disorder_per_start_replica = None
+    chain_q_top_block_range_per_disorder_per_start_replica = None
+    chain_q_top_last_half_minus_full_per_disorder_per_start_replica = None
+    chain_cold_sector_histogram_counts_per_disorder_per_start_replica = None
+    chain_cold_sector_histogram_block_counts_per_disorder_per_start_replica = None
+    chain_cold_sector_histogram_first_half_counts_per_disorder_per_start_replica = None
+    chain_cold_sector_histogram_second_half_counts_per_disorder_per_start_replica = None
+    chain_cold_sector_histogram_first_second_tv_per_disorder_per_start_replica = None
+    chain_cold_sector_histogram_adjacent_block_tv_per_disorder_per_start_replica = None
+    cold_sector_histogram_counts_per_disorder = None
+    cold_sector_histogram_block_counts_per_disorder = None
+    q_top_block_m_u_values_per_disorder = None
+    q_top_block_values_per_disorder = None
+    q_top_block_drift_per_disorder = None
+    q_top_block_range_per_disorder = None
+    q_top_last_half_minus_full_per_disorder = None
     q_top_spread_per_disorder = None
     m_u_spread_linf_per_disorder = None
     max_r_hat_per_disorder = None
@@ -2875,20 +3157,42 @@ def run_disorder_average_simulation(
     adaptive_pt_round_f_target_per_disorder = None
     cluster_summary_list = []
     if syndrome_error_probability > 0.0:
-        if zero_syndrome_move_data is None and resolved_num_start_chains > 1:
-            raise ValueError(
-                "zero_syndrome_move_data is required when num_start_chains > 1"
-            )
-        if zero_syndrome_move_data is None:
-            q_positive_start_sector_labels = np.array(["0"])
+        if q_positive_initial_chain_mode == "sector":
+            if zero_syndrome_move_data is None:
+                if resolved_num_start_chains > 1:
+                    raise ValueError(
+                        "zero_syndrome_move_data is required when "
+                        "num_start_chains > 1 and "
+                        "q_positive_initial_chain_mode=sector"
+                    )
+                q_positive_start_sector_labels = np.array(["0"])
+            else:
+                q_positive_start_sector_labels = (
+                    _build_q_positive_start_sector_labels(
+                        q_positive_initial_chain_mode=(
+                            q_positive_initial_chain_mode
+                        ),
+                        q_positive_num_start_chains=(
+                            resolved_num_start_chains
+                        ),
+                        num_start_sector_generators=(
+                            zero_syndrome_move_data[
+                                "start_sector_generators"
+                            ].shape[0]
+                        ),
+                    )
+                )
         else:
             q_positive_start_sector_labels = (
-                _build_q0_initial_chain_bits_per_start(
-                    observed_syndrome_bits=np.zeros(num_checks, dtype=bool),
-                    section_data=syndrome_representative_section,
-                    zero_syndrome_move_data=zero_syndrome_move_data,
-                    q0_num_start_chains=resolved_num_start_chains,
-                )[1]
+                _build_q_positive_start_sector_labels(
+                    q_positive_initial_chain_mode=(
+                        q_positive_initial_chain_mode
+                    ),
+                    q_positive_num_start_chains=(
+                        resolved_num_start_chains
+                    ),
+                    num_start_sector_generators=num_logical_qubits,
+                )
             )
         chain_shape = (
             num_disorder_samples,
@@ -2926,6 +3230,90 @@ def run_disorder_average_simulation(
             chain_shape,
             dtype=np.float64,
         )
+        if resolved_q_top_block_count > 0:
+            num_cold_sector_bins = 1 << num_masks
+            chain_q_top_block_m_u_values_per_disorder_per_start_replica = (
+                np.empty(
+                    chain_shape + (resolved_q_top_block_count, num_masks),
+                    dtype=np.float64,
+                )
+            )
+            chain_q_top_block_values_per_disorder_per_start_replica = (
+                np.empty(
+                    chain_shape + (resolved_q_top_block_count,),
+                    dtype=np.float64,
+                )
+            )
+            chain_q_top_block_drift_per_disorder_per_start_replica = (
+                np.empty(chain_shape, dtype=np.float64)
+            )
+            chain_q_top_block_range_per_disorder_per_start_replica = (
+                np.empty(chain_shape, dtype=np.float64)
+            )
+            chain_q_top_last_half_minus_full_per_disorder_per_start_replica = (
+                np.empty(chain_shape, dtype=np.float64)
+            )
+            chain_cold_sector_histogram_counts_per_disorder_per_start_replica = (
+                np.empty(chain_shape + (num_cold_sector_bins,), dtype=np.int64)
+            )
+            chain_cold_sector_histogram_block_counts_per_disorder_per_start_replica = (
+                np.empty(
+                    chain_shape
+                    + (resolved_q_top_block_count, num_cold_sector_bins),
+                    dtype=np.int64,
+                )
+            )
+            chain_cold_sector_histogram_first_half_counts_per_disorder_per_start_replica = (
+                np.empty(chain_shape + (num_cold_sector_bins,), dtype=np.int64)
+            )
+            chain_cold_sector_histogram_second_half_counts_per_disorder_per_start_replica = (
+                np.empty(chain_shape + (num_cold_sector_bins,), dtype=np.int64)
+            )
+            chain_cold_sector_histogram_first_second_tv_per_disorder_per_start_replica = (
+                np.empty(chain_shape, dtype=np.float64)
+            )
+            chain_cold_sector_histogram_adjacent_block_tv_per_disorder_per_start_replica = (
+                np.empty(
+                    chain_shape + (max(resolved_q_top_block_count - 1, 0),),
+                    dtype=np.float64,
+                )
+            )
+            cold_sector_histogram_counts_per_disorder = np.empty(
+                (num_disorder_samples, num_cold_sector_bins),
+                dtype=np.int64,
+            )
+            cold_sector_histogram_block_counts_per_disorder = np.empty(
+                (
+                    num_disorder_samples,
+                    resolved_q_top_block_count,
+                    num_cold_sector_bins,
+                ),
+                dtype=np.int64,
+            )
+            q_top_block_m_u_values_per_disorder = np.empty(
+                (
+                    num_disorder_samples,
+                    resolved_q_top_block_count,
+                    num_masks,
+                ),
+                dtype=np.float64,
+            )
+            q_top_block_values_per_disorder = np.empty(
+                (num_disorder_samples, resolved_q_top_block_count),
+                dtype=np.float64,
+            )
+            q_top_block_drift_per_disorder = np.empty(
+                num_disorder_samples,
+                dtype=np.float64,
+            )
+            q_top_block_range_per_disorder = np.empty(
+                num_disorder_samples,
+                dtype=np.float64,
+            )
+            q_top_last_half_minus_full_per_disorder = np.empty(
+                num_disorder_samples,
+                dtype=np.float64,
+            )
         q_top_spread_per_disorder = np.empty(
             num_disorder_samples,
             dtype=np.float64,
@@ -3262,20 +3650,30 @@ def run_disorder_average_simulation(
                 q0_q_top_values_per_start
             )
         else:
-            if zero_syndrome_move_data is None:
+            if q_positive_initial_chain_mode == "sector":
+                if zero_syndrome_move_data is None:
+                    initial_chain_bits_per_start = np.zeros(
+                        (resolved_num_start_chains, num_qubits),
+                        dtype=bool,
+                    )
+                else:
+                    (
+                        initial_chain_bits_per_start,
+                        _,
+                    ) = _build_zero_syndrome_sector_initial_chain_bits_per_start(
+                        zero_syndrome_move_data=zero_syndrome_move_data,
+                        num_start_chains=resolved_num_start_chains,
+                        num_qubits=num_qubits,
+                    )
+            elif q_positive_initial_chain_mode == "all_zero":
                 initial_chain_bits_per_start = np.zeros(
-                    (1, num_qubits),
+                    (resolved_num_start_chains, num_qubits),
                     dtype=bool,
                 )
             else:
-                (
-                    initial_chain_bits_per_start,
-                    _,
-                ) = _build_q0_initial_chain_bits_per_start(
-                    observed_syndrome_bits=np.zeros(num_checks, dtype=bool),
-                    section_data=syndrome_representative_section,
-                    zero_syndrome_move_data=zero_syndrome_move_data,
-                    q0_num_start_chains=resolved_num_start_chains,
+                initial_chain_bits_per_start = (
+                    rng.random((resolved_num_start_chains, num_qubits))
+                    < 0.5
                 )
             if use_parallel_tempering:
                 current_pt_enlarge_ladder = np.asarray(
@@ -3476,6 +3874,100 @@ def run_disorder_average_simulation(
                 (resolved_num_start_chains, num_replicas_per_start),
                 dtype=np.int64,
             )
+            if resolved_q_top_block_count > 0:
+                num_cold_sector_bins = 1 << num_masks
+                chain_q_top_block_m_u_values_per_start_replica = np.empty(
+                    (
+                        resolved_num_start_chains,
+                        num_replicas_per_start,
+                        resolved_q_top_block_count,
+                        num_masks,
+                    ),
+                    dtype=np.float64,
+                )
+                chain_q_top_block_values_per_start_replica = np.empty(
+                    (
+                        resolved_num_start_chains,
+                        num_replicas_per_start,
+                        resolved_q_top_block_count,
+                    ),
+                    dtype=np.float64,
+                )
+                chain_q_top_block_drift_per_start_replica = np.empty(
+                    (resolved_num_start_chains, num_replicas_per_start),
+                    dtype=np.float64,
+                )
+                chain_q_top_block_range_per_start_replica = np.empty(
+                    (resolved_num_start_chains, num_replicas_per_start),
+                    dtype=np.float64,
+                )
+                chain_q_top_last_half_minus_full_per_start_replica = np.empty(
+                    (resolved_num_start_chains, num_replicas_per_start),
+                    dtype=np.float64,
+                )
+                chain_q_top_last_half_m_u_values_per_start_replica = np.empty(
+                    (
+                        resolved_num_start_chains,
+                        num_replicas_per_start,
+                        num_masks,
+                    ),
+                    dtype=np.float64,
+                )
+                chain_cold_sector_histogram_counts_per_start_replica = np.empty(
+                    (
+                        resolved_num_start_chains,
+                        num_replicas_per_start,
+                        num_cold_sector_bins,
+                    ),
+                    dtype=np.int64,
+                )
+                chain_cold_sector_histogram_block_counts_per_start_replica = (
+                    np.empty(
+                        (
+                            resolved_num_start_chains,
+                            num_replicas_per_start,
+                            resolved_q_top_block_count,
+                            num_cold_sector_bins,
+                        ),
+                        dtype=np.int64,
+                    )
+                )
+                chain_cold_sector_histogram_first_half_counts_per_start_replica = (
+                    np.empty(
+                        (
+                            resolved_num_start_chains,
+                            num_replicas_per_start,
+                            num_cold_sector_bins,
+                        ),
+                        dtype=np.int64,
+                    )
+                )
+                chain_cold_sector_histogram_second_half_counts_per_start_replica = (
+                    np.empty(
+                        (
+                            resolved_num_start_chains,
+                            num_replicas_per_start,
+                            num_cold_sector_bins,
+                        ),
+                        dtype=np.int64,
+                    )
+                )
+                chain_cold_sector_histogram_first_second_tv_per_start_replica = (
+                    np.empty(
+                        (resolved_num_start_chains, num_replicas_per_start),
+                        dtype=np.float64,
+                    )
+                )
+                chain_cold_sector_histogram_adjacent_block_tv_per_start_replica = (
+                    np.empty(
+                        (
+                            resolved_num_start_chains,
+                            num_replicas_per_start,
+                            max(resolved_q_top_block_count - 1, 0),
+                        ),
+                        dtype=np.float64,
+                    )
+                )
             logical_observable_values_tensor = np.empty(
                 (
                     resolved_num_start_chains * num_replicas_per_start,
@@ -4022,6 +4514,83 @@ def run_disorder_average_simulation(
                     ] = int(
                         chain_analysis["first_signature_change_index"]
                     )
+                    if resolved_q_top_block_count > 0:
+                        block_summary = _compute_q_top_block_summary(
+                            logical_observable_values_per_measurement=(
+                                measurement_result[
+                                    "logical_observable_values_per_measurement"
+                                ]
+                            ),
+                            q_top_block_count=resolved_q_top_block_count,
+                        )
+                        chain_q_top_block_m_u_values_per_start_replica[
+                            start_index,
+                            replica_index,
+                        ] = block_summary[
+                            "block_logical_observable_mean_values"
+                        ]
+                        chain_q_top_block_values_per_start_replica[
+                            start_index,
+                            replica_index,
+                        ] = block_summary["block_q_top_values"]
+                        chain_q_top_block_drift_per_start_replica[
+                            start_index,
+                            replica_index,
+                        ] = block_summary["block_q_top_drift"]
+                        chain_q_top_block_range_per_start_replica[
+                            start_index,
+                            replica_index,
+                        ] = block_summary["block_q_top_range"]
+                        chain_q_top_last_half_minus_full_per_start_replica[
+                            start_index,
+                            replica_index,
+                        ] = block_summary[
+                            "block_q_top_last_half_minus_full"
+                        ]
+                        chain_q_top_last_half_m_u_values_per_start_replica[
+                            start_index,
+                            replica_index,
+                        ] = block_summary["last_half_m_u_values"]
+                        sector_histogram_summary = (
+                            _compute_cold_sector_histogram_summary(
+                                logical_observable_values_per_measurement=(
+                                    measurement_result[
+                                        "logical_observable_values_per_measurement"
+                                    ]
+                                ),
+                                sector_histogram_block_count=(
+                                    resolved_q_top_block_count
+                                ),
+                            )
+                        )
+                        chain_cold_sector_histogram_counts_per_start_replica[
+                            start_index,
+                            replica_index,
+                        ] = sector_histogram_summary["full_counts"]
+                        chain_cold_sector_histogram_block_counts_per_start_replica[
+                            start_index,
+                            replica_index,
+                        ] = sector_histogram_summary["block_counts"]
+                        chain_cold_sector_histogram_first_half_counts_per_start_replica[
+                            start_index,
+                            replica_index,
+                        ] = sector_histogram_summary["first_half_counts"]
+                        chain_cold_sector_histogram_second_half_counts_per_start_replica[
+                            start_index,
+                            replica_index,
+                        ] = sector_histogram_summary["second_half_counts"]
+                        chain_cold_sector_histogram_first_second_tv_per_start_replica[
+                            start_index,
+                            replica_index,
+                        ] = sector_histogram_summary[
+                            "first_second_tv_distance"
+                        ]
+                        chain_cold_sector_histogram_adjacent_block_tv_per_start_replica[
+                            start_index,
+                            replica_index,
+                        ] = sector_histogram_summary[
+                            "adjacent_block_tv_distances"
+                        ]
                     logical_observable_values_tensor[
                         flattened_chain_index
                     ] = measurement_result[
@@ -4090,6 +4659,98 @@ def run_disorder_average_simulation(
             chain_measurement_wall_time_per_disorder_per_start_replica[
                 disorder_index
             ] = chain_measurement_wall_times_per_start_replica
+            if resolved_q_top_block_count > 0:
+                chain_q_top_block_m_u_values_per_disorder_per_start_replica[
+                    disorder_index
+                ] = chain_q_top_block_m_u_values_per_start_replica
+                chain_q_top_block_values_per_disorder_per_start_replica[
+                    disorder_index
+                ] = chain_q_top_block_values_per_start_replica
+                chain_q_top_block_drift_per_disorder_per_start_replica[
+                    disorder_index
+                ] = chain_q_top_block_drift_per_start_replica
+                chain_q_top_block_range_per_disorder_per_start_replica[
+                    disorder_index
+                ] = chain_q_top_block_range_per_start_replica
+                chain_q_top_last_half_minus_full_per_disorder_per_start_replica[
+                    disorder_index
+                ] = chain_q_top_last_half_minus_full_per_start_replica
+                chain_cold_sector_histogram_counts_per_disorder_per_start_replica[
+                    disorder_index
+                ] = chain_cold_sector_histogram_counts_per_start_replica
+                chain_cold_sector_histogram_block_counts_per_disorder_per_start_replica[
+                    disorder_index
+                ] = chain_cold_sector_histogram_block_counts_per_start_replica
+                chain_cold_sector_histogram_first_half_counts_per_disorder_per_start_replica[
+                    disorder_index
+                ] = (
+                    chain_cold_sector_histogram_first_half_counts_per_start_replica
+                )
+                chain_cold_sector_histogram_second_half_counts_per_disorder_per_start_replica[
+                    disorder_index
+                ] = (
+                    chain_cold_sector_histogram_second_half_counts_per_start_replica
+                )
+                chain_cold_sector_histogram_first_second_tv_per_disorder_per_start_replica[
+                    disorder_index
+                ] = chain_cold_sector_histogram_first_second_tv_per_start_replica
+                chain_cold_sector_histogram_adjacent_block_tv_per_disorder_per_start_replica[
+                    disorder_index
+                ] = (
+                    chain_cold_sector_histogram_adjacent_block_tv_per_start_replica
+                )
+                cold_sector_histogram_counts_per_disorder[
+                    disorder_index
+                ] = np.sum(
+                    chain_cold_sector_histogram_counts_per_start_replica,
+                    axis=(0, 1),
+                )
+                cold_sector_histogram_block_counts_per_disorder[
+                    disorder_index
+                ] = np.sum(
+                    chain_cold_sector_histogram_block_counts_per_start_replica,
+                    axis=(0, 1),
+                )
+                flattened_chain_block_m_u_values = (
+                    chain_q_top_block_m_u_values_per_start_replica.reshape(
+                        resolved_num_start_chains * num_replicas_per_start,
+                        resolved_q_top_block_count,
+                        num_masks,
+                    )
+                )
+                block_m_u_values = np.mean(
+                    flattened_chain_block_m_u_values,
+                    axis=0,
+                )
+                block_q_top_values = np.mean(block_m_u_values ** 2, axis=1)
+                q_top_block_m_u_values_per_disorder[
+                    disorder_index
+                ] = block_m_u_values
+                q_top_block_values_per_disorder[
+                    disorder_index
+                ] = block_q_top_values
+                q_top_block_drift_per_disorder[disorder_index] = float(
+                    block_q_top_values[-1] - block_q_top_values[0]
+                )
+                q_top_block_range_per_disorder[disorder_index] = float(
+                    np.max(block_q_top_values) - np.min(block_q_top_values)
+                )
+                flattened_last_half_m_u_values = (
+                    chain_q_top_last_half_m_u_values_per_start_replica.reshape(
+                        resolved_num_start_chains * num_replicas_per_start,
+                        num_masks,
+                    )
+                )
+                last_half_m_u_values = np.mean(
+                    flattened_last_half_m_u_values,
+                    axis=0,
+                )
+                last_half_q_top_value = float(
+                    np.mean(last_half_m_u_values ** 2)
+                )
+                q_top_last_half_minus_full_per_disorder[
+                    disorder_index
+                ] = last_half_q_top_value - q_top_value
             q_top_spread_per_disorder[disorder_index] = (
                 convergence_summary["q_top_spread"]
             )
@@ -4197,10 +4858,14 @@ def run_disorder_average_simulation(
     result.update(_section_stats_result(syndrome_representative_section))
     if q_positive_start_sector_labels is not None:
         result["start_sector_labels"] = q_positive_start_sector_labels
+        result["q_positive_initial_chain_mode"] = np.array(
+            q_positive_initial_chain_mode
+        )
         result["num_start_chains"] = np.int64(resolved_num_start_chains)
         result["num_replicas_per_start"] = np.int64(
             num_replicas_per_start
         )
+        result["q_top_block_count"] = np.int64(resolved_q_top_block_count)
         result[
             "chain_logical_observable_mean_values_per_disorder_per_start_replica"
         ] = chain_logical_observable_mean_values_per_disorder_per_start_replica
@@ -4228,6 +4893,83 @@ def run_disorder_average_simulation(
         result[
             "chain_measurement_wall_time_per_disorder_per_start_replica"
         ] = chain_measurement_wall_time_per_disorder_per_start_replica
+        if resolved_q_top_block_count > 0:
+            result[
+                "chain_q_top_block_m_u_values_per_disorder_per_start_replica"
+            ] = (
+                chain_q_top_block_m_u_values_per_disorder_per_start_replica
+            )
+            result[
+                "chain_q_top_block_values_per_disorder_per_start_replica"
+            ] = (
+                chain_q_top_block_values_per_disorder_per_start_replica
+            )
+            result[
+                "chain_q_top_block_drift_per_disorder_per_start_replica"
+            ] = (
+                chain_q_top_block_drift_per_disorder_per_start_replica
+            )
+            result[
+                "chain_q_top_block_range_per_disorder_per_start_replica"
+            ] = (
+                chain_q_top_block_range_per_disorder_per_start_replica
+            )
+            result[
+                "chain_q_top_last_half_minus_full_per_disorder_per_start_replica"
+            ] = (
+                chain_q_top_last_half_minus_full_per_disorder_per_start_replica
+            )
+            result[
+                "chain_cold_sector_histogram_counts_per_disorder_per_start_replica"
+            ] = (
+                chain_cold_sector_histogram_counts_per_disorder_per_start_replica
+            )
+            result[
+                "chain_cold_sector_histogram_block_counts_per_disorder_per_start_replica"
+            ] = (
+                chain_cold_sector_histogram_block_counts_per_disorder_per_start_replica
+            )
+            result[
+                "chain_cold_sector_histogram_first_half_counts_per_disorder_per_start_replica"
+            ] = (
+                chain_cold_sector_histogram_first_half_counts_per_disorder_per_start_replica
+            )
+            result[
+                "chain_cold_sector_histogram_second_half_counts_per_disorder_per_start_replica"
+            ] = (
+                chain_cold_sector_histogram_second_half_counts_per_disorder_per_start_replica
+            )
+            result[
+                "chain_cold_sector_histogram_first_second_tv_per_disorder_per_start_replica"
+            ] = (
+                chain_cold_sector_histogram_first_second_tv_per_disorder_per_start_replica
+            )
+            result[
+                "chain_cold_sector_histogram_adjacent_block_tv_per_disorder_per_start_replica"
+            ] = (
+                chain_cold_sector_histogram_adjacent_block_tv_per_disorder_per_start_replica
+            )
+            result["q_top_block_m_u_values_per_disorder"] = (
+                q_top_block_m_u_values_per_disorder
+            )
+            result["q_top_block_values_per_disorder"] = (
+                q_top_block_values_per_disorder
+            )
+            result["q_top_block_drift_per_disorder"] = (
+                q_top_block_drift_per_disorder
+            )
+            result["q_top_block_range_per_disorder"] = (
+                q_top_block_range_per_disorder
+            )
+            result["q_top_last_half_minus_full_per_disorder"] = (
+                q_top_last_half_minus_full_per_disorder
+            )
+            result["cold_sector_histogram_counts_per_disorder"] = (
+                cold_sector_histogram_counts_per_disorder
+            )
+            result["cold_sector_histogram_block_counts_per_disorder"] = (
+                cold_sector_histogram_block_counts_per_disorder
+            )
         result["q_top_spread_per_disorder"] = q_top_spread_per_disorder
         result["m_u_spread_linf_per_disorder"] = (
             m_u_spread_linf_per_disorder

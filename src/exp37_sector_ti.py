@@ -40,6 +40,103 @@ EXP37_ROOT = (
     PROJECT_ROOT / "data" / "3d_toric_code" / "with_measurement_noise"
     / "exp37"
 )
+UINT64_MASK = (1 << 64) - 1
+SPLITMIX64_INCREMENT = 0x9E3779B97F4A7C15
+
+
+def _splitmix64(value):
+    x = (int(value) + SPLITMIX64_INCREMENT) & UINT64_MASK
+    x = ((x ^ (x >> 30)) * 0xBF58476D1CE4E5B9) & UINT64_MASK
+    x = ((x ^ (x >> 27)) * 0x94D049BB133111EB) & UINT64_MASK
+    return (x ^ (x >> 31)) & UINT64_MASK
+
+
+def _uniform_from_hash_key(key):
+    return ((_splitmix64(key) >> 11) & ((1 << 53) - 1)) * (1.0 / (1 << 53))
+
+
+def _hash_coordinate_key(seed_key, kind_key, type_index, i, j, k):
+    key = int(seed_key) & UINT64_MASK
+    for component in (
+        int(kind_key),
+        int(type_index),
+        int(i),
+        int(j),
+        int(k),
+    ):
+        key = _splitmix64(key ^ (component & UINT64_MASK))
+    return key
+
+
+def _coordinate_hash_uniforms_3d_toric(lattice_size, seed, kind):
+    """Build coordinate-keyed uniforms in the native 3D toric index order."""
+    lattice_size = int(lattice_size)
+    seed_key = int(seed) & UINT64_MASK
+    if kind == "data":
+        kind_key = 0xD1B54A32D192ED03
+    elif kind == "syndrome":
+        kind_key = 0xABC98388FB8FAC03
+    else:
+        raise ValueError("kind must be data or syndrome")
+    values = np.empty(3 * lattice_size ** 3, dtype=np.float64)
+    output_index = 0
+    for type_index in range(3):
+        for i in range(lattice_size):
+            for j in range(lattice_size):
+                for k in range(lattice_size):
+                    key = _hash_coordinate_key(
+                        seed_key=seed_key,
+                        kind_key=kind_key,
+                        type_index=type_index,
+                        i=i,
+                        j=j,
+                        k=k,
+                    )
+                    values[output_index] = _uniform_from_hash_key(key)
+                    output_index += 1
+    return values
+
+
+def _build_disorder_uniforms(code_family,
+                             lattice_size,
+                             num_qubits,
+                             num_checks,
+                             disorder_seed,
+                             disorder_realization_mode):
+    """Return data/syndrome uniforms for one disorder instance.
+
+    The default rng_stream mode exactly preserves the historical behavior.  The
+    coordinate_hash mode is an opt-in common-random-number coupling for 3D
+    toric finite-size comparisons: the same edge/check type and coordinate get
+    the same uniform at different L when the disorder seed is shared.
+    """
+    mode = str(disorder_realization_mode)
+    if mode == "rng_stream":
+        rng = np.random.default_rng(int(disorder_seed))
+        return rng.random(int(num_qubits)), rng.random(int(num_checks))
+    if mode != "coordinate_hash":
+        raise ValueError(
+            "disorder_realization_mode must be rng_stream or coordinate_hash"
+        )
+    if str(code_family) != "3d_toric":
+        raise ValueError("coordinate_hash disorder mode currently supports 3d_toric")
+    expected_size = 3 * int(lattice_size) ** 3
+    if int(num_qubits) != expected_size or int(num_checks) != expected_size:
+        raise ValueError(
+            "coordinate_hash disorder mode expects 3D toric n=m=3L^3"
+        )
+    return (
+        _coordinate_hash_uniforms_3d_toric(
+            lattice_size=lattice_size,
+            seed=disorder_seed,
+            kind="data",
+        ),
+        _coordinate_hash_uniforms_3d_toric(
+            lattice_size=lattice_size,
+            seed=disorder_seed,
+            kind="syndrome",
+        ),
+    )
 
 
 if njit is not None:
@@ -1771,7 +1868,6 @@ def _run_single_ais_task(task):
         raise ValueError("ais_estimator must be direct or flip_reweight")
     disorder_seed = int(task.get("disorder_seed", seed))
     sample_seed = int(task.get("sample_seed", seed))
-    rng_disorder = np.random.default_rng(disorder_seed)
     rng_sample = np.random.default_rng(sample_seed)
 
     parity_check_matrix, primitive_logical_masks = build_toric_code_by_family(
@@ -1799,8 +1895,18 @@ def _run_single_ais_task(task):
     num_checks, num_qubits = parity_check_matrix.shape
     parity_check_matrix_uint8 = parity_check_matrix.astype(np.uint8)
 
-    eta_bits = rng_disorder.random(num_qubits) < p_value
-    measurement_error_bits = rng_disorder.random(num_checks) < q_value
+    data_uniform, syndrome_uniform = _build_disorder_uniforms(
+        code_family=code_family,
+        lattice_size=lattice_size,
+        num_qubits=num_qubits,
+        num_checks=num_checks,
+        disorder_seed=disorder_seed,
+        disorder_realization_mode=str(
+            task.get("disorder_realization_mode", "rng_stream")
+        ),
+    )
+    eta_bits = data_uniform < p_value
+    measurement_error_bits = syndrome_uniform < q_value
     eta_syndrome_bits = (
         parity_check_matrix_uint8 @ eta_bits.astype(np.uint8)
     ) % 2
@@ -1919,6 +2025,9 @@ def _run_single_ais_task(task):
         "seed": seed,
         "disorder_seed": disorder_seed,
         "sample_seed": sample_seed,
+        "disorder_realization_mode": str(
+            task.get("disorder_realization_mode", "rng_stream")
+        ),
         "replica_index": int(task.get("replica_index", 0)),
         "ais_estimator": ais_estimator,
         "num_qubits": int(num_qubits),
@@ -1963,9 +2072,11 @@ def _run_single_ti_task(task):
     q_value = float(task["q_value"])
     disorder_index = int(task["disorder_index"])
     seed = int(task["seed"])
+    disorder_seed = int(task.get("disorder_seed", seed))
+    sample_seed = int(task.get("sample_seed", seed))
     code_family = str(task.get("code_family", "3d_toric"))
     projection_mode = str(task.get("projection_mode", "linear"))
-    rng = np.random.default_rng(seed)
+    rng_sample = np.random.default_rng(sample_seed)
 
     parity_check_matrix, primitive_logical_masks = build_toric_code_by_family(
         code_family,
@@ -1991,8 +2102,16 @@ def _run_single_ti_task(task):
     num_checks, num_qubits = parity_check_matrix.shape
     parity_check_matrix_uint8 = parity_check_matrix.astype(np.uint8)
 
-    data_uniform = rng.random(num_qubits)
-    syndrome_uniform = rng.random(num_checks)
+    data_uniform, syndrome_uniform = _build_disorder_uniforms(
+        code_family=code_family,
+        lattice_size=lattice_size,
+        num_qubits=num_qubits,
+        num_checks=num_checks,
+        disorder_seed=disorder_seed,
+        disorder_realization_mode=str(
+            task.get("disorder_realization_mode", "rng_stream")
+        ),
+    )
     eta_bits = data_uniform < p_value
     measurement_error_bits = syndrome_uniform < q_value
     eta_syndrome_bits = (
@@ -2039,6 +2158,10 @@ def _run_single_ti_task(task):
     num_sectors = sector_representatives.shape[0]
     num_grid = kp_grid.shape[0]
     block_count = int(task["block_count"])
+    num_burn_in_sweeps = int(task["num_burn_in_sweeps"])
+    max_effective_burn = int(task.get("max_effective_num_burn_in_sweeps", 0))
+    if max_effective_burn > 0:
+        num_burn_in_sweeps = min(num_burn_in_sweeps, max_effective_burn)
 
     mu_by_sector = np.empty((num_sectors, num_grid), dtype=np.float64)
     syndrome_mu_by_sector = np.empty((num_sectors, num_grid), dtype=np.float64)
@@ -2051,7 +2174,9 @@ def _run_single_ti_task(task):
     heatbath_by_sector = np.empty((num_sectors, num_grid), dtype=np.float64)
 
     for sector in range(num_sectors):
-        sector_seed = int(rng.integers(0, np.iinfo(np.uint64).max, dtype=np.uint64))
+        sector_seed = int(
+            rng_sample.integers(0, np.iinfo(np.uint64).max, dtype=np.uint64)
+        )
         sector_rng = np.random.default_rng(sector_seed)
         if projection_mode == "decoder_reject":
             chain_result = _run_fixed_sector_chain_decoder_reject(
@@ -2068,7 +2193,7 @@ def _run_single_ti_task(task):
                 proposals=proposals,
                 kp_grid=kp_grid,
                 kq_value=kq_value,
-                num_burn_in_sweeps=int(task["num_burn_in_sweeps"]),
+                num_burn_in_sweeps=num_burn_in_sweeps,
                 num_measurements=int(task["num_measurements"]),
                 num_sweeps_between_measurements=int(
                     task["num_sweeps_between_measurements"]
@@ -2088,7 +2213,7 @@ def _run_single_ti_task(task):
                 winding_groups=winding_groups,
                 kp_grid=kp_grid,
                 kq_value=kq_value,
-                num_burn_in_sweeps=int(task["num_burn_in_sweeps"]),
+                num_burn_in_sweeps=num_burn_in_sweeps,
                 num_measurements=int(task["num_measurements"]),
                 num_sweeps_between_measurements=int(
                     task["num_sweeps_between_measurements"]
@@ -2122,7 +2247,7 @@ def _run_single_ti_task(task):
     grid_q_top_abs_diff = float(abs(q_top - coarse_q_top))
 
     bootstrap_rng = np.random.default_rng(
-        int(rng.integers(0, np.iinfo(np.uint64).max, dtype=np.uint64))
+        int(rng_sample.integers(0, np.iinfo(np.uint64).max, dtype=np.uint64))
     )
     bootstrap = _bootstrap_ti(
         kp_grid=kp_grid,
@@ -2145,11 +2270,19 @@ def _run_single_ti_task(task):
         "projection_mode": projection_mode,
         "disorder_index": disorder_index,
         "seed": seed,
+        "disorder_seed": disorder_seed,
+        "sample_seed": sample_seed,
+        "disorder_seed_scope": str(task.get("disorder_seed_scope", "legacy")),
+        "disorder_realization_mode": str(
+            task.get("disorder_realization_mode", "rng_stream")
+        ),
         "num_qubits": int(num_qubits),
         "num_checks": int(num_checks),
         "kp_target": kp_target,
         "kq_value": kq_value,
         "kp_grid": kp_grid,
+        "num_burn_in_sweeps": int(num_burn_in_sweeps),
+        "max_effective_num_burn_in_sweeps": int(max_effective_burn),
         "measurement_error_weight": int(np.count_nonzero(measurement_error_bits)),
         "eta_weight": int(np.count_nonzero(eta_bits)),
         "observed_syndrome_weight": int(np.count_nonzero(observed_syndrome_bits)),
@@ -2458,21 +2591,50 @@ def _run_exact_benchmark(args):
 def _build_tasks(args):
     lattice_sizes = _parse_int_list(args.lattice_sizes)
     q_values = _parse_float_list(args.q_values)
+    disorder_realization_mode = str(
+        getattr(args, "disorder_realization_mode", "rng_stream")
+    )
+    if disorder_realization_mode not in {"rng_stream", "coordinate_hash"}:
+        raise ValueError(
+            "disorder_realization_mode must be rng_stream or coordinate_hash"
+        )
+    seed_scope = str(getattr(args, "disorder_seed_scope", "auto"))
+    if seed_scope == "auto":
+        if bool(args.common_disorder_across_q):
+            seed_scope = "lattice_size,disorder_index"
+        else:
+            seed_scope = "lattice_size,q_value,disorder_index"
+    seed_scope_parts = tuple(
+        part.strip()
+        for part in seed_scope.split(",")
+        if part.strip()
+    )
+    valid_seed_scope_parts = {"lattice_size", "q_value", "disorder_index"}
+    unknown_seed_scope_parts = set(seed_scope_parts) - valid_seed_scope_parts
+    if unknown_seed_scope_parts:
+        raise ValueError(
+            f"unknown disorder_seed_scope parts: {sorted(unknown_seed_scope_parts)}"
+        )
+    if "disorder_index" not in seed_scope_parts:
+        raise ValueError("disorder_seed_scope must include disorder_index")
     tasks = []
     for lattice_size in lattice_sizes:
         for q_value in q_values:
             for disorder_index in range(int(args.num_disorder_samples)):
-                if bool(args.common_disorder_across_q):
-                    seed = (
-                        int(args.seed_base)
-                        + 1000003 * int(lattice_size)
-                        + int(disorder_index)
-                    )
+                q_seed_offset = 1009 * int(round(10000 * float(q_value)))
+                disorder_seed = int(args.seed_base)
+                if "lattice_size" in seed_scope_parts:
+                    disorder_seed += 1000003 * int(lattice_size)
+                if "q_value" in seed_scope_parts:
+                    disorder_seed += q_seed_offset
+                disorder_seed += int(disorder_index)
+                if str(getattr(args, "disorder_seed_scope", "auto")) == "auto":
+                    sample_seed = disorder_seed
                 else:
-                    seed = (
+                    sample_seed = (
                         int(args.seed_base)
                         + 1000003 * int(lattice_size)
-                        + 1009 * int(round(10000 * float(q_value)))
+                        + q_seed_offset
                         + int(disorder_index)
                     )
                 tasks.append({
@@ -2486,11 +2648,20 @@ def _build_tasks(args):
                     "p_value": float(args.p),
                     "q_value": float(q_value),
                     "disorder_index": int(disorder_index),
-                    "seed": int(seed),
+                    "seed": int(sample_seed),
+                    "disorder_seed": int(disorder_seed),
+                    "sample_seed": int(sample_seed),
+                    "disorder_seed_scope": seed_scope,
+                    "disorder_realization_mode": disorder_realization_mode,
                     "num_kp_grid_points": int(args.num_kp_grid_points),
                     "num_burn_in_sweeps": int(getattr(
                         args,
                         "num_burn_in_sweeps",
+                        0,
+                    )),
+                    "max_effective_num_burn_in_sweeps": int(getattr(
+                        args,
+                        "max_effective_num_burn_in_sweeps",
                         0,
                     )),
                     "num_measurements": int(getattr(
@@ -2531,6 +2702,9 @@ def _aggregate_results(results, lattice_sizes, q_values, num_disorder_samples):
     delta_f_stderr = np.full(shape + (8,), np.nan, dtype=np.float64)
     flags = np.full(shape, "MISSING", dtype="<U128")
     wall = np.full(shape, np.nan, dtype=np.float64)
+    seed = np.full(shape, -1, dtype=np.int64)
+    disorder_seed = np.full(shape, -1, dtype=np.int64)
+    sample_seed = np.full(shape, -1, dtype=np.int64)
 
     l_index = {int(value): index for index, value in enumerate(lattice_sizes)}
     q_index = {float(value): index for index, value in enumerate(q_values)}
@@ -2558,6 +2732,13 @@ def _aggregate_results(results, lattice_sizes, q_values, num_disorder_samples):
         )
         flags[li, qi, di] = str(result["flags"])
         wall[li, qi, di] = float(result["wall_time_seconds"])
+        seed[li, qi, di] = int(result.get("seed", -1))
+        disorder_seed[li, qi, di] = int(
+            result.get("disorder_seed", result.get("seed", -1))
+        )
+        sample_seed[li, qi, di] = int(
+            result.get("sample_seed", result.get("seed", -1))
+        )
 
     mean_q_top = np.nanmean(q_top, axis=2)
     if int(num_disorder_samples) > 1:
@@ -2586,6 +2767,9 @@ def _aggregate_results(results, lattice_sizes, q_values, num_disorder_samples):
         "delta_f_stderr_per_disorder": delta_f_stderr,
         "flags_per_disorder": flags,
         "wall_time_seconds_per_disorder": wall,
+        "seed_per_disorder": seed,
+        "disorder_seed_per_disorder": disorder_seed,
+        "sample_seed_per_disorder": sample_seed,
         "mean_q_top": mean_q_top,
         "disorder_sem_q_top": disorder_sem,
         "mcmc_sem_q_top": mcmc_sem,
@@ -2898,8 +3082,15 @@ def _run_ti(args):
         "num_disorder_samples": int(args.num_disorder_samples),
         "seed_base": int(args.seed_base),
         "common_disorder_across_q": bool(args.common_disorder_across_q),
+        "disorder_seed_scope": str(getattr(args, "disorder_seed_scope", "auto")),
+        "disorder_realization_mode": str(
+            getattr(args, "disorder_realization_mode", "rng_stream")
+        ),
         "num_kp_grid_points": int(args.num_kp_grid_points),
         "num_burn_in_sweeps": int(args.num_burn_in_sweeps),
+        "max_effective_num_burn_in_sweeps": int(
+            getattr(args, "max_effective_num_burn_in_sweeps", 0)
+        ),
         "num_measurements": int(args.num_measurements),
         "num_sweeps_between_measurements": int(args.num_sweeps_between_measurements),
         "block_count": int(args.block_count),
@@ -2939,7 +3130,7 @@ def _run_ais(args):
     if int(args.num_ais_replicates) > 1:
         replicated_tasks = []
         for task in tasks:
-            disorder_seed = int(task["seed"])
+            disorder_seed = int(task["disorder_seed"])
             q_seed_offset = 1009 * int(round(10000 * float(task["q_value"])))
             for replica_index in range(int(args.num_ais_replicates)):
                 replica_task = dict(task)
@@ -3014,6 +3205,10 @@ def _run_ais(args):
         "num_disorder_samples": int(args.num_disorder_samples),
         "seed_base": int(args.seed_base),
         "common_disorder_across_q": bool(args.common_disorder_across_q),
+        "disorder_seed_scope": str(getattr(args, "disorder_seed_scope", "auto")),
+        "disorder_realization_mode": str(
+            getattr(args, "disorder_realization_mode", "rng_stream")
+        ),
         "num_kp_grid_points": int(args.num_kp_grid_points),
         "num_ais_particles": int(args.num_ais_particles),
         "num_ais_replicates": int(args.num_ais_replicates),
@@ -3064,8 +3259,39 @@ def _build_parser():
     run_parser.add_argument("--num-disorder-samples", type=int, default=4)
     run_parser.add_argument("--seed-base", type=int, default=637000)
     run_parser.add_argument("--common-disorder-across-q", action="store_true")
+    run_parser.add_argument(
+        "--disorder-seed-scope",
+        default="auto",
+        choices=(
+            "auto",
+            "lattice_size,q_value,disorder_index",
+            "lattice_size,disorder_index",
+            "q_value,disorder_index",
+            "disorder_index",
+        ),
+        help=(
+            "Components used to derive disorder_seed. The default auto preserves "
+            "the legacy common-disorder-across-q behavior."
+        ),
+    )
+    run_parser.add_argument(
+        "--disorder-realization-mode",
+        default="rng_stream",
+        choices=("rng_stream", "coordinate_hash"),
+        help=(
+            "How to turn disorder_seed into data/syndrome uniforms. rng_stream "
+            "preserves legacy behavior; coordinate_hash gives opt-in cross-L "
+            "common random numbers by 3D toric coordinate."
+        ),
+    )
     run_parser.add_argument("--num-kp-grid-points", type=int, default=33)
     run_parser.add_argument("--num-burn-in-sweeps", type=int, default=64)
+    run_parser.add_argument(
+        "--max-effective-num-burn-in-sweeps",
+        type=int,
+        default=0,
+        help="Optional cap for the burn-in sweeps actually used by TI tasks.",
+    )
     run_parser.add_argument("--num-measurements", type=int, default=128)
     run_parser.add_argument("--num-sweeps-between-measurements", type=int, default=2)
     run_parser.add_argument("--block-count", type=int, default=8)
@@ -3087,6 +3313,31 @@ def _build_parser():
     ais_parser.add_argument("--num-disorder-samples", type=int, default=4)
     ais_parser.add_argument("--seed-base", type=int, default=637000)
     ais_parser.add_argument("--common-disorder-across-q", action="store_true")
+    ais_parser.add_argument(
+        "--disorder-seed-scope",
+        default="auto",
+        choices=(
+            "auto",
+            "lattice_size,q_value,disorder_index",
+            "lattice_size,disorder_index",
+            "q_value,disorder_index",
+            "disorder_index",
+        ),
+        help=(
+            "Components used to derive disorder_seed. The default auto preserves "
+            "the legacy common-disorder-across-q behavior."
+        ),
+    )
+    ais_parser.add_argument(
+        "--disorder-realization-mode",
+        default="rng_stream",
+        choices=("rng_stream", "coordinate_hash"),
+        help=(
+            "How to turn disorder_seed into data/syndrome uniforms. rng_stream "
+            "preserves legacy behavior; coordinate_hash gives opt-in cross-L "
+            "common random numbers by 3D toric coordinate."
+        ),
+    )
     ais_parser.add_argument(
         "--ais-estimator",
         choices=["direct", "flip_reweight"],
