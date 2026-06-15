@@ -1,0 +1,62 @@
+# exp36 sector histogram gate
+
+## Gate Definition
+
+- For each fixed disorder, compare cold-chain sector histograms from different initial states.
+- The statistic is the maximum pairwise total-variation distance between start-chain histograms.
+- The reference scale is a parametric bootstrap from the pooled sector histogram with the same per-chain sample counts.
+- A disorder is flagged when observed max TV is larger than the bootstrap p99 plus the configured epsilon.
+
+- bootstrap replicates: 1000
+- TV epsilon: 1e-12
+
+## Initial-State Coverage
+
+| q | L | compared chains | logical-sector start coverage | start labels |
+|---:|---:|---:|---:|---|
+| 0.110 | 3 | 4 | 4/8 | 000, 100, 010, 110 |
+| 0.110 | 4 | 4 | 4/8 | 000, 100, 010, 110 |
+| 0.110 | 5 | 4 | 4/8 | 000, 100, 010, 110 |
+| 0.110 | 6 | 4 | 4/8 | 000, 100, 010, 110 |
+
+## Summary
+
+| q | L | disorders | q_top mean | q_top SEM | start-TV mean | start-TV max | boot-p99 median | boot-p99 max | TV fails | q_top spread max | first/second TV max | block q_top range max | never-flipped mean/max | dominant sectors |
+|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|
+| 0.110 | 3 | 64 | 0.973869 | 0.009300 | 0.0038 | 0.0400 | 0.0020 | 0.0576 | 0 | 0.048314 | 0.0781 | 0.2160 | 2.72/4 | +++++++:1.000 (30); +++++++:1.000, +--++--:0.000 (4); +++++++:1.000, -+-+-+-:0.000 (4) |
+| 0.110 | 4 | 64 | 0.998422 | 0.000795 | 0.0006 | 0.0098 | 0.0000 | 0.0186 | 0 | 0.021851 | 0.0156 | 0.1021 | 3.53/4 | +++++++:1.000 (48); +++++++:1.000, +--++--:0.000 (5); +++++++:1.000, -+-+-+-:0.000 (2) |
+| 0.110 | 5 | 64 | 0.999355 | 0.000158 | 0.0007 | 0.0039 | 0.0000 | 0.0078 | 0 | 0.008894 | 0.0039 | 0.0353 | 3.42/4 | +++++++:1.000 (38); +++++++:1.000, +--++--:0.000 (7); +++++++:1.000, +--++--:0.000, +----++:0.000 (4) |
+| 0.110 | 6 | 64 | 0.998296 | 0.000426 | 0.0011 | 0.0088 | 0.0020 | 0.0137 | 0 | 0.017650 | 0.0117 | 0.0692 | 2.81/4 | +++++++:1.000 (26); +++++++:1.000, +--++--:0.000 (14); +++++++:1.000, +++----:0.000 (4) |
+
+## Flagged Disorders
+
+No disorder exceeded the bootstrap p99 start-sector TV gate.
+
+## Sample Disorder Rows
+
+| q | L | disorder | q_top | observed TV | boot p99 | first/second TV max | top sectors | file |
+|---:|---:|---:|---:|---:|---:|---:|---|---|
+| 0.110 | 3 | 0 | 0.975632 | 0.0088 | 0.0137 | 0.0137 | +++++++:0.989, +--++--:0.005, --++--+:0.005 | `data/3d_toric_code/with_measurement_noise/exp36/018_production64_full_q_grid_20260531/remote_partial/run_q0p11_L3456_d64_m1024_seed518000/run_q0p11_L3456_d64_m1024_seed518000.npz` |
+| 0.110 | 3 | 1 | 1.000000 | 0.0000 | 0.0000 | 0.0000 | +++++++:1.000 | `data/3d_toric_code/with_measurement_noise/exp36/018_production64_full_q_grid_20260531/remote_partial/run_q0p11_L3456_d64_m1024_seed518000/run_q0p11_L3456_d64_m1024_seed518000.npz` |
+| 0.110 | 3 | 2 | 0.999442 | 0.0010 | 0.0029 | 0.0020 | +++++++:1.000, +--++--:0.000 | `data/3d_toric_code/with_measurement_noise/exp36/018_production64_full_q_grid_20260531/remote_partial/run_q0p11_L3456_d64_m1024_seed518000/run_q0p11_L3456_d64_m1024_seed518000.npz` |
+| 0.110 | 3 | 3 | 0.999442 | 0.0010 | 0.0020 | 0.0020 | +++++++:1.000, -+-+-+-:0.000 | `data/3d_toric_code/with_measurement_noise/exp36/018_production64_full_q_grid_20260531/remote_partial/run_q0p11_L3456_d64_m1024_seed518000/run_q0p11_L3456_d64_m1024_seed518000.npz` |
+| 0.110 | 3 | 4 | 1.000000 | 0.0000 | 0.0000 | 0.0000 | +++++++:1.000 | `data/3d_toric_code/with_measurement_noise/exp36/018_production64_full_q_grid_20260531/remote_partial/run_q0p11_L3456_d64_m1024_seed518000/run_q0p11_L3456_d64_m1024_seed518000.npz` |
+| 0.110 | 3 | 5 | 1.000000 | 0.0000 | 0.0000 | 0.0000 | +++++++:1.000 | `data/3d_toric_code/with_measurement_noise/exp36/018_production64_full_q_grid_20260531/remote_partial/run_q0p11_L3456_d64_m1024_seed518000/run_q0p11_L3456_d64_m1024_seed518000.npz` |
+| 0.110 | 3 | 6 | 0.884675 | 0.0215 | 0.0312 | 0.0234 | +++++++:0.948, +--++--:0.026, -+-+-+-:0.025 | `data/3d_toric_code/with_measurement_noise/exp36/018_production64_full_q_grid_20260531/remote_partial/run_q0p11_L3456_d64_m1024_seed518000/run_q0p11_L3456_d64_m1024_seed518000.npz` |
+| 0.110 | 3 | 7 | 0.938682 | 0.0098 | 0.0215 | 0.0176 | +++++++:0.972, +--++--:0.028 | `data/3d_toric_code/with_measurement_noise/exp36/018_production64_full_q_grid_20260531/remote_partial/run_q0p11_L3456_d64_m1024_seed518000/run_q0p11_L3456_d64_m1024_seed518000.npz` |
+| 0.110 | 3 | 8 | 0.995544 | 0.0039 | 0.0068 | 0.0020 | +++++++:0.998, -+-+-+-:0.002 | `data/3d_toric_code/with_measurement_noise/exp36/018_production64_full_q_grid_20260531/remote_partial/run_q0p11_L3456_d64_m1024_seed518000/run_q0p11_L3456_d64_m1024_seed518000.npz` |
+| 0.110 | 3 | 9 | 1.000000 | 0.0000 | 0.0000 | 0.0000 | +++++++:1.000 | `data/3d_toric_code/with_measurement_noise/exp36/018_production64_full_q_grid_20260531/remote_partial/run_q0p11_L3456_d64_m1024_seed518000/run_q0p11_L3456_d64_m1024_seed518000.npz` |
+| 0.110 | 3 | 10 | 0.995542 | 0.0039 | 0.0059 | 0.0039 | +++++++:0.998, -+-+-+-:0.001, +++----:0.001 | `data/3d_toric_code/with_measurement_noise/exp36/018_production64_full_q_grid_20260531/remote_partial/run_q0p11_L3456_d64_m1024_seed518000/run_q0p11_L3456_d64_m1024_seed518000.npz` |
+| 0.110 | 3 | 11 | 1.000000 | 0.0000 | 0.0000 | 0.0000 | +++++++:1.000 | `data/3d_toric_code/with_measurement_noise/exp36/018_production64_full_q_grid_20260531/remote_partial/run_q0p11_L3456_d64_m1024_seed518000/run_q0p11_L3456_d64_m1024_seed518000.npz` |
+| 0.110 | 3 | 12 | 0.999442 | 0.0010 | 0.0020 | 0.0020 | +++++++:1.000, +++----:0.000 | `data/3d_toric_code/with_measurement_noise/exp36/018_production64_full_q_grid_20260531/remote_partial/run_q0p11_L3456_d64_m1024_seed518000/run_q0p11_L3456_d64_m1024_seed518000.npz` |
+| 0.110 | 3 | 13 | 0.999442 | 0.0010 | 0.0020 | 0.0020 | +++++++:1.000, +--++--:0.000 | `data/3d_toric_code/with_measurement_noise/exp36/018_production64_full_q_grid_20260531/remote_partial/run_q0p11_L3456_d64_m1024_seed518000/run_q0p11_L3456_d64_m1024_seed518000.npz` |
+| 0.110 | 3 | 14 | 1.000000 | 0.0000 | 0.0000 | 0.0000 | +++++++:1.000 | `data/3d_toric_code/with_measurement_noise/exp36/018_production64_full_q_grid_20260531/remote_partial/run_q0p11_L3456_d64_m1024_seed518000/run_q0p11_L3456_d64_m1024_seed518000.npz` |
+| 0.110 | 3 | 15 | 0.719955 | 0.0186 | 0.0488 | 0.0352 | +++++++:0.865, +--++--:0.076, --++--+:0.032 | `data/3d_toric_code/with_measurement_noise/exp36/018_production64_full_q_grid_20260531/remote_partial/run_q0p11_L3456_d64_m1024_seed518000/run_q0p11_L3456_d64_m1024_seed518000.npz` |
+| 0.110 | 3 | 16 | 1.000000 | 0.0000 | 0.0000 | 0.0000 | +++++++:1.000 | `data/3d_toric_code/with_measurement_noise/exp36/018_production64_full_q_grid_20260531/remote_partial/run_q0p11_L3456_d64_m1024_seed518000/run_q0p11_L3456_d64_m1024_seed518000.npz` |
+| 0.110 | 3 | 17 | 0.999442 | 0.0010 | 0.0020 | 0.0020 | +++++++:1.000, +--++--:0.000 | `data/3d_toric_code/with_measurement_noise/exp36/018_production64_full_q_grid_20260531/remote_partial/run_q0p11_L3456_d64_m1024_seed518000/run_q0p11_L3456_d64_m1024_seed518000.npz` |
+| 0.110 | 3 | 18 | 1.000000 | 0.0000 | 0.0000 | 0.0000 | +++++++:1.000 | `data/3d_toric_code/with_measurement_noise/exp36/018_production64_full_q_grid_20260531/remote_partial/run_q0p11_L3456_d64_m1024_seed518000/run_q0p11_L3456_d64_m1024_seed518000.npz` |
+| 0.110 | 3 | 19 | 0.722066 | 0.0400 | 0.0508 | 0.0781 | +++++++:0.863, +--++--:0.108, +++----:0.011 | `data/3d_toric_code/with_measurement_noise/exp36/018_production64_full_q_grid_20260531/remote_partial/run_q0p11_L3456_d64_m1024_seed518000/run_q0p11_L3456_d64_m1024_seed518000.npz` |
+| 0.110 | 3 | 20 | 1.000000 | 0.0000 | 0.0000 | 0.0000 | +++++++:1.000 | `data/3d_toric_code/with_measurement_noise/exp36/018_production64_full_q_grid_20260531/remote_partial/run_q0p11_L3456_d64_m1024_seed518000/run_q0p11_L3456_d64_m1024_seed518000.npz` |
+| 0.110 | 3 | 21 | 0.999442 | 0.0010 | 0.0020 | 0.0020 | +++++++:1.000, -+-+-+-:0.000 | `data/3d_toric_code/with_measurement_noise/exp36/018_production64_full_q_grid_20260531/remote_partial/run_q0p11_L3456_d64_m1024_seed518000/run_q0p11_L3456_d64_m1024_seed518000.npz` |
+| 0.110 | 3 | 22 | 0.995544 | 0.0039 | 0.0059 | 0.0078 | +++++++:0.998, +++----:0.002 | `data/3d_toric_code/with_measurement_noise/exp36/018_production64_full_q_grid_20260531/remote_partial/run_q0p11_L3456_d64_m1024_seed518000/run_q0p11_L3456_d64_m1024_seed518000.npz` |
+| 0.110 | 3 | 23 | 0.906516 | 0.0088 | 0.0273 | 0.0195 | +++++++:0.957, -+-+-+-:0.043 | `data/3d_toric_code/with_measurement_noise/exp36/018_production64_full_q_grid_20260531/remote_partial/run_q0p11_L3456_d64_m1024_seed518000/run_q0p11_L3456_d64_m1024_seed518000.npz` |

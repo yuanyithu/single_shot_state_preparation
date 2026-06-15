@@ -1379,3 +1379,49 @@ run03 逐温度 cold-delivery 诊断：
   - run01：`pt_cold_edge_swap_stride=4,m=2048,sweeps_between_measurements=6`，复现 007 run03 并用更长链检查 cold flips 是否只是等待时间不足。
   - run02：`pt_cold_edge_swap_stride=4,pt_ladder_spacing_power=1.0,m=2048` 作为同参数独立 seed；若仍 cold flips 全 0，则应停止继续调度类优化，转向能改变 cold 附近自由能壁垒的 proposal 设计。
 - 不建议继续 `pt_ladder_spacing_power>1`；008 已显示它主要制造 hot-side bottleneck。
+
+## 2026-05-30 011 radical-start block probe
+
+009 结果已完成目标导向审计：两个 `m=2048` lightdiag seed 的 `q_top=1`、chain `q_top=[1,1,1,1]`、`Rhat=1`、`ESS=2048`，但该形态与共同冻结风险一致，不能单独作为热化证据。根据 `next_step_recommendation_20260529.md`，已先实现低开销 `q_top` block/window summary，并把 q>0 初态扩展为 `sector/all_zero/random_high_weight` 三种模式。
+
+验证：
+
+- `PYTHONPATH=src conda run -n 12 python -m py_compile src/main.py src/production_chunked_scan.py src/summarize_exp36_probe.py` 通过。
+- `PYTHONPATH=src conda run -n 12 pytest -q tests/test_pt_ladders.py tests/test_pt_swap_sweeps.py tests/test_cluster_q_ladder.py tests/test_winding_plane_heatbath.py` 通过，11 tests。
+- 本地 smoke：`data/3d_toric_code/with_measurement_noise/exp36/010_local_block_summary_smoke_20260530/`，确认 final NPZ 写入 block `q_top` tensor。
+- 远端 source 已同步到 `/home/DATA1/users/yuany/.single_shot/repos/011_radical_start_block_probe_20260530/source`；`nd-1` 上 `conda run --no-capture-output -n 11` 编译通过，`numba 0.65.1` 可用。
+
+011 远端 run 已启动，目录为 `/home/DATA1/users/yuany/.single_shot/exp36/011_radical_start_block_probe_20260530`。三条 run 使用相同 `seed_base=435000` 固定同一个 disorder realization，只改变初态：
+
+| run | node | screen | initial mode | measurements |
+|---|---|---|---|---:|
+| `run01_sector_m1024_seed435000` | `nd-1` | `exp36_011_sector` | `sector` | 1024 |
+| `run02_allzero_m1024_seed435000` | `nd-2` | `exp36_011_allzero` | `all_zero` | 1024 |
+| `run03_randomhigh_m1024_seed435000` | `nd-3` | `exp36_011_randhigh` | `random_high_weight` | 1024 |
+
+共同参数：`L=6,p=0.05,q=0.08,K=17,q_hot=0.35,cluster rho=0.15,cold_edge_stride=4,sweeps_between_measurements=6,burn-in=150,cap=750,num_start_chains=4,q_top_block_count=8,observable_temperature_mode=cold`；关闭 full sector histogram，只保留 cluster-sector light diagnostics。
+
+判据：若三种初态的最终或末 block `q_top` 差异 `>0.02`，或 block drift/range 仍显示系统漂移，则当前候选不能进入生产扫描。只有三种初态收敛到同一 `q_top` 且 `Rhat<=1.05, ESS>=100, spread<=0.02`，才进入共同 disorder A/B。
+
+011 结果：
+
+- 初次 sector run 暴露了一个 q>0 初始化错误：不能对带 measurement noise 的 observed syndrome 求 section representative，因为它不一定在 `im(H_Z)`，会让 section/decoder 路径卡住。已修正为 q>0 `sector` 只用 zero-syndrome sector representatives；q=0 路径保持原来的 syndrome representative 初态。
+- 修正后三初态在 `q=0.08` 均完成：最终 `q_top=1`，chain `q_top=[1,1,1,1]`，8 个 block 全为 `1`，`Rhat=1`，`ESS=1024`。
+- 该点通过原先的 q_top 初态一致性判据，但 `q=0.08` 已处于 `q_top` 饱和区，不能单独当作充分热化证明。
+
+012 高 q radical-start：
+
+- 为避免 011 的饱和判读问题，补跑 `L=6,p=0.05,q=0.23`，同样三初态、同一 disorder seed、`m=1024`。
+- 三初态最终 `q_top` 分别为 `0.991097/0.992207/0.990540`，最大差约 `0.00167`；Rhat 全部约 `1.0001`，ESS 全部 `1024`。
+- block range 约 `0.0177~0.0266`，last-half-full 绝对值不超过 `0.0023`，没有明显系统 drift。`random_high_weight` wall time 明显更高，不适合当生产初态。
+
+013 common-disorder A/B：
+
+- 在 `q=0.23` 上用 3 个共同 disorder 比较三类配置：
+  - 候选：`q_hot=0.35,rho=0.15,cold_edge_stride=4,m=1024`。
+  - cheap baseline：`q_hot=0.32,cluster off,cold_edge_stride=1,m=1024`。
+  - 参考：候选配置但 `m=2048`。
+- 结果目录：`data/3d_toric_code/with_measurement_noise/exp36/013_common_disorder_ab_q023_20260530/013_summary.md`。
+- 候选相对 2x reference 的逐 disorder `q_top` 最大差 `0.001115`，mean abs `0.000928`；cheap baseline 最大差 `0.00389`，mean abs `0.00259`，绝对偏差仍小。
+- wall time：cheap `138.6s`，候选 `164.3s`，2x reference `741.3s`。cheap 比候选快约 `16%`，reference 额外机器时间没有带来明显目标量改进。
+- 当前证据更支持下一轮 production-like 小矩阵采用 cheap baseline，而不是继续为 cluster/cold-edge hold 付费。
