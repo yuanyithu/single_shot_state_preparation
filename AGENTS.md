@@ -50,6 +50,9 @@ MCMC 三类 move ↔ 该分解：single-bit 翻转一般同时动 **T 与 S**（
   - 使用命令`ssh yuany`可以登录到存储节点(nd-0)，文件传输可以在这个节点与本地实现
   - 当登录到nd-0之后进一步使用命令`ssh nd-3`或`ssh nd-1`或`ssh nd-2`可以登录到计算节点，计算节点与存储节点共享存储，计算应在这个节点开展
   - 运行python请使用名为`11`的conda环境，运行请开启`screen`后台运行
+  - **服务器根目录唯一为 `~/.single_shot/`（launcher 的 `REMOTE_BASE`），是 Project D 在服务器上的唯一落脚点**；其它项目（N01 / A14 / QEDC / BP_OSD / QEM_QEC 等）与本项目无关，不要读写或混入。根目录下只长期保留两个子目录：`runs/`（唯一的实验产物文件夹，每次实验一个带编号子目录 `expNN_…`，与本地 `data/` 编号一一对应）和 `logs/`（launcher 日志）。索引见 `~/.single_shot/SERVER_README.md`。
+  - **保持有序、用完即清**：`repos/`（每次 launch tar 过去的 src 副本）、`mpl-cache/`、`*code*` 快照、profile/smoke/benchmark 等都是 scratch，由 launcher 自动重建——把一个 run 的结果 tar 回本地 `data/` 并校验后，应删掉该 run 的 `repos/` 副本和临时 cache，长期只留 `runs/` 下最终 NPZ/产物。不要再在根目录散放代码快照或散乱命名的 run。
+  - 本地 `data/` + git 是 single source of truth；服务器 `runs/` 只是 NPZ 的异地备份，不在服务器上做分析。（2026-06-15 已清理：删除 ~30G repos/代码快照/profile/smoke/早期摸底 scratch，59 个编号实验归拢到 `runs/`。）
 - 快速测试技巧：可以不做disorder sample，只看一个disorder固定为0的内部有没有相变
 - 每次实验放在一个文件夹下，文件夹命名规则类似`exp1_极简实验内容_20260501_日内时间戳`。每次实验按顺序编号命名
 - exp36 起的迭代优化实验统一使用带序号子文件夹，例如 `001_cluster_stage_diag_smoke_20260528/`、`002_cluster_stage_repeats_20260528/`；同一轮远端多节点结果放在该编号目录下的不同 run 子目录。
@@ -65,7 +68,6 @@ MCMC 三类 move ↔ 该分解：single-bit 翻转一般同时动 **T 与 S**（
 - `r` 的数学定义已经从"线性截面"修正为"任意 section"；代码里优先走 `ldpc.BpLsdDecoder` 风格的 syndrome-to-chain 代表元映射，失败再回退到高斯消元。
 - 逻辑观测量必须按修正公式 `(-1)^<z_u, c + eta + r(H_Z c) + r(H_Z eta)>` 计算；不要恢复旧的 `r^T`/factorized mask 线性化路径。
 - 旧的 `q!=0` 数值结果基于错误的线性化 observable 公式，已经失效，后续分析不要沿用；exp37 的 `020/028` 还用了旧 `x+r(Hx)` sector 标签，也只保留作审计。`p=0.05,q=0.08..0.23,L=3,4,5` 的 corrected AIS 最终表以 `exp37/032_final_corrected_qgrid_20260603` 为准。早期 AIS NPZ 可能没有 `delta_f_stderr_per_disorder`，优先用 `032` 或重新跑修正后的聚合代码。
-- exp38 P1b 已用记录在 `002_p1_paired_demo_20260604/p1b_decision_diagnostic.md` 的 production-power 判据通过：strict pilot gate（`ratio<=0.80` 且 pilot paired SEM `<=0.05`）仍保留为 audit failure；P2 应使用 `disorder_seed_scope=disorder_index` + 默认 `rng_stream`，crossing 区 `N_common=32`。关键数字：same-seed `q=0.21,N=12` paired SEM `0.069376` vs unpaired `0.081221`、ratio `0.854<1`、CI `[-0.294715,-0.030315]`、投影到 `N=32` 的 paired SEM `0.042484<=0.05`；`coordinate_hash` 坐标共享方案虽 audit shared fraction=1.0，但 `corr=-0.381、ratio=1.175` 且有 L5 grid warning，已明确排除。
 
 服务器/性能运行坑：
 
