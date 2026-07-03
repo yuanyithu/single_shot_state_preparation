@@ -55,6 +55,9 @@ DISORDER_REALIZATION_MODE="${DISORDER_REALIZATION_MODE:-rng_stream}"
 NUM_WORKERS="${NUM_WORKERS:-0}"
 SKIP_SYNC="${SKIP_SYNC:-0}"
 DRY_RUN="${DRY_RUN:-0}"
+# Optional ssh control opts (e.g. ControlMaster multiplexing for a flaky jump host).
+# Default empty = unchanged behavior. Set SSH_CTL='-o ControlPath=... -o ControlMaster=auto ...'.
+SSH_CTL="${SSH_CTL:-}"
 
 MANIFEST_PATH="${MANIFEST_PATH:-$STAGE_DIR/remote_runs_manifest.json}"
 
@@ -68,13 +71,13 @@ sync_remote_repo() {
   local host="$1" repo_dir="$2"
   echo "[boundary] syncing selected working tree to $host:$repo_dir"
   tar -C "$PROJECT_ROOT" --exclude='__pycache__' --exclude='*.pyc' -cf - src \
-    | ssh yuany "ssh ${host} 'rm -rf $(quote_arg "$repo_dir") && mkdir -p $(quote_arg "$repo_dir") && tar -xf - -C $(quote_arg "$repo_dir")'"
+    | ssh ${SSH_CTL} yuany "ssh ${host} 'rm -rf $(quote_arg "$repo_dir") && mkdir -p $(quote_arg "$repo_dir") && tar -xf - -C $(quote_arg "$repo_dir")'"
 }
 
 
 verify_remote_env() {
   local host="$1"
-  ssh yuany "ssh ${host} 'set -euo pipefail; hostname; echo nproc=\$(nproc); command -v screen >/dev/null; command -v conda >/dev/null; export CONDA_NO_PLUGINS=true; conda run --no-capture-output -n 11 python -c \"import importlib.util, numpy; print(\\\"python_env_ok=1\\\"); print(\\\"numba_available=\\\" + str(importlib.util.find_spec(\\\"numba\\\") is not None))\"'"
+  ssh ${SSH_CTL} yuany "ssh ${host} 'set -euo pipefail; hostname; echo nproc=\$(nproc); command -v screen >/dev/null; command -v conda >/dev/null; export CONDA_NO_PLUGINS=true; conda run --no-capture-output -n 11 python -c \"import importlib.util, numpy; print(\\\"python_env_ok=1\\\"); print(\\\"numba_available=\\\" + str(importlib.util.find_spec(\\\"numba\\\") is not None))\"'"
 }
 
 
@@ -268,7 +271,7 @@ launch_host() {
   if [[ "$NUM_WORKERS" != "0" ]]; then
     eff_workers="$NUM_WORKERS"
   else
-    eff_workers="$(ssh yuany "ssh ${host} nproc" 2>/dev/null | tr -dc '0-9')"
+    eff_workers="$(ssh ${SSH_CTL} yuany "ssh ${host} nproc" 2>/dev/null | tr -dc '0-9')"
     if [[ -z "$eff_workers" || "$eff_workers" -lt 1 ]]; then eff_workers=8; fi
     if [[ "$eff_workers" -gt 8 ]]; then eff_workers=$(( eff_workers - 4 )); fi
   fi
@@ -276,15 +279,15 @@ launch_host() {
 
   runner_tmp="$(mktemp)"
   build_remote_runner "$host" "$repo_dir" "$run_root" "$cells_blob" "$eff_workers" > "$runner_tmp"
-  ssh yuany "ssh ${host} 'mkdir -p $(quote_arg "$run_root") $(quote_arg "$REMOTE_BASE/logs")'"
-  ssh yuany "ssh ${host} 'cat > $(quote_arg "$runner_path")'" < "$runner_tmp"
+  ssh ${SSH_CTL} yuany "ssh ${host} 'mkdir -p $(quote_arg "$run_root") $(quote_arg "$REMOTE_BASE/logs")'"
+  ssh ${SSH_CTL} yuany "ssh ${host} 'cat > $(quote_arg "$runner_path")'" < "$runner_tmp"
   rm -f "$runner_tmp"
 
   printf -v remote_command 'chmod +x %q && if screen -ls | grep -q %q; then echo %q >&2; exit 24; fi && screen -dmS %q bash -lc %q && printf "HOST=%%s\nSCREEN_NAME=%%s\nLOG_PATH=%%s\nRUN_ROOT=%%s\n" %q %q %q %q' \
     "$runner_path" "[.]${screen_name}[[:space:]]" "screen session already exists: $screen_name" \
     "$screen_name" "exec $(quote_arg "$runner_path") >> $(quote_arg "$log_path") 2>&1" \
     "$host" "$screen_name" "$log_path" "$run_root"
-  ssh yuany "ssh ${host} $(quote_arg "$remote_command")"
+  ssh ${SSH_CTL} yuany "ssh ${host} $(quote_arg "$remote_command")"
 }
 
 

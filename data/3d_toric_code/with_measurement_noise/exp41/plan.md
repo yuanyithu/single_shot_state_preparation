@@ -2,6 +2,8 @@
 
 日期：2026-06-20（优化版，基于 exp40 实测数据修正）
 
+> **状态（2026-07-03）：exp41 已完成收官。** phase-1 见 `003_*/summary.md`；phase-2 三步见 `004_*/`、`005_*/`、`006_*/summary.md`；**最终相图 = `006_*/phase_diagram_final.png`**（五点平台 w0 q_c≈0.033–0.035，p∈[0.05,0.22]）。⚠️ 本文 §7「近 p_c 收口/fan-out」的预期已被实测**证伪**：p=0.21、0.22 都不收口，塌缩被限制在 p∈(0.22, 0.227) 宽 0.007 的窄窗（sharp knee）；不要按 §7 原样再投点。
+
 目标：延续 exp40 的 sector-TI 路线（`run --projection-mode linear`），加大计算资源，画出可发表的 3D toric code 在 data error `p` 与 measurement error `q` 平面上的相边界 `q_c(p)`，核心是**压低误差限**。
 
 ---
