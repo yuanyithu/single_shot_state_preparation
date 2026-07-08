@@ -255,4 +255,5 @@ data/expander_code/exp101/
 
 ## changelog
 - 2026-07-07 初版（规划会话；4 项用户决策已确认并写入 §0）。
+- 2026-07-08 G2 执行期修订：①G2.8 与 G2.7 顺序互换（先 TI 引擎后扫描入口，使 run_scan 一次覆盖两引擎）；②G2.8 的 numba TI kernel 子项挂账至 G4.2 性能线（python 参考版为正确性权威，正确性判据全绿后不阻塞 Phase 3）；③G2.6 的收敛 gate 增加符号敏感 m_u_spread 判据（q_top spread 被证符号盲——不同 sector 共冻给出相同 q_top）；④pairwise TI 定义细化：链锚定在 {ℓ_ref, ℓ_ref⊕e_u}（true 系综正确锚点，repo_compat 自动退化为 {0,e_u}）。
 - 2026-07-07 G0.1 修订：①判决发现主项目模型为 δ-only 盘度（证据 validation/001），§1.2 引入 true_posterior/repo_compat 双系综开关；②考证旧 q_top = 全部非零 u 均值（=归一化 purity），§1.4 更新；③新增 G2.8 sector-TI 引擎移植（exp37 生产路径泛化 + 大 k basis-pairwise 变体）；④G3.2/G3.5 扩为双系综与 TI 覆盖；⑤§6 新增风险 11/12。详见 notes/00_interface_recon.md。

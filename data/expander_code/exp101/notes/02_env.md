@@ -5,7 +5,8 @@
 - 主机：darwin（Mac），conda env **`12`**（项目规定，勿切换）。
 - 2026-07-07 实测：python 3.12.12, numpy 2.4.1, numba 0.65.1, ldpc 2.4.1, scipy 1.17.0, matplotlib 3.10.8, pytest 9.0.3。
 - 已复现坑：本地 `conda run -n 12 python - <<'PY'` heredoc 吞输出（与 CLAUDE.md 远端坑同源）——一律先写 .py 再运行。
-- 测试运行约定：`cd "project D" && conda run -n 12 python -m pytest data/expander_code/exp101/tests -q`。
+- **已复现坑（G2.4 排障代价惨痛）**：`conda run` 不加 `--no-capture-output` 会**整体捕获子进程输出直到退出**——长任务/被 kill 的任务看起来"零输出"，无法判断进度，faulthandler 转储也被吞。**本地所有 conda run 一律加 `--no-capture-output`**（远端 launcher 已有此规则，本地同样强制）。
+- 测试运行约定：`cd "project D" && conda run --no-capture-output -n 12 python -m pytest data/expander_code/exp101/tests -q`。
 
 ## 远端（nd-1 / nd-2 / nd-3，经 `ssh yuany` → `ssh nd-{1,2,3}`）
 
