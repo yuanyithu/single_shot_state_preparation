@@ -1,8 +1,8 @@
 # exp101 status — 开发进度与检查点（进度唯一真值）
 
-**当前指针**：G3.6（V4 实现冗余 A/B）+ G3.7（V6 冻结扇区 torture）
+**当前指针**：G4.1（远端 env 确认 + launcher + 单节点 smoke）— **Phase 3 全绿**
 **循环状态**：运行中（/loop 已启动，2026-07-07）
-**最后更新**：2026-07-09（loop 迭代 28：G3.5 Nishimori 通过）
+**最后更新**：2026-07-09（loop 迭代 29：G3.6/G3.7 通过，Phase 3 收官）
 
 ---
 
@@ -77,8 +77,8 @@
 | G3.3 | V1c section-frame A/B | **通过** | `validation/006_v1c_frame_ab_20260709/{run_v1c.py,results.json,summary.md}` | 2026-07-09（18s）。ALL PASS：G1 每 frame 内 enum=MCMC（z≤4.54）；**G2 q=0 相对分布 frame 无关精确 1.1e-15**（linear-A/B + decoder 三 frame，证实平移不变推导）；G3 q>0 frame 依赖被观测（rel-TVD 0.60，gauge=修正协议）；G4 三 frame 指纹互异。修 2 bug：q=0 走 coset 表、G1 用 z-OR-绝对 |
 | G3.4 | V2 解析极限（p=0.5 / q=0.5 闭式 m=2,4,6 / 极限一致） | **通过** | `validation/005_v2_analytic_limits_20260708/{run_v2.py,results.json,summary.md,run_v2.log}` | 2026-07-09。8 检查全绿（1s）：V2a p=0.5 零化+L接受率≡1；**V2b q=0.5 闭式 m_u=(1−2p)^{\|w_u\|} 覆盖 m=2/4/6（n=100/400/900,k=4/16/36）生产规模 z≤2.4**；V2c q→0⁺vsq=0 连续（diff 1.8e-5）；V2d p,q→0 Bayes 极限 q_top=0.995；V2e 零盘度两系综重合。**捕获真生产 bug**：section.fingerprint 用 bytes() 序列化主元列，索引>255（所有 m≥4/n≥400）即崩——已修为定宽 int64 + 回归测试；V2d 修正错误的极限预期（固定 q 时 p→0 不集中于 η） |
 | G3.5 | V3 Nishimori 三级（全求和 / 抽样×enum / 全 MCMC n=100） | **通过** | `validation/008_v3_nishimori_20260709/{run_v3.py,results.json,summary.md}` | 2026-07-09（31s）。ALL PASS：**L1 [[8,2,2]] 全 4096-disorder 求和 E[m]=E[m²] 精确 1.9e-14**；L2 toric_m3(z=1.1)/K43(z=3.5) 抽样×枚举；**L3 expander_m2 n=100 越枚举界全 MCMC**（双独立链无偏 m²，z=2.06）；JUDGE repo_compat q=0.5 恒等式违反 gap=0.25（确认恒等式为 true_posterior 特有=系综判别）。修 1 import typo |
-| G3.6 | V4 实现冗余 A/B（numba/PT/多起点/RNG） | 未开始 | — | |
-| G3.7 | V6 冻结扇区 torture（负例必须报警 + 正例通过） | 未开始 | — | per-u 冻结检测 k=4..9 |
+| G3.6 | V4 实现冗余 A/B（numba/PT/多起点/RNG） | **通过** | `validation/009_v4_v6_redundancy_torture_20260709/{run_v4_v6.py,results.json,summary.md}` | 2026-07-09。ref≡numba bit 级一致；PT/direct/1-vs-8-start 各自对枚举一致（z 0.1/2.5/0.1<5） |
+| G3.7 | V6 冻结扇区 torture（负例必须报警 + 正例通过） | **通过** | 同 009 目录 | 2026-07-09。**负例 expander k=4 与 k=9 诊断均报警**（共冻仅因 sector_transport_insufficient 失败）；正例 PT round_trips 19/15、初始 sector 无关性 z=1.7；per-u 冻结检测在 k=9 生效 |
 
 ### Phase 4 — 服务器规模化验证
 
@@ -133,6 +133,7 @@
 - 2026-07-08 loop#21（G2.8，与 G2.7 顺序互换）：sector_ti.py（TI 引擎泛化：proposals/退火续链/bootstrap/flags/full+pairwise 双档、pairwise 围绕 ℓ_ref）+ 13 测试全过（累计 238），对枚举全绿。numba TI 挂账 G4.2。指针 → G2.7。
 - 2026-07-08 loop#22（G2.7）：run_scan.py（双引擎入口、seed scope、原子 chunk 续采、兼容 NPZ+manifest、CLI）+ 8 测试全过（累计 246）。**Phase 2 全绿（G2.1–G2.8，102 个 Phase-2 测试）**，phase-2 提交 `35d0b2a` 已推送。指针 → G3.1。
 - 2026-07-08 loop#23（G3.1）：enumerate_exact.py（计数表 + Gray + numba/python 双实现 + 守卫）+ 10 测试全过（累计 256）：一表多 (p,q) 机器精度、K_{4,3} 2^25 <1s、主项目 logZ/decoder-frame 双通道互证。指针 → G3.2。
+- 2026-07-09 loop#29（G3.6/G3.7 通过 → **Phase 3 全绿 G3.1–G3.7**）：V4 ref≡numba bit 级 + PT/direct/多起点一致；V6 冻结 torture 负例 k=4/k=9 诊断报警、正例 PT 传输+起点无关。Phase 3 收官提交。指针 → Phase 4（G4.1 远端 smoke）。
 - 2026-07-09 loop#27-28（G3.3 + G3.5 通过）：frame A/B（q=0 相对分布 frame 无关 1e-15、q>0 gauge 依赖）；Nishimori 三级递进全绿（L1 全求和 1.9e-14、L3 n=100 全 MCMC z=2.06、repo_compat 判别 gap=0.25）。两脚本各修 1-2 个启动 bug。
 - 2026-07-09 loop#26（G3.2 通过 + D4 发现）：V1 regime-aware 重跑（3531s）；分析确认 4 处 instrument 错配（逐任务偏差 vs 池化、ergodic 阈值、TI flag-aware、pairwise 比较对象），用 finalize_v1.py 对有效采样数据施正确 instrument → **ALL PASS**。**pairwise-TI 大 k 失效**（validation/007：K43 max dev 1.55、k=2 也 0.11 而 full-TI 0.03）→ 弃用，大 k 走 direct/PT 采样（D4，plan/风险12 已更新）。累计单元测试 258 全绿。
 - 2026-07-09 loop#24-25（G3.4 通过 + G3.2 重构）：写 V1/V2 重型验证脚本。**V2 全绿**（含 m=6 生产规模闭式），捕获并修复 section.fingerprint >255 崩溃真 bug（+回归测试，累计 258 tests）+ V2d 极限预期修正。**V1 首轮暴露 instrument 错配**（bare 单链跑 q=0/超冷 + 纯 z-gate → 假红）：分析确认非 bug（q=0 sector 权重单链原理取不到、m_u≈±1 饱和 z 失真、TI raw-ΔF-z 错 instrument）→ 按 regime-aware 重构 run_v1.py（direct 自证遍历区 z-OR-绝对、PT 覆盖冷点、TI 物理量判据），plan changelog 记录。V1 重跑后台进行中。
