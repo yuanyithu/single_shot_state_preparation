@@ -8,6 +8,7 @@ import pytest
 from src.run_scan import (
     PROTOCOL_VERSION,
     build_code,
+    merge,
     scan,
     task_seed,
 )
@@ -47,7 +48,8 @@ class TestScanEndToEnd:
             out, "surface", [2], 0.12, [0.08, 0.15], 2,
             engine="ti", engine_config=FAST_TI,
         )
-        assert report == {"reused": 0, "computed": 4, "total": 4}
+        assert (report["reused"], report["computed"], report["total"]) == (0, 4, 4)
+        assert report["failed"] == []
         # 续采：全部 chunk 复用，结果不变
         with np.load(npz_path, allow_pickle=True) as data:
             q_top_first = data["q_top_per_disorder"].copy()
@@ -55,7 +57,7 @@ class TestScanEndToEnd:
             out, "surface", [2], 0.12, [0.08, 0.15], 2,
             engine="ti", engine_config=FAST_TI,
         )
-        assert report2 == {"reused": 4, "computed": 0, "total": 4}
+        assert (report2["reused"], report2["computed"], report2["total"]) == (4, 0, 4)
         with np.load(npz_path2, allow_pickle=True) as data:
             assert np.array_equal(data["q_top_per_disorder"], q_top_first)
         # schema 字段
@@ -137,3 +139,40 @@ class TestScanEndToEnd:
             assert np.isfinite(data["q_top_per_disorder"]).all()
             manifest = json.loads(str(data["manifest_json"]))
             assert manifest["per_size_k"] == {"2": 2, "3": 2}
+
+
+class TestParallelism:
+    def test_parallel_matches_serial_bit_identical(self, tmp_path):
+        """确定性：num_workers=4 与 =1 必须逐位一致（seed scope 与 worker 数无关）。"""
+        r1, rep1 = scan(tmp_path / "serial", "surface", [2], 0.12,
+                        [0.08, 0.15], 2, engine="ti", engine_config=FAST_TI,
+                        num_workers=1)
+        r4, rep4 = scan(tmp_path / "par", "surface", [2], 0.12,
+                        [0.08, 0.15], 2, engine="ti", engine_config=FAST_TI,
+                        num_workers=4)
+        assert rep4["num_workers"] == 4 and rep4["computed"] == 4
+        assert rep4["failed"] == []
+        with np.load(r1, allow_pickle=True) as d1, \
+                np.load(r4, allow_pickle=True) as d4:
+            assert np.array_equal(d1["q_top_per_disorder"],
+                                  d4["q_top_per_disorder"])
+            assert np.array_equal(d1["disorder_seed_per_disorder"],
+                                  d4["disorder_seed_per_disorder"])
+            assert np.array_equal(d1["m_u_per_disorder"],
+                                  d4["m_u_per_disorder"])
+
+    def test_merge_handles_missing_chunk(self, tmp_path):
+        out = tmp_path / "miss"
+        scan(out, "surface", [2], 0.12, [0.08, 0.15], 2, engine="ti",
+             engine_config=FAST_TI, num_workers=1)
+        chunk = sorted((out / "chunks").glob("task_*.json"))[0]
+        chunk.unlink()   # 模拟失败/缺失 cell
+        npz_path = merge(out, "surface", [2], 0.12, [0.08, 0.15], 2,
+                         "x_error", "true_posterior", "ti", FAST_TI,
+                         "full_rank")
+        with np.load(npz_path, allow_pickle=True) as data:
+            manifest = json.loads(str(data["manifest_json"]))
+            assert manifest["missing_chunks"] == 1
+            flags = data["flags_per_disorder"].astype(str)
+            assert (flags == "MISSING").sum() == 1
+            assert np.isfinite(data["q_top_per_disorder"]).sum() == 3

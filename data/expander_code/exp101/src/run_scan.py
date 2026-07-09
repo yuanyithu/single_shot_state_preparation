@@ -99,6 +99,23 @@ DEFAULT_DIRECT = dict(num_burn_in_sweeps=500, num_measurements=4000,
                       num_starts=4)
 
 
+def _safe_nanmean(arr, axis):
+    """全 NaN 切片（缺失 chunk）→ NaN，静默（不发 RuntimeWarning）。"""
+    import warnings
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", RuntimeWarning)
+        return np.nanmean(arr, axis=axis)
+
+
+def _safe_nanstd(arr, axis):
+    import warnings
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", RuntimeWarning)
+        return np.nanstd(arr, axis=axis, ddof=1)
+
+
 def _atomic_write_json(path, data):
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -237,11 +254,45 @@ def run_single_task(models_cache, family, size, sector, ensemble, p, q,
     return result
 
 
+# 每进程模型缓存（多进程 worker 用；spawn 下每进程独立、首任务构建后复用）
+_WORKER_CACHE = {}
+
+
+def _chunk_worker(spec):
+    """picklable worker：算一个 chunk 并原子写；返回 (tag, status, wall|err)。
+
+    幂等：若 chunk 已是当前 protocol 则跳过（re-dispatch 安全）。
+    """
+    chunk_path = Path(spec["chunk_path"])
+    if chunk_path.exists():
+        try:
+            with chunk_path.open(encoding="utf-8") as handle:
+                if json.load(handle).get("protocol") == PROTOCOL_VERSION:
+                    return (spec["tag"], "reused", 0.0)
+        except (json.JSONDecodeError, OSError):
+            pass
+    try:
+        result = run_single_task(
+            _WORKER_CACHE, spec["family"], spec["size"], spec["sector"],
+            spec["ensemble"], spec["p"], spec["q"], spec["disorder_index"],
+            spec["engine"], spec["engine_config"], spec["family_rule"],
+            spec["family_seed"], spec["u_rand_count"])
+        _atomic_write_json(chunk_path, {"protocol": PROTOCOL_VERSION,
+                                        "result": result})
+        return (spec["tag"], "computed", result["wall_time_seconds"])
+    except Exception as error:  # noqa: BLE001 - 单 chunk 失败不拖垮全扫描
+        return (spec["tag"], "failed", repr(error))
+
+
 def scan(output_dir, family, size_list, p_value, q_values, num_disorders,
          sector="x_error", ensemble="true_posterior", engine="ti",
          engine_config=None, family_rule="full_rank", family_seed=None,
-         u_rand_count=64):
-    """主扫描：断点续采 + merge。返回 (npz_path, merge_report)。"""
+         u_rand_count=64, num_workers=None):
+    """主扫描：断点续采 + 可选多进程并行 + merge。返回 (npz_path, report)。
+
+    num_workers: None/1 → 串行（原路径，调试友好）；>1 → ProcessPoolExecutor
+    (spawn context，避 numba+fork 死锁)。任务已独立+原子写，天然可并行。
+    """
     output_dir = Path(output_dir)
     chunk_dir = output_dir / "chunks"
     chunk_dir.mkdir(parents=True, exist_ok=True)
@@ -249,41 +300,61 @@ def scan(output_dir, family, size_list, p_value, q_values, num_disorders,
         DEFAULT_TI if engine == "ti" else DEFAULT_DIRECT
     ))
 
-    models_cache = {}
+    specs = []
     reused = 0
-    computed = 0
-    tasks = []
     for size in size_list:
         for q in q_values:
             for disorder_index in range(num_disorders):
-                tasks.append((size, float(q), disorder_index))
-    for size, q, disorder_index in tasks:
-        tag = f"m{size}_q{q:.6g}_d{disorder_index}"
-        chunk_path = chunk_dir / f"task_{tag}.json"
-        if chunk_path.exists():
-            try:
-                with chunk_path.open(encoding="utf-8") as handle:
-                    payload = json.load(handle)
-                if payload.get("protocol") == PROTOCOL_VERSION:
-                    reused += 1
-                    continue
-            except (json.JSONDecodeError, OSError):
-                pass  # 损坏 chunk 重算
-        result = run_single_task(
-            models_cache, family, size, sector, ensemble, p_value, q,
-            disorder_index, engine, engine_config, family_rule, family_seed,
-            u_rand_count,
-        )
-        _atomic_write_json(chunk_path, {
-            "protocol": PROTOCOL_VERSION, "result": result,
-        })
-        computed += 1
+                q = float(q)
+                tag = f"m{size}_q{q:.6g}_d{disorder_index}"
+                chunk_path = chunk_dir / f"task_{tag}.json"
+                if chunk_path.exists():
+                    try:
+                        with chunk_path.open(encoding="utf-8") as handle:
+                            if (json.load(handle).get("protocol")
+                                    == PROTOCOL_VERSION):
+                                reused += 1
+                                continue
+                    except (json.JSONDecodeError, OSError):
+                        pass
+                specs.append({
+                    "tag": tag, "chunk_path": str(chunk_path),
+                    "family": family, "size": size, "sector": sector,
+                    "ensemble": ensemble, "p": p_value, "q": q,
+                    "disorder_index": disorder_index, "engine": engine,
+                    "engine_config": engine_config, "family_rule": family_rule,
+                    "family_seed": family_seed, "u_rand_count": u_rand_count,
+                })
+
+    total = reused + len(specs)
+    computed = 0
+    failed = []
+    if num_workers and int(num_workers) > 1 and specs:
+        import multiprocessing as mp
+        from concurrent.futures import ProcessPoolExecutor
+
+        ctx = mp.get_context("spawn")
+        with ProcessPoolExecutor(max_workers=int(num_workers),
+                                 mp_context=ctx) as pool:
+            for tag, status, info in pool.map(_chunk_worker, specs):
+                if status == "computed":
+                    computed += 1
+                elif status == "failed":
+                    failed.append((tag, info))
+    else:
+        for spec in specs:
+            tag, status, info = _chunk_worker(spec)
+            if status == "computed":
+                computed += 1
+            elif status == "failed":
+                failed.append((tag, info))
 
     npz_path = merge(output_dir, family, size_list, p_value, q_values,
                      num_disorders, sector, ensemble, engine, engine_config,
                      family_rule)
     return npz_path, {"reused": reused, "computed": computed,
-                      "total": len(tasks)}
+                      "failed": failed, "total": total,
+                      "num_workers": int(num_workers or 1)}
 
 
 def merge(output_dir, family, size_list, p_value, q_values, num_disorders,
@@ -294,27 +365,38 @@ def merge(output_dir, family, size_list, p_value, q_values, num_disorders,
     num_m, num_q, num_d = len(size_list), len(q_values), int(num_disorders)
 
     def load(size, q, disorder_index):
+        # 缺失/损坏 chunk → None（生产可能有失败 cell，NaN 填充，operator 补跑）
         tag = f"m{size}_q{q:.6g}_d{disorder_index}"
-        with (chunk_dir / f"task_{tag}.json").open(encoding="utf-8") as handle:
-            return json.load(handle)["result"]
+        path = chunk_dir / f"task_{tag}.json"
+        if not path.exists():
+            return None
+        try:
+            with path.open(encoding="utf-8") as handle:
+                return json.load(handle)["result"]
+        except (json.JSONDecodeError, OSError, KeyError):
+            return None
 
     all_results = [
         [[load(size, float(q), d) for d in range(num_d)]
          for q in q_values]
         for size in size_list
     ]
-    max_slots = max(
-        (r["num_weight_slots"] for ms in all_results for qs in ms for r in qs),
-        default=0,
-    )
-    max_k = max(r["k"] for ms in all_results for qs in ms for r in qs)
+    present = [r for ms in all_results for qs in ms for r in qs if r is not None]
+    if not present:
+        raise ValueError("merge: no valid chunks found")
+    missing = num_m * num_q * num_d - len(present)
+    max_slots = max((r["num_weight_slots"] for r in present), default=0)
+    max_k = max(r["k"] for r in present)
 
     def tensor(getter, default=np.nan, dtype=np.float64, extra=()):
         arr = np.full((num_m, num_q, num_d, *extra), default, dtype=dtype)
         for i in range(num_m):
             for j in range(num_q):
                 for d in range(num_d):
-                    value = getter(all_results[i][j][d])
+                    r = all_results[i][j][d]
+                    if r is None:
+                        continue
+                    value = getter(r)
                     if value is None:
                         continue
                     arr[(i, j, d)] = value
@@ -330,6 +412,9 @@ def merge(output_dir, family, size_list, p_value, q_values, num_disorders,
         for j in range(num_q):
             for d in range(num_d):
                 r = all_results[i][j][d]
+                if r is None:
+                    flags[i, j, d] = "MISSING"
+                    continue
                 w = r.get("weights") or []
                 weights[i, j, d, :len(w)] = w
                 df = r.get("delta_f") or []
@@ -352,13 +437,16 @@ def merge(output_dir, family, size_list, p_value, q_values, num_disorders,
         "versions": _versions(),
         "hostname": platform.node(),
         "per_size_meta": {
-            str(size): all_results[i][0][0]["family"]
+            str(size): next((r["family"] for qs in all_results[i] for r in qs
+                             if r is not None), None)
             for i, size in enumerate(size_list)
         },
         "per_size_k": {
-            str(size): all_results[i][0][0]["k"]
+            str(size): next((r["k"] for qs in all_results[i] for r in qs
+                             if r is not None), None)
             for i, size in enumerate(size_list)
         },
+        "missing_chunks": int(missing),
         "weights_layout": (
             "full: relative class weights (2^k slots, NaN-padded); "
             "pairwise: delta_f per label [ℓ_ref, ℓ_ref^e_u...] (k+1 slots)"
@@ -387,9 +475,9 @@ def merge(output_dir, family, size_list, p_value, q_values, num_disorders,
                                           default=-1, dtype=np.int64),
         sample_seed_per_disorder=tensor(lambda r: r["engine_seed"],
                                         default=-1, dtype=np.int64),
-        mean_q_top=np.nanmean(q_top, axis=2),
+        mean_q_top=_safe_nanmean(q_top, axis=2),
         disorder_sem_q_top=(
-            np.nanstd(q_top, axis=2, ddof=1) / np.sqrt(num_d)
+            _safe_nanstd(q_top, axis=2) / np.sqrt(num_d)
             if num_d > 1 else np.full((num_m, num_q), np.nan)
         ),
         pass_fraction=np.mean(
@@ -420,6 +508,9 @@ def build_arg_parser():
     parser.add_argument("--ti-grid-points", type=int, default=33)
     parser.add_argument("--ti-burn-in", type=int, default=200)
     parser.add_argument("--ti-measurements", type=int, default=400)
+    parser.add_argument("--num-workers", type=int, default=1,
+                        help="进程并行数；远端务必显式传（screen 外探测的核数），"
+                             "勿依赖 in-screen $(nproc)（cgroup 下误报 1）")
     return parser
 
 
@@ -438,7 +529,7 @@ def main(argv=None):
         args.q_values, args.num_disorders, sector=args.sector,
         ensemble=args.ensemble, engine=args.engine,
         engine_config=engine_config, family_rule=args.family_rule,
-        family_seed=args.family_seed,
+        family_seed=args.family_seed, num_workers=args.num_workers,
     )
     print(f"npz: {npz_path}\nreport: {report}")
 
