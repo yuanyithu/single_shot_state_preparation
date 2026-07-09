@@ -161,3 +161,21 @@ class TestFrameRelations:
                 disagreement += 1
         # frame 依赖是真实现象：记录（不强断言具体数值，但期待出现过不一致）
         assert disagreement >= 0  # 文档性；具体分布 G3.3 定量
+
+
+class TestFingerprintLargeCodes:
+    def test_fingerprint_survives_pivot_indices_over_255(self):
+        """回归（V2 排障）：n≥100 的码主元列索引 >255，指纹序列化必须定宽。"""
+        from src.graphs import random_biregular_graph_from_m
+        from src.hgp import classical_parity_check_matrix, hgp_from_H
+
+        graph = random_biregular_graph_from_m(4, 3, 4, seed=12345)  # n=400
+        H_Z, _ = hgp_from_H(classical_parity_check_matrix(graph))
+        # 逆序列优先级 ⇒ 主元集中在高位索引（必然 >255）
+        priority = list(reversed(range(H_Z.shape[1])))
+        section = build_linear_section(H_Z, column_priority=priority)
+        assert max(section.pivot_columns) > 255
+        fp = section.fingerprint()
+        assert len(fp) == 64
+        # 默认 frame 也顺带确认可指纹化
+        assert len(build_linear_section(H_Z).fingerprint()) == 64

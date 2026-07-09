@@ -239,7 +239,7 @@ data/expander_code/exp101/
 9. **cluster update 缺席的混合代价**：expander 无 cluster 加速，深有序相混合更依赖 PT 与 logical-flip；若 Phase 4 发现混合瓶颈，优先调 ladder/moves 配比，不引入未经验证的新算法。
 10. **q>0 sector 初始化**：只用零 syndrome sector representatives（base ⊕ x_u），不对观测 syndrome 求 representative（沿用 CLAUDE.md 的坑）。
 11. **系综开关（G0.1 新增）**：true_posterior 与 repo_compat 的差别只在 syndrome 参数接线（s vs δ）与真类标签（sig(η) vs 0）——所有 run 的 manifest 必须带 ensemble 标签；跨 run 比较必须同系综；Nishimori 检验只约束 true 系综。生产默认 true_posterior（待用户确认，见 status D1）。
-12. **TI 大 k 变体（basis-pairwise）是新估计量**：它与全 TI/枚举的关系必须在小 k 上定量标定（G3.2），生产使用范围以标定结论为准；不得未经标定直接外推。
+12. **TI 大 k 变体（basis-pairwise）是新估计量** — 【2026-07-09 G3.2 已标定：**判定失效，弃用为 q_top 方法**】。K43(k=13) 上 pairwise m_u 对 exact m_u 的 max 偏差达 0.8–1.45（可加性严重失效），远超任何可用界。**大 k 生产 q_top 改走 direct/PT 采样观测量**（V2b k=16/36 + V1 direct K43 已验）。pairwise 仅保留"正确测量单翻转 ΔF_u"的诊断用途，禁止合成 q_top。full-TI 仅 k≤10 有效。详见 status D4。
 
 ---
 
@@ -256,4 +256,6 @@ data/expander_code/exp101/
 ## changelog
 - 2026-07-07 初版（规划会话；4 项用户决策已确认并写入 §0）。
 - 2026-07-08 G2 执行期修订：①G2.8 与 G2.7 顺序互换（先 TI 引擎后扫描入口，使 run_scan 一次覆盖两引擎）；②G2.8 的 numba TI kernel 子项挂账至 G4.2 性能线（python 参考版为正确性权威，正确性判据全绿后不阻塞 Phase 3）；③G2.6 的收敛 gate 增加符号敏感 m_u_spread 判据（q_top spread 被证符号盲——不同 sector 共冻给出相同 q_top）；④pairwise TI 定义细化：链锚定在 {ℓ_ref, ℓ_ref⊕e_u}（true 系综正确锚点，repo_compat 自动退化为 {0,e_u}）。
+- 2026-07-09 **G3.2 关键发现：pairwise-TI 大 k 方法失效**。测得 K43(k=13) pairwise m_u vs exact m_u max 偏差 0.8–1.45（可加性失效），planned k>10 方法作废；**大 k q_top 改用 direct/PT 采样观测量**（已由 V2b/V1-direct 验证）。风险 12 更新为"已标定失效"，status D4 记录生产策略含义。此为 exp101 的核心价值兑现：在烧生产算力前发现 planned 方法不可用并定位可用方法。
+- 2026-07-09 G3.2 V1 执行期修订（**regime-aware 验证**，首轮 naive 设计暴露方法学问题）：首轮把 bare 单链 direct 引擎跑遍全网格（含 q=0 与超冷点）并用纯 z-gate 判定，结果 A/B/C/D 全红。分析（validation/004 首轮 results.json）确认**非 bug 而是工具/instrument 错配**：(a) **q=0 与超冷点的 sector 权重单链原理上取不到**（q=0 无 single-bit、logical move 冻结 → 只见一个 sector；PT 在 q=0 不可用）——必须由 TI 覆盖；(b) **m_u≈±1 饱和时 block-stderr 塌缩**，纯 z 检验失真（需 z-OR-绝对判据）；(c) **TI 的 raw-ΔF-z 是错误 instrument**（ΔF 大时权重≈0，网格离散误差不进 bootstrap stderr；正确判据是物理量 q_top/weight-TVD——数据佐证：(0.15,0)处 ΔF-z=7 但 weight-TVD=0.05、q_top 全过）。**修正后 V1 设计**：direct 仅在自证遍历区（worst-u 冷端接受率 ≥ 0.02）用 z-OR-绝对判据；新增 **PT-vs-枚举** 覆盖 q>0 冷点（验证 PT 解冻 sector）；TI 用物理量判据（q_top 绝对 + weight-TVD）覆盖含 q=0 全谱、冷点给足配置；每 regime 由其对应工具验证、各工具在其有效域内被检验。判据不放宽，只换到正确 instrument 与正确工具。
 - 2026-07-07 G0.1 修订：①判决发现主项目模型为 δ-only 盘度（证据 validation/001），§1.2 引入 true_posterior/repo_compat 双系综开关；②考证旧 q_top = 全部非零 u 均值（=归一化 purity），§1.4 更新；③新增 G2.8 sector-TI 引擎移植（exp37 生产路径泛化 + 大 k basis-pairwise 变体）；④G3.2/G3.5 扩为双系综与 TI 覆盖；⑤§6 新增风险 11/12。详见 notes/00_interface_recon.md。

@@ -63,8 +63,9 @@ class LinearSection:
     def fingerprint(self):
         import hashlib
 
+        # 注意：主元列索引可 >255（n≥100 的码），必须用定宽整型序列化
         payload = (
-            bytes(self.pivot_columns)
+            np.asarray(self.pivot_columns, dtype=np.int64).tobytes()
             + np.ascontiguousarray(self.solve_matrix).tobytes()
         )
         return hashlib.sha256(payload).hexdigest()

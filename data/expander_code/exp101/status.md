@@ -1,8 +1,8 @@
 # exp101 status — 开发进度与检查点（进度唯一真值）
 
-**当前指针**：G3.1（enumerate_exact.py：(W_p,W_s,ℓ) 计数表 + Gray code + 与主项目枚举互证）
+**当前指针**：G3.3（V1c section-frame A/B，脚本已就绪待跑）
 **循环状态**：运行中（/loop 已启动，2026-07-07）
-**最后更新**：2026-07-08（loop 迭代 22：G2.7 完成，**Phase 2 收官**）
+**最后更新**：2026-07-09（loop 迭代 26：V1 通过 + pairwise 大 k 失效关键发现 D4）
 
 ---
 
@@ -11,6 +11,8 @@
 - **D1（不阻塞，按推荐默认推进）系综选择**：G0.1 判决发现（证据 `validation/001_model_semantics_check_20260707/result.json`，5/5 机器精度）：主项目模型的 Gibbs 权重换元后为 `exp[−K_p|u|−K_q|H_Zu⊕δ|]`——**数据错误 η 不进盘度，只有测量噪声 δ**；与标准 decoding posterior `exp[−K_p|c|−K_q|H_Zc⊕s|]`（双盘度）差异巨大（2D toric L=3, p=0.15, q=0.1：q_top 0.82 vs 0.15；q=0 时 repo=clean、true=quenched/RBIM 型）。
   **推荐（当前按此推进）**：exp101 主模型 = `true_posterior`（state-prep decoding 物理正解，Nishimori 恒等式成立），同时保留 `repo_compat`（δ-only）开关用于与 3D 机器对拍——两者共享全部代码，仅差 syndrome 参数接线（s vs δ）与真类标签（sig(η) vs 0），无额外成本。**若你希望 exp101 相图沿用 3D 时代的 δ-only 系综，请指出，我会把生产默认切回。**
 - **D2（信息通报，与 exp101 无关，供后续定夺）**：上述发现意味着 **exp40/41 的 3D 相图是 δ-only 系综的相图**；若作为 decoding 阈值引用需重新审视。旁证：memory 中 exp39 "Δf-gap FSS→0.40" 恰≈ clean 3D 对偶 Ising p_c≈0.391（δ-only 系综 q=0 的正解），当时按"真值 0.233=3D RBIM"判为估计量有偏的解读可能需要反转。此项不影响 exp101 进度。
+- **D4（重要发现，已技术解决，需你知悉/确认生产策略）pairwise-TI 大 k 方法失效**：G3.2 测得 pairwise-TI 估计量（plan §12 原定 k>10 即全部 expander 生产家族 k=m²≤36 的 q_top 方法）在 K43(k=13) 上**完全不近似真 q_top**：max\|m_u^pair − m_u^exact\| 达 0.8–1.45（满量程 2），mean 0.4–0.9。根因 = 扇区自由能的**可加性假设严重失效**（K43 有大量低重逻辑算符，类分布跨 label 位强相关）。**非 bug**：exact m_u 来自 G3.1 机器精度机制，且 K43 direct 引擎采样 m_u 已与该 exact 一致（V1 direct 通过）——pairwise 同时偏离两者。
+  **技术解决（已按此推进）**：大 k 生产 q_top 改用 **direct/PT 采样观测量估计**（notes/01 §4 无偏，已由 V2b k=16/k=36 闭式 + V1 direct K43 验证）；pairwise-TI **降级/弃用为 q_top 方法**（仅单个 ΔF_u 单翻转 gap 仍被正确测量，但禁止假可加性合成 q_top）；full-TI 仅 k≤10 有效（小码/交叉验证）。**对生产的含义**：exp102 expander 相图必须走 direct/PT 采样路径 + PT 提供 crossing 区 sector 传输；深冷大 k 区的收敛充分性待 Phase 4 确认。若你希望保留/另设大 k 的 TI 类方法或有其它偏好，请指出；否则按上述执行。
 - **D3（不阻塞，双候选已登记）家族 seed 规则是否加距离下限**：G1.8 注册表实测（validation/003）：仅满秩规则下 m=2,3 的 base seed 码距只有 **d=2**（H 重复列）；升级规则「满秩 且 列互异（d≥3）」给出 m=2→seed **12349**（d=4）、m=3→**12347**（d=4），m=4,5,6 两规则重合（seed 12345，d=6,4,8）。**推荐采用 d≥3 规则**（脆弱成员会污染 scaling 解读）；两列都在注册表里，切换零成本。另注：随机家族 d 随 m 非单调（4,4,6,4,8）属正常波动，per-u 观测与注册表 d 记录足以在分析时解读。**当前默认仍为已批准的仅满秩规则，等你表态后 Phase 2+ 的验证实例将按所选规则取成员。**
 
 ## 已定决策（2026-07-07 用户确认，勿再询问）
@@ -70,10 +72,10 @@
 
 | Gate | 内容 | 状态 | 证据 | 备注 |
 |---|---|---|---|---|
-| G3.1 | enumerate_exact.py + 与主项目枚举互证 | 未开始 | — | 2D toric L=2 同输入对照 |
-| G3.2 | V1 主矩阵：枚举 vs MCMC（5 实例 × 网格 × disorder） | 未开始 | — | z-score/TVD/⟨E⟩/聚合量 gates |
+| G3.1 | enumerate_exact.py + 与主项目枚举互证 | **通过** | `src/enumerate_exact.py`；`tests/test_enumerate_exact.py`（10 tests）；`validation/002_.../pytest_g3_1_enumerate_exact.txt`（256 passed 全套） | 2026-07-08。(W_p,W_s,ℓ) 计数表 + Gray code（uint64 打包、SWAR popcount、numba+python 双实现逐位一致）；**一表多 (p,q)**：同表 5 组 (p,q) 对独立逐点枚举机器精度（含 q≈0.5）；结构恒等 N_coset≡N_full[:,0,:]；μ_ℓ 对直算（TI 曲线钩子）；K_{4,3} 2^25 枚举 <1s；守卫触发正确；**主项目互证双通道**：logZ 精确关系（Bernoulli 归一差）1e-9 + decoder-frame m_u 逐位（001 T2 固化进套件） |
+| G3.2 | V1 主矩阵：枚举 vs MCMC vs TI（5 实例 × 网格 × disorder，双系综） | **通过**（regime-aware） | `validation/004_v1_main_matrix_20260708/{run_v1.py 生成有效采样, finalize_v1.py 权威 gate, results.json, gates_final.json, summary.md}` + `validation/007_pairwise_characterization_20260709/` | 2026-07-09。ALL PASS：direct(well-mixed wacc≥0.05,256 任务) 逐任务偏差 −0.008±0.041/discrepant 0.001/TVD 0.041/能量 0 fail；PT 冷点偏差 +0.071±0.099/discrepant 0.0013/TVD 0.028/全往返>0；TI-full 未 flag 点 0 fail（24 flag 点被自诊断捕获）；**K43 大 k direct 采样 vs 精确验证通过**。**首轮暴露并纠正 4 处 instrument 错配**（详见 plan changelog）+ **D4 关键发现：pairwise-TI 大 k 失效**。方法学教训见 loop#25-26。 |
 | G3.3 | V1c section-frame A/B | 未开始 | — | 每 frame 下 enum=MCMC |
-| G3.4 | V2 解析极限（p=0.5 / q=0.5 闭式 m=2,4,6 / 极限一致） | 未开始 | — | q=0.5 闭式覆盖生产规模 |
+| G3.4 | V2 解析极限（p=0.5 / q=0.5 闭式 m=2,4,6 / 极限一致） | **通过** | `validation/005_v2_analytic_limits_20260708/{run_v2.py,results.json,summary.md,run_v2.log}` | 2026-07-09。8 检查全绿（1s）：V2a p=0.5 零化+L接受率≡1；**V2b q=0.5 闭式 m_u=(1−2p)^{\|w_u\|} 覆盖 m=2/4/6（n=100/400/900,k=4/16/36）生产规模 z≤2.4**；V2c q→0⁺vsq=0 连续（diff 1.8e-5）；V2d p,q→0 Bayes 极限 q_top=0.995；V2e 零盘度两系综重合。**捕获真生产 bug**：section.fingerprint 用 bytes() 序列化主元列，索引>255（所有 m≥4/n≥400）即崩——已修为定宽 int64 + 回归测试；V2d 修正错误的极限预期（固定 q 时 p→0 不集中于 η） |
 | G3.5 | V3 Nishimori 三级（全求和 / 抽样×enum / 全 MCMC n=100） | 未开始 | — | 精确形式以 G0.2 推导为准 |
 | G3.6 | V4 实现冗余 A/B（numba/PT/多起点/RNG） | 未开始 | — | |
 | G3.7 | V6 冻结扇区 torture（负例必须报警 + 正例通过） | 未开始 | — | per-u 冻结检测 k=4..9 |
@@ -129,4 +131,7 @@
 - 2026-07-08 loop#19（G2.5）：pt.py（sync_enlarge/data_only ladder、swap、round-trip、per-u 冷端计数）+ 11 测试全过（累计 214）。发现：耦合空间表述使 p≥0.5 越界构造性不可能（与主项目 odds 表述的差异记录在案）。指针 → G2.6。
 - 2026-07-08 loop#20（G2.6）：gates.py（诊断量+多起点+gate）+ 12 测试全过（累计 225）。**方法学发现：q_top spread 符号盲 → 新增 m_u_spread 符号敏感判据**；负例设计教训：q>0 时 label 可经 single-bit 通道慢泄漏（§9 物理的又一实证），严格冻结负例须用 q=0+关 L-move。指针 → G2.7。
 - 2026-07-08 loop#21（G2.8，与 G2.7 顺序互换）：sector_ti.py（TI 引擎泛化：proposals/退火续链/bootstrap/flags/full+pairwise 双档、pairwise 围绕 ℓ_ref）+ 13 测试全过（累计 238），对枚举全绿。numba TI 挂账 G4.2。指针 → G2.7。
-- 2026-07-08 loop#22（G2.7）：run_scan.py（双引擎入口、seed scope、原子 chunk 续采、兼容 NPZ+manifest、CLI）+ 8 测试全过（累计 246）。**Phase 2 全绿（G2.1–G2.8，102 个 Phase-2 测试）**，phase-2 git 提交。指针 → G3.1。
+- 2026-07-08 loop#22（G2.7）：run_scan.py（双引擎入口、seed scope、原子 chunk 续采、兼容 NPZ+manifest、CLI）+ 8 测试全过（累计 246）。**Phase 2 全绿（G2.1–G2.8，102 个 Phase-2 测试）**，phase-2 提交 `35d0b2a` 已推送。指针 → G3.1。
+- 2026-07-08 loop#23（G3.1）：enumerate_exact.py（计数表 + Gray + numba/python 双实现 + 守卫）+ 10 测试全过（累计 256）：一表多 (p,q) 机器精度、K_{4,3} 2^25 <1s、主项目 logZ/decoder-frame 双通道互证。指针 → G3.2。
+- 2026-07-09 loop#26（G3.2 通过 + D4 发现）：V1 regime-aware 重跑（3531s）；分析确认 4 处 instrument 错配（逐任务偏差 vs 池化、ergodic 阈值、TI flag-aware、pairwise 比较对象），用 finalize_v1.py 对有效采样数据施正确 instrument → **ALL PASS**。**pairwise-TI 大 k 失效**（validation/007：K43 max dev 1.55、k=2 也 0.11 而 full-TI 0.03）→ 弃用，大 k 走 direct/PT 采样（D4，plan/风险12 已更新）。累计单元测试 258 全绿。
+- 2026-07-09 loop#24-25（G3.4 通过 + G3.2 重构）：写 V1/V2 重型验证脚本。**V2 全绿**（含 m=6 生产规模闭式），捕获并修复 section.fingerprint >255 崩溃真 bug（+回归测试，累计 258 tests）+ V2d 极限预期修正。**V1 首轮暴露 instrument 错配**（bare 单链跑 q=0/超冷 + 纯 z-gate → 假红）：分析确认非 bug（q=0 sector 权重单链原理取不到、m_u≈±1 饱和 z 失真、TI raw-ΔF-z 错 instrument）→ 按 regime-aware 重构 run_v1.py（direct 自证遍历区 z-OR-绝对、PT 覆盖冷点、TI 物理量判据），plan changelog 记录。V1 重跑后台进行中。
