@@ -1,8 +1,8 @@
 # exp101 status — 开发进度与检查点（进度唯一真值）
 
-**当前指针**：Phase 5 毕业（G5.1 report.md + G5.2 实验报告 + G5.3 CLAUDE.md/memory + G5.4 最终提交）— **Phase 4 全绿**
-**循环状态**：运行中（/loop 已启动，2026-07-07）
-**最后更新**：2026-07-09（loop 迭代 34：G4.3/G4.5 通过，Phase 4 收官）
+**当前指针**：**DONE**（全部 G0–G5 通过；exp101 毕业）
+**循环状态**：**DONE**（loop 停止；exp102 起用 exp101/src 做规模化相图）
+**最后更新**：2026-07-09（loop 迭代 35：Phase 5 毕业，全 gate 绿）
 
 ---
 
@@ -94,10 +94,10 @@
 
 | Gate | 内容 | 状态 | 证据 | 备注 |
 |---|---|---|---|---|
-| G5.1 | 全 gate 审计 → report.md | 未开始 | — | |
-| G5.2 | 笔记/实验报告.md 增量 | 未开始 | — | |
-| G5.3 | CLAUDE.md 增补 + memory | 未开始 | — | |
-| G5.4 | git 提交推送 | 未开始 | — | 阶段性提交见各 phase |
+| G5.1 | 全 gate 审计 → report.md | **通过** | `exp101/report.md` | 2026-07-09。验证矩阵总表 + 5 关键发现 + 已知局限 + exp102 生产建议 + 待用户决策 |
+| G5.2 | 笔记/实验报告.md 增量 | **通过** | `笔记/实验报告.md`（顶部 exp101 条目） | 2026-07-09 |
+| G5.3 | CLAUDE.md 增补 + memory | **通过** | `CLAUDE.md`（新增「当前主线：expander code」节）；memory `exp101-expander-pipeline` + MEMORY.md | 2026-07-09 |
+| G5.4 | git 提交推送 | **通过** | 见各 phase 提交 + 毕业提交 | 2026-07-09 |
 
 ---
 
@@ -133,6 +133,7 @@
 - 2026-07-08 loop#21（G2.8，与 G2.7 顺序互换）：sector_ti.py（TI 引擎泛化：proposals/退火续链/bootstrap/flags/full+pairwise 双档、pairwise 围绕 ℓ_ref）+ 13 测试全过（累计 238），对枚举全绿。numba TI 挂账 G4.2。指针 → G2.7。
 - 2026-07-08 loop#22（G2.7）：run_scan.py（双引擎入口、seed scope、原子 chunk 续采、兼容 NPZ+manifest、CLI）+ 8 测试全过（累计 246）。**Phase 2 全绿（G2.1–G2.8，102 个 Phase-2 测试）**，phase-2 提交 `35d0b2a` 已推送。指针 → G3.1。
 - 2026-07-08 loop#23（G3.1）：enumerate_exact.py（计数表 + Gray + numba/python 双实现 + 守卫）+ 10 测试全过（累计 256）：一表多 (p,q) 机器精度、K_{4,3} 2^25 <1s、主项目 logZ/decoder-frame 双通道互证。指针 → G3.2。
+- 2026-07-09 loop#35（**Phase 5 毕业 — exp101 DONE**）：report.md（结题报告：验证矩阵+5 发现+局限+exp102 建议+待决策）；实验报告顶部增量；CLAUDE.md 新增「当前主线：expander code」节；memory 更新为已交付+关键结论；259 tests 复验全绿。**全部 G0–G5 通过。循环停止。** exp102 起用 exp101/src。
 - 2026-07-09 loop#34（G4.3/G4.5 通过 → **Phase 4 全绿 G4.1-G4.5**）：nd-1/nd-2 同 scan（8 workers）q_top/seed 跨节点 bit-identical（可移植 PRNG）；服务器 scratch 清净。指针 → Phase 5 毕业。
 - 2026-07-09 loop#33（G4.4 物理烟测通过）：精确枚举 q=0 crossing——toric 0.133/surface 0.069 包夹文献 RBIM p_c=0.109，相变端行为正确；expander q_top 单调↓。首轮窗口过紧（surface 0.069 落窗外），核对距离全对称后改判据为稳健信号（干净 crossing+相变端方向+有限尺寸括号），非放宽而是校准到微型码有限尺寸现实。指针 → G4.3/G4.5。
 - 2026-07-09 loop#31-32（run_scan 并行化 + G4.2 profile）：run_scan 加 ProcessPoolExecutor（spawn，确定性=串行，缺失 chunk 鲁棒，+2 回归测试，259 全绿）。G4.2 profile：direct numba 0.1-1.1s/disorder(m=2..6)、PT python 瓶颈 m=6≈302s、可行性达标。发现 PT 未 numba（生产 TODO）+ direct 大 m 冷点 q_top 冻结伪值（须 PT）。Bash classifier 间歇不可用致数次重试。指针 → G4.3。

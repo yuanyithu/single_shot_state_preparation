@@ -7,6 +7,17 @@
 - 优先**就地改写**已有条目，而不是在底部不断追加新条目；同一个坑有了新认识就改原条目，避免各节无限增长、前后矛盾。
 - 清理判据是「这条坑是否还会再次绊到 agent」：只要某个坑在后续 run 里仍可能复现、需要主动规避，就保留在本文档——无论它是通用规律还是带具体参数实例的个案（如 `exp35 p=0.05,q_hot=0.44 可行`）。只有已被代码或流程修掉、不可能再触发的历史记录，才删除或下沉到 `笔记/实验报告.md`。
 
+## 当前主线：expander code（exp101 起，2026-07-07~）
+
+项目从 3D toric 转向 quantum expander code（(3,4)-biregular 随机图 HGP）单发制备 q_top。**exp101 已交付经全面验证的可复用管线**（`data/expander_code/exp101/src`，259 tests + V1–V6 全绿；契约 `exp101/plan.md`、进度 `exp101/status.md`、结题 `exp101/report.md`）。exp102+ 直接复用 `exp101/src`。**接手 expander 工作先读 exp101/report.md + status.md。** 关键避坑（会再绊到）：
+
+- **大 k（k=m²>10）q_top 必须用 direct/PT 采样观测量，禁用 pairwise-TI**：pairwise-TI（假扇区自由能可加）已在 K43(k=13) 证实失效（对精确 m_u 偏差达 1.55/满量程 2，validation/007）。full-TI 仅 k≤10 有效（小码交叉验证）。
+- **双系综区分**：exp101 支持 `true_posterior`（双盘度 |c⊕η|+|Hc⊕s|，decoding 正解，Nishimori E[m]=E[m²] 成立）与 `repo_compat`（δ-only，等价 3D 时代模型）。**3D 时代 exp40/41 相图是 δ-only 系综结果**，非标准 decoding posterior；作阈值引用需重审。跨 run 比较必须同系综 + 同 section frame（q>0 时 m_u frame 依赖=gauge）。
+- **PT 是纯 python（未 numba）**：direct 引擎 numba 快（m=6 ~1.1s/disorder），PT（冷区 sector 传输）大 m 慢（m=6 ~302s/disorder）。若成生产瓶颈：PT 内循环 numba 化 或 decoder-informed 初始化。
+- **direct 单链在冷区大 k 冻结**（q_top 假值，非物理）——冷区/crossing 必须用 PT；per-u worst-u 冷端 logical 接受率 + PT round-trip 是收敛硬判据（`gates.py`，「共冻≠收敛」内建，q_top spread 符号盲，另有 m_u_spread 符号敏感判据）。
+- **本地 `conda run -n 12` 必须加 `--no-capture-output`**：否则整体捕获子进程输出直到退出，长/被杀任务看似零输出、无法看进度（本地与远端同此坑）。
+- run_scan 支持多进程并行（`--num-workers N`，spawn context 避 numba+fork 死锁）；跨节点 bit-identical（可移植 PRNG）；生产须显式传 N（勿依赖 in-screen `$(nproc)`）。
+
 ## 物理图像与 L·T·S 分解（核心概念对齐）
 
 模拟对象是 3D toric code 纠 X 错误的统计力学模型。MCMC 更新的是 edge 上的 X-error 构型 `c ∈ C_1 = F_2^n`（`n = 3L³`，逻辑比特数 `k = 3`）。固定 disorder `(s, η)`：`s` 是带测量噪声的 syndrome，`η` 是真实 data error。目标是采样该 disorder 下的 Gibbs 热态
