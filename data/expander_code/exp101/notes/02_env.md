@@ -10,10 +10,11 @@
 
 ## 远端（nd-1 / nd-2 / nd-3，经 `ssh yuany` → `ssh nd-{1,2,3}`）
 
-- **状态：未验（挂账）**。G4.1 前必须完成并回填本节：
-  - [ ] `conda run -n 11 python -c "import numpy, numba, ldpc; ..."` 三节点各验一次，记版本。
-  - [ ] screen 外探测核数（nproc/affinity；nd 节点既往实测 80/80/96 核），烘焙进 runner 显式 `--num-workers`。
-  - [ ] `~/.single_shot/runs/` 可写、`SERVER_README.md` 索引更新方式确认。
+- **状态：已验（2026-07-09, G4.1）**：
+  - nd-0 (storage) 可达；`~/.single_shot/{runs,logs,repos,mpl-cache,SERVER_README.md}` 完整。
+  - env 11 三节点齐全：numba 0.65.1（与本地同）、ldpc 2.3.7（本地 2.4.1）、numpy 2.3.4（本地 2.4.1）、scipy 1.16.3。**版本小差无碍**：可移植 PRNG（splitmix64/xorshift128+）位级复现与版本无关；代码只用基础 numpy+numba njit+ldpc BpLsdDecoder。
+  - 核数（screen 外 nproc/affinity 直测）：**nd-1=80, nd-2=80, nd-3=96**。
+  - ⚠ **exp101 run_scan.py 目前单进程串行**，不会自动吃满多核——生产（exp102/G4.2）前需加 ProcessPoolExecutor + 显式 `--num-workers`（disorder/task 级并行），并遵守 remote-prod-scan 的 workers 探测坑。G4.1 smoke 用串行足够。
 - 运行规范（CLAUDE.md 全文适用）：env `11`、screen 后台、`conda run --no-capture-output`、复杂脚本先落 .py、结果 tar 回本地校验后清 scratch。
 
 ## 版本记录规则

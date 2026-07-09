@@ -1,8 +1,8 @@
 # exp101 status — 开发进度与检查点（进度唯一真值）
 
-**当前指针**：G4.1（远端 env 确认 + launcher + 单节点 smoke）— **Phase 3 全绿**
+**当前指针**：G4.2（性能 profile m=2..6 + numba TI kernel + run_scan 并行化 + 验收线）
 **循环状态**：运行中（/loop 已启动，2026-07-07）
-**最后更新**：2026-07-09（loop 迭代 29：G3.6/G3.7 通过，Phase 3 收官）
+**最后更新**：2026-07-09（loop 迭代 30：G4.1 远端 smoke 全往返通过）
 
 ---
 
@@ -84,7 +84,7 @@
 
 | Gate | 内容 | 状态 | 证据 | 备注 |
 |---|---|---|---|---|
-| G4.1 | 远端 env 确认 + launcher + 单节点 smoke 全往返 | 未开始 | — | remote-prod-scan checklist |
+| G4.1 | 远端 env 确认 + launcher + 单节点 smoke 全往返 | **通过** | `validation/010_g4_remote_smoke_20260709/{summary.md,sector_ti_results.npz(本地)}`；notes/02_env.md | 2026-07-09。nd-1/2/3 env 11 确认（核 80/80/96，numba 0.65.1/ldpc 2.3.7）；smoke 全往返（传输→nd-1 运行→sha256 一致→schema 校验 host=nd-1→清 scratch）。**生产前 TODO**：run_scan 加 ProcessPoolExecutor 并行 + launcher 显式传 commit SHA（见 010 summary）|
 | G4.2 | 性能 profile m=2..6 + 验收线钉数 | 未开始 | — | 对标 3D L=7 |
 | G4.3 | 多节点一致性 + 同 seed 复现 + 续采一致 | 未开始 | — | |
 | G4.4 | mini 物理烟测（2D toric 文献对照 + expander sanity） | 未开始 | — | q=0 crossing ∈ [0.09,0.12] |
@@ -133,6 +133,7 @@
 - 2026-07-08 loop#21（G2.8，与 G2.7 顺序互换）：sector_ti.py（TI 引擎泛化：proposals/退火续链/bootstrap/flags/full+pairwise 双档、pairwise 围绕 ℓ_ref）+ 13 测试全过（累计 238），对枚举全绿。numba TI 挂账 G4.2。指针 → G2.7。
 - 2026-07-08 loop#22（G2.7）：run_scan.py（双引擎入口、seed scope、原子 chunk 续采、兼容 NPZ+manifest、CLI）+ 8 测试全过（累计 246）。**Phase 2 全绿（G2.1–G2.8，102 个 Phase-2 测试）**，phase-2 提交 `35d0b2a` 已推送。指针 → G3.1。
 - 2026-07-08 loop#23（G3.1）：enumerate_exact.py（计数表 + Gray + numba/python 双实现 + 守卫）+ 10 测试全过（累计 256）：一表多 (p,q) 机器精度、K_{4,3} 2^25 <1s、主项目 logZ/decoder-frame 双通道互证。指针 → G3.2。
+- 2026-07-09 loop#30（G4.1 通过）：远端 nd-0/1/2/3 连通 + env 11 确认（核 80/80/96）；exp101 src 传输→nd-1 运行 run_scan smoke→sha256 一致回收→schema 校验（host=nd-1 记录）→清 scratch。识别生产前 2 TODO（run_scan 并行化、commit SHA 记录）。指针 → G4.2。
 - 2026-07-09 loop#29（G3.6/G3.7 通过 → **Phase 3 全绿 G3.1–G3.7**）：V4 ref≡numba bit 级 + PT/direct/多起点一致；V6 冻结 torture 负例 k=4/k=9 诊断报警、正例 PT 传输+起点无关。Phase 3 收官提交。指针 → Phase 4（G4.1 远端 smoke）。
 - 2026-07-09 loop#27-28（G3.3 + G3.5 通过）：frame A/B（q=0 相对分布 frame 无关 1e-15、q>0 gauge 依赖）；Nishimori 三级递进全绿（L1 全求和 1.9e-14、L3 n=100 全 MCMC z=2.06、repo_compat 判别 gap=0.25）。两脚本各修 1-2 个启动 bug。
 - 2026-07-09 loop#26（G3.2 通过 + D4 发现）：V1 regime-aware 重跑（3531s）；分析确认 4 处 instrument 错配（逐任务偏差 vs 池化、ergodic 阈值、TI flag-aware、pairwise 比较对象），用 finalize_v1.py 对有效采样数据施正确 instrument → **ALL PASS**。**pairwise-TI 大 k 失效**（validation/007：K43 max dev 1.55、k=2 也 0.11 而 full-TI 0.03）→ 弃用，大 k 走 direct/PT 采样（D4，plan/风险12 已更新）。累计单元测试 258 全绿。
