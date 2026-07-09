@@ -1,8 +1,8 @@
 # exp101 status — 开发进度与检查点（进度唯一真值）
 
-**当前指针**：G3.3（V1c section-frame A/B，脚本已就绪待跑）
+**当前指针**：G3.6（V4 实现冗余 A/B）+ G3.7（V6 冻结扇区 torture）
 **循环状态**：运行中（/loop 已启动，2026-07-07）
-**最后更新**：2026-07-09（loop 迭代 26：V1 通过 + pairwise 大 k 失效关键发现 D4）
+**最后更新**：2026-07-09（loop 迭代 28：G3.5 Nishimori 通过）
 
 ---
 
@@ -74,9 +74,9 @@
 |---|---|---|---|---|
 | G3.1 | enumerate_exact.py + 与主项目枚举互证 | **通过** | `src/enumerate_exact.py`；`tests/test_enumerate_exact.py`（10 tests）；`validation/002_.../pytest_g3_1_enumerate_exact.txt`（256 passed 全套） | 2026-07-08。(W_p,W_s,ℓ) 计数表 + Gray code（uint64 打包、SWAR popcount、numba+python 双实现逐位一致）；**一表多 (p,q)**：同表 5 组 (p,q) 对独立逐点枚举机器精度（含 q≈0.5）；结构恒等 N_coset≡N_full[:,0,:]；μ_ℓ 对直算（TI 曲线钩子）；K_{4,3} 2^25 枚举 <1s；守卫触发正确；**主项目互证双通道**：logZ 精确关系（Bernoulli 归一差）1e-9 + decoder-frame m_u 逐位（001 T2 固化进套件） |
 | G3.2 | V1 主矩阵：枚举 vs MCMC vs TI（5 实例 × 网格 × disorder，双系综） | **通过**（regime-aware） | `validation/004_v1_main_matrix_20260708/{run_v1.py 生成有效采样, finalize_v1.py 权威 gate, results.json, gates_final.json, summary.md}` + `validation/007_pairwise_characterization_20260709/` | 2026-07-09。ALL PASS：direct(well-mixed wacc≥0.05,256 任务) 逐任务偏差 −0.008±0.041/discrepant 0.001/TVD 0.041/能量 0 fail；PT 冷点偏差 +0.071±0.099/discrepant 0.0013/TVD 0.028/全往返>0；TI-full 未 flag 点 0 fail（24 flag 点被自诊断捕获）；**K43 大 k direct 采样 vs 精确验证通过**。**首轮暴露并纠正 4 处 instrument 错配**（详见 plan changelog）+ **D4 关键发现：pairwise-TI 大 k 失效**。方法学教训见 loop#25-26。 |
-| G3.3 | V1c section-frame A/B | 未开始 | — | 每 frame 下 enum=MCMC |
+| G3.3 | V1c section-frame A/B | **通过** | `validation/006_v1c_frame_ab_20260709/{run_v1c.py,results.json,summary.md}` | 2026-07-09（18s）。ALL PASS：G1 每 frame 内 enum=MCMC（z≤4.54）；**G2 q=0 相对分布 frame 无关精确 1.1e-15**（linear-A/B + decoder 三 frame，证实平移不变推导）；G3 q>0 frame 依赖被观测（rel-TVD 0.60，gauge=修正协议）；G4 三 frame 指纹互异。修 2 bug：q=0 走 coset 表、G1 用 z-OR-绝对 |
 | G3.4 | V2 解析极限（p=0.5 / q=0.5 闭式 m=2,4,6 / 极限一致） | **通过** | `validation/005_v2_analytic_limits_20260708/{run_v2.py,results.json,summary.md,run_v2.log}` | 2026-07-09。8 检查全绿（1s）：V2a p=0.5 零化+L接受率≡1；**V2b q=0.5 闭式 m_u=(1−2p)^{\|w_u\|} 覆盖 m=2/4/6（n=100/400/900,k=4/16/36）生产规模 z≤2.4**；V2c q→0⁺vsq=0 连续（diff 1.8e-5）；V2d p,q→0 Bayes 极限 q_top=0.995；V2e 零盘度两系综重合。**捕获真生产 bug**：section.fingerprint 用 bytes() 序列化主元列，索引>255（所有 m≥4/n≥400）即崩——已修为定宽 int64 + 回归测试；V2d 修正错误的极限预期（固定 q 时 p→0 不集中于 η） |
-| G3.5 | V3 Nishimori 三级（全求和 / 抽样×enum / 全 MCMC n=100） | 未开始 | — | 精确形式以 G0.2 推导为准 |
+| G3.5 | V3 Nishimori 三级（全求和 / 抽样×enum / 全 MCMC n=100） | **通过** | `validation/008_v3_nishimori_20260709/{run_v3.py,results.json,summary.md}` | 2026-07-09（31s）。ALL PASS：**L1 [[8,2,2]] 全 4096-disorder 求和 E[m]=E[m²] 精确 1.9e-14**；L2 toric_m3(z=1.1)/K43(z=3.5) 抽样×枚举；**L3 expander_m2 n=100 越枚举界全 MCMC**（双独立链无偏 m²，z=2.06）；JUDGE repo_compat q=0.5 恒等式违反 gap=0.25（确认恒等式为 true_posterior 特有=系综判别）。修 1 import typo |
 | G3.6 | V4 实现冗余 A/B（numba/PT/多起点/RNG） | 未开始 | — | |
 | G3.7 | V6 冻结扇区 torture（负例必须报警 + 正例通过） | 未开始 | — | per-u 冻结检测 k=4..9 |
 
@@ -133,5 +133,6 @@
 - 2026-07-08 loop#21（G2.8，与 G2.7 顺序互换）：sector_ti.py（TI 引擎泛化：proposals/退火续链/bootstrap/flags/full+pairwise 双档、pairwise 围绕 ℓ_ref）+ 13 测试全过（累计 238），对枚举全绿。numba TI 挂账 G4.2。指针 → G2.7。
 - 2026-07-08 loop#22（G2.7）：run_scan.py（双引擎入口、seed scope、原子 chunk 续采、兼容 NPZ+manifest、CLI）+ 8 测试全过（累计 246）。**Phase 2 全绿（G2.1–G2.8，102 个 Phase-2 测试）**，phase-2 提交 `35d0b2a` 已推送。指针 → G3.1。
 - 2026-07-08 loop#23（G3.1）：enumerate_exact.py（计数表 + Gray + numba/python 双实现 + 守卫）+ 10 测试全过（累计 256）：一表多 (p,q) 机器精度、K_{4,3} 2^25 <1s、主项目 logZ/decoder-frame 双通道互证。指针 → G3.2。
+- 2026-07-09 loop#27-28（G3.3 + G3.5 通过）：frame A/B（q=0 相对分布 frame 无关 1e-15、q>0 gauge 依赖）；Nishimori 三级递进全绿（L1 全求和 1.9e-14、L3 n=100 全 MCMC z=2.06、repo_compat 判别 gap=0.25）。两脚本各修 1-2 个启动 bug。
 - 2026-07-09 loop#26（G3.2 通过 + D4 发现）：V1 regime-aware 重跑（3531s）；分析确认 4 处 instrument 错配（逐任务偏差 vs 池化、ergodic 阈值、TI flag-aware、pairwise 比较对象），用 finalize_v1.py 对有效采样数据施正确 instrument → **ALL PASS**。**pairwise-TI 大 k 失效**（validation/007：K43 max dev 1.55、k=2 也 0.11 而 full-TI 0.03）→ 弃用，大 k 走 direct/PT 采样（D4，plan/风险12 已更新）。累计单元测试 258 全绿。
 - 2026-07-09 loop#24-25（G3.4 通过 + G3.2 重构）：写 V1/V2 重型验证脚本。**V2 全绿**（含 m=6 生产规模闭式），捕获并修复 section.fingerprint >255 崩溃真 bug（+回归测试，累计 258 tests）+ V2d 极限预期修正。**V1 首轮暴露 instrument 错配**（bare 单链跑 q=0/超冷 + 纯 z-gate → 假红）：分析确认非 bug（q=0 sector 权重单链原理取不到、m_u≈±1 饱和 z 失真、TI raw-ΔF-z 错 instrument）→ 按 regime-aware 重构 run_v1.py（direct 自证遍历区 z-OR-绝对、PT 覆盖冷点、TI 物理量判据），plan changelog 记录。V1 重跑后台进行中。
