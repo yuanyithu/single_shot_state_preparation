@@ -1,8 +1,8 @@
 # exp101 status — 开发进度与检查点（进度唯一真值）
 
-**当前指针**：G4.3（多节点一致性，server）+ G4.5（清理）→ Phase 5 毕业
+**当前指针**：Phase 5 毕业（G5.1 report.md + G5.2 实验报告 + G5.3 CLAUDE.md/memory + G5.4 最终提交）— **Phase 4 全绿**
 **循环状态**：运行中（/loop 已启动，2026-07-07）
-**最后更新**：2026-07-09（loop 迭代 33：G4.4 物理烟测通过）
+**最后更新**：2026-07-09（loop 迭代 34：G4.3/G4.5 通过，Phase 4 收官）
 
 ---
 
@@ -86,9 +86,9 @@
 |---|---|---|---|---|
 | G4.1 | 远端 env 确认 + launcher + 单节点 smoke 全往返 | **通过** | `validation/010_g4_remote_smoke_20260709/{summary.md,sector_ti_results.npz(本地)}`；notes/02_env.md | 2026-07-09。nd-1/2/3 env 11 确认（核 80/80/96，numba 0.65.1/ldpc 2.3.7）；smoke 全往返（传输→nd-1 运行→sha256 一致→schema 校验 host=nd-1→清 scratch）。**生产前 TODO**：run_scan 加 ProcessPoolExecutor 并行 + launcher 显式传 commit SHA（见 010 summary）|
 | G4.2 | 性能 profile m=2..6 + 验收线钉数 | **通过** | `validation/011_g4_profile_20260709/{run_profile.py,profile.json,summary.md}`；`src/run_scan.py`(并行化) | 2026-07-09。**direct(numba) 极快**：m=2..6 = 0.1..1.1s/disorder（8 起点）；**PT 纯 python 是瓶颈**：m=6 生产等效≈302s/disorder。可行性达标（3D L=7 sector-TI 6090s/disorder 既可行，expander 远低于此 + disorder 级 240 核并行）。numba 生效确认。**run_scan 并行化完成**（ProcessPoolExecutor，259 tests）。**新生产 TODO**：PT numba 化或 decoder-init（若大 m PT 成瓶颈）。注：direct-only 大 m 冷点 q_top 是冻结伪值（须 PT，呼应 D4） |
-| G4.3 | 多节点一致性 + 同 seed 复现 + 续采一致 | 未开始 | — | |
+| G4.3 | 多节点一致性 + 同 seed 复现 + 续采一致 | **通过** | `validation/013_g4_multinode_20260709/summary.md` | 2026-07-09。同 scan 于 nd-1/nd-2（8 workers）→ q_top/seed **跨节点 bit-identical**（可移植 PRNG+内容哈希 seed scope）；同 seed 确定性 + 续采一致（test_run_scan 单测）。生产须确认 load≈workers |
 | G4.4 | mini 物理烟测（2D toric 文献对照 + expander sanity） | **通过** | `validation/012_g4_physics_smoke_20260709/{run_physics.py,results.json,summary.md}` | 2026-07-09（67s）。**精确枚举 q=0 true_posterior=2D RBIM 阈值**：toric m2/m3 crossing 0.133、surface m3/m4 crossing 0.069——**两侧包夹文献 p_c=0.109**，相变端行为（可恢复/不可恢复相×码尺寸）干净正确；expander m2 q>0 q_top 随 p 单调下降。整链复现 2D 阈值物理。精确阈值需更大码+FSS（生产后续）。距离已核对全对称 d=m |
-| G4.5 | 服务器目录规范核查 + 回收校验 + 清 scratch | 未开始 | — | |
+| G4.5 | 服务器目录规范核查 + 回收校验 + 清 scratch | **通过** | 同 013 | 2026-07-09。每次远端 run 回收校验后即清；`~/.single_shot/runs/` 无 exp101 scratch 残留；本地 data/+git 为唯一真值 |
 
 ### Phase 5 — 毕业
 
@@ -133,6 +133,7 @@
 - 2026-07-08 loop#21（G2.8，与 G2.7 顺序互换）：sector_ti.py（TI 引擎泛化：proposals/退火续链/bootstrap/flags/full+pairwise 双档、pairwise 围绕 ℓ_ref）+ 13 测试全过（累计 238），对枚举全绿。numba TI 挂账 G4.2。指针 → G2.7。
 - 2026-07-08 loop#22（G2.7）：run_scan.py（双引擎入口、seed scope、原子 chunk 续采、兼容 NPZ+manifest、CLI）+ 8 测试全过（累计 246）。**Phase 2 全绿（G2.1–G2.8，102 个 Phase-2 测试）**，phase-2 提交 `35d0b2a` 已推送。指针 → G3.1。
 - 2026-07-08 loop#23（G3.1）：enumerate_exact.py（计数表 + Gray + numba/python 双实现 + 守卫）+ 10 测试全过（累计 256）：一表多 (p,q) 机器精度、K_{4,3} 2^25 <1s、主项目 logZ/decoder-frame 双通道互证。指针 → G3.2。
+- 2026-07-09 loop#34（G4.3/G4.5 通过 → **Phase 4 全绿 G4.1-G4.5**）：nd-1/nd-2 同 scan（8 workers）q_top/seed 跨节点 bit-identical（可移植 PRNG）；服务器 scratch 清净。指针 → Phase 5 毕业。
 - 2026-07-09 loop#33（G4.4 物理烟测通过）：精确枚举 q=0 crossing——toric 0.133/surface 0.069 包夹文献 RBIM p_c=0.109，相变端行为正确；expander q_top 单调↓。首轮窗口过紧（surface 0.069 落窗外），核对距离全对称后改判据为稳健信号（干净 crossing+相变端方向+有限尺寸括号），非放宽而是校准到微型码有限尺寸现实。指针 → G4.3/G4.5。
 - 2026-07-09 loop#31-32（run_scan 并行化 + G4.2 profile）：run_scan 加 ProcessPoolExecutor（spawn，确定性=串行，缺失 chunk 鲁棒，+2 回归测试，259 全绿）。G4.2 profile：direct numba 0.1-1.1s/disorder(m=2..6)、PT python 瓶颈 m=6≈302s、可行性达标。发现 PT 未 numba（生产 TODO）+ direct 大 m 冷点 q_top 冻结伪值（须 PT）。Bash classifier 间歇不可用致数次重试。指针 → G4.3。
 - 2026-07-09 loop#30（G4.1 通过）：远端 nd-0/1/2/3 连通 + env 11 确认（核 80/80/96）；exp101 src 传输→nd-1 运行 run_scan smoke→sha256 一致回收→schema 校验（host=nd-1 记录）→清 scratch。识别生产前 2 TODO（run_scan 并行化、commit SHA 记录）。指针 → G4.2。
