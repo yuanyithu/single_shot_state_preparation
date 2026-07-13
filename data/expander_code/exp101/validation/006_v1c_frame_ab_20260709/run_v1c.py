@@ -1,3 +1,4 @@
+# PRE_ALIGNMENT: historical v1 runner; it does not certify exp101.physics.v2.
 """G3.3 V1c：section-frame A/B（plan §3 G3.3, notes/01 §4）。
 
 frames：linear-A（默认列序）、linear-B（逆列序，不同主元）、decoder（BpLsd）。
@@ -251,6 +252,11 @@ def main():
         f"| G4 | 三 frame 指纹互异 | — | "
         f"{'✅' if g['G4_fingerprints_distinct'] else '❌'} |",
         "", f"**总判定：{'ALL PASS ✅' if g['ALL_PASS'] else 'FAIL ❌'}**",
+    ]
+    lines[1:1] = [
+        "",
+        "> **PRE_ALIGNMENT（自动生成保护）：** 本页只记录 v1 历史 frame 实验；",
+        "> 重新运行本 runner 不认证 v2 section invariance，也不得覆盖 014 结论。",
     ]
     (OUT_DIR / "summary.md").write_text("\n".join(lines) + "\n",
                                         encoding="utf-8")

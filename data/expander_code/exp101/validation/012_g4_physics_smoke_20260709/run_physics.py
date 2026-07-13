@@ -1,3 +1,4 @@
+# PRE_ALIGNMENT: historical v1 runner; it does not certify exp101.physics.v2.
 """G4.4 mini 端到端物理烟测（plan §3 G4.4）。
 
 核心：**true_posterior q=0 = 最优解码器阈值 = 2D RBIM Nishimori 点 p_c≈0.1094**。
@@ -184,6 +185,11 @@ def main():
               "**整条 model→HGP→logicals→observable→物理 链复现 2D 阈值物理**。",
               "精确阈值需更大码 + FSS（用采样器，越枚举界；生产/分析后续）。", "",
               f"**总判定：{'ALL PASS ✅' if all_pass else 'FAIL ❌'}**"]
+    lines[1:1] = [
+        "",
+        "> **PRE_ALIGNMENT（自动生成保护）：** 本页只记录旧语义下的历史 smoke；",
+        "> 重新运行本 runner 不认证 v2 posterior/estimator/schema，也不得覆盖 014 结论。",
+    ]
     (OUT_DIR / "summary.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
     print("\n".join(lines))
     return 0 if all_pass else 1

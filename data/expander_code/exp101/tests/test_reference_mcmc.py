@@ -41,7 +41,10 @@ def make_wiring(model, frame, p, q, seed, ensemble="true_posterior"):
 
 
 def total_energy_of(model, wiring, v):
-    syndrome_term = gf2_matmul(model.H_check, v[:, None])[:, 0] ^ wiring.sigma_arg
+    syndrome_term = (
+        gf2_matmul(model.H_check, v[:, None])[:, 0]
+        ^ wiring.gibbs_syndrome_argument
+    )
     weight_s = float(syndrome_term.sum())
     if wiring.q_zero:
         assert weight_s == 0
@@ -68,7 +71,8 @@ class TestExhaustiveDeltaE:
         _, wiring = make_wiring(self.model, self.frame, 0.12, 0.08, seed=1)
         for v in self._all_states():
             syndrome_term = (
-                gf2_matmul(self.model.H_check, v[:, None])[:, 0] ^ wiring.sigma_arg
+                gf2_matmul(self.model.H_check, v[:, None])[:, 0]
+                ^ wiring.gibbs_syndrome_argument
             ).astype(np.uint8)
             state = McmcState(
                 v=v.copy(), syndrome_term=syndrome_term,
@@ -115,7 +119,9 @@ class TestExhaustiveDeltaE:
 
 
 class TestStationarityAgainstEnum:
-    @pytest.mark.parametrize("ensemble", ["true_posterior", "repo_compat"])
+    @pytest.mark.parametrize(
+        "ensemble", ["true_posterior", "legacy_delta_only"]
+    )
     def test_surface5_qpos_m_u_matches_enum(self, ensemble):
         model, frame, obs_set = build_setup(repetition_parity_check_matrix(2))
         disorder, wiring = make_wiring(model, frame, 0.12, 0.08, seed=3,
@@ -241,10 +247,10 @@ class TestReproducibilityAndInvariants:
         rng = np.random.default_rng(29)
         disorder = draw_disorder(model, 0.2, 0.0, rng)
         # 强制非零 syndrome（若 η 恰为 0 则翻一位）
-        if not disorder.observed_syndrome.any():
-            disorder.eta[0] ^= 1
-            disorder.observed_syndrome = gf2_matmul(
-                model.H_check, disorder.eta[:, None]
+        if not disorder.effective_syndrome.any():
+            disorder.epsilon_data_true[0] ^= 1
+            disorder.effective_syndrome = gf2_matmul(
+                model.H_check, disorder.epsilon_data_true[:, None]
             )[:, 0]
         wiring = wire_ensemble(model, disorder, "true_posterior", frame)
         with pytest.raises(ValueError, match="hard constraint"):

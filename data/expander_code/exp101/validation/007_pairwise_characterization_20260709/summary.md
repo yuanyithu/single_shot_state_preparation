@@ -1,5 +1,7 @@
 # pairwise-TI 大 k 失效刻画（status D4 证据）
 
+> **PRE_ALIGNMENT（scan/physics v1）：** 失效数值仍可作为历史动机，但本页 runner/输出依赖旧 pairwise-q_top 接口，不是 `exp101.physics.v2` 当前 diagnostics/schema 通过证据。见 `../README.md`。
+
 墙钟 239s
 
 | 对照 | 量 | 值 |

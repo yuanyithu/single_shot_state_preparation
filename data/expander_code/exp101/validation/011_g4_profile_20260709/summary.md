@@ -1,5 +1,7 @@
 # G4.2 性能 profile（direct + PT，D4 后的大 k 生产方法）
 
+> **PRE_ALIGNMENT（scan/physics v1）：** 本页只提供旧实现的历史性能量级；runner 可能依赖弃用字段、估计器或 schema，不认证 `exp101.physics.v2` 正确性或新 PT 成本。见 `../README.md`。
+
 config: direct 8 起点×(burn 2000+meas 8000); PT 8 温×200 轮；(p=0.05,q=0.03) engine=numba
 
 | m | n | k | direct/disorder(8起点,numba) | PT 生产/disorder(python,外推) | q_top自检 |

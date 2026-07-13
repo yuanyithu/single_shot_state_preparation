@@ -1,5 +1,7 @@
 # G3.6 V4 + G3.7 V6 结果
 
+> **PRE_ALIGNMENT（scan/physics v1）：** 本页与 raw 产物只记录旧内核/冻结 gate 的历史实验；未覆盖 v2 四实例 PT 与 INVALID 传播，不是当前通过证据。见 `../README.md`。
+
 墙钟 35s
 
 | 测试 | 关键指标 | 结果 |

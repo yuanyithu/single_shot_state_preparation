@@ -1,5 +1,7 @@
 # G4.3 多节点一致性 + G4.5 服务器清理
 
+> **PRE_ALIGNMENT（scan/physics v1）：** 本页只记录 scan v1 的历史可复现/运维证据；未覆盖 v2 fingerprint、alias normalization 或 cache isolation，不是当前通过证据。见 `../README.md`。
+
 2026-07-09。
 
 ## G4.3 多节点一致性

@@ -1,0 +1,91 @@
+{
+  "alias_and_routing": {
+    "deprecated_alias_seed_equals_canonical": true,
+    "resolved_engines": {
+      "k10_q_positive": "full_sector_ti",
+      "k11_q_positive": "parallel_tempering_observable_sampling",
+      "k11_q_zero": "validated_q0_sampling"
+    }
+  },
+  "artificial_posterior_0p1_0p9": {
+    "map_success_lower_bound": 0.8200000000000001,
+    "map_success_probability": 0.9,
+    "map_success_upper_bound": 0.9055385138137417,
+    "posterior_mass_on_planted_class": 0.1,
+    "posterior_purity": 0.8200000000000001,
+    "posterior_purity_within_physical_bounds": true,
+    "q_top": 0.6400000000000001
+  },
+  "enumeration": {
+    "configuration_weight_comparisons": 16384,
+    "disorder_context_count": 512,
+    "independent_preparation_representative_difference_count": 3,
+    "map_success_abs_error": 0.0,
+    "partition_function_abs_error": 0.0,
+    "physical_sigma_prep_count": 4,
+    "pointwise_weight_abs_error": 0.0,
+    "q_top_abs_error": 0.0,
+    "sector_weight_abs_error": 0.0
+  },
+  "exact_oracle": {
+    "characters_absolute": [
+      0.6773392612826432
+    ],
+    "characters_relative": [
+      -0.6773392612826432
+    ],
+    "fields": [
+      "weights_absolute",
+      "weights_relative",
+      "characters_absolute",
+      "characters_relative",
+      "posterior_purity",
+      "posterior_mass_on_planted_class",
+      "map_success_probability",
+      "map_success_lower_bound",
+      "map_success_upper_bound",
+      "q_top"
+    ],
+    "map_success_bounds": [
+      0.7293942374374585,
+      0.854045805233805
+    ],
+    "map_success_probability": 0.8386696306413216,
+    "posterior_mass_on_planted_class": 0.16133036935867834,
+    "posterior_purity": 0.7293942374374585,
+    "q_top_absolute": 0.4587884748749169,
+    "q_top_relative": 0.4587884748749169,
+    "weights_absolute": [
+      0.8386696306413216,
+      0.16133036935867834
+    ],
+    "weights_relative": [
+      0.16133036935867834,
+      0.8386696306413216
+    ]
+  },
+  "fixed_y_truth_syndrome_changed": true,
+  "passed": true,
+  "physics_contract_version": "exp101.physics.v2",
+  "q_zero_semantics": {
+    "legacy_gibbs_argument": [
+      0,
+      0
+    ],
+    "legacy_map_success_probability": null,
+    "true_gibbs_argument": [
+      1,
+      0
+    ],
+    "true_quenched_coset_differs_from_legacy_clean_kernel": true
+  },
+  "scan_contract_version": "exp101.scan.v2",
+  "shifted_coordinate_energy_max_abs_difference": 0.0,
+  "small_css": {
+    "k": 1,
+    "n": 5,
+    "num_checks": 2
+  },
+  "true_energy_fixed_effective_syndrome_max_abs_difference": 0.0,
+  "true_vs_legacy_nontrivial_energy_gap": 1.900958761193047
+}

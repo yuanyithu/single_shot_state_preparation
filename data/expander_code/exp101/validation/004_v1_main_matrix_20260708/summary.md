@@ -1,5 +1,7 @@
 # V1 主矩阵 权威 gate（regime-aware，统计正确 instrument）
 
+> **PRE_ALIGNMENT（scan/physics v1）：** 本页与 raw 产物只记录 2026-07-09 前的历史内部一致性；runner 可能依赖弃用字段、估计器或 schema，不是 `exp101.physics.v2` 当前通过证据。见 `../README.md`。
+
 run_v1.py 产出有效逐任务采样；本表用正确统计工具重聚合（见 finalize_v1.py 头注）。
 direct: 严格判定(well-mixed wacc≥0.05) 256 / 边缘报告 87 / 冻结披露 77（后两者由 TI 覆盖）。
 

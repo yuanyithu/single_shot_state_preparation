@@ -1,3 +1,4 @@
+# PRE_ALIGNMENT: historical v1 runner; it does not certify exp101.physics.v2.
 """G4.2 性能 profile：expander direct 引擎（D4 后的大 k 生产方法）m=2..6 per-disorder
 墙钟，并与 3D L=7 生产点对比（验收线：同量级）。
 
@@ -159,6 +160,11 @@ def main():
               "**生产前 TODO（新增）**：若 PT 成为大 m 瓶颈，(a) 把 run_parallel_tempering "
               "内循环 numba 化（对齐 fast_mcmc kernel），或 (b) 用 decoder-informed 初始化"
               "（起点近 φ(η) 真类，减少对传输的依赖）。先按 python-PT 起量，瓶颈显现再优化。"]
+    lines[1:1] = [
+        "",
+        "> **PRE_ALIGNMENT（自动生成保护）：** 本页只提供旧实现的历史性能量级；",
+        "> 重新运行本 runner 不认证 v2 正确性或新 PT 成本，也不得覆盖 014 结论。",
+    ]
     (OUT_DIR / "summary.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
     print("\n".join(lines))
 

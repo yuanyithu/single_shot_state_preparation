@@ -1,4 +1,11 @@
-【本文件是 exp101 开发循环的 /loop prompt：直接把本文全文作为 /loop 的 prompt 使用（自定节奏），每轮迭代执行以下指令。】
+# PRE_ALIGNMENT 历史循环提示（已停用）
+
+> 本文件只保留 exp101 v1 的开发过程，不得再作为当前 `/loop` 提示执行，也不构成
+> 物理或生产契约。当前唯一物理权威是 `PHYSICS_CONTRACT.md`
+>（`exp101.physics.v2`），当前进度与验证要求见 `status.md`、`plan.md` 和
+> `validation/README.md`。
+
+【以下为 2026-07-07~09 的历史循环提示，仅供审计。】
 
 继续推进 exp101：expander code 单发制备统计力学 q_top 管线的开发与正确性验证。
 

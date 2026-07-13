@@ -7,6 +7,26 @@
 - 优先**就地改写**已有条目，而不是在底部不断追加新条目；同一个坑有了新认识就改原条目，避免各节无限增长、前后矛盾。
 - 清理判据是「这条坑是否还会再次绊到 agent」：只要某个坑在后续 run 里仍可能复现、需要主动规避，就保留在本文档——无论它是通用规律还是带具体参数实例的个案（如 `exp35 p=0.05,q_hot=0.44 可行`）。只有已被代码或流程修掉、不可能再触发的历史记录，才删除或下沉到 `笔记/实验报告.md`。
 
+## 当前主线：expander code（exp101 起，2026-07-07~）
+
+项目从 3D toric 转向 quantum expander code（(3,4)-biregular 随机图 HGP）单发制备 q_top。
+**exp101 已完成 `exp101.physics.v2` / `exp101.scan.v2` 论文语义对齐并由
+`validation/014_paper_alignment_20260713/` 认证；旧 259 tests 与 V1–V6 仍全部是
+`PRE_ALIGNMENT`，不能替代 v2 证据。exp102 可复用当前管线，但必须遵守下列生产约束。**接手先读
+`data/expander_code/exp101/PHYSICS_CONTRACT.md`（唯一物理权威）、`status.md` 和
+`validation/README.md`。关键硬约束：
+
+- **生产 convention 固定**：`sector=x_error`、`H_check=H_Z`、稳定子 move=`H_X` 行、logical move=`logical_X`、observable=`logical_Z`、制备态=`|+>_L`；对偶 `z_error/H_X` 才对应 `|0>_L`。现有矩阵接线不交换。
+- **生产 posterior 固定**：`pi(e|y_eff) ∝ exp[-K_p|e|-K_q|H_check e xor y_eff|]`，`y_eff=H_check epsilon_data_true xor measurement_error`；真实错误不得直接进入能量、Metropolis/TI/PT 比值。正式系综名为 `true_posterior`、`legacy_delta_only`，`paper_true_posterior/repo_compat` 只作先归一化的 deprecated alias。
+- **三种 section 不混用**：meta-check measurement-error decoder、preparation-chain representative、logical-sector section 的 domain/用途不同；q>0 的一般 `effective_syndrome` 不在 `im(H_check)`，禁止传给 logical-sector section。
+- **统计量不混称**：同时区分 absolute/relative characters、`posterior_mass_on_planted_class`、`posterior_purity` 与 `map_success_probability`；公共 `w0` 已废弃。只保证 boundary-only section shift 不变，不再声称任意 frame change 是 gauge。
+- **引擎和 gate**：full-sector TI 仅 `k<=10`；large-k pairwise 只输出 free-energy-gap diagnostics，不得有 `m_u/q_top`；`k>10,q>0` 用四独立 PT observable instances，`q=0` 用 validated 8-start。任一 gate 失败的 chunk 必须 `INVALID`，不得进入 mean/crossing。
+- **scan v2**：输出 `scan_results.npz`，v1 chunk 永不复用；sampled 二阶矩用独立链 U-statistic，basis/nonbasis 按总体数量加权，character 维不得截断。当前权威回归只认 `validation/014_paper_alignment_20260713/`。
+- **运行坑仍有效**：本地 `conda run -n 12` 加 `--no-capture-output`；多进程显式传 `--num-workers N`，不要依赖 screen 内的 `$(nproc)`。
+
+下方「物理图像与 L·T·S 分解」及其 Gibbs 公式描述旧 3D toric 程序，只用于 legacy 3D 工作，
+不得覆盖 exp101 的 v2 契约。
+
 ## 物理图像与 L·T·S 分解（核心概念对齐）
 
 模拟对象是 3D toric code 纠 X 错误的统计力学模型。MCMC 更新的是 edge 上的 X-error 构型 `c ∈ C_1 = F_2^n`（`n = 3L³`，逻辑比特数 `k = 3`）。固定 disorder `(s, η)`：`s` 是带测量噪声的 syndrome，`η` 是真实 data error。目标是采样该 disorder 下的 Gibbs 热态

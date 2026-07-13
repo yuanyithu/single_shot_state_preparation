@@ -1,31 +1,37 @@
-"""G2.1 单元测试：section（线性部分）/ model / observables。
+"""Canonical disorder, absolute/relative characters, and estimators.
 
-关键锁定：
-  - w_u 三性质（独立复核，不只靠构造内断言）
-  - 规范形式（|v|, σ_arg）与旧形式（|v⊕η|, s, 标签相对 η）的换元等价（数值逐位）
-  - true 系综桥梁恒等式 T3 在新接线下成立
-  - full / sampled 两档估计量一致；聚合公式对手工类分布精确
+The old repository-energy equivalence below is deliberately limited to the
+``legacy_delta_only`` regression mode; it is not a coordinate description of
+the paper's ``true_posterior`` ensemble.
 """
 
 import numpy as np
 import pytest
 
-from src.gf2 import gf2_matmul
+from src.gf2 import gf2_matmul, gf2_rank
 from src.graphs import cycle_parity_check_matrix, random_biregular_graph_from_m
 from src.hgp import classical_parity_check_matrix, hgp_from_H
 from src.logicals import logical_pauli_operators
 from src.model import (
+    DisorderRealization,
+    EnsembleWiring,
     assemble_sector_model,
     coupling_from_probability,
     disorder_from_uniforms,
     draw_disorder,
+    normalize_ensemble,
     wire_ensemble,
 )
 from src.observables import (
+    absolute_observable_values,
     aggregate_observables,
     build_observable_frame,
     build_observable_set,
+    independent_chain_squared_character_estimates,
     observable_values,
+    posterior_statistics,
+    relative_observable_values,
+    sampled_nonzero_character_mean,
 )
 from src.section import build_linear_section
 
@@ -37,30 +43,38 @@ def build_models(classical, sectors=("x_error", "z_error")):
 
 
 def enum_m_u_canonical(model, frame, obs_set, wiring):
-    """规范形式全枚举：权重 exp[−K_p|v|−K_q|Hv⊕σ_arg|]（q=0 → 硬约束）。"""
+    """Enumerate the reduced weight in its absolute candidate-error state."""
     n = model.num_qubits
     total = np.zeros(obs_set.num_u, dtype=np.float64)
     norm = 0.0
     for value in range(1 << n):
-        v = np.array([(value >> j) & 1 for j in range(n)], dtype=np.uint8)
-        syndrome_term = gf2_matmul(model.H_check, v[:, None])[:, 0] ^ wiring.sigma_arg
+        e = np.array([(value >> j) & 1 for j in range(n)], dtype=np.uint8)
+        syndrome_term = (
+            gf2_matmul(model.H_check, e[:, None])[:, 0]
+            ^ wiring.gibbs_syndrome_argument
+        )
         weight_s = int(syndrome_term.sum())
         if wiring.q_zero:
             if weight_s:
                 continue
-            log_weight = -wiring.K_p * float(v.sum())
+            log_weight = -wiring.K_p * float(e.sum())
         else:
-            log_weight = -wiring.K_p * float(v.sum()) - wiring.K_q * float(weight_s)
+            log_weight = (
+                -wiring.K_p * float(e.sum())
+                - wiring.K_q * float(weight_s)
+            )
         weight = np.exp(log_weight)
-        total += weight * observable_values(obs_set, wiring, v).astype(np.float64)
+        total += weight * observable_values(
+            obs_set, wiring, e
+        ).astype(np.float64)
         norm += weight
     return total / norm
 
 
-def enum_m_u_legacy_repo_form(model, frame, obs_set, disorder):
-    """旧形式（主项目约定）：权重 exp[−K_p|v⊕η|−K_q|Hv⊕s|]，标签相对 η。
+def enum_m_u_old_repository_form(model, frame, obs_set, disorder):
+    """Independently evaluate the historical delta-only repository formula.
 
-    不用新 wiring 机制，直接按公式（作为独立参照）。
+    This is regression evidence only and is never used as the paper posterior.
     """
     n = model.num_qubits
     K_p = coupling_from_probability(disorder.p)
@@ -68,13 +82,13 @@ def enum_m_u_legacy_repo_form(model, frame, obs_set, disorder):
     total = np.zeros(obs_set.num_u, dtype=np.float64)
     norm = 0.0
     W = obs_set.W_rows
-    label_eta = gf2_matmul(W, disorder.eta[:, None])[:, 0]
+    label_eta = gf2_matmul(W, disorder.epsilon_data_true[:, None])[:, 0]
     for value in range(1 << n):
         v = np.array([(value >> j) & 1 for j in range(n)], dtype=np.uint8)
-        data_w = int(np.count_nonzero(v ^ disorder.eta))
+        data_w = int(np.count_nonzero(v ^ disorder.epsilon_data_true))
         syndrome_w = int(
             (gf2_matmul(model.H_check, v[:, None])[:, 0]
-             ^ disorder.observed_syndrome).sum()
+             ^ disorder.effective_syndrome).sum()
         )
         weight = np.exp(-K_p * data_w - K_q * syndrome_w)
         parity = gf2_matmul(W, v[:, None])[:, 0] ^ label_eta
@@ -150,12 +164,21 @@ class TestObservableFrame:
         for model in build_models(classical_builder(), sectors=check_sectors):
             frame = build_observable_frame(model)  # 内部断言已跑
             W = frame.W_basis
+            kernel_generators = np.vstack((
+                model.stabilizer_rows, model.logical_move_basis
+            ))
+            assert gf2_rank(kernel_generators) == (
+                model.num_qubits - gf2_rank(model.H_check)
+            )
+            assert not gf2_matmul(
+                model.stabilizer_rows, model.logical_obs_basis.T
+            ).any()
             # 独立复核 (i)：对随机 im 元素的 section 像正交
             rng = np.random.default_rng(11)
             for _ in range(5):
                 x = (rng.random(model.num_qubits) < 0.4).astype(np.uint8)
                 sigma = gf2_matmul(model.H_check, x[:, None])[:, 0]
-                t_vec = model.section.apply(sigma)
+                t_vec = model.logical_sector_section.apply(sigma)
                 assert not gf2_matmul(W, t_vec[:, None]).any()
             # (ii) stabilizer 行随机组合
             coeff = (rng.random(model.stabilizer_rows.shape[0]) < 0.5).astype(np.uint8)
@@ -184,44 +207,53 @@ class TestEnsembleWiringAndEquivalence:
         rng = np.random.default_rng(seed)
         disorder = draw_disorder(model, p, q, rng)
         if force_nontrivial_eta and not gf2_matmul(
-                model.H_check, disorder.eta[:, None]).any():
-            disorder.eta[0] ^= 1
-            disorder.observed_syndrome = (
-                gf2_matmul(model.H_check, disorder.eta[:, None])[:, 0]
-                ^ disorder.delta
+                model.H_check, disorder.epsilon_data_true[:, None]).any():
+            disorder.epsilon_data_true[0] ^= 1
+            disorder.effective_syndrome = (
+                gf2_matmul(
+                    model.H_check, disorder.epsilon_data_true[:, None]
+                )[:, 0]
+                ^ disorder.measurement_error
             )
-            disorder.eta_weight = int(disorder.eta.sum())
+            disorder.epsilon_data_weight = int(
+                disorder.epsilon_data_true.sum()
+            )
         return disorder
 
-    def test_repo_compat_canonical_equals_legacy_form(self, toric2_setup):
-        """换元锁定：规范 (|v|, δ, ℓ_ref=0) ≡ 旧式 (|v⊕η|, s, 标签相对 η)。"""
+    def test_legacy_delta_only_equals_old_repository_form(self, toric2_setup):
+        """The legacy canonical variable reproduces only the old repository model."""
         model, frame, obs_set = toric2_setup
         for seed in (1, 2, 3):
             disorder = self._disorder(model, 0.15, 0.1, seed)
-            wiring = wire_ensemble(model, disorder, "repo_compat", frame)
+            wiring = wire_ensemble(
+                model, disorder, "legacy_delta_only", frame
+            )
             canonical = enum_m_u_canonical(model, frame, obs_set, wiring)
-            legacy = enum_m_u_legacy_repo_form(model, frame, obs_set, disorder)
+            legacy = enum_m_u_old_repository_form(
+                model, frame, obs_set, disorder
+            )
             assert np.allclose(canonical, legacy, atol=1e-12)
 
-    def test_true_posterior_bridge_identity_T3(self, toric2_setup):
-        """m_true(η,δ) = (−1)^{⟨u,φ(η)⟩} 因子已含于 wiring；验证与 (η=0, δ:=s) 等价。"""
+    def test_fixed_effective_syndrome_absolute_and_relative_relation(
+        self, toric2_setup
+    ):
+        """At fixed effective syndrome, ground truth changes only Mattis signs."""
         model, frame, obs_set = toric2_setup
         disorder = self._disorder(model, 0.15, 0.1, seed=7)
         wiring = wire_ensemble(model, disorder, "true_posterior", frame)
         m_direct = enum_m_u_canonical(model, frame, obs_set, wiring)
-        # 构造 η=0、δ=s 的 disorder：σ_arg 相同、ℓ_ref=0
-        from src.model import DisorderRealization
-
+        # A zero planted class with the same fixed Gibbs argument isolates the
+        # absolute character means.
         shifted = DisorderRealization(
-            eta=np.zeros(model.num_qubits, dtype=np.uint8),
-            delta=disorder.observed_syndrome.copy(),
-            observed_syndrome=disorder.observed_syndrome.copy(),
+            epsilon_data_true=np.zeros(model.num_qubits, dtype=np.uint8),
+            measurement_error=disorder.effective_syndrome.copy(),
+            effective_syndrome=disorder.effective_syndrome.copy(),
             p=disorder.p, q=disorder.q,
         )
         wiring_shifted = wire_ensemble(model, shifted, "true_posterior", frame)
         m_shifted = enum_m_u_canonical(model, frame, obs_set, wiring_shifted)
-        # 手工乘符号 (−1)^{⟨u, φ(η)⟩}
-        label_eta = frame.label_of(disorder.eta)
+        # Apply the planted Mattis sign explicitly.
+        label_eta = frame.label_of(disorder.epsilon_data_true)
         mask = sum(1 << b for b, bit in enumerate(label_eta) if bit)
         signs = np.array(
             [1.0 - 2.0 * (int(u & mask).bit_count() & 1)
@@ -229,45 +261,50 @@ class TestEnsembleWiringAndEquivalence:
         )
         assert np.allclose(m_direct, signs * m_shifted, atol=1e-12)
 
-    def test_repo_compat_eta_independence_T1(self, toric2_setup):
+    def test_legacy_delta_only_ground_truth_independence(self, toric2_setup):
         model, frame, obs_set = toric2_setup
         base = self._disorder(model, 0.15, 0.1, seed=11)
-        from src.model import DisorderRealization
-
         results = []
         for eta_seed in (0, 1, 2):
             rng = np.random.default_rng(eta_seed + 100)
             eta = (rng.random(model.num_qubits) < 0.3).astype(np.uint8)
             disorder = DisorderRealization(
-                eta=eta,
-                delta=base.delta.copy(),
-                observed_syndrome=(
-                    gf2_matmul(model.H_check, eta[:, None])[:, 0] ^ base.delta
+                epsilon_data_true=eta,
+                measurement_error=base.measurement_error.copy(),
+                effective_syndrome=(
+                    gf2_matmul(model.H_check, eta[:, None])[:, 0]
+                    ^ base.measurement_error
                 ),
                 p=0.15, q=0.1,
             )
-            wiring = wire_ensemble(model, disorder, "repo_compat", frame)
+            wiring = wire_ensemble(
+                model, disorder, "legacy_delta_only", frame
+            )
             results.append(enum_m_u_canonical(model, frame, obs_set, wiring))
         assert np.allclose(results[0], results[1], atol=1e-12)
         assert np.allclose(results[0], results[2], atol=1e-12)
 
     def test_observable_at_truth_is_plus_one(self, toric2_setup):
-        """true 系综：v = η（= 候选即真实错误）⇒ 所有 O_u = +1。"""
+        """The planted-relative character is +1 at the true candidate error."""
         model, frame, obs_set = toric2_setup
         disorder = self._disorder(model, 0.15, 0.1, seed=13)
         wiring = wire_ensemble(model, disorder, "true_posterior", frame)
-        values = observable_values(obs_set, wiring, disorder.eta)
+        values = observable_values(
+            obs_set, wiring, disorder.epsilon_data_true
+        )
         assert np.all(values == 1)
 
     def test_q_zero_wiring(self, toric2_setup):
         model, frame, _ = toric2_setup
         disorder = self._disorder(model, 0.15, 0.0, seed=17)
-        assert disorder.delta_weight == 0
+        assert disorder.measurement_error_weight == 0
         wiring = wire_ensemble(model, disorder, "true_posterior", frame)
         assert wiring.q_zero
-        # 硬约束满足的 v（=η）能量有限；违反者抛错
-        assert np.isfinite(wiring.total_energy(model, disorder.eta))
-        bad = disorder.eta.copy()
+        # The true error lies in the quenched coset; a violating state is rejected.
+        assert np.isfinite(
+            wiring.total_energy(model, disorder.epsilon_data_true)
+        )
+        bad = disorder.epsilon_data_true.copy()
         bad[0] ^= 1
         with pytest.raises(ValueError, match="hard constraint"):
             wiring.total_energy(model, bad)
@@ -331,7 +368,9 @@ class TestAggregates:
         agg = aggregate_observables(obs_set, np.array(m_u))
         purity_direct = sum(p * p for p in P.values())
         assert np.isclose(agg["purity"], purity_direct, atol=1e-12)
-        assert np.isclose(agg["w0"], P[0], atol=1e-12)
+        assert np.isclose(
+            agg["posterior_mass_on_planted_class"], P[0], atol=1e-12
+        )
         assert np.isclose(
             agg["q_top_all"], (4 * purity_direct - 1) / 3, atol=1e-12
         )
@@ -357,12 +396,9 @@ class TestAggregates:
         index = {int(u): i for i, u in enumerate(full_set.u_bitmasks)}
         m_sampled = np.array([m_u[index[int(u)]] for u in sampled.u_bitmasks])
         agg_sampled = aggregate_observables(sampled, m_sampled)
-        # 抽到全体非零 u 时，“无偏估计”与全量精确值只差 basis 行不进平均的口径；
-        # 此处验证公式一致性：用去除 basis 的均值重算 full 口径
-        random_mask = np.ones(sampled.num_u, dtype=bool)
-        random_mask[sampled.basis_positions] = False
+        # 抽到全部 nonbasis 时必须精确复现全体非零 character 平均。
         assert np.isclose(
-            agg_sampled["q_top_all"], float(np.mean(m_sampled[random_mask] ** 2))
+            agg_sampled["q_top"], agg_full["q_top"]
         )
 
 
@@ -373,20 +409,327 @@ class TestDisorderDraw:
                              sectors=("x_error",))[0]
         d1 = draw_disorder(model, 0.1, 0.05, np.random.default_rng(7))
         d2 = draw_disorder(model, 0.1, 0.05, np.random.default_rng(7))
-        assert np.array_equal(d1.eta, d2.eta) and np.array_equal(d1.delta, d2.delta)
-        # CRN：同一批 uniforms，p 增大 ⇒ η 单调增长（集合包含）
+        assert np.array_equal(
+            d1.epsilon_data_true, d2.epsilon_data_true
+        ) and np.array_equal(d1.measurement_error, d2.measurement_error)
+        # With common uniforms, increasing p grows the data-error support.
         rng = np.random.default_rng(8)
         du = rng.random(model.num_qubits)
         su = rng.random(model.num_checks)
         low = disorder_from_uniforms(model, 0.05, 0.02, du, su)
         high = disorder_from_uniforms(model, 0.2, 0.02, du, su)
-        assert np.all(low.eta <= high.eta)
-        # s = Hη ⊕ δ 自洽
-        expected = gf2_matmul(model.H_check, high.eta[:, None])[:, 0] ^ high.delta
-        assert np.array_equal(high.observed_syndrome, expected)
+        assert np.all(low.epsilon_data_true <= high.epsilon_data_true)
+        # effective_syndrome = H epsilon_data_true xor measurement_error.
+        expected = (
+            gf2_matmul(
+                model.H_check, high.epsilon_data_true[:, None]
+            )[:, 0]
+            ^ high.measurement_error
+        )
+        assert np.array_equal(high.effective_syndrome, expected)
 
     def test_coupling_edge_values(self):
         assert coupling_from_probability(0.5) == 0.0
         assert np.isinf(coupling_from_probability(0.0))
         with pytest.raises(ValueError):
             coupling_from_probability(0.7)
+
+    def test_disorder_dimensions_are_validated_before_wiring(self):
+        model = build_models(
+            cycle_parity_check_matrix(2), sectors=("x_error",)
+        )[0]
+        with pytest.raises(ValueError, match="measurement_error.*length"):
+            DisorderRealization(
+                epsilon_data_true=np.zeros(model.num_qubits, dtype=np.uint8),
+                measurement_error=np.zeros(model.num_checks, dtype=np.uint8),
+                effective_syndrome=np.zeros(
+                    model.num_checks + 1, dtype=np.uint8
+                ),
+                p=0.1,
+                q=0.05,
+            )
+        disorder = DisorderRealization(
+            epsilon_data_true=np.zeros(model.num_qubits + 1, dtype=np.uint8),
+            measurement_error=np.zeros(model.num_checks, dtype=np.uint8),
+            effective_syndrome=np.zeros(model.num_checks, dtype=np.uint8),
+            p=0.1,
+            q=0.05,
+        )
+        with pytest.raises(ValueError, match="epsilon_data_true length"):
+            wire_ensemble(
+                model,
+                disorder,
+                "true_posterior",
+                build_observable_frame(model),
+            )
+
+
+class TestV2PhysicsSemantics:
+    def test_true_energy_uses_fixed_effective_syndrome_not_truth(
+        self, toric2_setup
+    ):
+        model, frame, _ = toric2_setup
+        base = draw_disorder(model, 0.15, 0.1, np.random.default_rng(91))
+        supported_qubit = int(np.flatnonzero(model.H_check.any(axis=0))[0])
+        shifted_truth = base.epsilon_data_true.copy()
+        shifted_truth[supported_qubit] ^= 1
+        shifted_data_syndrome = gf2_matmul(
+            model.H_check, shifted_truth[:, None]
+        )[:, 0]
+        original_data_syndrome = gf2_matmul(
+            model.H_check, base.epsilon_data_true[:, None]
+        )[:, 0]
+        assert not np.array_equal(
+            shifted_data_syndrome, original_data_syndrome
+        )
+        shifted_measurement = base.effective_syndrome ^ shifted_data_syndrome
+        alternative = DisorderRealization(
+            epsilon_data_true=shifted_truth,
+            measurement_error=shifted_measurement,
+            effective_syndrome=base.effective_syndrome,
+            p=base.p,
+            q=base.q,
+        )
+        wiring_a = wire_ensemble(model, base, "true_posterior", frame)
+        wiring_b = wire_ensemble(model, alternative, "true_posterior", frame)
+        assert np.array_equal(
+            wiring_a.gibbs_syndrome_argument,
+            wiring_b.gibbs_syndrome_argument,
+        )
+        rng = np.random.default_rng(92)
+        for _ in range(10):
+            e = (rng.random(model.num_qubits) < 0.5).astype(np.uint8)
+            assert wiring_a.total_energy(model, e) == wiring_b.total_energy(
+                model, e
+            )
+
+    def test_true_and_legacy_differ_for_nontrivial_data_syndrome(
+        self, toric2_setup
+    ):
+        model, frame, _ = toric2_setup
+        epsilon = np.zeros(model.num_qubits, dtype=np.uint8)
+        epsilon[0] = 1
+        measurement = np.zeros(model.num_checks, dtype=np.uint8)
+        effective = gf2_matmul(model.H_check, epsilon[:, None])[:, 0]
+        assert effective.any()
+        disorder = DisorderRealization(
+            epsilon_data_true=epsilon,
+            measurement_error=measurement,
+            effective_syndrome=effective,
+            p=0.15,
+            q=0.1,
+        )
+        true = wire_ensemble(model, disorder, "true_posterior", frame)
+        legacy = wire_ensemble(
+            model, disorder, "legacy_delta_only", frame
+        )
+        assert not np.array_equal(
+            true.gibbs_syndrome_argument,
+            legacy.gibbs_syndrome_argument,
+        )
+        e = np.zeros(model.num_qubits, dtype=np.uint8)
+        assert true.total_energy(model, e) != legacy.total_energy(model, e)
+
+    def test_deprecated_ensemble_aliases_normalize_before_storage(
+        self, toric2_setup
+    ):
+        model, frame, _ = toric2_setup
+        disorder = draw_disorder(model, 0.1, 0.05, np.random.default_rng(93))
+        with pytest.warns(DeprecationWarning):
+            true = wire_ensemble(
+                model, disorder, "paper_true_posterior", frame
+            )
+        with pytest.warns(DeprecationWarning):
+            legacy = wire_ensemble(model, disorder, "repo_compat", frame)
+        assert true.ensemble == "true_posterior"
+        assert legacy.ensemble == "legacy_delta_only"
+        assert normalize_ensemble("true_posterior") == "true_posterior"
+
+    def test_legacy_disorder_aliases_are_warned_read_only(self, toric2_setup):
+        model, _, _ = toric2_setup
+        disorder = draw_disorder(model, 0.1, 0.05, np.random.default_rng(94))
+        for alias, canonical in (
+            ("eta", "epsilon_data_true"),
+            ("delta", "measurement_error"),
+            ("observed_syndrome", "effective_syndrome"),
+        ):
+            with pytest.warns(DeprecationWarning, match=alias):
+                legacy_value = getattr(disorder, alias)
+            assert np.array_equal(legacy_value, getattr(disorder, canonical))
+            with pytest.raises(ValueError, match="read-only"):
+                legacy_value[0] ^= 1
+        with pytest.warns(DeprecationWarning, match="eta_weight"):
+            assert disorder.eta_weight == disorder.epsilon_data_weight
+        with pytest.warns(DeprecationWarning, match="delta_weight"):
+            assert disorder.delta_weight == disorder.measurement_error_weight
+        with pytest.raises(AttributeError):
+            disorder.observed_syndrome = np.zeros(model.num_checks, dtype=np.uint8)
+
+    def test_legacy_constructor_aliases_and_conflicts(self, toric2_setup):
+        model, _, _ = toric2_setup
+        data = np.zeros(model.num_qubits, dtype=np.uint8)
+        syndrome = np.zeros(model.num_checks, dtype=np.uint8)
+        with pytest.warns(DeprecationWarning) as warnings_seen:
+            disorder = DisorderRealization(
+                eta=data,
+                delta=syndrome,
+                observed_syndrome=syndrome,
+                eta_weight=0,
+                delta_weight=0,
+                p=0.1,
+                q=0.05,
+            )
+        assert len(warnings_seen) == 5
+        disorder.validate_for_model(model)
+        required = {
+            "epsilon_data_true": data,
+            "measurement_error": syndrome,
+            "effective_syndrome": syndrome,
+        }
+        for old_name, canonical_name, value in (
+            ("eta", "epsilon_data_true", data),
+            ("delta", "measurement_error", syndrome),
+            ("observed_syndrome", "effective_syndrome", syndrome),
+            ("eta_weight", "epsilon_data_weight", 0),
+            ("delta_weight", "measurement_error_weight", 0),
+        ):
+            canonical = {**required, canonical_name: value}
+            with pytest.raises(TypeError, match="cannot pass both"):
+                DisorderRealization(
+                    **canonical,
+                    **{old_name: value},
+                    p=0.1,
+                    q=0.05,
+                )
+
+    def test_legacy_wiring_aliases_are_read_only_and_conflicts_rejected(
+        self, toric2_setup
+    ):
+        model, _, _ = toric2_setup
+        syndrome = np.zeros(model.num_checks, dtype=np.uint8)
+        logical_class = np.zeros(model.k, dtype=np.uint8)
+        with pytest.warns(DeprecationWarning):
+            wiring = EnsembleWiring(
+                ensemble="true_posterior",
+                sigma_arg=syndrome,
+                ell_ref=logical_class,
+                K_p=1.0,
+                K_q=1.0,
+            )
+        for alias in ("sigma_arg", "reference_label", "ell_ref"):
+            with pytest.warns(DeprecationWarning, match=alias):
+                view = getattr(wiring, alias)
+            if view.size:
+                with pytest.raises(ValueError, match="read-only"):
+                    view[0] ^= 1
+        with pytest.raises(TypeError, match="cannot pass both"):
+            EnsembleWiring(
+                ensemble="true_posterior",
+                gibbs_syndrome_argument=syndrome,
+                sigma_arg=syndrome,
+                planted_logical_class=logical_class,
+            )
+        for alias in ("reference_label", "ell_ref"):
+            with pytest.raises(TypeError, match="cannot pass both"):
+                EnsembleWiring(
+                    ensemble="true_posterior",
+                    gibbs_syndrome_argument=syndrome,
+                    planted_logical_class=logical_class,
+                    **{alias: logical_class},
+                )
+
+    def test_absolute_relative_mattis_relation(self, toric2_setup):
+        model, frame, obs_set = toric2_setup
+        disorder = draw_disorder(model, 0.2, 0.1, np.random.default_rng(95))
+        wiring = wire_ensemble(model, disorder, "true_posterior", frame)
+        e = np.arange(model.num_qubits, dtype=np.uint8) & 1
+        absolute = absolute_observable_values(obs_set, e)
+        relative = relative_observable_values(obs_set, wiring, e)
+        signs = relative_observable_values(
+            obs_set,
+            wiring,
+            np.zeros(model.num_qubits, dtype=np.uint8),
+        )
+        assert np.array_equal(relative, signs * absolute)
+        assert np.array_equal(relative**2, absolute**2)
+        assert len(frame.fingerprint()) == 64
+        assert frame.fingerprint() == build_observable_frame(model).fingerprint()
+
+    def test_planted_mass_is_not_map_success(self):
+        stats = posterior_statistics(np.array([0.1, 0.9]), planted_class=0)
+        assert stats["posterior_mass_on_planted_class"] == 0.1
+        assert stats["map_success_probability"] == 0.9
+        assert stats["posterior_purity"] <= stats["map_success_probability"]
+        assert stats["map_success_probability"] <= stats[
+            "map_success_upper_bound"
+        ]
+
+
+class TestSampledCharacterEstimators:
+    def _sampled_k4(self):
+        graph = random_biregular_graph_from_m(2, 3, 4, seed=12345)
+        model = build_models(
+            classical_parity_check_matrix(graph), sectors=("x_error",)
+        )[0]
+        frame = build_observable_frame(model)
+        return build_observable_set(
+            frame, full_max_k=2, num_random_u=2, u_rand_seed=101
+        )
+
+    def test_basis_and_nonbasis_population_weighting(self):
+        obs = self._sampled_k4()
+        values = np.array([1.0, 2.0, 3.0, 4.0, 10.0, 20.0])
+        estimate, _ = sampled_nonzero_character_mean(obs, values)
+        N = (1 << 4) - 1
+        expected = (1 + 2 + 3 + 4 + (N - 4) * 15.0) / N
+        assert estimate == expected
+        assert estimate != np.mean(values[4:])
+
+    def test_cross_chain_square_is_unbiased_while_pooled_square_is_not(self):
+        rng = np.random.default_rng(102)
+        true_mean = 0.3
+        samples_per_chain = 50
+        probability_plus = (1 + true_mean) / 2
+        # Treat independent repetitions as separate characters so the helper
+        # vectorizes the Monte Carlo verification.
+        counts = rng.binomial(
+            samples_per_chain, probability_plus, size=(4, 5000)
+        )
+        chain_means = 2.0 * counts / samples_per_chain - 1.0
+        result = independent_chain_squared_character_estimates(chain_means)
+        truth = true_mean**2
+        assert np.mean(result["m2_u_pooled_square_raw"]) > truth + 0.002
+        assert abs(np.mean(result["m2_u_debiased"]) - truth) < 0.003
+        assert np.all(np.isfinite(result["m2_u_debiased_jackknife_se"]))
+
+    def test_delete_one_jackknife_tracks_repeated_sampling_error(self):
+        rng = np.random.default_rng(103)
+        true_mean = 0.3
+        samples_per_chain = 100
+        repetitions = 6000
+        counts = rng.binomial(
+            samples_per_chain,
+            (1.0 + true_mean) / 2.0,
+            size=(4, repetitions),
+        )
+        chain_means = 2.0 * counts / samples_per_chain - 1.0
+        result = independent_chain_squared_character_estimates(chain_means)
+        empirical_se = float(np.std(result["m2_u_debiased"], ddof=1))
+        jackknife_rms = float(np.sqrt(np.mean(
+            result["m2_u_debiased_jackknife_se"] ** 2
+        )))
+        assert 0.85 < jackknife_rms / empirical_se < 1.15
+
+    def test_unphysical_debiased_purity_is_retained_without_success_bounds(
+        self, toric2_setup
+    ):
+        _, _, obs = toric2_setup
+        result = aggregate_observables(
+            obs,
+            np.zeros(obs.num_u),
+            m2_u_values=np.full(obs.num_u, -0.5),
+        )
+        assert result["posterior_purity"] < 1.0 / (1 << obs.k)
+        assert not result["posterior_purity_within_physical_bounds"]
+        assert result["map_success_lower_bound"] is None
+        assert result["map_success_upper_bound"] is None

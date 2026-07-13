@@ -63,7 +63,7 @@ class TestPortablePrngTwins:
 CASES = [
     # (classical, p, q, ensemble)
     (repetition_parity_check_matrix(2), 0.12, 0.08, "true_posterior"),
-    (repetition_parity_check_matrix(2), 0.12, 0.08, "repo_compat"),
+    (repetition_parity_check_matrix(2), 0.12, 0.08, "legacy_delta_only"),
     (cycle_parity_check_matrix(2), 0.15, 0.12, "true_posterior"),
     (cycle_parity_check_matrix(2), 0.18, 0.0, "true_posterior"),   # q=0
     (cycle_parity_check_matrix(3), 0.10, 0.05, "true_posterior"),
@@ -79,6 +79,8 @@ class TestBitLevelEngineIdentity:
             num_burn_in_sweeps=40, num_measurements=300,
             num_sweeps_between_measurements=2, logical_move_repeat=2,
             record_observable_trajectory=True,
+            record_state_trajectory=True,
+            debug_invariants=True,
         )
         ref = run_reference_mcmc(model, frame, obs_set, wiring, config, seed=33)
         fast = run_fast_mcmc(model, frame, obs_set, wiring, config, seed=33)
@@ -98,6 +100,9 @@ class TestBitLevelEngineIdentity:
                            rtol=0, atol=0)
         assert np.array_equal(
             ref["observable_trajectory"], fast["observable_trajectory"]
+        )
+        assert np.array_equal(
+            ref["state_trajectory"], fast["state_trajectory"]
         )
 
     def test_identity_with_sampled_tier_and_sector_start(self):
@@ -119,6 +124,29 @@ class TestBitLevelEngineIdentity:
 
 
 class TestFastEngineIndependentChecks:
+    @pytest.mark.parametrize("q", [0.0, 0.1])
+    def test_p_zero_energy_trace_is_finite_and_matches_reference(self, q):
+        model, frame, obs_set = build_setup(repetition_parity_check_matrix(2))
+        wiring = make_wiring(model, frame, p=0.0, q=q, seed=38)
+        assert np.isposinf(wiring.K_p)
+        config = ReferenceMcmcConfig(
+            num_burn_in_sweeps=5,
+            num_measurements=20,
+            record_state_trajectory=True,
+            debug_invariants=True,
+        )
+        reference = run_reference_mcmc(
+            model, frame, obs_set, wiring, config, seed=40
+        )
+        fast = run_fast_mcmc(
+            model, frame, obs_set, wiring, config, seed=40
+        )
+        assert np.all(np.isfinite(reference["energy_trace"]))
+        assert np.array_equal(reference["energy_trace"], fast["energy_trace"])
+        assert np.array_equal(
+            reference["state_trajectory"], fast["state_trajectory"]
+        )
+
     def test_fast_vs_enum(self):
         model, frame, obs_set = build_setup(repetition_parity_check_matrix(2))
         wiring = make_wiring(model, frame, 0.12, 0.08, seed=39)

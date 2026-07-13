@@ -1,4 +1,12 @@
-"""Syndrome section r: im(H) → F_2^n（G2.1 线性部分；G2.2 增补 BpLsd 与防误用）。
+"""Logical-sector qubit-chain sections ``r_sec: im(H) -> F_2^n``.
+
+This module does not implement the measurement-error decoder ``r_meta`` or
+the physical preparation-chain representative ``c_prep``.  Its sections are
+used only to label logical sectors after closing ``e`` with ``r_sec(H e)``.
+In particular, a general noisy ``effective_syndrome`` must never be passed to
+``apply`` merely because it appears in the Gibbs energy.
+
+Syndrome section r: im(H) → F_2^n（G2.1 线性部分；G2.2 增补 BpLsd 与防误用）。
 
 线性 section 构造（确定性）：
   取 H 的 RREF 主元列集 P（|P| = r = rank H）；M := H[:, P] 满列秩且
@@ -13,6 +21,7 @@
 必须 in_image 检查（strict 模式自动检查并抛错）。
 """
 
+import warnings
 from dataclasses import dataclass
 
 import numpy as np
@@ -107,8 +116,13 @@ def build_linear_section(parity_check_matrix, column_priority=None):
     return section
 
 
-class DecoderSection:
-    """BpLsd 解码器 section（非线性 frame；G2.2）。
+# Canonical descriptive names; the shorter names remain stable public APIs.
+LinearLogicalSectorSection = LinearSection
+build_linear_logical_sector_section = build_linear_section
+
+
+class LogicalSectorQubitChainSection:
+    """BpLsd-backed qubit-chain section used only for logical-sector labels.
 
     仅用于 frame A/B 对照（G3.3）与低权重代表需求——生产观测路径是线性 frame
     （W mask），本类不进采样热循环。行为对齐主项目 SyndromeRepresentativeSection，
@@ -231,6 +245,25 @@ class DecoderSection:
             + np.ascontiguousarray(self.parity_check_matrix).tobytes()
         )
         return hashlib.sha256(payload).hexdigest()
+
+
+# Spelled-out alternative retained because both word orders occur in the
+# physics contract.  They name the same logical-sector qubit-chain object.
+QubitChainLogicalSectorSection = LogicalSectorQubitChainSection
+LogicalSectorDecoderSection = LogicalSectorQubitChainSection
+
+
+class DecoderSection(LogicalSectorQubitChainSection):
+    """Deprecated compatibility name for ``LogicalSectorQubitChainSection``."""
+
+    def __init__(self, *args, **kwargs):
+        warnings.warn(
+            "DecoderSection is ambiguous and deprecated; use "
+            "LogicalSectorQubitChainSection",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        super().__init__(*args, **kwargs)
 
 
 class DecoderObservableFrame:

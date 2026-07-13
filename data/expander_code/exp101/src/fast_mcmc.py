@@ -15,7 +15,7 @@ from dataclasses import dataclass
 import numpy as np
 
 from .gf2 import gf2_matmul
-from .observables import observable_values  # 仅回退/校验用
+from .observables import character_signs_for_label
 from .prng import (
     NUMBA_AVAILABLE,
     PortablePrng,
@@ -31,6 +31,30 @@ from .reference_mcmc import (
 
 if NUMBA_AVAILABLE:
     from numba import njit, uint64
+
+    @njit(cache=True)
+    def _assert_invariants_nb(v, syndrome_term, weights_io, check_flat,
+                              check_off, gibbs_syndrome_argument, q_zero):
+        data_weight = 0
+        for j in range(v.shape[0]):
+            data_weight += int(v[j])
+        if data_weight != weights_io[0]:
+            raise AssertionError("data weight cache broken")
+
+        recomputed = gibbs_syndrome_argument.copy()
+        for j in range(v.shape[0]):
+            if v[j]:
+                for index in range(check_off[j], check_off[j + 1]):
+                    recomputed[check_flat[index]] ^= 1
+        syndrome_weight = 0
+        for check in range(syndrome_term.shape[0]):
+            if recomputed[check] != syndrome_term[check]:
+                raise AssertionError("syndrome cache broken")
+            syndrome_weight += int(syndrome_term[check])
+        if syndrome_weight != weights_io[1]:
+            raise AssertionError("syndrome weight cache broken")
+        if q_zero and syndrome_weight != 0:
+            raise AssertionError("q=0 constraint violated")
 else:  # pragma: no cover
     njit = None
 
@@ -140,7 +164,7 @@ if NUMBA_AVAILABLE:
             for idx in range(stab_off[r], stab_off[r + 1]):
                 overlap += v[stab_flat[idx]]
             delta = (stab_off[r + 1] - stab_off[r]) - 2 * overlap
-            log_acc = -K_p * delta
+            log_acc = 0.0 if delta == 0 else -K_p * delta
             u = nb_random(rng_state)
             if log_acc >= 0.0 or u < np.exp(log_acc):
                 counters[3] += 1
@@ -157,7 +181,7 @@ if NUMBA_AVAILABLE:
                     for idx in range(log_off[i], log_off[i + 1]):
                         overlap += v[log_flat[idx]]
                     delta = (log_off[i + 1] - log_off[i]) - 2 * overlap
-                    log_acc = -K_p * delta
+                    log_acc = 0.0 if delta == 0 else -K_p * delta
                     u = nb_random(rng_state)
                     if log_acc >= 0.0 or u < np.exp(log_acc):
                         log_acc_counts[i] += 1
@@ -171,12 +195,13 @@ if NUMBA_AVAILABLE:
     def _run_chain_kernel(rng_state, v, syndrome_term, weights_io, obs_parity,
                           check_flat, check_off, qubit_obs_words,
                           stab_flat, stab_off, log_flat, log_off,
-                          log_obs_words,
+                          log_obs_words, gibbs_syndrome_argument,
                           K_p, K_q, q_zero,
                           num_burn, num_meas, sweeps_between, logical_repeat,
                           ref_signs, obs_sums, energy_trace,
                           counters, log_att, log_acc_counts,
-                          record_traj, obs_traj, num_words):
+                          record_traj, obs_traj, record_state, state_traj,
+                          debug_invariants, num_words):
         n = v.shape[0]
         qubit_perm = np.empty(n, dtype=np.int64)
         stab_perm = np.empty(stab_off.shape[0] - 1, dtype=np.int64)
@@ -189,6 +214,11 @@ if NUMBA_AVAILABLE:
                        K_p, K_q, q_zero, logical_repeat,
                        counters, log_att, log_acc_counts,
                        qubit_perm, stab_perm, log_perm, num_words)
+            if debug_invariants:
+                _assert_invariants_nb(
+                    v, syndrome_term, weights_io, check_flat, check_off,
+                    gibbs_syndrome_argument, q_zero,
+                )
         for m in range(num_meas):
             for _ in range(sweeps_between):
                 _one_sweep(rng_state, v, syndrome_term, weights_io, obs_parity,
@@ -198,16 +228,32 @@ if NUMBA_AVAILABLE:
                            K_p, K_q, q_zero, logical_repeat,
                            counters, log_att, log_acc_counts,
                            qubit_perm, stab_perm, log_perm, num_words)
+                if debug_invariants:
+                    _assert_invariants_nb(
+                        v, syndrome_term, weights_io, check_flat, check_off,
+                        gibbs_syndrome_argument, q_zero,
+                    )
             for u_idx in range(num_u):
                 bit = (obs_parity[u_idx >> 6] >> uint64(u_idx & 63)) & uint64(1)
                 value = ref_signs[u_idx] * (1 - 2 * int(bit))
                 obs_sums[u_idx] += value
                 if record_traj:
                     obs_traj[m, u_idx] = value
+            if record_state:
+                for j in range(n):
+                    state_traj[m, j] = v[j]
             if q_zero:
-                energy_trace[m] = K_p * weights_io[0]
+                energy_trace[m] = (
+                    0.0 if weights_io[0] == 0 else K_p * weights_io[0]
+                )
             else:
-                energy_trace[m] = K_p * weights_io[0] + K_q * weights_io[1]
+                data_energy = (
+                    0.0 if weights_io[0] == 0 else K_p * weights_io[0]
+                )
+                syndrome_energy = (
+                    0.0 if weights_io[1] == 0 else K_q * weights_io[1]
+                )
+                energy_trace[m] = data_energy + syndrome_energy
 
 
 def run_fast_mcmc(model, frame, observable_set, wiring, config, seed,
@@ -237,9 +283,9 @@ def run_fast_mcmc(model, frame, observable_set, wiring, config, seed,
         if parities[u_idx]:
             obs_parity[u_idx >> 6] |= np.uint64(1) << np.uint64(u_idx & 63)
 
-    from .observables import _reference_signs
-
-    ref_signs = _reference_signs(observable_set, wiring).astype(np.int64)
+    ref_signs = character_signs_for_label(
+        observable_set, wiring.planted_logical_class
+    ).astype(np.int64)
     num_u = observable_set.num_u
     obs_sums = np.zeros(num_u, dtype=np.int64)
     energy_trace = np.zeros(config.num_measurements, dtype=np.float64)
@@ -252,6 +298,12 @@ def run_fast_mcmc(model, frame, observable_set, wiring, config, seed,
          num_u if record_traj else 1),
         dtype=np.int64,
     )
+    record_state = bool(config.record_state_trajectory)
+    state_traj = np.zeros(
+        (config.num_measurements if record_state else 1,
+         model.num_qubits if record_state else 1),
+        dtype=np.uint8,
+    )
     K_q_eff = 0.0 if wiring.q_zero else float(wiring.K_q)
 
     _run_chain_kernel(
@@ -260,13 +312,15 @@ def run_fast_mcmc(model, frame, observable_set, wiring, config, seed,
         chain_data.qubit_obs_words,
         chain_data.stab_flat, chain_data.stab_off,
         chain_data.log_flat, chain_data.log_off, chain_data.log_obs_words,
+        np.asarray(wiring.gibbs_syndrome_argument, dtype=np.uint8),
         float(wiring.K_p), K_q_eff, bool(wiring.q_zero),
         int(config.num_burn_in_sweeps), int(config.num_measurements),
         int(config.num_sweeps_between_measurements),
         int(config.logical_move_repeat),
         ref_signs, obs_sums, energy_trace,
         counters_arr, log_att, log_acc_counts,
-        record_traj, obs_traj, chain_data.num_words,
+        record_traj, obs_traj, record_state, state_traj,
+        bool(config.debug_invariants), chain_data.num_words,
     )
 
     counters = MoveCounters(
@@ -281,17 +335,30 @@ def run_fast_mcmc(model, frame, observable_set, wiring, config, seed,
         v=v, syndrome_term=syndrome_term,
         data_weight=int(weights_io[0]), syndrome_weight=int(weights_io[1]),
     )
+    m_u_relative = (
+        obs_sums.astype(np.float64) / float(config.num_measurements)
+    )
+    obs_sums_absolute = obs_sums * ref_signs
+    relative_trajectory = obs_traj.astype(np.int8) if record_traj else None
+    absolute_trajectory = (
+        relative_trajectory * ref_signs[None, :]
+        if relative_trajectory is not None else None
+    )
     return {
         "engine": "numba",
-        "m_u": obs_sums.astype(np.float64) / float(config.num_measurements),
+        "m_u": m_u_relative,
+        "m_u_relative": m_u_relative,
+        "m_u_absolute": m_u_relative * ref_signs,
         "observable_sums": obs_sums,
+        "observable_sums_relative": obs_sums,
+        "observable_sums_absolute": obs_sums_absolute,
         "num_measurements": int(config.num_measurements),
         "acceptance": counters.rates(),
         "counters": counters,
         "energy_trace": energy_trace,
-        "observable_trajectory": (
-            obs_traj.astype(np.int8) if record_traj else None
-        ),
-        "state_trajectory": None,
+        "observable_trajectory": relative_trajectory,
+        "observable_trajectory_relative": relative_trajectory,
+        "observable_trajectory_absolute": absolute_trajectory,
+        "state_trajectory": state_traj if record_state else None,
         "final_state": final_state,
     }

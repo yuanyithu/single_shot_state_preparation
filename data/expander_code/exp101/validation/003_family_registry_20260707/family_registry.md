@@ -1,5 +1,8 @@
 # 官方 (3,4) 家族注册表
 
+> **PRE_ALIGNMENT：** 这是 v1 家族构造的历史注册表，可参考 seed/秩/距离，但不认证
+> `exp101.physics.v2` 的 task/cache fingerprint 或生产配置。见 `../README.md`。
+
 - d_A=3, d_B=4, base_seed=12345
 - 规则 full_rank：简单图 + 满秩（k=m²）；full_rank_d3：再加 H 列互异（d≥3）
 

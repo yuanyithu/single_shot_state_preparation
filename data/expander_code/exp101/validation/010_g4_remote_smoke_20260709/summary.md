@@ -1,5 +1,7 @@
 # G4.1 远端 env 确认 + 单节点 smoke 全往返
 
+> **PRE_ALIGNMENT（scan/physics v1）：** 本页及 `sector_ti_results.npz` 只作历史运维证据；旧 chunk/schema 永不复用于 `exp101.scan.v2`，不是当前通过证据。见 `../README.md`。
+
 2026-07-09。手工最小 launcher（tar src → ssh 运行 → 拉回校验 → 清 scratch）。
 
 ## 远端 env（screen 外直测）

@@ -1,5 +1,7 @@
 # G3.4 V2 解析极限结果
 
+> **PRE_ALIGNMENT（scan/physics v1）：** 标题中的 V2 早于 `exp101.physics.v2`；本页与 raw 产物只记录历史内部一致性，runner 可能依赖弃用字段、估计器或 schema。见 `../README.md`。
+
 | check | 实例/参数 | 关键指标 | 结果 |
 |---|---|---|---|
 | V2a | toric_m3 | max_abs_z=0.8698, logical_acceptance_all_one=True | ✅ |

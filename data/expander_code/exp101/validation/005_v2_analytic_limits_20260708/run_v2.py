@@ -1,3 +1,4 @@
+# PRE_ALIGNMENT: historical v1 runner; it does not certify exp101.physics.v2.
 """G3.4 V2 解析极限（notes/01 §6 的全部落地；q=0.5 闭式覆盖生产规模 m=2,4,6）。
 
 检查项（全部对 fast 引擎；m_u 的 z 用分块 stderr，floor 5e-3）：
@@ -260,6 +261,11 @@ def main():
         )
     lines += ["", f"**总判定：{'ALL PASS ✅' if all_pass else 'FAIL ❌'}**",
               f"墙钟 {payload['wall_time_seconds']:.0f}s"]
+    lines[1:1] = [
+        "",
+        "> **PRE_ALIGNMENT（自动生成保护）：** 标题中的 V2 早于 `exp101.physics.v2`；",
+        "> 重新运行本 runner 只生成历史证据，不得覆盖当前 014 认证结论。",
+    ]
     (OUT_DIR / "summary.md").write_text("\n".join(lines) + "\n",
                                         encoding="utf-8")
     print("\n".join(lines))

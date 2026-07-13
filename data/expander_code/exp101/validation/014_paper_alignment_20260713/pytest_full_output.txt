@@ -1,0 +1,21 @@
+command: ["/Users/jarvis/miniforge3/envs/12/bin/python", "-m", "pytest", "-q", "/Users/jarvis/Desktop/sync/project D/data/expander_code/exp101/tests"]
+
+[stdout]
+........................................................................ [ 20%]
+........................................................................ [ 41%]
+........................................................................ [ 62%]
+........................................................................ [ 83%]
+.......................................................                  [100%]
+=============================== warnings summary ===============================
+data/expander_code/exp101/tests/test_run_scan.py::TestScanEndToEnd::test_alias_is_canonical_before_seed_and_manifest
+  /Users/jarvis/Desktop/sync/project D/data/expander_code/exp101/src/run_scan.py:981: DeprecationWarning: ensemble 'paper_true_posterior' is deprecated; use 'true_posterior'
+    canonical_ensemble = normalize_ensemble(ensemble)
+
+data/expander_code/exp101/tests/test_run_scan.py::TestScanEndToEnd::test_alias_is_canonical_before_seed_and_manifest
+  /Users/jarvis/Desktop/sync/project D/data/expander_code/exp101/src/run_scan.py:981: DeprecationWarning: ensemble 'repo_compat' is deprecated; use 'legacy_delta_only'
+    canonical_ensemble = normalize_ensemble(ensemble)
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+343 passed, 2 warnings in 29.52s
+
+[stderr]

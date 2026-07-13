@@ -1,5 +1,7 @@
 # G3.3 V1c section-frame A/B 结果
 
+> **PRE_ALIGNMENT（scan/physics v1）：** 本页与 raw 产物只记录历史 frame 实验；runner 可能依赖弃用字段、估计器或 schema，不是 `exp101.physics.v2` 当前 section-invariance 证据。见 `../README.md`。
+
 墙钟 18s
 
 | gate | 内容 | 值 | 结果 |

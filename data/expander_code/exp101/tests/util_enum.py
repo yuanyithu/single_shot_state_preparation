@@ -15,7 +15,8 @@ def enum_m_u(model, observable_set, wiring):
     for value in range(1 << n):
         v = np.array([(value >> j) & 1 for j in range(n)], dtype=np.uint8)
         syndrome_term = (
-            gf2_matmul(model.H_check, v[:, None])[:, 0] ^ wiring.sigma_arg
+            gf2_matmul(model.H_check, v[:, None])[:, 0]
+            ^ wiring.gibbs_syndrome_argument
         )
         weight_s = int(syndrome_term.sum())
         if wiring.q_zero:
@@ -46,7 +47,8 @@ def enum_class_weights(model, frame, wiring):
     for value in range(1 << n):
         v = np.array([(value >> j) & 1 for j in range(n)], dtype=np.uint8)
         syndrome_term = (
-            _mm(model.H_check, v[:, None])[:, 0] ^ wiring.sigma_arg
+            _mm(model.H_check, v[:, None])[:, 0]
+            ^ wiring.gibbs_syndrome_argument
         )
         weight_s = int(syndrome_term.sum())
         if wiring.q_zero:

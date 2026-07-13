@@ -15,6 +15,7 @@ from src.model import (
 from src.observables import build_observable_frame, build_observable_set
 from src.pt import (
     PtConfig,
+    _RoundTripCounter,
     data_only_ladder,
     probability_from_coupling,
     run_parallel_tempering,
@@ -96,8 +97,11 @@ class TestSwapFormula:
 
         wirings = [
             EnsembleWiring(
-                ensemble="true_posterior", sigma_arg=wiring_cold.sigma_arg,
-                reference_label=wiring_cold.reference_label,
+                ensemble="true_posterior",
+                gibbs_syndrome_argument=(
+                    wiring_cold.gibbs_syndrome_argument
+                ),
+                planted_logical_class=wiring_cold.planted_logical_class,
                 K_p=coupling_from_probability(p_ladder[r]),
                 K_q=coupling_from_probability(q_ladder[r]), q_zero=False,
             )
@@ -109,7 +113,7 @@ class TestSwapFormula:
         def state_of(v):
             syndrome = (
                 gf2_matmul(model.H_check, v[:, None])[:, 0]
-                ^ wiring_cold.sigma_arg
+                ^ wiring_cold.gibbs_syndrome_argument
             ).astype(np.uint8)
             return McmcState(v=v, syndrome_term=syndrome,
                              data_weight=int(v.sum()),
@@ -130,6 +134,29 @@ class TestSwapFormula:
                 - log_weight(wirings[i], s_i) - log_weight(wirings[i + 1], s_j)
             )
             assert np.isclose(got, expected, atol=1e-12)
+
+
+class TestRoundTripCounter:
+    def test_initial_hot_to_cold_is_not_a_round_trip(self):
+        counter = _RoundTripCounter(num_replicas=2, cold_replica=0)
+        # Replica 1 starts hot.  Its first arrival at cold has not completed a
+        # cold->hot->cold path and must not increment the counter.
+        counter.observe_endpoints(cold_replica=1, hot_replica=0)
+        assert counter.total == 0
+        assert counter.counts.tolist() == [0, 0]
+        # Replica 0 did start cold and has now visited hot; returning it to
+        # cold completes exactly one valid path.
+        counter.observe_endpoints(cold_replica=0, hot_replica=1)
+        assert counter.total == 1
+        assert counter.counts.tolist() == [1, 0]
+
+    def test_new_phase_does_not_inherit_partial_transit(self):
+        burn = _RoundTripCounter(num_replicas=2, cold_replica=0)
+        burn.observe_endpoints(cold_replica=1, hot_replica=0)
+        assert burn.total == 0
+        measurement = _RoundTripCounter(num_replicas=2, cold_replica=1)
+        measurement.observe_endpoints(cold_replica=0, hot_replica=1)
+        assert measurement.total == 0
 
 
 class TestPtEndToEnd:
@@ -193,6 +220,10 @@ class TestPtEndToEnd:
             seed=15,
         )
         assert result.round_trips > 0  # 易参数下必须有替身往返
+        assert result.round_trips == result.measurement_round_trips
+        assert result.burn_in_round_trips >= 0
+        assert result.burn_in_round_trips_per_replica.shape == (4,)
+        assert result.measurement_round_trips_per_replica.shape == (4,)
         assert sorted(result.replica_id_per_rung.tolist()) == [0, 1, 2, 3]
         # per-u 冷端 logical 接受率被记录且有限
         cold_rates = result.cold_logical_acceptance_per_u()

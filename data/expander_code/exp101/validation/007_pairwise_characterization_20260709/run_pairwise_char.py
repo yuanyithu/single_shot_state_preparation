@@ -1,3 +1,4 @@
+# PRE_ALIGNMENT: historical v1 runner; it does not certify exp101.physics.v2.
 """G3.2 附属：pairwise-TI 大 k 失效的定量刻画（status D4 / plan §12 更新的证据）。
 
 比较 pairwise-TI 的 m_u^pair 与**精确** m_u（全枚举，非 tanh(gap)）：
@@ -153,6 +154,11 @@ def main():
         "而 direct 采样与 full-TI 都与精确一致 ⇒ **pairwise 作为 q_top 方法失效**"
         "（源于可加性假设，非实现 bug）。大 k 生产用 direct/PT 采样。",
         f"判定: {'确认失效 ✅（符合预期，方法作废）' if summary['conclusion_pairwise_invalid'] else '需复核'}",
+    ]
+    lines[1:1] = [
+        "",
+        "> **PRE_ALIGNMENT（自动生成保护）：** 失效数值只作历史动机；",
+        "> 重新运行本 runner 不认证 v2 gap-only API/schema，也不得覆盖 014 结论。",
     ]
     (OUT_DIR / "summary.md").write_text("\n".join(lines) + "\n",
                                         encoding="utf-8")

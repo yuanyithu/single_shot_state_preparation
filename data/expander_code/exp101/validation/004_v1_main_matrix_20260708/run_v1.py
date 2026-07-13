@@ -1,3 +1,4 @@
+# PRE_ALIGNMENT: historical v1 runner; it does not certify exp101.physics.v2.
 """G3.2 V1 主矩阵（regime-aware，plan §3 G3.2 + 2026-07-09 修订）。
 
 每 regime 由其对应工具验证，各工具在其有效域内被检验。正确 instrument 见 plan
@@ -381,6 +382,11 @@ def main():
         f"{'✅' if g['TI_pair_fail']==0 else '❌'} |",
         "",
         f"**总判定：{'ALL PASS ✅' if g['ALL_PASS'] else 'FAIL ❌'}**",
+    ]
+    lines[1:1] = [
+        "",
+        "> **PRE_ALIGNMENT（自动生成保护）：** 本页及 raw 数据只记录 v1 历史内部一致性；",
+        "> 重新运行本 runner 不认证 `exp101.physics.v2`，也不得覆盖 014 结论。",
     ]
     (OUT_DIR / "summary.md").write_text("\n".join(lines) + "\n",
                                         encoding="utf-8")

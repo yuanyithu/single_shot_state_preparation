@@ -16,7 +16,7 @@
   - effective_sample_size：N_total / τ（跨链拼合的保守版）
 """
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 
 import numpy as np
 
@@ -27,7 +27,13 @@ def autocovariance(series):
     series = np.asarray(series, dtype=np.float64)
     n = series.shape[0]
     centered = series - series.mean()
-    result = np.correlate(centered, centered, mode="full")[n - 1:]
+    # FFT avoids the quadratic cost of running the gate for every sampled
+    # character across four long production chains.
+    fft_size = 1 << max(1, (2 * n - 1).bit_length())
+    transformed = np.fft.rfft(centered, n=fft_size)
+    result = np.fft.irfft(
+        transformed * np.conjugate(transformed), n=fft_size
+    )[:n]
     return result / n
 
 
@@ -142,7 +148,7 @@ def default_sector_bitmasks(k, num_starts=8):
 
 
 def evaluate_convergence_gate(start_results, pt_result=None, thresholds=None,
-                              q_top_key="q_top_basis"):
+                              q_top_key="q_top_all"):
     """start_results：多起点运行列表，每项 dict 至少含
         "observable_trajectory" (num_meas, num_u) int8
         "aggregates" dict（含 q_top_basis / q_top_all）
@@ -208,7 +214,13 @@ def evaluate_convergence_gate(start_results, pt_result=None, thresholds=None,
     round_trips = None
     min_swap_rate = None
     if pt_result is not None:
-        round_trips = int(pt_result.round_trips)
+        measured_round_trips = getattr(
+            pt_result, "measurement_round_trips", None
+        )
+        round_trips = int(
+            pt_result.round_trips
+            if measured_round_trips is None else measured_round_trips
+        )
         min_swap_rate = float(pt_result.swap_rates().min())
         pt_transport_ok = (
             round_trips >= thresholds.min_round_trips and min_swap_rate > 0.0
@@ -236,6 +248,140 @@ def evaluate_convergence_gate(start_results, pt_result=None, thresholds=None,
         "pt_transport_ok": pt_transport_ok,
         "num_starts": num_starts,
     }
+    return GateReport(
+        passed=not failed,
+        failed_checks=failed,
+        metrics=metrics,
+        thresholds=thresholds,
+        notes=notes,
+    )
+
+
+def evaluate_pt_convergence_gate(
+    pt_results, observable_set, thresholds=None, min_instances=4
+):
+    """Gate independent PT instances using their cold-end trajectories.
+
+    Statistical R-hat/ESS checks use one cold trajectory per PT instance.
+    Transport is deliberately stricter than the direct-chain OR rule: every
+    instance must complete enough round trips, every adjacent swap edge must
+    have nonzero acceptance, and the pooled worst logical-basis acceptance
+    must pass the established cold-end threshold.
+    """
+    thresholds = thresholds or GateThresholds()
+    pt_results = list(pt_results)
+    if len(pt_results) < 2:
+        raise ValueError("PT gate requires at least two independent instances")
+
+    starts = []
+    from .observables import aggregate_observables
+
+    for result in pt_results:
+        trajectory = result.observable_trajectory_cold
+        if trajectory is None:
+            raise ValueError(
+                "PT gate requires record_observable_trajectory=True"
+            )
+        aggregates = aggregate_observables(
+            observable_set, np.asarray(result.m_u_cold)
+        )
+        starts.append({
+            "observable_trajectory": trajectory,
+            "aggregates": aggregates,
+            "acceptance": {
+                "logical_per_u": result.cold_logical_acceptance_per_u(),
+            },
+        })
+
+    # Reuse the common statistical diagnostics without allowing local moves
+    # to substitute for the PT-specific transport requirements below.
+    diagnostic_thresholds = replace(
+        thresholds, min_cold_logical_acceptance=0.0
+    )
+    base = evaluate_convergence_gate(
+        starts, thresholds=diagnostic_thresholds
+    )
+    failed = [
+        check for check in base.failed_checks
+        if check != "sector_transport_insufficient"
+    ]
+
+    measurement_round_trips_per_instance = np.asarray(
+        [
+            result.round_trips
+            if getattr(result, "measurement_round_trips", None) is None
+            else result.measurement_round_trips
+            for result in pt_results
+        ], dtype=np.int64
+    )
+    burn_in_round_trips_per_instance = np.asarray([
+        -1
+        if getattr(result, "burn_in_round_trips", None) is None
+        else result.burn_in_round_trips
+        for result in pt_results
+    ], dtype=np.int64)
+    min_swap_rate_per_instance = np.asarray([
+        float(np.min(result.swap_rates())) for result in pt_results
+    ])
+    logical_attempts = np.sum([
+        result.counters_per_rung[0].logical_attempts_per_u
+        for result in pt_results
+    ], axis=0)
+    logical_accepts = np.sum([
+        result.counters_per_rung[0].logical_accepts_per_u
+        for result in pt_results
+    ], axis=0)
+    with np.errstate(invalid="ignore", divide="ignore"):
+        pooled_acceptance = np.where(
+            logical_attempts > 0,
+            logical_accepts / np.maximum(logical_attempts, 1),
+            0.0,
+        )
+    pooled_acceptance = np.where(
+        np.isfinite(pooled_acceptance), pooled_acceptance, 0.0
+    )
+    pooled_worst = (
+        float(np.min(pooled_acceptance)) if pooled_acceptance.size else 0.0
+    )
+
+    if len(pt_results) < int(min_instances):
+        failed.append(f"pt_instance_count<{int(min_instances)}")
+    if np.any(
+        measurement_round_trips_per_instance < thresholds.min_round_trips
+    ):
+        failed.append("pt_instance_round_trips_insufficient")
+    if np.any(min_swap_rate_per_instance <= 0.0):
+        failed.append("pt_adjacent_swap_rate_zero")
+    if pooled_worst < thresholds.min_cold_logical_acceptance:
+        failed.append("pt_pooled_logical_acceptance_insufficient")
+
+    metrics = dict(base.metrics)
+    metrics.update({
+        "pt_instance_count": len(pt_results),
+        "pt_round_trips_per_instance": measurement_round_trips_per_instance,
+        "pt_burn_in_round_trips_per_instance": (
+            burn_in_round_trips_per_instance
+        ),
+        "pt_measurement_round_trips_per_instance": (
+            measurement_round_trips_per_instance
+        ),
+        "pt_min_swap_rate_per_instance": min_swap_rate_per_instance,
+        "pt_pooled_logical_acceptance_per_u": pooled_acceptance,
+        "pt_pooled_worst_basis_logical_acceptance": pooled_worst,
+        "pt_all_instances_round_trip_ok": bool(np.all(
+            measurement_round_trips_per_instance
+            >= thresholds.min_round_trips
+        )),
+        "pt_all_adjacent_swap_edges_nonzero": bool(np.all(
+            min_swap_rate_per_instance > 0.0
+        )),
+    })
+    notes = list(base.notes)
+    if failed:
+        notes.append(
+            "PT production requires four independent cold traces, per-instance "
+            "round trips, nonzero adjacent swaps, and pooled logical transport."
+        )
     return GateReport(
         passed=not failed,
         failed_checks=failed,

@@ -9,14 +9,23 @@
 
 ## 当前主线：expander code（exp101 起，2026-07-07~）
 
-项目从 3D toric 转向 quantum expander code（(3,4)-biregular 随机图 HGP）单发制备 q_top。**exp101 已交付经全面验证的可复用管线**（`data/expander_code/exp101/src`，259 tests + V1–V6 全绿；契约 `exp101/plan.md`、进度 `exp101/status.md`、结题 `exp101/report.md`）。exp102+ 直接复用 `exp101/src`。**接手 expander 工作先读 exp101/report.md + status.md。** 关键避坑（会再绊到）：
+项目从 3D toric 转向 quantum expander code（(3,4)-biregular 随机图 HGP）单发制备 q_top。
+**exp101 已完成 `exp101.physics.v2` / `exp101.scan.v2` 论文语义对齐并由
+`validation/014_paper_alignment_20260713/` 认证；旧 259 tests 与 V1–V6 仍全部是
+`PRE_ALIGNMENT`，不能替代 v2 证据。exp102 可复用当前管线，但必须遵守下列生产约束。**接手先读
+`data/expander_code/exp101/PHYSICS_CONTRACT.md`（唯一物理权威）、`status.md` 和
+`validation/README.md`。关键硬约束：
 
-- **大 k（k=m²>10）q_top 必须用 direct/PT 采样观测量，禁用 pairwise-TI**：pairwise-TI（假扇区自由能可加）已在 K43(k=13) 证实失效（对精确 m_u 偏差达 1.55/满量程 2，validation/007）。full-TI 仅 k≤10 有效（小码交叉验证）。
-- **双系综区分**：exp101 支持 `true_posterior`（双盘度 |c⊕η|+|Hc⊕s|，decoding 正解，Nishimori E[m]=E[m²] 成立）与 `repo_compat`（δ-only，等价 3D 时代模型）。**3D 时代 exp40/41 相图是 δ-only 系综结果**，非标准 decoding posterior；作阈值引用需重审。跨 run 比较必须同系综 + 同 section frame（q>0 时 m_u frame 依赖=gauge）。
-- **PT 是纯 python（未 numba）**：direct 引擎 numba 快（m=6 ~1.1s/disorder），PT（冷区 sector 传输）大 m 慢（m=6 ~302s/disorder）。若成生产瓶颈：PT 内循环 numba 化 或 decoder-informed 初始化。
-- **direct 单链在冷区大 k 冻结**（q_top 假值，非物理）——冷区/crossing 必须用 PT；per-u worst-u 冷端 logical 接受率 + PT round-trip 是收敛硬判据（`gates.py`，「共冻≠收敛」内建，q_top spread 符号盲，另有 m_u_spread 符号敏感判据）。
-- **本地 `conda run -n 12` 必须加 `--no-capture-output`**：否则整体捕获子进程输出直到退出，长/被杀任务看似零输出、无法看进度（本地与远端同此坑）。
-- run_scan 支持多进程并行（`--num-workers N`，spawn context 避 numba+fork 死锁）；跨节点 bit-identical（可移植 PRNG）；生产须显式传 N（勿依赖 in-screen `$(nproc)`）。
+- **生产 convention 固定**：`sector=x_error`、`H_check=H_Z`、稳定子 move=`H_X` 行、logical move=`logical_X`、observable=`logical_Z`、制备态=`|+>_L`；对偶 `z_error/H_X` 才对应 `|0>_L`。现有矩阵接线不交换。
+- **生产 posterior 固定**：`pi(e|y_eff) ∝ exp[-K_p|e|-K_q|H_check e xor y_eff|]`，`y_eff=H_check epsilon_data_true xor measurement_error`；真实错误不得直接进入能量、Metropolis/TI/PT 比值。正式系综名为 `true_posterior`、`legacy_delta_only`，`paper_true_posterior/repo_compat` 只作先归一化的 deprecated alias。
+- **三种 section 不混用**：meta-check measurement-error decoder、preparation-chain representative、logical-sector section 的 domain/用途不同；q>0 的一般 `effective_syndrome` 不在 `im(H_check)`，禁止传给 logical-sector section。
+- **统计量不混称**：同时区分 absolute/relative characters、`posterior_mass_on_planted_class`、`posterior_purity` 与 `map_success_probability`；公共 `w0` 已废弃。只保证 boundary-only section shift 不变，不再声称任意 frame change 是 gauge。
+- **引擎和 gate**：full-sector TI 仅 `k<=10`；large-k pairwise 只输出 free-energy-gap diagnostics，不得有 `m_u/q_top`；`k>10,q>0` 用四独立 PT observable instances，`q=0` 用 validated 8-start。任一 gate 失败的 chunk 必须 `INVALID`，不得进入 mean/crossing。
+- **scan v2**：输出 `scan_results.npz`，v1 chunk 永不复用；sampled 二阶矩用独立链 U-statistic，basis/nonbasis 按总体数量加权，character 维不得截断。当前权威回归只认 `validation/014_paper_alignment_20260713/`。
+- **运行坑仍有效**：本地 `conda run -n 12` 加 `--no-capture-output`；多进程显式传 `--num-workers N`，不要依赖 screen 内的 `$(nproc)`。
+
+下方「物理图像与 L·T·S 分解」及其 Gibbs 公式描述旧 3D toric 程序，只用于 legacy 3D 工作，
+不得覆盖 exp101 的 v2 契约。
 
 ## 物理图像与 L·T·S 分解（核心概念对齐）
 

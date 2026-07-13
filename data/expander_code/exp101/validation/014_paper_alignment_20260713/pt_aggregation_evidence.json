@@ -1,0 +1,58 @@
+{
+  "passed": true,
+  "physics_contract_version": "exp101.physics.v2",
+  "real_pt_invalid_scan": {
+    "burn_in_round_trips_per_instance": [
+      0,
+      0,
+      0,
+      0
+    ],
+    "complete_pt_schema_fields_present": true,
+    "computed_or_reused_tasks": 1,
+    "computed_tasks": 1,
+    "failure_reasons": "min_ess<200;q_top_spread>0.03;m_u_spread>0.1;pt_instance_round_trips_insufficient;pt_adjacent_swap_rate_zero",
+    "git_commit_sha": "eb3403a0b3c5b6d453929d18d119f6a4dd851338",
+    "git_worktree_dirty": true,
+    "implementation_fingerprint": "bc3867f359bdc14e2dee10535e21064c75df21d0ebef5b5102d973bd5d688ae2",
+    "mean_q_top_estimate": null,
+    "measurement_round_trips_per_instance": [
+      0,
+      0,
+      0,
+      0
+    ],
+    "merge_git_commit_sha": "eb3403a0b3c5b6d453929d18d119f6a4dd851338",
+    "merge_git_worktree_dirty": true,
+    "missing_pt_schema_fields": [],
+    "reused_tasks": 0,
+    "round_trips_per_instance": [
+      0,
+      0,
+      0,
+      0
+    ],
+    "task_fingerprint": "d46c6c0c4cd8f5c95e43e2ff06d0538f0551bd9a90d8625679db022acc8a782b",
+    "valid_for_aggregation": false
+  },
+  "scan_contract_version": "exp101.scan.v2",
+  "synthetic_validity_aggregation": {
+    "counts": {
+      "invalid": 1,
+      "missing": 0,
+      "valid": 2
+    },
+    "crossing_input": [
+      0.2,
+      0.4,
+      null
+    ],
+    "invalid_q_top": 0.95,
+    "reported_disorder_sem_q_top_estimate": 0.1,
+    "reported_mean_q_top_estimate": 0.30000000000000004,
+    "valid_q_top": [
+      0.2,
+      0.4
+    ]
+  }
+}

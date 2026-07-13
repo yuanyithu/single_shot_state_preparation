@@ -1,12 +1,16 @@
-"""参考 MCMC 采样器（G2.3）：纯 numpy、直白、无优化技巧——正确性的锚。
+"""Reference MCMC for the canonical reduced posterior.
 
-模型（notes/01 规范形式）：π(v) ∝ exp[−K_p|v| − K_q|Hv⊕σ_arg|]。
+The sampled energy is ``K_p |e| + K_q |H e xor y_eff|``.  Ground-truth
+data errors never enter an acceptance ratio.  Character observations are
+returned in both the absolute logical-sector frame and the planted-relative
+(Mattis) frame; the historical ``m_u`` keys remain relative aliases.
 move 集（notes/01 §1.3 的 L·T·S 对应）：
   - single-bit Metropolis（仅 q>0）：采样 T⊕S；ΔE = ±K_p + K_q·Δ|syndrome_term|
   - stabilizer-row 翻转（S-move）：syndrome 不变；ΔE = K_p·Δ|v|
   - logical 翻转（L-move，sector flip）：syndrome 不变；ΔE = K_p·Δ|v|；
     **per-u 接受计数**（冷端 logical 接受率 = 收敛硬判据的数据源）
-q=0：single-bit 关闭，v 初始必须满足 Hv=σ_arg（用 section 代表 + sector 平移）。
+q=0：single-bit 关闭，e 初始必须满足 H e=effective_syndrome
+（用 logical-sector section 代表 + sector 平移）。
 
 RNG 协议（reproducibility + 与 fast 引擎 bit 级一致的基础）：单个
 PortablePrng(seed)（src/prng.py，python/numba 双胞胎逐位一致）；每个 sweep 依次
@@ -23,7 +27,7 @@ from dataclasses import dataclass, field
 import numpy as np
 
 from .gf2 import gf2_matmul
-from .observables import observable_values
+from .observables import character_signs_for_label, observable_values
 from .prng import PortablePrng
 
 
@@ -41,7 +45,7 @@ class ReferenceMcmcConfig:
 @dataclass
 class McmcState:
     v: np.ndarray                  # (n,) uint8
-    syndrome_term: np.ndarray      # (m_c,) uint8 = Hv ⊕ σ_arg
+    syndrome_term: np.ndarray      # (m_c,) uint8 = H e xor effective_syndrome
     data_weight: int
     syndrome_weight: int
 
@@ -50,10 +54,10 @@ def make_initial_state(model, wiring, mode="auto", sector_bitmask=0):
     """初态构造。
 
     mode:
-      "auto"        q=0 → "section"；q>0 → "zero"（σ_arg 此时一般 ∉ im(H)，
+      "auto"        q=0 → "section"；q>0 → "zero"（y_eff 此时一般 ∉ im(H)，
                     严格 section 会正确拒绝——这正是防误用设计）
-      "zero"        v = 0（q>0 任意；q=0 仅当 σ_arg=0）
-      "section"     v = r(σ_arg)（要求 σ_arg ∈ im(H)，q=0 恒成立）
+      "zero"        v = 0（q>0 任意；q=0 仅当 y_eff=0）
+      "section"     v = r(y_eff)（要求 y_eff ∈ im(H)，q=0 恒成立）
     sector_bitmask：再 ⊕ 相应 logical move 基组合（sector 平移，q=0/q>0 通用）。
     """
     if mode == "auto":
@@ -62,18 +66,21 @@ def make_initial_state(model, wiring, mode="auto", sector_bitmask=0):
     if mode == "zero":
         v = np.zeros(n, dtype=np.uint8)
     elif mode == "section":
-        v = model.section.apply(wiring.sigma_arg, strict=True).copy()
+        v = model.logical_sector_section.apply(
+            wiring.gibbs_syndrome_argument, strict=True
+        ).copy()
     else:
         raise ValueError("mode must be auto|zero|section")
     for bit in range(model.k):
         if (int(sector_bitmask) >> bit) & 1:
             v ^= model.logical_move_basis[bit]
     syndrome_term = (
-        gf2_matmul(model.H_check, v[:, None])[:, 0] ^ wiring.sigma_arg
+        gf2_matmul(model.H_check, v[:, None])[:, 0]
+        ^ wiring.gibbs_syndrome_argument
     ).astype(np.uint8)
     if wiring.q_zero and syndrome_term.any():
         raise ValueError(
-            "q=0 initial state violates hard constraint H v = sigma_arg "
+            "q=0 initial state violates hard constraint H e = y_eff "
             "(use mode='section')"
         )
     return McmcState(
@@ -98,7 +105,7 @@ def support_move_log_acceptance(wiring, state, move_support_row):
     overlap = int(state.v[move_support_row].sum())
     weight = int(move_support_row.shape[0])
     delta_data = weight - 2 * overlap
-    return -wiring.K_p * delta_data
+    return 0.0 if delta_data == 0 else -wiring.K_p * delta_data
 
 
 @dataclass
@@ -186,13 +193,19 @@ def run_sweep(model, wiring, state, rng, counters, stab_supports,
 def _check_invariants(model, wiring, state):
     v = state.v
     syndrome = (
-        gf2_matmul(model.H_check, v[:, None])[:, 0] ^ wiring.sigma_arg
+        gf2_matmul(model.H_check, v[:, None])[:, 0]
+        ^ wiring.gibbs_syndrome_argument
     ).astype(np.uint8)
     assert np.array_equal(syndrome, state.syndrome_term), "syndrome cache broken"
     assert int(v.sum()) == state.data_weight, "data weight cache broken"
     assert int(syndrome.sum()) == state.syndrome_weight, "syndrome weight cache broken"
     if wiring.q_zero:
         assert state.syndrome_weight == 0, "q=0 constraint violated"
+
+
+def _weighted_energy(coupling, weight):
+    """Evaluate ``coupling * weight`` without the hard-limit ``inf * 0``."""
+    return 0.0 if int(weight) == 0 else float(coupling) * int(weight)
 
 
 def run_reference_mcmc(model, frame, observable_set, wiring, config, seed,
@@ -238,20 +251,40 @@ def run_reference_mcmc(model, frame, observable_set, wiring, config, seed,
             observable_traj[measurement_index] = values
         if state_traj is not None:
             state_traj[measurement_index] = state.v
-        energy_trace[measurement_index] = (
-            wiring.K_p * state.data_weight
-            + (0.0 if wiring.q_zero else wiring.K_q * state.syndrome_weight)
+        energy_trace[measurement_index] = _weighted_energy(
+            wiring.K_p, state.data_weight
+        ) + (
+            0.0
+            if wiring.q_zero
+            else _weighted_energy(wiring.K_q, state.syndrome_weight)
         )
 
-    m_u = observable_sums.astype(np.float64) / float(config.num_measurements)
+    m_u_relative = (
+        observable_sums.astype(np.float64) / float(config.num_measurements)
+    )
+    signs = character_signs_for_label(
+        observable_set, wiring.planted_logical_class
+    ).astype(np.int64)
+    m_u_absolute = m_u_relative * signs
+    observable_sums_absolute = observable_sums * signs
+    observable_trajectory_absolute = (
+        observable_traj * signs[None, :]
+        if observable_traj is not None else None
+    )
     return {
-        "m_u": m_u,
+        "m_u": m_u_relative,
+        "m_u_relative": m_u_relative,
+        "m_u_absolute": m_u_absolute,
         "observable_sums": observable_sums,
+        "observable_sums_relative": observable_sums,
+        "observable_sums_absolute": observable_sums_absolute,
         "num_measurements": int(config.num_measurements),
         "acceptance": counters.rates(),
         "counters": counters,
         "energy_trace": energy_trace,
         "observable_trajectory": observable_traj,
+        "observable_trajectory_relative": observable_traj,
+        "observable_trajectory_absolute": observable_trajectory_absolute,
         "state_trajectory": state_traj,
         "final_state": state,
     }

@@ -1,3 +1,4 @@
+# PRE_ALIGNMENT: historical v1 runner; it does not certify exp101.physics.v2.
 """G0.1/G0.2 判决实验：主项目 Gibbs 模型的盘度语义。
 
 问题：主项目模型 pi(v) ∝ exp[-K_p|v⊕η| - K_q|H_Z v⊕s|]（CLAUDE.md 公式、
@@ -25,8 +26,8 @@ from pathlib import Path
 
 import numpy as np
 
-SRC = "/Users/jarvis/Desktop/sync/project D/src"
-sys.path.insert(0, SRC)
+SRC = Path(__file__).resolve().parents[5] / "src"
+sys.path.insert(0, str(SRC))
 
 from build_toric_code_examples import build_2d_toric_code  # noqa: E402
 from preprocessing import build_logical_observable_masks  # noqa: E402

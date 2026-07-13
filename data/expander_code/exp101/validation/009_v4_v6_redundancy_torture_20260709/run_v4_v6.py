@@ -1,3 +1,4 @@
+# PRE_ALIGNMENT: historical v1 runner; it does not certify exp101.physics.v2.
 """G3.6 V4 实现冗余 + G3.7 V6 冻结扇区 torture（plan §3）。
 
 V4（实现冗余 A/B，多为单测覆盖，此处大尺度落证据）：
@@ -213,6 +214,11 @@ def main():
                       f"{r['z_initial_sector_independence']:.1f}")
         lines.append(f"| {r['test']} | {metric} | {'✅' if r['pass'] else '❌'} |")
     lines += ["", f"**总判定：{'ALL PASS ✅' if all_pass else 'FAIL ❌'}**"]
+    lines[1:1] = [
+        "",
+        "> **PRE_ALIGNMENT（自动生成保护）：** 本页只记录旧内核与旧冻结 gate；",
+        "> 重新运行本 runner 不认证四实例 PT/INVALID 传播，也不得覆盖 014 结论。",
+    ]
     (OUT_DIR / "summary.md").write_text("\n".join(lines) + "\n",
                                         encoding="utf-8")
     print("\n".join(lines))

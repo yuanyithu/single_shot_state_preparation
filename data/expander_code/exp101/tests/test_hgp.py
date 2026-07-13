@@ -21,7 +21,7 @@ from src.hgp import (
     verify_css_commutation,
 )
 
-MAIN_SRC = Path("/Users/jarvis/Desktop/sync/project D/src")
+MAIN_SRC = Path(__file__).resolve().parents[4] / "src"
 
 
 class TestClassicalMatrix:

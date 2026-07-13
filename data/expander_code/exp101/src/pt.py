@@ -8,8 +8,10 @@ ladder（notes/00 §2.2）：
 swap（规范变量推导）：相邻 rung i,j 交换构型 v_i, v_j：
   log_ratio = (K_p,i−K_p,j)(W_p(v_i)−W_p(v_j)) + (K_q,i−K_q,j)(W_s(v_i)−W_s(v_j))
   与主项目 log-odds 形式等价（K = −log_odds）。even/odd 交替奇偶尝试。
-所有 rung 共享同一 disorder/σ_arg/ℓ_ref；只交换状态对象引用。
-replica 往返（round trip）计数：replica 触底(冷)且上次到过顶(热) → +1。
+All rungs share one canonical Gibbs syndrome and planted logical reference;
+only state-object references are swapped.
+replica 往返（round trip）只计完整的冷→热→冷路径；burn-in 与 measurement
+分别计数，生产 gate 只使用 measurement-phase 往返。
 
 cluster update 不移植（决策记录）：主项目 cluster_update 的 RREF 受限子空间
 采样是为 toric 几何/ladder 语义调过的加速器，非正确性必需；expander 用
@@ -25,7 +27,7 @@ from dataclasses import dataclass, field
 import numpy as np
 
 from .model import EnsembleWiring, coupling_from_probability
-from .observables import observable_values
+from .observables import character_signs_for_label, observable_values
 from .prng import PortablePrng
 from .reference_mcmc import (
     MoveCounters,
@@ -130,6 +132,15 @@ class PtResult:
     m_u_per_rung: object = None          # observable_rungs="all" 时 (K, num_u)
     observable_trajectory_cold: object = None
     energy_trace_cold: object = None
+    m_u_cold_absolute: object = None
+    m_u_cold_relative: object = None
+    m_u_per_rung_absolute: object = None
+    observable_trajectory_cold_absolute: object = None
+    observable_trajectory_cold_relative: object = None
+    burn_in_round_trips: object = None
+    measurement_round_trips: object = None
+    burn_in_round_trips_per_replica: object = None
+    measurement_round_trips_per_replica: object = None
 
     def swap_rates(self):
         with np.errstate(invalid="ignore"):
@@ -137,6 +148,36 @@ class PtResult:
 
     def cold_logical_acceptance_per_u(self):
         return self.counters_per_rung[0].rates()["logical_per_u"]
+
+
+class _RoundTripCounter:
+    """Count complete cold->hot->cold replica paths within one phase."""
+
+    _UNARMED = 0
+    _SEEN_COLD = 1
+    _SEEN_HOT_AFTER_COLD = 2
+
+    def __init__(self, num_replicas, cold_replica):
+        self.state = np.full(
+            int(num_replicas), self._UNARMED, dtype=np.int8
+        )
+        self.counts = np.zeros(int(num_replicas), dtype=np.int64)
+        self.state[int(cold_replica)] = self._SEEN_COLD
+
+    def observe_endpoints(self, cold_replica, hot_replica):
+        cold_replica = int(cold_replica)
+        hot_replica = int(hot_replica)
+        if self.state[cold_replica] == self._SEEN_HOT_AFTER_COLD:
+            self.counts[cold_replica] += 1
+            self.state[cold_replica] = self._SEEN_COLD
+        elif self.state[cold_replica] == self._UNARMED:
+            self.state[cold_replica] = self._SEEN_COLD
+        if self.state[hot_replica] == self._SEEN_COLD:
+            self.state[hot_replica] = self._SEEN_HOT_AFTER_COLD
+
+    @property
+    def total(self):
+        return int(self.counts.sum())
 
 
 def run_parallel_tempering(model, frame, observable_set, wiring, pt_config,
@@ -165,8 +206,8 @@ def run_parallel_tempering(model, frame, observable_set, wiring, pt_config,
     for rung in range(num_rungs):
         wirings.append(EnsembleWiring(
             ensemble=wiring.ensemble,
-            sigma_arg=wiring.sigma_arg,
-            reference_label=wiring.reference_label,
+            gibbs_syndrome_argument=wiring.gibbs_syndrome_argument,
+            planted_logical_class=wiring.planted_logical_class,
             K_p=coupling_from_probability(ladder_p[rung]),
             K_q=coupling_from_probability(ladder_q[rung]),
             q_zero=False,
@@ -196,11 +237,8 @@ def run_parallel_tempering(model, frame, observable_set, wiring, pt_config,
     swap_attempts = np.zeros(num_rungs - 1, dtype=np.int64)
     swap_accepts = np.zeros(num_rungs - 1, dtype=np.int64)
     replica_id = np.arange(num_rungs, dtype=np.int64)
-    # round-trip 记录：every replica 的上一个到达端点（-1 未定，0 冷端，1 热端）
-    last_extreme = np.full(num_rungs, -1, dtype=np.int64)
-    last_extreme[replica_id[0]] = 0
-    last_extreme[replica_id[-1]] = 1
-    round_trips = 0
+    burn_in_round_trips = _RoundTripCounter(num_rungs, replica_id[0])
+    active_round_trip_counter = burn_in_round_trips
 
     num_u = observable_set.num_u
     sums_cold = np.zeros(num_u, dtype=np.int64)
@@ -215,7 +253,6 @@ def run_parallel_tempering(model, frame, observable_set, wiring, pt_config,
     energy_cold = np.zeros(pt_config.num_measurement_rounds, dtype=np.float64)
 
     def one_round(parity):
-        nonlocal round_trips
         for rung in range(num_rungs):
             for _ in range(pt_config.sweeps_per_round):
                 run_sweep(model, wirings[rung], states[rung], rng,
@@ -233,18 +270,17 @@ def run_parallel_tempering(model, frame, observable_set, wiring, pt_config,
                 replica_id[i], replica_id[i + 1] = (
                     replica_id[i + 1], replica_id[i]
                 )
-        # 端点访问与往返统计
-        cold_replica = replica_id[0]
-        hot_replica = replica_id[-1]
-        if last_extreme[cold_replica] == 1:
-            round_trips += 1
-        last_extreme[cold_replica] = 0
-        last_extreme[hot_replica] = 1
+        active_round_trip_counter.observe_endpoints(
+            replica_id[0], replica_id[-1]
+        )
 
     parity = 0
     for _ in range(int(pt_config.num_burn_in_rounds)):
         one_round(parity)
         parity ^= 1
+    # Do not carry a partial burn-in transit into production diagnostics.
+    measurement_round_trips = _RoundTripCounter(num_rungs, replica_id[0])
+    active_round_trip_counter = measurement_round_trips
     for measurement_index in range(int(pt_config.num_measurement_rounds)):
         one_round(parity)
         parity ^= 1
@@ -265,8 +301,21 @@ def run_parallel_tempering(model, frame, observable_set, wiring, pt_config,
         )
 
     num_meas = int(pt_config.num_measurement_rounds)
+    m_u_relative = sums_cold.astype(np.float64) / num_meas
+    character_signs = character_signs_for_label(
+        observable_set, wiring.planted_logical_class
+    ).astype(np.int64)
+    m_u_absolute = m_u_relative * character_signs
+    m_u_per_rung_relative = (
+        sums_per_rung.astype(np.float64) / num_meas
+        if sums_per_rung is not None else None
+    )
+    trajectory_absolute = (
+        traj_cold * character_signs[None, :]
+        if traj_cold is not None else None
+    )
     return PtResult(
-        m_u_cold=sums_cold.astype(np.float64) / num_meas,
+        m_u_cold=m_u_relative,
         observable_sums_cold=sums_cold,
         num_measurements=num_meas,
         ladder_p=ladder_p,
@@ -274,12 +323,25 @@ def run_parallel_tempering(model, frame, observable_set, wiring, pt_config,
         swap_attempts=swap_attempts,
         swap_accepts=swap_accepts,
         counters_per_rung=counters,
-        round_trips=round_trips,
+        round_trips=measurement_round_trips.total,
         replica_id_per_rung=replica_id,
-        m_u_per_rung=(
-            sums_per_rung.astype(np.float64) / num_meas
-            if sums_per_rung is not None else None
-        ),
+        m_u_per_rung=m_u_per_rung_relative,
         observable_trajectory_cold=traj_cold,
         energy_trace_cold=energy_cold,
+        m_u_cold_absolute=m_u_absolute,
+        m_u_cold_relative=m_u_relative,
+        m_u_per_rung_absolute=(
+            m_u_per_rung_relative * character_signs[None, :]
+            if m_u_per_rung_relative is not None else None
+        ),
+        observable_trajectory_cold_absolute=trajectory_absolute,
+        observable_trajectory_cold_relative=traj_cold,
+        burn_in_round_trips=burn_in_round_trips.total,
+        measurement_round_trips=measurement_round_trips.total,
+        burn_in_round_trips_per_replica=(
+            burn_in_round_trips.counts.copy()
+        ),
+        measurement_round_trips_per_replica=(
+            measurement_round_trips.counts.copy()
+        ),
     )

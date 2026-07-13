@@ -1,5 +1,7 @@
 # G4.4 mini 端到端物理烟测
 
+> **PRE_ALIGNMENT（scan/physics v1）：** 本页与 raw 产物只记录旧语义下的历史 smoke，不认证修正后的 reduced posterior、estimators 或 schema。见 `../README.md`。
+
 墙钟 67s；文献 p_c(2D RBIM)=0.1094；精确枚举 q=0 true_posterior，CRN disorder×40
 
 | 测试 | 尺寸 | crossing p_c | 相变端行为(低p大码↑/高p大码↓) | 结果 |

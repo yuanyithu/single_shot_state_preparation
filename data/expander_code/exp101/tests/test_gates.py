@@ -170,7 +170,7 @@ class TestGateNegativeFrozen:
         fake = {
             "observable_trajectory": np.random.default_rng(0).choice(
                 [-1, 1], size=(1000, 3)),
-            "aggregates": {"q_top_basis": 0.5},
+            "aggregates": {"q_top_all": 0.5, "q_top_basis": 0.5},
             "acceptance": {"logical_per_u": np.array([0.5, 0.0, np.nan])},
         }
         report = evaluate_convergence_gate(

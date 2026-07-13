@@ -1,3 +1,4 @@
+# PRE_ALIGNMENT: historical v1 runner; it does not certify exp101.physics.v2.
 """G1.8 证据脚本：构建官方 (3,4) 家族 m=1..6 双规则注册表并落盘。
 
 输出：本目录 family_registry.json（本地，.gitignore 策略）与 family_registry.md（可提交）。
@@ -21,10 +22,15 @@ def main():
     out_dir = Path(__file__).resolve().parent
     with (out_dir / "family_registry.json").open("w", encoding="utf-8") as handle:
         json.dump(registry, handle, indent=2, ensure_ascii=False)
-    (out_dir / "family_registry.md").write_text(
-        registry_markdown(registry), encoding="utf-8"
-    )
-    print(registry_markdown(registry))
+    lines = registry_markdown(registry).splitlines()
+    lines[1:1] = [
+        "",
+        "> **PRE_ALIGNMENT（自动生成保护）：** 这是 v1 历史证据；重新运行本脚本",
+        "> 不认证 `exp101.physics.v2`，也不得覆盖当前 014 认证结论。",
+    ]
+    markdown = "\n".join(lines) + "\n"
+    (out_dir / "family_registry.md").write_text(markdown, encoding="utf-8")
+    print(markdown, end="")
     print(f"wall_time: {registry['wall_time_seconds']}s")
 
 

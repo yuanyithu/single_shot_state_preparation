@@ -1,102 +1,124 @@
-# exp101 结题报告：expander code 单发制备统计力学 q_top 管线（正确性验证）
+# exp101 历史报告与 v2 勘误
 
-2026-07-09。对应 plan.md 的全部 gate（G0–G4 全绿；G5 本报告）。目标：产出**自包含、经多重
-ground-truth 交叉验证、后续 exp102+ 可稳健复用的正确程序**。**结论：达成。**
+## ERRATUM（2026-07-13，优先于本文全部历史结论）
 
----
+2026-07-09 版报告声称 exp101 已由“259 tests + V1–V6”全面认证并可直接供 exp102 生产。
+该结论现已撤回。旧验证只能证明旧实现内部一致，不能认证随后明确的论文语义、无偏估计器、
+PT 接入和 scan v2 schema。所有旧证据现标为 `PRE_ALIGNMENT`。
 
-## 1. 交付物
+当前唯一物理权威是 `PHYSICS_CONTRACT.md`（`exp101.physics.v2`），当前状态见 `status.md`：
+**DONE**。`validation/014_paper_alignment_20260713/` 已通过并给出新的 v2 认证；以下旧数值仍只作
+真实历史记录，不代表论文 threshold 结论。
 
-自包含 python 包 `exp101/src/`（不依赖主项目 src，文件头标来源；259 单元测试全绿）：
+## v2 认证结论（2026-07-13）
 
-| 模块 | 内容 |
-|---|---|
-| gf2 / graphs / hgp / expansion / logicals / params / instance / families | 构造层（精确 GF(2)；HGP；expansion 验证；逻辑算符；[[n,k,d]]；家族注册） |
-| section / model / observables | 统计力学层：线性/decoder section frame；双系综规范变量；W frame + 三档观测量 |
-| prng / reference_mcmc / fast_mcmc | 可移植 PRNG（python/numba 双胞胎，位级一致）+ 参考/numba 双引擎 |
-| pt / gates / sector_ti | parallel tempering；收敛诊断 gate；sector-TI 引擎 |
-| enumerate_exact / run_scan | 精确枚举（计数表+Gray）；扫描入口（双引擎、多进程并行、兼容 NPZ、断点续采） |
+- conda `12` 全套回归为 **343 passed**；2 个 warning 均来自有意测试 deprecated ensemble alias。
+- raw-paper/reduced-canonical oracle 枚举 512 个 disorder contexts、16,384 个候选构型比较；
+  pointwise weight、partition function、sector weights、q_top 与 MAP 的最大误差全部为 0。
+- exact 证据使用独立 preparation-chain representative；fixed-y 比较实际改变
+  `H_check epsilon_data_true`，shifted-coordinate identity 逐构型成立。
+- 四实例 PT integration 强制 fresh run（`computed=1,reused=0`），零 measurement round trip 的任务
+  正确标为 `INVALID`；invalid 值不进入 mean、SEM 或 crossing。
+- task/chunk/NPZ/manifest 记录 source implementation fingerprint 与 Git dirty provenance；v1 chunk、
+  浮点 q 路径碰撞和跨 family/sector/config cache 误复用均有回归保护。
+- sampled estimator 使用四独立链（q=0 八起点）的 U-statistic，分别保存 pooled raw、debiased、
+  jackknife 与 finite-population error；80-character 实例不截断。
+- full TI 限 `k<=10`，独立 sector 链独立 bootstrap；`p=0/0.5` 走解析端点。legacy 数据只进入
+  `formal_*`，状态为 `FORMAL_ONLY`，不产生论文 aggregate。
 
-CLI：`cd exp101 && python -m src.run_scan --family expander34 --size-list 2 3 ... --engine direct --num-workers N`。
+因此 exp101 可作为 exp102 的 reduced-posterior 数值基础复用；复用前提是保持 v2 contract、生产
+`x_error/true_posterior` convention 和所有 validity gates。本结论不扩展到完整 preparation channel，
+也不声称已经得到新的 expander threshold。
 
----
+## 1. 旧实现确实完成过的工程工作
 
-## 2. 验证矩阵结果（全部通过）
+2026-07-07 至 07-09，exp101 建立了自包含的 GF(2)、图/HGP、logical basis、distance、family、
+section、reference/fast MCMC、PT、gates、TI、exact enumeration 与 chunked scan 模块。旧测试对结构
+代数、参考/numba 一致性、随机数可复现和若干小码内部对拍提供了有用调试基础。
 
-| gate | 内容 | 关键证据 |
+这些结构模块可以在 v2 复用，但“旧测试通过”不自动证明它们与新字段、fingerprint、engine
+routing 或 output schema 的组合正确。
+
+## 2. PRE_ALIGNMENT 数值事实
+
+| 历史实验 | 当时记录的结果 | v2 解释 |
 |---|---|---|
-| V0 单测 | spec §10 A–G + MCMC 内核平稳性 | 259 tests；独立 oracle 交叉（bitmask rank、全空间距离、set-并集 expansion） |
-| G1 构造 | [[n,k,d]] 已知码对照 | [[8,2,2]]/[[18,2,3]]/[[13,1,3]]/[[25,13,2]]/[[32,2,4]] 全命中；主项目 toric 互证 |
-| V1 枚举 vs MCMC vs TI | 5 实例 × (p,q) 网格 × disorder，双系综 | regime-aware ALL PASS：direct 偏差 −0.008±0.041、PT 冷点传输、TI-full flag-aware |
-| V1c frame A/B | q=0 frame 无关 / q>0 gauge | q=0 相对分布三 frame 无关 **1e-15**；q>0 依赖被观测 |
-| V2 解析极限 | p=0.5 / q=0.5 闭式 / 极限一致 | q=0.5 闭式覆盖 **m=2/4/6（n=100/400/900,k=4/16/36）** z≤2.4 |
-| V3 Nishimori | E[m]=E[m²] 三级 | L1 全 4096-disorder 求和 **1.9e-14**；L3 n=100 全 MCMC z=2.06；repo_compat 判别 gap=0.25 |
-| V4 冗余 | numba/PT/多起点/RNG | ref≡numba bit 级；各引擎对枚举一致 |
-| V6 冻结 torture | 负例必报警 + 正例通过 | expander k=4/k=9 冻结诊断均报警；PT 正例传输 |
-| G3.1 枚举互证 | 与主项目 exact_enumeration | logZ 关系 1e-9 + decoder-frame m_u 逐位 |
-| G4 服务器 | env/smoke/profile/多节点/清理 | nd-1/2/3 env 11；跨节点 **bit-identical**；物理烟测复现 2D 阈值 |
-| G4.4 物理 | 2D toric/surface 阈值 | crossing 0.133/0.069 **包夹文献 RBIM p_c=0.109**，相变端行为正确 |
+| 单元测试总表 | 259 tests 全绿 | 仅旧 API/旧 estimator 的内部回归；不是当前认证 |
+| V1 direct | pooled bias 约 `-0.008 +/- 0.041` | 旧 instrument 下的采样对拍；未覆盖四独立链无偏二阶矩 |
+| V1 PT 冷点 | bias 约 `+0.071 +/- 0.099`，旧任务有往返 | 未覆盖四个独立 PT 实例、冷端 R-hat/ESS 与 v2 INVALID 传播 |
+| V2 解析极限 | q=0.5 闭式覆盖 m=2/4/6，旧 z <= 2.4 | 有用回归，但标题“V2”与 `exp101.physics.v2` 无关 |
+| V3 Nishimori | 小码全 disorder 差约 `1.9e-14`；n=100 MCMC z 约 2.06 | 使用旧变量/observable estimator，须以 v2 canonical 与 debiased test 重跑 |
+| pairwise characterization | K43(k=13) 对 exact character 最大偏差约 1.55/满量程 2 | 仍是禁用 large-k pairwise q_top 的强历史证据；不能证明新 gap-only API |
+| section fingerprint | n >= 400 的旧序列化崩溃被发现并修复 | 工程 bug 修复事实仍成立，v2 fingerprint 覆盖仍需新测 |
+| profile | direct m=6 约 1.1 s/disorder；PT 约 302 s/disorder | 只供旧实现性能量级参考；四 PT 实例成本更高 |
+| 多节点 | scan v1 曾跨节点 bit-identical | v2 protocol/cache/task identity 改变后必须重证 |
+| 2D smoke | 微型 crossing 约0.133/0.069，包围参考0.109 | 仅 smoke；不认证修正后的论文 preparation semantics |
 
----
+原始文件保留在 `validation/001`–`013`，逐项限制见 `validation/README.md`。
 
-## 3. 关键发现（本实验的核心价值）
+## 3. 必须纠正的旧叙述
 
-1. **【D4，最重要】pairwise-TI 大 k 方法失效**：plan 原定 k>10（即全部 expander 生产家族
-   k=m²≤36）的 q_top 方法在 K43(k=13) 上对精确 m_u 偏差达 **1.55/满量程 2**（可加性假设崩溃），
-   k=2 亦 0.11（对照 full-TI 0.03）。**非 bug**（exact m_u 被枚举机制与 direct 采样双重佐证）。
-   → **弃用；大 k q_top 改用 direct/PT 采样观测量**（已由 V2b k=16/36 + V1 direct K43 验证）。
-   证据 `validation/007`。exp101 在烧生产算力前拦截了 dead-end 方法。
-2. **主项目 3D 模型 = δ-only 盘度**（validation/001，机器精度）：`exp[−K_p|c⊕η|−K_q|Hc⊕s|]`
-   换元后数据项无 η 盘度。exp101 支持 **true_posterior**（双盘度，decoding 正解，Nishimori 成立）
-   与 **repo_compat**（δ-only，与 3D 时代对拍）双系综，仅差 (σ_arg,ℓ_ref) 接线。
-3. **PT 是纯 python（未 numba）**：direct 引擎 numba 极快（m=6 仅 1.1s/disorder），但 PT
-   （冷区 sector 传输方法）大 m 慢（m=6 生产等效≈302s/disorder）。仍可行（远低于既已可行的
-   3D L=7 6090s/disorder + disorder 级 240 核并行）。
-4. **frame = gauge（修正协议）**：q=0 相对类分布 frame 无关（精确），q>0 依赖 frame；跨 run 比较须同 frame。
-5. **section.fingerprint n≥400 崩溃真 bug**（V2 捕获，已修+回归）：会崩所有 m≥4 生产 run。
+### 3.1 状态与矩阵 mapping
 
----
+生产 `x_error/H_Z` 对应从 `|+>^n` 测 Z checks 制备 `|+>_L`，stabilizer/logical moves 是
+X 型，observable 是 dual logical Z。旧报告 §5 写成 `|0>_L` 是错误；现有 H_X/H_Z 矩阵接线
+不应交换。Hadamard 对偶 `z_error/H_X` 才对应 `|0>_L`。
 
-## 4. 已知局限与注记
+### 3.2 canonical posterior
 
-- **精确阈值未定**：G4.4 是烟测（微型码有限尺寸 crossing 散布），精确 expander 阈值需更大码 + FSS
-  （生产/分析后续）。
-- **深冷大 k 收敛**：direct 在冷区大 k 冻结（q_top 假值），须 PT；expander 生产深冷区的 PT 收敛
-  充分性待 exp102 实测（D4 挂账）。
-- **K43(m=1) 特殊**：d=2、k=13，是构造/大 k 强测例，非物理典型（家族从 m=2 起）。
-- **枚举界**：full 2^n 要求 n≤28、coset dim≤28（守卫）。
-- **expansion 验证**：小 m 空真（γ·n<1），(3,4) 在 spec 示例 (1/10,1/16) 下大 m 不通过属预期。
+生产 posterior 是
 
----
+```text
+pi(e|effective_syndrome)
+  proportional to exp[-Kp|e|-Kq|H_check e xor effective_syndrome|],
+effective_syndrome=H_check epsilon_data_true xor measurement_error.
+```
 
-## 5. exp102 生产建议
+真实错误不直接进入能量。旧报告把含真实错误的 shifted-coordinate 表述称为 canonical
+“双盘度”并与 repo model 对照，容易造成错误实现。严格 shifted formula 只在换元
+`x=e xor epsilon_data_true` 后出现。
 
-- **方法**：大 k q_top = **direct + PT 采样观测量**（sampled u，k>10 抽样 64 个）。TI 仅 k≤10 交叉验证。
-- **sector/系综**：X 错误/H_Z（|0̄⟩ 制备）；默认 true_posterior（待 D1 确认）。
-- **家族**：(3,4)，seed 规则 full_rank 或 full_rank_d3（待 D3；后者 m=2,3 距离更大：seed 12349/12347）。
-- **参数网格**：p、q 二维扫；crossing 区加密。每点 disorder ≥ 数十–上百。
-- **收敛**：per-u worst-u 冷端 logical 接受率 + PT round-trip 双硬判据（gates.py）；q>0 label 有
-  O(1) 局域混合通道（notes/01 §9），crossing 须查随尺寸漂移。
-- **算力**：direct 秒级/disorder；PT ~数十–数百 s/disorder（m=6）。disorder 级跨 nd-1/2/3
-  （80/80/96 核）`--num-workers` 并行。总成本 ≈ points×disorders×per-disorder，完全可行。
-- **生产前 TODO**：①若 PT 成瓶颈 → PT 内循环 numba 化 或 decoder-informed 初始化（起点近 φ(η)）；
-  ②launcher 显式传 commit SHA（远端无 .git）；③复制改造 remote-prod-scan 模板 launcher（多节点
-  cell 矩阵 + _CELL_SUCCESS + README 恢复手册）；④生产日志确认 workers=N、load≈N。
+正式 legacy 名是 `legacy_delta_only`；`repo_compat` 只是 deprecated alias。3D exp40/41 是
+legacy delta-only 历史结果，不能直接作为论文 reduced MLD threshold。
 
----
+### 3.3 section 与 observable
 
-## 6. 待用户决策（非阻塞，已按推荐推进；exp102 前请确认）
+直接测量 `m_u_absolute`，relative 值只乘 planted Mattis sign。两种 frame 在固定 section 下
+拥有相同 q_top/purity/max mass。只对逐 syndrome stabilizer-boundary section shift 有严格不变性；
+旧报告“frame=gauge”不能扩展到一般 logical-valued section change。
 
-- **D1 系综默认**：推荐 true_posterior（decoding 正解）。若要沿用 3D δ-only 请指出。
-- **D3 家族 seed 规则**：推荐 full_rank_d3（距离≥3，避免 d=2 脆弱成员）。
-- **D4 大 k 方法**：pairwise-TI 已弃用，改 direct/PT 采样（已验证）。如有其它偏好请指出。
+### 3.4 posterior statistics
 
----
+旧 `w0` 实际是 planted-class mass，不等于 MAP success。v2 分开输出：
 
-## 7. 结论
+```text
+posterior_mass_on_planted_class
+posterior_purity
+map_success_probability=max(weights_absolute)
+q_top=(2^k*posterior_purity-1)/(2^k-1).
+```
 
-exp101 交付了一个经全面 ground-truth 交叉验证的、正确的、可复用的 expander code 单发制备
-q_top 管线。**核心价值**：不仅验证了程序正确性（枚举/解析极限/Nishimori/多引擎/frame/物理阈值
-全绿），更在烧生产算力前发现并纠正了 planned 大 k 方法（pairwise-TI）失效、定位了可用方法
-（direct/PT 采样），并捕获修复了会崩溃所有大规模生产 run 的真 bug。exp102 可直接复用 `exp101/src`
-开展 expander q_top(p,q) 相图的规模化研究。
+因此旧 3D 报告中把 `w0` 无条件称为“success”或把 q_top 直接称 purity 的句子不能迁移到
+exp101 v2。
+
+### 3.5 large-k 方法与 sampled estimator
+
+旧报告正确识别了 pairwise-TI 的可加性失败，但随后称 direct/PT sampled q_top “已验证可生产”
+仍然过早：旧路径没有完整锁定 basis/nonbasis 总体权重、四独立链 U-statistic、jackknife/FPC、
+四 PT 实例 cold diagnostics 与 INVALID-safe aggregation。因此修复期的生产结论必须等待 014；
+当前这些缺口已由 014 补齐。
+
+## 4. v2 交付边界
+
+v2 只实现论文 preparation 变量约化后的 logical-class MLD posterior，不是完整 Clifford/
+preparation channel simulator。raw preparation enumeration 只作为逐构型等价 golden oracle。
+
+预定生产路由为：`k<=10` full TI；`k>10,q>0` PT observable sampling；`k>10,q=0`
+validated 8-start。large-k TI 必须硬拒绝；pairwise API 只输出 basis-sector free-energy gaps。
+
+## 5. 当前结论
+
+exp101 v1 提供了有价值的工程骨架和历史反例，尤其提前发现 large-k pairwise-TI 失败，但旧
+259-test 数量本身从未证明论文语义。当前的 `DONE` 结论只来自 v2 契约与 validation/014：
+reduced posterior、统计估计器、PT/TI 路由、INVALID-safe aggregation 和 scan schema 已验证；完整
+preparation channel 与实际 expander threshold 仍在交付边界之外。

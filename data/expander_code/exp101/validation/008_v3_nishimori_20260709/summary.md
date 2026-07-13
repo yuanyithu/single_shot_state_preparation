@@ -1,5 +1,7 @@
 # G3.5 V3 Nishimori 恒等式结果
 
+> **PRE_ALIGNMENT（scan/physics v1）：** 本页与 raw 产物只记录旧接线下的历史实验；runner 可能依赖弃用字段、估计器或 schema，不是 `exp101.physics.v2` 当前通过证据。见 `../README.md`。
+
 墙钟 31s
 
 | 级 | 实例 | (p,q) | 关键指标 | 结果 |

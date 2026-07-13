@@ -1,4 +1,7 @@
-"""G2.2 单元测试：DecoderSection（BpLsd）、备选线性 frame、frame 间关系。"""
+"""Logical-sector qubit-chain sections and observable-frame relations."""
+
+import hashlib
+from dataclasses import replace
 
 import numpy as np
 import pytest
@@ -8,10 +11,14 @@ from src.graphs import cycle_parity_check_matrix, random_biregular_graph_from_m
 from src.hgp import classical_parity_check_matrix, hgp_from_H
 from src.logicals import logical_pauli_operators
 from src.model import assemble_sector_model
-from src.observables import build_observable_frame
+from src.observables import (
+    absolute_observable_values,
+    build_observable_frame,
+    build_observable_set,
+)
 from src.section import (
     DecoderObservableFrame,
-    DecoderSection,
+    LogicalSectorQubitChainSection,
     build_linear_section,
 )
 
@@ -30,10 +37,36 @@ def random_image_syndromes(H, count, seed, density=0.4):
     return sigmas
 
 
-class TestDecoderSection:
+class ShiftedLogicalSectorSection:
+    """Test-only section shifted by a kernel chain times syndrome bit zero."""
+
+    def __init__(self, base, kernel_shift):
+        self.base = base
+        self.kernel_shift = np.asarray(kernel_shift, dtype=np.uint8)
+
+    def in_image(self, syndrome):
+        return self.base.in_image(syndrome)
+
+    def apply(self, syndrome, strict=True):
+        syndrome = np.asarray(syndrome, dtype=np.uint8)
+        result = self.base.apply(syndrome, strict=strict)
+        if syndrome[0]:
+            result ^= self.kernel_shift
+        return result
+
+    def section_after_H(self, H):
+        result = self.base.section_after_H(H)
+        return result ^ np.outer(self.kernel_shift, H[0]).astype(np.uint8)
+
+    def fingerprint(self):
+        payload = self.base.fingerprint().encode() + self.kernel_shift.tobytes()
+        return hashlib.sha256(payload).hexdigest()
+
+
+class TestLogicalSectorQubitChainSection:
     def test_bplsd_backend_available_and_correct(self):
         H = toric3_H_Z()
-        section = DecoderSection(H)
+        section = LogicalSectorQubitChainSection(H)
         assert section.backend_name == "bplsd", section.ldpc_import_error
         for sigma in random_image_syndromes(H, 10, seed=1):
             chain = section.apply(sigma)
@@ -41,7 +74,7 @@ class TestDecoderSection:
 
     def test_fallback_backend(self):
         H = toric3_H_Z()
-        section = DecoderSection(H, prefer_bplsd=False)
+        section = LogicalSectorQubitChainSection(H, prefer_bplsd=False)
         assert section.backend_name == "linear_elimination_fallback"
         sigma = random_image_syndromes(H, 1, seed=2)[0]
         chain = section.apply(sigma)
@@ -50,7 +83,7 @@ class TestDecoderSection:
 
     def test_misuse_rejected_strict(self):
         H = toric3_H_Z()
-        section = DecoderSection(H)
+        section = LogicalSectorQubitChainSection(H)
         bad = np.zeros(H.shape[0], dtype=np.uint8)
         bad[0] = 1  # toric 单违反 ∉ im
         assert not section.in_image(bad)
@@ -59,7 +92,7 @@ class TestDecoderSection:
 
     def test_cache_behavior_and_limit(self):
         H = toric3_H_Z()
-        section = DecoderSection(H, cache_limit=1)
+        section = LogicalSectorQubitChainSection(H, cache_limit=1)
         sigmas = random_image_syndromes(H, 3, seed=3)
         section.apply(sigmas[0])
         section.apply(sigmas[0])
@@ -71,7 +104,7 @@ class TestDecoderSection:
 
     def test_k43_large_instance(self):
         H_Z, _ = hgp_from_H(np.ones((3, 4), dtype=np.uint8))
-        section = DecoderSection(H_Z)
+        section = LogicalSectorQubitChainSection(H_Z)
         for sigma in random_image_syndromes(H_Z, 5, seed=4):
             chain = section.apply(sigma)
             assert np.array_equal(gf2_matmul(H_Z, chain[:, None])[:, 0], sigma)
@@ -123,7 +156,9 @@ class TestFrameRelations:
         model = toric3_model
         linear_frame = build_observable_frame(model)
         decoder_frame = DecoderObservableFrame(
-            model.H_check, model.logical_obs_basis, DecoderSection(model.H_check)
+            model.H_check,
+            model.logical_obs_basis,
+            LogicalSectorQubitChainSection(model.H_check),
         )
         rng = np.random.default_rng(8)
         # ker 元素 = stabilizer 行与 logical move 基的随机组合
@@ -140,7 +175,9 @@ class TestFrameRelations:
         model = toric3_model
         linear_frame = build_observable_frame(model)
         decoder_frame = DecoderObservableFrame(
-            model.H_check, model.logical_obs_basis, DecoderSection(model.H_check)
+            model.H_check,
+            model.logical_obs_basis,
+            LogicalSectorQubitChainSection(model.H_check),
         )
         rng = np.random.default_rng(9)
         disagreement = 0
@@ -161,6 +198,52 @@ class TestFrameRelations:
                 disagreement += 1
         # frame 依赖是真实现象：记录（不强断言具体数值，但期待出现过不一致）
         assert disagreement >= 0  # 文档性；具体分布 G3.3 定量
+
+    def test_boundary_only_section_shift_leaves_characters_unchanged(
+        self, toric3_model
+    ):
+        model = toric3_model
+        original = build_observable_frame(model)
+        shifted_section = ShiftedLogicalSectorSection(
+            model.logical_sector_section, model.stabilizer_rows[0]
+        )
+        shifted_model = replace(
+            model, logical_sector_section=shifted_section
+        )
+        shifted = build_observable_frame(shifted_model)
+        assert np.array_equal(original.W_basis, shifted.W_basis)
+        assert original.section_fingerprint != shifted.section_fingerprint
+        assert original.fingerprint() != shifted.fingerprint()
+
+    def test_logical_section_shift_is_not_claimed_as_gauge(self, toric3_model):
+        model = toric3_model
+        original = build_observable_frame(model)
+        shifted_section = ShiftedLogicalSectorSection(
+            model.logical_sector_section, model.logical_move_basis[0]
+        )
+        shifted_model = replace(
+            model, logical_sector_section=shifted_section
+        )
+        shifted = build_observable_frame(shifted_model)
+        assert not np.array_equal(original.W_basis, shifted.W_basis)
+        e = np.zeros(model.num_qubits, dtype=np.uint8)
+        e[np.flatnonzero(model.H_check[0])[0]] = 1
+        assert gf2_matmul(model.H_check, e[:, None]).any()
+        original_label = original.label_of(e)
+        shifted_label = shifted.label_of(e)
+        assert not np.array_equal(original_label, shifted_label)
+
+        # A distribution with mass on an off-kernel chain has genuinely
+        # different characters in the two logical-sector sections.
+        original_set = build_observable_set(original)
+        shifted_set = build_observable_set(shifted)
+        original_characters = 0.25 * absolute_observable_values(
+            original_set, np.zeros_like(e)
+        ) + 0.75 * absolute_observable_values(original_set, e)
+        shifted_characters = 0.25 * absolute_observable_values(
+            shifted_set, np.zeros_like(e)
+        ) + 0.75 * absolute_observable_values(shifted_set, e)
+        assert not np.array_equal(original_characters, shifted_characters)
 
 
 class TestFingerprintLargeCodes:
