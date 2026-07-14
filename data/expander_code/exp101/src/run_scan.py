@@ -60,8 +60,23 @@ from .sector_ti import (
     run_sector_ti,
 )
 
-PROTOCOL_VERSION = "exp101.scan.v2"
+PROTOCOL_VERSION = "exp101.scan.v3"
 SCAN_CONTRACT_VERSION = PROTOCOL_VERSION
+
+AGGREGATION_REPORTABLE = "REPORTABLE"
+AGGREGATION_SAMPLING_INSUFFICIENT = "SAMPLING_INSUFFICIENT"
+AGGREGATION_INCOMPLETE = "INCOMPLETE"
+AGGREGATION_FORMAL_ONLY = "FORMAL_ONLY"
+
+AGGREGATION_POLICY = {
+    "point_eligibility": "all_planned_disorders_valid",
+    "fraction_denominator": "planned_disorders",
+    "maximum_invalid_disorders": 0,
+    "maximum_missing_disorders": 0,
+    "conditional_statistics_purpose": "diagnostics_only",
+    "conditional_statistics_are_publication_eligible": False,
+    "crossing_input_policy": "whole_point_nan_unless_reportable",
+}
 
 ENGINE_FULL_TI = "full_sector_ti"
 ENGINE_PT = "parallel_tempering_observable_sampling"
@@ -419,13 +434,14 @@ def _sampled_estimator_result(
     if not physical:
         failures.append("debiased_posterior_purity_out_of_range")
 
+    estimated_bounds_valid = physical and not failures
     if ensemble == "true_posterior":
         planted_mass = estimates["posterior_mass_on_planted_class"]
         # Character inversion of finite MCMC means is not an exact sector
         # posterior and therefore cannot be labelled paper MLD success.
         map_success = None
-        lower = purity if physical else None
-        upper = float(np.sqrt(purity)) if physical else None
+        lower = purity if estimated_bounds_valid else None
+        upper = float(np.sqrt(purity)) if estimated_bounds_valid else None
         posterior_purity = purity
     else:
         planted_mass = None
@@ -464,8 +480,16 @@ def _sampled_estimator_result(
             if ensemble == "true_posterior" else None
         ),
         "map_success_probability": map_success,
-        "map_success_lower_bound": lower,
-        "map_success_upper_bound": upper,
+        "map_success_algebraic_lower_bound": None,
+        "map_success_algebraic_upper_bound": None,
+        "map_success_estimated_lower_bound": lower,
+        "map_success_estimated_upper_bound": upper,
+        "map_success_bound_kind": (
+            "sampled_u_statistic_plugin_no_coverage"
+            if estimated_bounds_valid and ensemble == "true_posterior"
+            else "unavailable"
+        ),
+        "map_success_bound_has_confidence_coverage": False,
         "largest_sector_mass": (
             float(np.max(weights_absolute))
             if weights_absolute is not None else None
@@ -528,10 +552,15 @@ def _sampled_estimator_result(
         "q_top_character_sampling_se", "q_top_raw_character_sampling_se",
         "posterior_purity", "posterior_mass_on_planted_class",
         "posterior_mass_character_sampling_se", "map_success_probability",
-        "map_success_lower_bound", "map_success_upper_bound",
+        "map_success_algebraic_lower_bound",
+        "map_success_algebraic_upper_bound",
+        "map_success_estimated_lower_bound",
+        "map_success_estimated_upper_bound",
         "weights_absolute", "weights_relative", "weights_estimator_name",
     ):
         result[name] = None
+    result["map_success_bound_kind"] = "unavailable"
+    result["map_success_bound_has_confidence_coverage"] = False
     result["weights_cover_all_sectors"] = False
     return result
 
@@ -662,7 +691,9 @@ def run_single_task(
                 "q_top_raw_pooled_square": float(ti["q_top"]),
                 "weights_estimator_name": "full_sector_ti",
                 "weights_cover_all_sectors": True,
-                "weights_are_exact_sector_posterior": False,
+                "weights_are_exact_sector_posterior": bool(ti.get(
+                    "weights_are_exact_sector_posterior", False
+                )),
             })
         else:
             result.update({
@@ -683,7 +714,9 @@ def run_single_task(
                 "formal_q_top_raw_character_sampling_se": 0.0,
                 "formal_weights_estimator_name": "full_sector_ti",
                 "formal_weights_cover_all_sectors": True,
-                "formal_weights_are_exact_sector_posterior": False,
+                "formal_weights_are_exact_sector_posterior": bool(ti.get(
+                    "formal_weights_are_exact_sector_posterior", False
+                )),
                 "character_means_absolute": None,
                 "character_means_relative": None,
                 "m2_u_pooled_square_raw": None,
@@ -840,8 +873,12 @@ def run_single_task(
         ensemble == "true_posterior" and result["numerically_valid"]
     )
     if not result["valid_for_aggregation"]:
-        result["map_success_lower_bound"] = None
-        result["map_success_upper_bound"] = None
+        result["map_success_algebraic_lower_bound"] = None
+        result["map_success_algebraic_upper_bound"] = None
+        result["map_success_estimated_lower_bound"] = None
+        result["map_success_estimated_upper_bound"] = None
+        result["map_success_bound_kind"] = "unavailable"
+        result["map_success_bound_has_confidence_coverage"] = False
     if result["valid_for_aggregation"]:
         result["task_status"] = "VALID"
         result["flags"] = "PASS"
@@ -871,8 +908,12 @@ def _chunk_matches(path, task_fingerprint, source_implementation_fingerprint):
             == source_implementation_fingerprint
             and payload.get("result", {}).get("implementation_fingerprint")
             == source_implementation_fingerprint
+            and payload.get("result", {}).get("scan_contract_version")
+            == PROTOCOL_VERSION
+            and payload.get("result", {}).get("physics_contract_version")
+            == PHYSICS_CONTRACT_VERSION
         )
-    except (OSError, json.JSONDecodeError):
+    except (OSError, json.JSONDecodeError, TypeError, AttributeError):
         return False
 
 
@@ -910,6 +951,8 @@ def _build_specs(
     output_dir, family, size_list, p_value, q_values, num_disorders, sector,
     ensemble, engine, engine_config, family_rule, family_seed, u_rand_count,
 ):
+    if int(num_disorders) <= 0:
+        raise ValueError("num_disorders must be positive")
     cache = {}
     specs = []
     source_implementation_fingerprint = implementation_fingerprint()
@@ -1039,7 +1082,7 @@ def merge(
     ensemble, engine, engine_config, family_rule, family_seed=None,
     u_rand_count=64, expected_specs=None,
 ):
-    """Merge current-v2 chunks; missing/invalid tasks remain explicit."""
+    """Merge current-v3 chunks with parameter-point fail-closed outputs."""
     output_dir = Path(output_dir)
     ensemble = normalize_ensemble(ensemble, warn_alias=False)
     if expected_specs is None:
@@ -1075,38 +1118,38 @@ def merge(
         item for per_m in all_results for per_q in per_m
         for item in per_q if item is not None
     ]
-    if not present:
-        failures = [
-            (spec["tag"], spec["chunk_path"]) for spec in expected_specs
-        ]
-        raise ValueError(f"merge: no current valid chunks found: {failures[:3]}")
-
     shape = (num_m, num_q, num_d)
-    max_characters = max(int(item.get("character_count", 0)) for item in present)
+    max_characters = max(
+        (int(item.get("character_count", 0)) for item in present), default=0
+    )
     max_chains = max(
-        len(
+        (len(
             item.get("chain_character_means_relative")
             or item.get("formal_chain_sector_characters_relative")
             or []
-        )
-        for item in present
+        ) for item in present),
+        default=0,
     )
     max_weights = max(
-        len(
+        (len(
             item.get("weights_absolute")
             or item.get("formal_sector_weights_absolute")
             or []
-        )
-        for item in present
+        ) for item in present),
+        default=0,
     )
     max_pt_instances = max(
-        len(item.get("pt_round_trips_per_instance") or []) for item in present
+        (len(item.get("pt_round_trips_per_instance") or [])
+         for item in present),
+        default=0,
     )
     max_pt_temperatures = max(
-        len(item.get("pt_ladder_p") or []) for item in present
+        (len(item.get("pt_ladder_p") or []) for item in present), default=0
     )
     max_pt_edges = max(max_pt_temperatures - 1, 0)
-    max_pt_logicals = max(int(item.get("k", 0)) for item in present)
+    max_pt_logicals = max(
+        (int(item.get("k", 0)) for item in present), default=0
+    )
 
     def scalar(getter, default=np.nan, dtype=np.float64):
         array = np.full(shape, default, dtype=dtype)
@@ -1239,7 +1282,6 @@ def merge(
         [[all_results[i][j][d] is not None for d in range(num_d)]
          for j in range(num_q)] for i in range(num_m)
     ], dtype=bool)
-    q_valid = np.where(valid, q_top, np.nan)
     valid_count = valid.sum(axis=2).astype(np.int64)
     numerical_valid_count = numerical_valid.sum(axis=2).astype(np.int64)
     formal_only_count = formal_only.sum(axis=2).astype(np.int64)
@@ -1248,18 +1290,73 @@ def merge(
     ).sum(axis=2).astype(np.int64)
     missing_count = (~present_mask).sum(axis=2).astype(np.int64)
     present_count = present_mask.sum(axis=2).astype(np.int64)
-    denominator = np.maximum(present_count, 1)
-    paper_aggregation_fraction = valid_count / denominator
-    numerical_pass_fraction = numerical_valid_count / denominator
-    mean_q_top = np.full((num_m, num_q), np.nan)
-    sem_q_top = np.full_like(mean_q_top, np.nan)
+    planned_count = np.full(
+        (num_m, num_q), num_d, dtype=np.int64
+    )
+    paper_aggregation_fraction = valid_count / planned_count
+    numerical_pass_fraction = numerical_valid_count / planned_count
+    conditional_mean_q_top = np.full((num_m, num_q), np.nan)
+    conditional_sem_q_top = np.full_like(conditional_mean_q_top, np.nan)
     for i in range(num_m):
         for j in range(num_q):
-            values = q_valid[i, j][np.isfinite(q_valid[i, j])]
+            values = q_top[i, j][valid[i, j]]
             if values.size:
-                mean_q_top[i, j] = values.mean()
+                conditional_mean_q_top[i, j] = values.mean()
             if values.size > 1:
-                sem_q_top[i, j] = values.std(ddof=1) / np.sqrt(values.size)
+                conditional_sem_q_top[i, j] = (
+                    values.std(ddof=1) / np.sqrt(values.size)
+                )
+
+    aggregation_status = np.full(
+        (num_m, num_q), AGGREGATION_SAMPLING_INSUFFICIENT,
+        dtype="U24",
+    )
+    aggregation_failure_reasons_object = np.full(
+        (num_m, num_q), "", dtype=object
+    )
+    for i in range(num_m):
+        for j in range(num_q):
+            reasons = []
+            if ensemble == "legacy_delta_only":
+                aggregation_status[i, j] = AGGREGATION_FORMAL_ONLY
+                reasons.append("legacy_delta_only_not_publication_eligible")
+            elif missing_count[i, j] > 0:
+                aggregation_status[i, j] = AGGREGATION_INCOMPLETE
+            elif invalid_count[i, j] > 0 or valid_count[i, j] != num_d:
+                aggregation_status[
+                    i, j
+                ] = AGGREGATION_SAMPLING_INSUFFICIENT
+            else:
+                aggregation_status[i, j] = AGGREGATION_REPORTABLE
+            if missing_count[i, j] > 0:
+                reasons.append("missing_disorders_present")
+            if invalid_count[i, j] > 0:
+                reasons.append("invalid_disorders_present")
+            if (
+                ensemble == "true_posterior"
+                and missing_count[i, j] == 0
+                and invalid_count[i, j] == 0
+                and valid_count[i, j] != num_d
+            ):
+                reasons.append("not_all_planned_disorders_valid")
+            aggregation_failure_reasons_object[i, j] = ";".join(reasons)
+
+    reportable = aggregation_status == AGGREGATION_REPORTABLE
+    mean_q_top = np.where(reportable, conditional_mean_q_top, np.nan)
+    sem_q_top = np.where(reportable, conditional_sem_q_top, np.nan)
+    q_crossing = np.where(reportable[..., None], q_top, np.nan)
+    aggregation_reason_width = max(
+        1,
+        max(
+            len(str(value))
+            for value in aggregation_failure_reasons_object.flat
+        ),
+    )
+    aggregation_failure_reasons = (
+        aggregation_failure_reasons_object.astype(
+            f"U{aggregation_reason_width}"
+        )
+    )
 
     string_shape = shape
     flags = np.full(string_shape, "MISSING", dtype="U512")
@@ -1268,6 +1365,9 @@ def merge(
     formal_estimator_names = np.full(string_shape, "", dtype="U64")
     weights_estimator_names = np.full(string_shape, "", dtype="U64")
     formal_weights_estimator_names = np.full(string_shape, "", dtype="U64")
+    map_success_bound_kinds = np.full(
+        string_shape, "unavailable", dtype="U48"
+    )
     resolved_engines = np.full(string_shape, "", dtype="U64")
     ti_endpoint_modes = np.full(string_shape, "", dtype="U64")
     task_fingerprints = np.full(string_shape, "", dtype="U64")
@@ -1299,6 +1399,9 @@ def merge(
                 )
                 formal_weights_estimator_names[i, j, d] = (
                     item.get("formal_weights_estimator_name") or ""
+                )
+                map_success_bound_kinds[i, j, d] = item.get(
+                    "map_success_bound_kind", "unavailable"
                 )
                 resolved_engines[i, j, d] = item.get("resolved_engine", "")
                 ti_endpoint_modes[i, j, d] = item.get("endpoint_mode") or ""
@@ -1462,6 +1565,7 @@ def merge(
             "sampled_square_estimator": "independent_chain_u_statistic",
             "random_character_error": "finite_population_correction",
         },
+        "aggregation_policy": dict(AGGREGATION_POLICY),
         "code_size_list": list(map(int, size_list)),
         "p_value": float(p_value),
         "q_values": list(map(float, q_values)),
@@ -1486,22 +1590,27 @@ def merge(
         "per_size_section_fingerprint": per_size_section_fp,
         "per_size_observable_frame_fingerprint": per_size_observable_fp,
         "valid_disorder_count": valid_count.tolist(),
+        "planned_disorder_count": planned_count.tolist(),
+        "present_disorder_count": present_count.tolist(),
         "numerically_valid_disorder_count": numerical_valid_count.tolist(),
         "formal_only_disorder_count": formal_only_count.tolist(),
         "invalid_disorder_count": invalid_count.tolist(),
         "missing_disorder_count": missing_count.tolist(),
+        "aggregation_status_per_point": aggregation_status.tolist(),
+        "aggregation_failure_reasons_per_point": (
+            aggregation_failure_reasons.tolist()
+        ),
+        "reportable_for_crossing_fss": reportable.tolist(),
         "missing_chunks": int(missing_count.sum()),
         "fraction_semantics": {
             "paper_aggregation_fraction": (
-                "valid_for_aggregation / present disorder count"
+                "valid_for_aggregation / planned disorder count"
             ),
             "numerical_pass_fraction": (
-                "numerically_valid / present disorder count"
-            ),
-            "pass_fraction": (
-                "deprecated alias of paper_aggregation_fraction"
+                "numerically_valid / planned disorder count"
             ),
         },
+        "publication_loader": "src.scan_results.load_publication_q_top",
         "character_layout": (
             "last axis padded to actual max character_count; use "
             "character_count_per_disorder/character_mask_per_disorder"
@@ -1524,7 +1633,7 @@ def merge(
         q_values=np.asarray(q_values, dtype=np.float64),
         p_value=np.float64(p_value),
         q_top_estimate_per_disorder=q_top,
-        q_top_crossing_input_per_disorder=q_valid,
+        q_top_crossing_input_per_disorder=q_crossing,
         formal_q_top_per_disorder=formal_q_top,
         formal_q_top_absolute_per_disorder=scalar(
             lambda item: item.get("formal_q_top_absolute")
@@ -1579,10 +1688,23 @@ def merge(
         disorder_sem_q_top_estimate=sem_q_top,
         mean_q_top=mean_q_top,
         disorder_sem_q_top=sem_q_top,
+        conditional_mean_q_top_estimate_valid_only=(
+            conditional_mean_q_top
+        ),
+        conditional_disorder_sem_q_top_estimate_valid_only=(
+            conditional_sem_q_top
+        ),
+        aggregation_status_per_point=aggregation_status,
+        aggregation_failure_reasons_per_point=(
+            aggregation_failure_reasons
+        ),
+        reportable_for_crossing_fss=reportable,
         valid_for_aggregation=valid,
         numerically_valid=numerical_valid,
         formal_only=formal_only,
         valid_disorder_count=valid_count,
+        planned_disorder_count=planned_count,
+        present_disorder_count=present_count,
         numerically_valid_disorder_count=numerical_valid_count,
         formal_only_disorder_count=formal_only_count,
         invalid_disorder_count=invalid_count,
@@ -1665,17 +1787,25 @@ def merge(
         map_success_probability_per_disorder=scalar(
             lambda item: item.get("map_success_probability")
         ),
-        map_success_lower_bound_per_disorder=scalar(
-            lambda item: (
-                item.get("map_success_lower_bound")
-                if item.get("valid_for_aggregation", False) else None
-            )
+        map_success_algebraic_lower_bound_per_disorder=scalar(
+            lambda item: item.get("map_success_algebraic_lower_bound")
         ),
-        map_success_upper_bound_per_disorder=scalar(
-            lambda item: (
-                item.get("map_success_upper_bound")
-                if item.get("valid_for_aggregation", False) else None
-            )
+        map_success_algebraic_upper_bound_per_disorder=scalar(
+            lambda item: item.get("map_success_algebraic_upper_bound")
+        ),
+        map_success_estimated_lower_bound_per_disorder=scalar(
+            lambda item: item.get("map_success_estimated_lower_bound")
+        ),
+        map_success_estimated_upper_bound_per_disorder=scalar(
+            lambda item: item.get("map_success_estimated_upper_bound")
+        ),
+        map_success_bound_kind_per_disorder=map_success_bound_kinds,
+        map_success_bound_has_confidence_coverage_per_disorder=scalar(
+            lambda item: bool(item.get(
+                "map_success_bound_has_confidence_coverage", False
+            )),
+            default=False,
+            dtype=bool,
         ),
         largest_sector_mass_per_disorder=scalar(
             lambda item: item.get("largest_sector_mass")
@@ -1728,8 +1858,6 @@ def merge(
         ),
         paper_aggregation_fraction=paper_aggregation_fraction,
         numerical_pass_fraction=numerical_pass_fraction,
-        # Deprecated compatibility alias; see manifest fraction_semantics.
-        pass_fraction=paper_aggregation_fraction,
         **character_fields,
         **formal_character_fields,
     )

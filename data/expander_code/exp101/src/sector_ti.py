@@ -329,6 +329,7 @@ def _weights_from_delta(delta_values):
 def _attach_full_sector_statistics(
     result, model, wiring, weights_absolute, q_top_stderr,
     estimator_name="full_sector_weights",
+    bound_kind="full_sector_ti_plugin_no_coverage",
 ):
     """Attach paper posterior fields or legacy formal-only diagnostics."""
     labels = result["labels"]
@@ -351,6 +352,10 @@ def _attach_full_sector_statistics(
         "planted_logical_class_bitmask": planted_class,
         "formal_sector_purity": formal_purity,
         "largest_sector_mass": largest_mass,
+        "weights_are_exact_sector_posterior": bool(
+            bound_kind == "analytic_endpoint_algebraic"
+            and wiring.ensemble == "true_posterior"
+        ),
     })
     if wiring.ensemble == "true_posterior":
         result.update({
@@ -369,7 +374,22 @@ def _attach_full_sector_statistics(
             "q_top_estimator_name": estimator_name,
             "q_top_stderr": float(q_top_stderr),
         })
-        result.update(posterior_statistics(weights_absolute, planted_class))
+        statistics = posterior_statistics(weights_absolute, planted_class)
+        if bound_kind == "full_sector_ti_plugin_no_coverage":
+            statistics["map_success_estimated_lower_bound"] = (
+                statistics["map_success_algebraic_lower_bound"]
+            )
+            statistics["map_success_estimated_upper_bound"] = (
+                statistics["map_success_algebraic_upper_bound"]
+            )
+            statistics["map_success_algebraic_lower_bound"] = None
+            statistics["map_success_algebraic_upper_bound"] = None
+        elif bound_kind == "analytic_endpoint_algebraic":
+            pass
+        else:
+            raise ValueError(f"unsupported full-sector bound kind {bound_kind}")
+        statistics["map_success_bound_kind"] = bound_kind
+        result.update(statistics)
         return result
 
     result.update({
@@ -384,6 +404,9 @@ def _attach_full_sector_statistics(
         "formal_q_top_relative": q_top,
         "formal_q_top_estimator_name": estimator_name,
         "formal_q_top_stderr": float(q_top_stderr),
+        "formal_weights_are_exact_sector_posterior": bool(
+            bound_kind == "analytic_endpoint_algebraic"
+        ),
     })
     for name in (
         "weights_absolute", "weights_relative", "characters_absolute",
@@ -392,10 +415,15 @@ def _attach_full_sector_statistics(
         "q_top_absolute", "q_top_relative", "q_top_estimator_name",
         "q_top_stderr", "posterior_purity",
         "posterior_mass_on_planted_class", "map_success_probability",
-        "map_success_lower_bound", "map_success_upper_bound",
+        "map_success_algebraic_lower_bound",
+        "map_success_algebraic_upper_bound",
+        "map_success_estimated_lower_bound",
+        "map_success_estimated_upper_bound",
         "posterior_purity_within_physical_bounds",
     ):
         result[name] = None
+    result["map_success_bound_kind"] = "unavailable"
+    result["map_success_bound_has_confidence_coverage"] = False
     return result
 
 
@@ -443,6 +471,7 @@ def _analytic_endpoint_result(model, frame, wiring):
     return _attach_full_sector_statistics(
         result, model, wiring, weights_absolute, q_top_stderr=0.0,
         estimator_name="analytic_full_sector_endpoint",
+        bound_kind="analytic_endpoint_algebraic",
     )
 
 

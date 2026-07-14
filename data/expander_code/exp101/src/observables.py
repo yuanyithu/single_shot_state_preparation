@@ -315,12 +315,21 @@ def sector_weights_from_characters(observable_set, character_means):
 
 
 def posterior_statistics(weights_absolute, planted_class=0):
-    """Compute distinct purity, planted mass, and MAP-success statistics."""
+    """Compute exact posterior statistics and algebraic MAP bounds.
+
+    Algebraic bounds are meaningful only for a normalized probability vector.
+    Reject malformed inputs instead of silently normalizing or clipping them.
+    """
     weights = np.asarray(weights_absolute, dtype=np.float64)
     if weights.ndim != 1 or weights.size == 0 or weights.size & (weights.size - 1):
         raise ValueError("weights length must be a nonzero power of two")
     if not np.all(np.isfinite(weights)):
         raise ValueError("weights must be finite")
+    if np.any(weights < 0.0):
+        raise ValueError("weights must be nonnegative")
+    total = float(np.sum(weights))
+    if not np.isclose(total, 1.0, rtol=0.0, atol=1e-12):
+        raise ValueError("weights must sum to 1 within absolute tolerance 1e-12")
     planted_class = int(planted_class)
     if not 0 <= planted_class < weights.size:
         raise ValueError("planted_class outside sector range")
@@ -330,15 +339,17 @@ def posterior_statistics(weights_absolute, planted_class=0):
         q_top = None
     else:
         q_top = float((weights.size * purity - 1.0) / (weights.size - 1.0))
-    minimum_purity = 1.0 / weights.size
-    bounds_valid = minimum_purity - 1e-14 <= purity <= 1.0 + 1e-14
     return {
         "posterior_purity": purity,
         "posterior_mass_on_planted_class": float(weights[planted_class]),
         "map_success_probability": map_success,
-        "map_success_lower_bound": purity if bounds_valid else None,
-        "map_success_upper_bound": float(np.sqrt(purity)) if bounds_valid else None,
-        "posterior_purity_within_physical_bounds": bool(bounds_valid),
+        "map_success_algebraic_lower_bound": purity,
+        "map_success_algebraic_upper_bound": float(np.sqrt(purity)),
+        "map_success_estimated_lower_bound": None,
+        "map_success_estimated_upper_bound": None,
+        "map_success_bound_kind": "exact_posterior_algebraic",
+        "map_success_bound_has_confidence_coverage": False,
+        "posterior_purity_within_physical_bounds": True,
         "q_top": q_top,
     }
 
@@ -377,9 +388,23 @@ def aggregate_observables(
             "posterior_purity": 1.0,
             "purity": 1.0,
             "posterior_mass_on_planted_class": 1.0,
-            "map_success_probability": 1.0,
-            "map_success_lower_bound": 1.0,
-            "map_success_upper_bound": 1.0,
+            "map_success_probability": None,
+            "map_success_algebraic_lower_bound": None,
+            "map_success_algebraic_upper_bound": None,
+            "map_success_estimated_lower_bound": (
+                1.0 if estimator_name == "independent_chain_u_statistic"
+                else None
+            ),
+            "map_success_estimated_upper_bound": (
+                1.0 if estimator_name == "independent_chain_u_statistic"
+                else None
+            ),
+            "map_success_bound_kind": (
+                "sampled_u_statistic_plugin_no_coverage"
+                if estimator_name == "independent_chain_u_statistic"
+                else "unavailable"
+            ),
+            "map_success_bound_has_confidence_coverage": False,
             "q_top_character_sampling_se": 0.0,
             "posterior_purity_within_physical_bounds": True,
         }
@@ -409,16 +434,17 @@ def aggregate_observables(
         planted_mass = (1.0 + N * mean_relative) / (1 << k)
         planted_mass_sampling_se = N * mean_relative_se / (1 << k)
 
-    map_success = None
     weights_in_input_frame = None
     if observable_set.tier == "full":
         weights_in_input_frame = sector_weights_from_characters(
             observable_set, m_u_values
         )
-        map_success = float(np.max(weights_in_input_frame))
 
     minimum_purity = 1.0 / (1 << k)
     bounds_valid = minimum_purity - 1e-14 <= purity <= 1.0 + 1e-14
+    estimated_bounds_valid = (
+        bounds_valid and estimator_name == "independent_chain_u_statistic"
+    )
     return {
         "q_top": float(q_top),
         "q_top_all": float(q_top),
@@ -435,11 +461,20 @@ def aggregate_observables(
             if planted_mass_sampling_se is None
             else float(planted_mass_sampling_se)
         ),
-        "map_success_probability": map_success,
-        "map_success_lower_bound": float(purity) if bounds_valid else None,
-        "map_success_upper_bound": (
-            float(np.sqrt(purity)) if bounds_valid else None
+        "map_success_probability": None,
+        "map_success_algebraic_lower_bound": None,
+        "map_success_algebraic_upper_bound": None,
+        "map_success_estimated_lower_bound": (
+            float(purity) if estimated_bounds_valid else None
         ),
+        "map_success_estimated_upper_bound": (
+            float(np.sqrt(purity)) if estimated_bounds_valid else None
+        ),
+        "map_success_bound_kind": (
+            "sampled_u_statistic_plugin_no_coverage"
+            if estimated_bounds_valid else "unavailable"
+        ),
+        "map_success_bound_has_confidence_coverage": False,
         "posterior_purity_within_physical_bounds": bool(bounds_valid),
         "weights_in_character_frame": weights_in_input_frame,
     }

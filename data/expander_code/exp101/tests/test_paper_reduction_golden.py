@@ -367,7 +367,7 @@ def test_character_table_preserves_q_top_under_planted_translation():
     assert weights_absolute.max() == weights_relative.max()
 
 
-def test_exact_oracle_exposes_complete_v2_posterior_statistics():
+def test_exact_oracle_exposes_algebraic_posterior_bounds():
     _, _, _, model, frame = _setup()
     epsilon_data_true = _bits(7, model.num_qubits)
     measurement_error = _bits(2, model.num_checks)
@@ -393,8 +393,13 @@ def test_exact_oracle_exposes_complete_v2_posterior_statistics():
         "posterior_purity",
         "posterior_mass_on_planted_class",
         "map_success_probability",
-        "map_success_lower_bound",
-        "map_success_upper_bound",
+        "map_success_algebraic_lower_bound",
+        "map_success_algebraic_upper_bound",
+        "map_success_estimated_lower_bound",
+        "map_success_estimated_upper_bound",
+        "map_success_bound_kind",
+        "map_success_bound_has_confidence_coverage",
+        "weights_are_exact_sector_posterior",
         "q_top",
         "q_top_absolute",
         "q_top_relative",
@@ -410,6 +415,16 @@ def test_exact_oracle_exposes_complete_v2_posterior_statistics():
     assert result["posterior_purity"] <= result["map_success_probability"]
     assert (
         result["map_success_probability"]
-        <= result["map_success_upper_bound"]
+        <= result["map_success_algebraic_upper_bound"]
     )
+    assert result["map_success_algebraic_lower_bound"] == result[
+        "posterior_purity"
+    ]
+    assert result["map_success_estimated_lower_bound"] is None
+    assert result["map_success_estimated_upper_bound"] is None
+    assert result["map_success_bound_kind"] == "exact_posterior_algebraic"
+    assert result["map_success_bound_has_confidence_coverage"] is False
+    assert result["weights_are_exact_sector_posterior"] is True
+    assert "map_success_lower_bound" not in result
+    assert "map_success_upper_bound" not in result
     assert np.isclose(result["q_top_absolute"], result["q_top_relative"])

@@ -432,6 +432,7 @@ def evaluate_table(
         "m_u_basis": m_basis_relative,
         "q_top_absolute": statistics["q_top"],
         "q_top_relative": statistics["q_top"],
+        "weights_are_exact_sector_posterior": True,
         "mean_Wp": mean_wp,
         "mean_Ws": mean_ws,
         "mu_per_label": mean_wp_label,
@@ -479,6 +480,9 @@ def exact_reference(model, frame, wiring, force_python=False):
     result["largest_sector_mass"] = float(
         np.max(np.asarray(result["weights_absolute"]))
     )
+    result["weights_are_exact_sector_posterior"] = bool(
+        wiring.ensemble == "true_posterior"
+    )
     if wiring.ensemble == "legacy_delta_only":
         # Preserve the exact regression data under explicitly formal names.
         # None-valued paper fields keep the schema stable without presenting
@@ -497,6 +501,7 @@ def exact_reference(model, frame, wiring, force_python=False):
             "formal_q_top": result["q_top"],
             "formal_q_top_absolute": result["q_top_absolute"],
             "formal_q_top_relative": result["q_top_relative"],
+            "formal_weights_are_exact_sector_posterior": True,
         })
         for name in (
             "weights_absolute",
@@ -514,9 +519,13 @@ def exact_reference(model, frame, wiring, force_python=False):
             "posterior_purity",
             "posterior_mass_on_planted_class",
             "map_success_probability",
-            "map_success_lower_bound",
-            "map_success_upper_bound",
+            "map_success_algebraic_lower_bound",
+            "map_success_algebraic_upper_bound",
+            "map_success_estimated_lower_bound",
+            "map_success_estimated_upper_bound",
             "posterior_purity_within_physical_bounds",
         ):
             result[name] = None
+        result["map_success_bound_kind"] = "unavailable"
+        result["map_success_bound_has_confidence_coverage"] = False
     return result

@@ -1,0 +1,17 @@
+........................................................................ [ 19%]
+........................................................................ [ 39%]
+........................................................................ [ 59%]
+........................................................................ [ 78%]
+........................................................................ [ 98%]
+.....                                                                    [100%]
+=============================== warnings summary ===============================
+tests/test_run_scan.py::TestScanEndToEnd::test_alias_is_canonical_before_seed_and_manifest
+  /Users/jarvis/Desktop/sync/project D/data/expander_code/exp101/src/run_scan.py:1024: DeprecationWarning: ensemble 'paper_true_posterior' is deprecated; use 'true_posterior'
+    canonical_ensemble = normalize_ensemble(ensemble)
+
+tests/test_run_scan.py::TestScanEndToEnd::test_alias_is_canonical_before_seed_and_manifest
+  /Users/jarvis/Desktop/sync/project D/data/expander_code/exp101/src/run_scan.py:1024: DeprecationWarning: ensemble 'repo_compat' is deprecated; use 'legacy_delta_only'
+    canonical_ensemble = normalize_ensemble(ensemble)
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+365 passed, 2 warnings in 30.41s

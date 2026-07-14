@@ -1,0 +1,447 @@
+{
+  "aggregation": {
+    "aggregation_policy": {
+      "conditional_statistics_are_publication_eligible": false,
+      "conditional_statistics_purpose": "diagnostics_only",
+      "crossing_input_policy": "whole_point_nan_unless_reportable",
+      "fraction_denominator": "planned_disorders",
+      "maximum_invalid_disorders": 0,
+      "maximum_missing_disorders": 0,
+      "point_eligibility": "all_planned_disorders_valid"
+    },
+    "cases": {
+      "invalid": {
+        "conditional_mean": 0.4,
+        "conditional_sem": 0.19999999999999998,
+        "counts": {
+          "invalid": 1,
+          "missing": 0,
+          "planned": 3,
+          "present": 3,
+          "valid": 2
+        },
+        "crossing_input": [
+          "NaN",
+          "NaN",
+          "NaN"
+        ],
+        "formal_only_count": 0,
+        "mean": "NaN",
+        "numerical_pass_fraction": 0.6666666666666666,
+        "numerically_valid_count": 2,
+        "paper_aggregation_fraction": 0.6666666666666666,
+        "raw_q_top": [
+          0.2,
+          0.6,
+          0.99
+        ],
+        "reason": "invalid_disorders_present",
+        "reportable": false,
+        "sem": "NaN",
+        "status": "SAMPLING_INSUFFICIENT",
+        "valid_mask": [
+          true,
+          true,
+          false
+        ]
+      },
+      "legacy": {
+        "conditional_mean": "NaN",
+        "conditional_sem": "NaN",
+        "counts": {
+          "invalid": 0,
+          "missing": 0,
+          "planned": 2,
+          "present": 2,
+          "valid": 0
+        },
+        "crossing_input": [
+          "NaN",
+          "NaN"
+        ],
+        "formal_only_count": 2,
+        "mean": "NaN",
+        "numerical_pass_fraction": 1.0,
+        "numerically_valid_count": 2,
+        "paper_aggregation_fraction": 0.0,
+        "raw_q_top": [
+          "NaN",
+          "NaN"
+        ],
+        "reason": "legacy_delta_only_not_publication_eligible",
+        "reportable": false,
+        "sem": "NaN",
+        "status": "FORMAL_ONLY",
+        "valid_mask": [
+          false,
+          false
+        ]
+      },
+      "missing": {
+        "conditional_mean": 0.4,
+        "conditional_sem": 0.19999999999999998,
+        "counts": {
+          "invalid": 0,
+          "missing": 1,
+          "planned": 3,
+          "present": 2,
+          "valid": 2
+        },
+        "crossing_input": [
+          "NaN",
+          "NaN",
+          "NaN"
+        ],
+        "formal_only_count": 0,
+        "mean": "NaN",
+        "numerical_pass_fraction": 0.6666666666666666,
+        "numerically_valid_count": 2,
+        "paper_aggregation_fraction": 0.6666666666666666,
+        "raw_q_top": [
+          0.2,
+          0.6,
+          "NaN"
+        ],
+        "reason": "missing_disorders_present",
+        "reportable": false,
+        "sem": "NaN",
+        "status": "INCOMPLETE",
+        "valid_mask": [
+          true,
+          true,
+          false
+        ]
+      },
+      "reportable": {
+        "conditional_mean": 0.4,
+        "conditional_sem": 0.19999999999999998,
+        "counts": {
+          "invalid": 0,
+          "missing": 0,
+          "planned": 2,
+          "present": 2,
+          "valid": 2
+        },
+        "crossing_input": [
+          0.2,
+          0.6
+        ],
+        "formal_only_count": 0,
+        "mean": 0.4,
+        "numerical_pass_fraction": 1.0,
+        "numerically_valid_count": 2,
+        "paper_aggregation_fraction": 1.0,
+        "raw_q_top": [
+          0.2,
+          0.6
+        ],
+        "reason": "",
+        "reportable": true,
+        "sem": 0.19999999999999998,
+        "status": "REPORTABLE",
+        "valid_mask": [
+          true,
+          true
+        ]
+      },
+      "single": {
+        "conditional_mean": 0.3,
+        "conditional_sem": "NaN",
+        "counts": {
+          "invalid": 0,
+          "missing": 0,
+          "planned": 1,
+          "present": 1,
+          "valid": 1
+        },
+        "crossing_input": [
+          0.3
+        ],
+        "formal_only_count": 0,
+        "mean": 0.3,
+        "numerical_pass_fraction": 1.0,
+        "numerically_valid_count": 1,
+        "paper_aggregation_fraction": 1.0,
+        "raw_q_top": [
+          0.3
+        ],
+        "reason": "",
+        "reportable": true,
+        "sem": "NaN",
+        "status": "REPORTABLE",
+        "valid_mask": [
+          true
+        ]
+      }
+    },
+    "loader_checks": {
+      "invalid": {
+        "exception": "PublicationPointNotReportableError",
+        "message": "selected q_top point(s) are not publication-reportable: size=2, q=0.05: status=SAMPLING_INSUFFICIENT, invalid=1, missing=0, reason=invalid_disorders_present"
+      },
+      "legacy": {
+        "exception": "NonPublicationEnsembleError",
+        "message": "publication q_top loader requires canonical_ensemble='true_posterior'; got 'legacy_delta_only': legacy_delta_only is formal-only and cannot be used for publication aggregation"
+      },
+      "missing": {
+        "exception": "PublicationPointNotReportableError",
+        "message": "selected q_top point(s) are not publication-reportable: size=2, q=0.05: status=INCOMPLETE, invalid=0, missing=1, reason=missing_disorders_present"
+      },
+      "reportable": {
+        "outcome": "accepted",
+        "selected_point_count": 1
+      },
+      "scan_v2": {
+        "exception": "UnsupportedScanContractError",
+        "message": "publication q_top loader requires 'exp101.scan.v3'; got 'exp101.scan.v2': scan v2 results are audit-only; publication eligibility cannot be inferred or migrated from conditional means"
+      }
+    },
+    "source": "fingerprint-validated synthetic chunks merged by src.run_scan.merge"
+  },
+  "assertion_count": 104,
+  "assertions": [
+    "scan contract is exp101.scan.v3",
+    "physics contract remains exp101.physics.v2",
+    "fixed fail-closed aggregation policy",
+    "all-valid status",
+    "all-valid publication gate",
+    "all-valid counts",
+    "all-valid mean",
+    "all-valid SEM",
+    "all-valid conditional mean equals official mean",
+    "all-valid conditional SEM equals official SEM",
+    "all-valid crossing input",
+    "invalid status is sampling insufficient",
+    "invalid gate is closed",
+    "invalid counts",
+    "invalid reason",
+    "invalid official mean is NaN",
+    "invalid official SEM is NaN",
+    "invalid whole-point crossing input is NaN",
+    "invalid conditional mean retained",
+    "invalid conditional SEM retained",
+    "invalid raw estimator retained",
+    "invalid paper fraction uses planned denominator",
+    "invalid numerical fraction uses planned denominator",
+    "missing status",
+    "missing gate is closed",
+    "missing counts",
+    "missing reason",
+    "missing official mean is NaN",
+    "missing whole-point crossing input is NaN",
+    "missing conditional mean retained",
+    "missing paper fraction uses planned denominator",
+    "missing numerical fraction uses planned denominator",
+    "legacy status",
+    "legacy gate is closed",
+    "legacy counts",
+    "legacy formal-only count",
+    "legacy paper fraction",
+    "legacy numerical fraction uses planned denominator",
+    "legacy official mean is NaN",
+    "legacy crossing input is NaN",
+    "single status",
+    "single reportable gate",
+    "single mean",
+    "single SEM is undefined NaN",
+    "single conditional SEM is undefined NaN",
+    "loader accepts reportable",
+    "loader reportable mean",
+    "loader canonical plug-in label",
+    "invalid loader rejection: message contains size=2",
+    "invalid loader rejection: message contains q=0.05",
+    "invalid loader rejection: message contains SAMPLING_INSUFFICIENT",
+    "missing loader rejection: message contains size=2",
+    "missing loader rejection: message contains q=0.05",
+    "missing loader rejection: message contains INCOMPLETE",
+    "legacy loader rejection: message contains legacy_delta_only",
+    "legacy loader rejection: message contains formal-only",
+    "scan-v2 loader rejection: message contains exp101.scan.v2",
+    "scan-v2 loader rejection: message contains audit-only",
+    "scan-v2 loader rejection: message contains conditional means",
+    "exact producer: bound kind",
+    "exact producer: no confidence coverage",
+    "exact producer: algebraic fields populated",
+    "exact producer: estimated fields empty",
+    "exact producer weights exact",
+    "analytic endpoint producer: bound kind",
+    "analytic endpoint producer: no confidence coverage",
+    "analytic endpoint producer: algebraic fields populated",
+    "analytic endpoint producer: estimated fields empty",
+    "analytic endpoint weights exact",
+    "ordinary TI producer: bound kind",
+    "ordinary TI producer: no confidence coverage",
+    "ordinary TI producer: algebraic fields empty",
+    "ordinary TI producer: estimated fields populated",
+    "ordinary TI weights are estimated",
+    "sampled producer: bound kind",
+    "sampled producer: no confidence coverage",
+    "sampled producer: algebraic fields empty",
+    "sampled producer: estimated fields populated",
+    "sampled weights are estimated",
+    "sampled producer does not claim MAP success",
+    "sampled valid fixture passes estimator gates",
+    "sampled invalid producer: bound kind",
+    "sampled invalid producer: no confidence coverage",
+    "sampled invalid producer: all bound fields empty",
+    "sampled invalid raw U-statistic remains negative",
+    "sampled invalid physical-range gate",
+    "sampled invalid does not claim MAP success",
+    "legacy sampled producer: bound kind",
+    "legacy sampled producer: no confidence coverage",
+    "legacy sampled producer: all bound fields empty",
+    "legacy posterior purity hidden",
+    "posterior_statistics: bound kind",
+    "posterior_statistics: no confidence coverage",
+    "posterior_statistics: algebraic fields populated",
+    "posterior_statistics: estimated fields empty",
+    "posterior planted mass",
+    "posterior MAP success differs from planted mass",
+    "malformed weights reject with nonnegative",
+    "malformed weights reject with sum to 1",
+    "malformed weights reject with sum to 1",
+    "malformed weights reject with finite",
+    "malformed weights reject with finite",
+    "canonical plot label for full_sector_ti_plugin_no_coverage",
+    "canonical plot label for sampled_u_statistic_plugin_no_coverage"
+  ],
+  "bounds": {
+    "invalid_weight_rejections": [
+      {
+        "exception": "ValueError",
+        "message": "weights must be nonnegative",
+        "weights": [
+          -0.1,
+          1.1
+        ]
+      },
+      {
+        "exception": "ValueError",
+        "message": "weights must sum to 1 within absolute tolerance 1e-12",
+        "weights": [
+          0.1,
+          0.8
+        ]
+      },
+      {
+        "exception": "ValueError",
+        "message": "weights must sum to 1 within absolute tolerance 1e-12",
+        "weights": [
+          0.5,
+          0.500000000002
+        ]
+      },
+      {
+        "exception": "ValueError",
+        "message": "weights must be finite",
+        "weights": [
+          "NaN",
+          1.0
+        ]
+      },
+      {
+        "exception": "ValueError",
+        "message": "weights must be finite",
+        "weights": [
+          "Infinity",
+          0.0
+        ]
+      }
+    ],
+    "plug_in_plot_label": "Estimated MAP-purity bounds (plug-in; no confidence coverage)",
+    "producers": {
+      "analytic_endpoint": {
+        "algebraic_lower": 0.5,
+        "algebraic_upper": 0.7071067811865476,
+        "estimated_lower": null,
+        "estimated_upper": null,
+        "has_confidence_coverage": false,
+        "kind": "analytic_endpoint_algebraic",
+        "map_success_probability": 0.5,
+        "posterior_purity": 0.5,
+        "source": "src.sector_ti.run_sector_ti analytic endpoint",
+        "weights_are_exact_sector_posterior": true
+      },
+      "exact": {
+        "algebraic_lower": 0.7293942374374585,
+        "algebraic_upper": 0.854045805233805,
+        "estimated_lower": null,
+        "estimated_upper": null,
+        "has_confidence_coverage": false,
+        "kind": "exact_posterior_algebraic",
+        "map_success_probability": 0.8386696306413216,
+        "posterior_purity": 0.7293942374374585,
+        "source": "src.enumerate_exact.exact_reference",
+        "weights_are_exact_sector_posterior": true
+      },
+      "legacy": {
+        "algebraic_lower": null,
+        "algebraic_upper": null,
+        "estimated_lower": null,
+        "estimated_upper": null,
+        "has_confidence_coverage": false,
+        "kind": "unavailable",
+        "map_success_probability": null,
+        "posterior_purity": null,
+        "source": "src.run_scan._sampled_estimator_result legacy path",
+        "weights_are_exact_sector_posterior": false
+      },
+      "ordinary_ti": {
+        "algebraic_lower": null,
+        "algebraic_upper": null,
+        "estimated_lower": 0.6057999999999999,
+        "estimated_upper": 0.7783315488916018,
+        "has_confidence_coverage": false,
+        "kind": "full_sector_ti_plugin_no_coverage",
+        "map_success_probability": 0.73,
+        "posterior_purity": 0.6057999999999999,
+        "source": "src.sector_ti._attach_full_sector_statistics producer",
+        "weights_are_exact_sector_posterior": false
+      },
+      "posterior_statistics": {
+        "algebraic_lower": 0.8200000000000001,
+        "algebraic_upper": 0.9055385138137417,
+        "estimated_lower": null,
+        "estimated_upper": null,
+        "has_confidence_coverage": false,
+        "kind": "exact_posterior_algebraic",
+        "map_success_probability": 0.9,
+        "posterior_purity": 0.8200000000000001,
+        "source": "src.observables.posterior_statistics",
+        "weights_are_exact_sector_posterior": null
+      },
+      "sampled_invalid": {
+        "algebraic_lower": null,
+        "algebraic_upper": null,
+        "estimated_lower": null,
+        "estimated_upper": null,
+        "estimator_failure_reasons": [
+          "debiased_posterior_purity_out_of_range"
+        ],
+        "has_confidence_coverage": false,
+        "kind": "unavailable",
+        "map_success_probability": null,
+        "posterior_purity": 0.33333333333333337,
+        "raw_q_top_estimate": -0.3333333333333333,
+        "source": "src.run_scan._sampled_estimator_result",
+        "weights_are_exact_sector_posterior": false
+      },
+      "sampled_valid": {
+        "algebraic_lower": null,
+        "algebraic_upper": null,
+        "estimated_lower": 0.5591666666666667,
+        "estimated_upper": 0.7477744758058186,
+        "has_confidence_coverage": false,
+        "kind": "sampled_u_statistic_plugin_no_coverage",
+        "map_success_probability": null,
+        "posterior_purity": 0.5591666666666667,
+        "source": "src.run_scan._sampled_estimator_result",
+        "weights_are_exact_sector_posterior": false
+      }
+    }
+  },
+  "implementation_fingerprint": "0e215bb1481310daf44f36f63dee129a838e625f56feb4b6a477fa508e8aa8fe",
+  "physics_contract_version": "exp101.physics.v2",
+  "scan_contract_version": "exp101.scan.v3",
+  "status": "PASS"
+}

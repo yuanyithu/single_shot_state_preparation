@@ -1,9 +1,10 @@
 # exp101 physics contract
 
 - `physics_contract_version`: `exp101.physics.v2`
-- `scan_contract_version`: `exp101.scan.v2`
-- 生效日期：2026-07-13
-- 状态：物理定义已冻结；代码与 `validation/014_paper_alignment_20260713/` 的一致性验证 PASS
+- `scan_contract_version`: `exp101.scan.v3`
+- 生效日期：2026-07-14
+- 状态：物理定义由 `validation/014_paper_alignment_20260713/` 认证；scan v3 的正式 publication
+  聚合由 `validation/015_aggregation_safety_20260714/` 认证
 
 本文是 `data/expander_code/exp101/` 唯一的物理权威。`notes/`、`plan.md`、源码注释、
 测试和历史报告只能解释或验证本文，不得另立不同公式。若它们与本文冲突，以本文为准。
@@ -173,8 +174,10 @@ E_legacy(u) = K_p |u| + K_q |H_check u xor measurement_error|,
 故它只有 measurement-error disorder。`q=0` 时它是 clean kernel，与
 `true_posterior` 的 quenched coset 一般不同。legacy 输出中的 sector 数据只是形式上的回归量；
 只能保存在显式 `formal_*` 字段（以及 `largest_sector_mass`）中。论文语义的 weights、characters、
-`m_u`、`q_top`、posterior、MAP 与 bounds 字段必须为空，且 legacy task 不得进入论文 disorder
-average 或 crossing；数值 gate 通过时状态记为 `FORMAL_ONLY`，不得混称论文 `VALID`。
+`m_u`、`q_top`、posterior、MAP 与四个 algebraic/estimated bounds 字段必须为空；
+`map_success_bound_kind=unavailable`、`weights_are_exact_sector_posterior=false`。legacy task 不得进入
+论文 disorder average 或 crossing；数值 gate 通过时点级状态记为 `FORMAL_ONLY`，不得混称论文
+`VALID`。
 
 ## 6. 三种 section/decoder 不得混用
 
@@ -254,7 +257,7 @@ map_success_probability = max_l P(l).
 `q_top` 是归一化 purity，不等于 `posterior_purity`。planted mass 也不等于 MAP success；例如
 posterior `(0.1, 0.9)` 且 planted class 为 0 时，两者分别为 `0.1` 与 `0.9`。
 
-每个 true-posterior full-weight 样本必须验证
+对一个**精确且已归一化**的 true-posterior sector distribution，代数上必有
 
 ```text
 posterior_purity
@@ -269,6 +272,26 @@ posterior_purity
   <= map_success_probability
   <= sqrt([1 + (M-1) q_top] / M).
 ```
+
+`posterior_statistics()` 只有在输入 weights 全部有限、非负，且总和与 1 的绝对误差不超过
+`1e-12` 时才允许输出上述 algebraic bounds。非法输入必须直接报错；不得静默归一化、裁剪负值
+或把非 posterior 权重伪装成概率。
+
+scan v3 将 algebraic bounds 与估计 purity 的 plug-in bounds 分开：
+
+| 来源 | `weights_are_exact_sector_posterior` | bounds 字段 | `map_success_bound_kind` |
+|---|---:|---|---|
+| exact enumeration | `true` | `map_success_algebraic_lower_bound/upper_bound` | `exact_posterior_algebraic` |
+| `p=0`/`p=0.5` 解析 TI 端点 | `true` | `map_success_algebraic_lower_bound/upper_bound` | `analytic_endpoint_algebraic` |
+| 普通 full-sector TI | `false` | `map_success_estimated_lower_bound/upper_bound` | `full_sector_ti_plugin_no_coverage` |
+| 物理区间内且通过全部 disorder gate 的 sampled U-statistic | `false` | `map_success_estimated_lower_bound/upper_bound` | `sampled_u_statistic_plugin_no_coverage` |
+| 不可用、越界或 gate 失败 | `false` | 四个 bounds 字段均空 | `unavailable` |
+
+algebraic 与 estimated 字段不得同时填充。逐 disorder 必须保存
+`map_success_bound_has_confidence_coverage=false`：algebraic bounds 是确定性不等式而非置信区间；
+estimated bounds 是把估计 purity 代入不等式得到的 plug-in estimates，也没有置信覆盖。后者绘图
+标签固定为 `Estimated MAP-purity bounds (plug-in; no confidence coverage)`。sampled 路径真正的
+`map_success_probability` 始终为 `None`。
 
 公共字段 `w0` 被移除。legacy 模式不输出论文语义的
 `posterior_mass_on_planted_class` 或 `map_success_probability`。
@@ -298,12 +321,17 @@ m2_debiased_u
   = 2 / [C(C-1)] * sum_{a<b} m[a,u] m[b,u].
 ```
 
-`m2_debiased_u` 是独立链 U-statistic。必须另存 delete-one-chain jackknife 标准误。随机
-nonbasis 抽样误差使用有限总体修正，必须与链/MCMC 误差分开报告。
+`m2_debiased_u` 是独立链 U-statistic。无偏不等于逐次实现落在物理区间：真实二阶矩接近零时，
+有限样本 cross-product 可以为负，也可使估计 purity 或 `q_top` 超出物理范围。必须原样保存该
+raw estimator，不得 clipping。必须另存 delete-one-chain jackknife 标准误；随机 nonbasis 抽样
+误差使用有限总体修正，并与链/MCMC 误差分开报告。
 
 生产配置少于 4 条独立链不得进入 disorder average。若 debiased purity 或 `q_top` 超出物理
 范围，不得静默裁剪：保存 raw 值、标为无效、设置 `valid_for_aggregation=false`，并禁止生成
-成功率 bounds。
+成功率 bounds。只对落回物理区间的 realized estimates 做 valid-only 平均会产生条件选择偏差；
+因此此类均值只能保存为显式 `conditional_*_valid_only` 诊断，不能用于 publication、crossing
+或 FSS。若未来增加自适应采样，pilot 选预算与最终 certification 必须使用独立 seed，不能把
+pilot 中第一个落回物理区间的估计当作认证结果。
 
 ## 10. engine routing 与方法限制
 
@@ -339,15 +367,32 @@ sector weights 为 delta 分布。后者若同时 `q=0` 且 Gibbs syndrome 非�
   round trip；相邻温度的最小 swap rate 必须非零；pooled worst-basis-logical cold acceptance
   必须达到既有阈值。任一失败即 INVALID。
 
-`INVALID` chunk 保留完整诊断和失败原因，但不得进入 disorder mean、SEM、crossing 或成功率
-bounds。`mean_q_top_estimate` 及 SEM 只使用 `valid_for_aggregation=true` 的样本，并同时报告
-valid/formal-only/invalid/missing 与 numerically-valid 数量。比例字段分为
-`paper_aggregation_fraction` 与 `numerical_pass_fraction`；历史 `pass_fraction` 只作为前者的
-deprecated alias，不得解释为数值 gate 通过率。
+`INVALID` chunk 保留完整诊断、raw estimator 和失败原因。scan v3 在参数点层面严格
+fail-closed，设 planned/present/valid/invalid/missing disorder counts 分别为 `D/P/V/I/M`：
 
-## 12. v2 scan identity 与最小输出契约
+- `legacy_delta_only` 点为 `FORMAL_ONLY`，没有 publication 输出；
+- true-posterior 点只要 `M>0` 就是 `INCOMPLETE`；
+- true-posterior 点在 `M=0,I>0` 时是 `SAMPLING_INSUFFICIENT`；
+- 只有 `M=I=0` 且全部 planned disorders 有效时才是 `REPORTABLE`。
 
-v2 输出文件名为 `scan_results.npz`。任何 `exp101.scan.v1` chunk 均不可复用。
+状态保存为 `aggregation_status_per_point`，同时保存布尔
+`reportable_for_crossing_fss` 和固定、可审计的
+`aggregation_failure_reasons_per_point`。非 `REPORTABLE` 点的
+`mean_q_top_estimate`、`disorder_sem_q_top_estimate` 及安全兼容别名全部为 NaN；
+`q_top_crossing_input_per_disorder` 的整条 disorder 轴也必须置 NaN，而不是只屏蔽 invalid 项。
+单 disorder 点可以 `REPORTABLE`，但 SEM 按定义仍为 NaN。
+
+先于正式门禁计算的 valid-only 诊断只允许写入
+`conditional_mean_q_top_estimate_valid_only` 和
+`conditional_disorder_sem_q_top_estimate_valid_only`；它们不得进入 crossing/FSS。必须同时保存
+planned/present/valid/invalid/missing counts。`paper_aggregation_fraction` 与
+`numerical_pass_fraction` 都以 planned count `D` 为分母；含糊的公共 `pass_fraction` 在 v3
+删除，不保留 alias。该零 invalid、零 missing 策略是 scan v3 固定语义，不开放容忍阈值。
+
+## 12. v3 scan identity、publication loader 与最小输出契约
+
+v3 输出文件名仍为 `scan_results.npz`。任何 `exp101.scan.v1` 或 `exp101.scan.v2` chunk 均不可
+复用；v2 NPZ 只供审计，不能迁移或重新解释成 v3 publication 结果。
 
 task fingerprint 至少覆盖：physics/scan contract version、canonical ensemble、sector、family
 rule/seed、code fingerprint、requested/resolved engine、全部 sampler/estimator 配置。worker model
@@ -365,16 +410,34 @@ NPZ/manifest 至少保存：
 - 所有 absolute/relative per-chain means、raw/debiased per-character moments、两种 frame 的 q_top；
 - chain/jackknife 与 finite-population 两类误差；
 - 可得时的 absolute/relative weights、`posterior_purity`、
-  `posterior_mass_on_planted_class`、`map_success_probability` 与 bounds；
+  `posterior_mass_on_planted_class`、`map_success_probability`，以及互斥的 algebraic/estimated
+  MAP bounds、`map_success_bound_kind`、`map_success_bound_has_confidence_coverage` 和
+  `weights_are_exact_sector_posterior`；
 - `q_top_estimate_per_disorder`、`q_top_estimator_name`、validity mask、失败原因；
 - 完整 PT ladder、swap、round-trip、cold-acceptance、R-hat/ESS 与 gate diagnostics；
-- valid/invalid/missing counts，以及仅由 valid 样本得到的 mean/SEM/crossing inputs。
+- planned/present/valid/invalid/missing counts、planned-denominator fractions、点级 status/reasons；
+- fail-closed 的正式 mean/SEM/crossing inputs，以及明确仅供诊断的 conditional valid-only mean/SEM。
 
 TI 的主结果来自 full sector weights；sampled 路径的主结果来自 debiased estimator。
 
+manifest 必须包含固定 `aggregation_policy`，声明 planned denominator、invalid/missing 零容忍、
+conditional statistics 仅供诊断，以及整点 crossing fail-closed；不得用隐藏配置改变这些语义。
+
+所有 publication、crossing 与 FSS 分析必须通过
+`src.scan_results.load_publication_q_top(path, point_mask=None)`。`point_mask` 只能选择预先指定的
+分析区域，loader 只接受 `exp101.scan.v3`、canonical `true_posterior`，并验证所选点全部为
+`REPORTABLE`、没有 invalid/missing、正式 mean 与逐 disorder crossing 数据一致。对 v2、legacy、
+采样不足、缺失或恶意不一致 schema 必须分别报错，并列出 size、q 与失败原因；不得提供从 v2
+valid-only 条件均值推断 publication eligibility 的回退路径。loader 同时提供 bound kind 到绘图
+标签的唯一映射；两个 plug-in kind 都必须映射到
+`Estimated MAP-purity bounds (plug-in; no confidence coverage)`。
+
 ## 13. 决定性验证
 
-`validation/014_paper_alignment_20260713/` 是 v2 的唯一当前认证目录。至少需要锁定：
+`validation/014_paper_alignment_20260713/` 继续认证 `exp101.physics.v2` 的 raw/reduced 等价、模型
+接线与 estimator 基础；其中 scan v2 的 valid-only 聚合行为只作历史审计，不再认证 publication
+aggregation。`validation/015_aggregation_safety_20260714/` 是 scan v3 的唯一认证目录。两者合计
+至少需要锁定：
 
 1. 原始 preparation 与 reduced posterior 的逐构型、Z、sector weights、q_top、MAP 完全相等；
 2. 固定 `effective_syndrome` 时 true energy 不读取 `epsilon_data_true`；
@@ -383,13 +446,18 @@ TI 的主结果来自 full sector weights；sampled 路径的主结果来自 deb
 5. alias 与 canonical 名 seed/结果相同，manifest 只存 canonical；
 6. x_error/H_Z 对应 `|+>_L`，对偶 z_error/H_X 对应 `|0>_L`；
 7. absolute/relative Mattis 关系、boundary-only invariance 与一般 logical shift 非不变反例；
-8. planted mass 与 MAP 的 `(0.1,0.9)` 反例及 purity bounds；
-9. basis/nonbasis 加权、独立链 U-statistic、jackknife 与有限总体误差；
+8. planted mass 与 MAP 的 `(0.1,0.9)` 反例、非法 weights 拒绝及 algebraic/plugin bounds 分流；
+9. basis/nonbasis 加权、可为负的独立链 U-statistic、jackknife 与有限总体误差；
 10. large-k TI 拒绝、gap diagnostics 无 q_top、auto 三路路由；
-11. PT transport 失败导致 INVALID，INVALID 不进入 aggregate；
-12. 80-character 不截断、完整 schema/fingerprint/chunk 隔离；
-13. exact oracle 输出 full absolute/relative weights、all characters 与全部 posterior statistics；
-14. 全仓库错误叙述扫描，以及 conda `12` 下全部 exp101 tests。
+11. PT transport 失败导致 INVALID，任一 invalid/missing 关闭整点正式 aggregate/crossing；
+12. REPORTABLE/SAMPLING_INSUFFICIENT/INCOMPLETE/FORMAL_ONLY、planned-denominator fractions、
+    conditional-only 统计与单 disorder SEM；
+13. publication loader 成功、point mask、v2/legacy/失败点拒绝及 schema tamper 拒绝；
+14. exact/解析端点/普通 TI/sampled-valid/sampled-invalid/legacy 的 bounds kind 与字段互斥；
+15. 80-character 不截断、完整 v3 schema/fingerprint 及 v1/v2 chunk 隔离；
+16. exact oracle 输出 full absolute/relative weights、all characters 与全部 posterior statistics；
+17. 全仓库错误叙述扫描，以及 conda `12` 下全部 exp101 tests。
 
 旧 `259 tests` 与 `validation/001`–`013` 一律标记为 `PRE_ALIGNMENT`，只能作为历史调试证据，
-不能认证本契约。只有 014 全部通过后，`status.md` 才可恢复 `DONE`。
+不能认证本契约。014 的 physics 证据与 015 的 scan v3 证据现均已通过，`status.md` 为
+`DONE — exp101.physics.v2 / exp101.scan.v3`。

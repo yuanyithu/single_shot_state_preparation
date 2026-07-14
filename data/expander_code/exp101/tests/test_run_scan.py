@@ -97,8 +97,13 @@ class TestScanEndToEnd:
                 "git_worktree_dirty", "per_size_code_fingerprint",
                 "per_size_section_fingerprint",
                 "per_size_observable_frame_fingerprint",
+                "aggregation_policy",
+                "planned_disorder_count", "present_disorder_count",
                 "valid_disorder_count", "numerically_valid_disorder_count",
                 "invalid_disorder_count", "missing_disorder_count",
+                "aggregation_status_per_point",
+                "aggregation_failure_reasons_per_point",
+                "reportable_for_crossing_fss",
                 "fraction_semantics",
             }
             assert required_manifest_fields <= set(manifest)
@@ -125,6 +130,19 @@ class TestScanEndToEnd:
                 "posterior_purity_per_disorder",
                 "posterior_mass_on_planted_class_per_disorder",
                 "map_success_probability_per_disorder",
+                "map_success_algebraic_lower_bound_per_disorder",
+                "map_success_algebraic_upper_bound_per_disorder",
+                "map_success_estimated_lower_bound_per_disorder",
+                "map_success_estimated_upper_bound_per_disorder",
+                "map_success_bound_kind_per_disorder",
+                "map_success_bound_has_confidence_coverage_per_disorder",
+                "mean_q_top_estimate", "disorder_sem_q_top_estimate",
+                "conditional_mean_q_top_estimate_valid_only",
+                "conditional_disorder_sem_q_top_estimate_valid_only",
+                "aggregation_status_per_point",
+                "aggregation_failure_reasons_per_point",
+                "reportable_for_crossing_fss",
+                "planned_disorder_count", "present_disorder_count",
                 "valid_for_aggregation", "numerically_valid", "formal_only",
                 "failure_reasons_per_disorder",
                 "implementation_fingerprint_per_disorder",
@@ -141,7 +159,6 @@ class TestScanEndToEnd:
                 "gate_diagnostics_json_per_disorder",
                 "ti_endpoint_mode_per_disorder",
                 "paper_aggregation_fraction", "numerical_pass_fraction",
-                "pass_fraction",
             }
             assert required_npz_fields <= set(data.files)
             assert manifest["protocol"] == PROTOCOL_VERSION
@@ -156,6 +173,17 @@ class TestScanEndToEnd:
             assert len(manifest["implementation_fingerprint"]) == 64
             assert manifest["state_prep_protocol"] == "plus_Zcheck_X"
             assert manifest["syndrome_semantics"] == "effective_y"
+            assert manifest["aggregation_policy"] == {
+                "point_eligibility": "all_planned_disorders_valid",
+                "fraction_denominator": "planned_disorders",
+                "maximum_invalid_disorders": 0,
+                "maximum_missing_disorders": 0,
+                "conditional_statistics_purpose": "diagnostics_only",
+                "conditional_statistics_are_publication_eligible": False,
+                "crossing_input_policy": (
+                    "whole_point_nan_unless_reportable"
+                ),
+            }
             resolved_config = manifest["resolved_engine_configs"][
                 ENGINE_FULL_TI
             ][0]
@@ -185,6 +213,30 @@ class TestScanEndToEnd:
                 "weights_are_exact_sector_posterior_per_disorder"
             ].any()
             assert data["weights_cover_all_sectors_per_disorder"].all()
+            assert np.isnan(data[
+                "map_success_algebraic_lower_bound_per_disorder"
+            ]).all()
+            estimated_finite = np.isfinite(data[
+                "map_success_estimated_lower_bound_per_disorder"
+            ])
+            assert np.array_equal(
+                estimated_finite, data["valid_for_aggregation"]
+            )
+            expected_kinds = np.where(
+                data["valid_for_aggregation"],
+                "full_sector_ti_plugin_no_coverage",
+                "unavailable",
+            )
+            assert np.array_equal(
+                data["map_success_bound_kind_per_disorder"],
+                expected_kinds,
+            )
+            assert not data[
+                "map_success_bound_has_confidence_coverage_per_disorder"
+            ].any()
+            assert "pass_fraction" not in data.files
+            assert "map_success_lower_bound_per_disorder" not in data.files
+            assert "map_success_upper_bound_per_disorder" not in data.files
         # 无 .tmp 残留（原子写）
         assert not list((out / "chunks").glob("*.tmp"))
 
@@ -208,12 +260,16 @@ class TestScanEndToEnd:
                 data["failure_reasons_per_disorder"][0, 0, 0]
             )
             assert np.isnan(data["mean_q_top_estimate"][0, 0])
-            assert np.isnan(
-                data["map_success_lower_bound_per_disorder"][0, 0, 0]
-            )
-            assert np.isnan(
-                data["map_success_upper_bound_per_disorder"][0, 0, 0]
-            )
+            for name in (
+                "map_success_algebraic_lower_bound_per_disorder",
+                "map_success_algebraic_upper_bound_per_disorder",
+                "map_success_estimated_lower_bound_per_disorder",
+                "map_success_estimated_upper_bound_per_disorder",
+            ):
+                assert np.isnan(data[name][0, 0, 0])
+            assert str(data[
+                "map_success_bound_kind_per_disorder"
+            ][0, 0, 0]) == "unavailable"
 
     @pytest.mark.parametrize(
         ("p_value", "endpoint_mode", "expected_q_top", "expected_weights"),
@@ -244,6 +300,18 @@ class TestScanEndToEnd:
             )
             assert data["q_top_stderr_per_disorder"][0, 0, 0] == 0.0
             assert data["ti_grid_tv_per_disorder"][0, 0, 0] == 0.0
+            assert data[
+                "weights_are_exact_sector_posterior_per_disorder"
+            ][0, 0, 0]
+            assert str(data[
+                "map_success_bound_kind_per_disorder"
+            ][0, 0, 0]) == "analytic_endpoint_algebraic"
+            assert np.isfinite(data[
+                "map_success_algebraic_lower_bound_per_disorder"
+            ][0, 0, 0])
+            assert np.isnan(data[
+                "map_success_estimated_lower_bound_per_disorder"
+            ][0, 0, 0])
             infinite_mask = data[
                 "delta_f_infinite_mask_per_disorder"
             ][0, 0, 0]
@@ -356,12 +424,13 @@ class TestScanEndToEnd:
             assert data["invalid_disorder_count"][0, 0] == 0
             assert data["paper_aggregation_fraction"][0, 0] == 0.0
             assert data["numerical_pass_fraction"][0, 0] == 1.0
-            assert data["pass_fraction"][0, 0] \
-                == data["paper_aggregation_fraction"][0, 0]
+            assert "pass_fraction" not in data.files
+            assert str(data["aggregation_status_per_point"][0, 0]) \
+                == "FORMAL_ONLY"
+            assert not data["reportable_for_crossing_fss"][0, 0]
             manifest = json.loads(str(data["manifest_json"]))
             assert manifest["numerically_valid_disorder_count"] == [[1]]
-            assert manifest["fraction_semantics"]["pass_fraction"] \
-                == "deprecated alias of paper_aggregation_fraction"
+            assert "pass_fraction" not in manifest["fraction_semantics"]
         chunk = next((tmp_path / "legacy_direct" / "chunks").glob("*.json"))
         task = json.loads(chunk.read_text(encoding="utf-8"))["result"]
         assert task["task_status"] == "FORMAL_ONLY"
@@ -448,12 +517,16 @@ class TestScanEndToEnd:
             assert "debiased_posterior_purity_out_of_range" in str(
                 data["failure_reasons_per_disorder"][0, 0, 0]
             )
-            assert np.isnan(
-                data["map_success_lower_bound_per_disorder"][0, 0, 0]
-            )
-            assert np.isnan(
-                data["map_success_upper_bound_per_disorder"][0, 0, 0]
-            )
+            for name in (
+                "map_success_algebraic_lower_bound_per_disorder",
+                "map_success_algebraic_upper_bound_per_disorder",
+                "map_success_estimated_lower_bound_per_disorder",
+                "map_success_estimated_upper_bound_per_disorder",
+            ):
+                assert np.isnan(data[name][0, 0, 0])
+            assert str(data[
+                "map_success_bound_kind_per_disorder"
+            ][0, 0, 0]) == "unavailable"
 
     def test_direct_gate_failure_marks_worker_result_invalid(
         self, tmp_path
@@ -600,9 +673,62 @@ class TestParallelism:
             flags = data["flags_per_disorder"].astype(str)
             assert (flags == "MISSING").sum() == 1
             assert np.isfinite(data["q_top_estimate_per_disorder"]).sum() == 3
+            incomplete = data["missing_disorder_count"] > 0
+            assert incomplete.sum() == 1
+            assert np.all(data["planned_disorder_count"] == 2)
+            assert data["present_disorder_count"][incomplete].item() == 1
+            assert str(data["aggregation_status_per_point"][
+                incomplete
+            ].item()) == "INCOMPLETE"
+            assert not data["reportable_for_crossing_fss"][
+                incomplete
+            ].item()
+            assert np.isnan(data["mean_q_top_estimate"][incomplete]).all()
+            assert np.isnan(data[
+                "q_top_crossing_input_per_disorder"
+            ][incomplete]).all()
+            valid_count = data["valid_disorder_count"][incomplete].item()
+            conditional = data[
+                "conditional_mean_q_top_estimate_valid_only"
+            ][incomplete].item()
+            assert np.isfinite(conditional) == (valid_count > 0)
+            assert data["paper_aggregation_fraction"][incomplete].item() \
+                == valid_count / 2
+            numerical_count = data[
+                "numerically_valid_disorder_count"
+            ][incomplete].item()
+            assert data["numerical_pass_fraction"][incomplete].item() \
+                == numerical_count / 2
+
+    def test_merge_all_missing_still_emits_incomplete_audit_result(
+        self, tmp_path
+    ):
+        out = tmp_path / "all_missing"
+        scan(
+            out, "surface", [2], 0.12, [0.08], 2,
+            engine="ti", engine_config=FAST_TI,
+        )
+        for chunk in (out / "chunks").glob("task_*.json"):
+            chunk.unlink()
+        npz_path = merge(
+            out, "surface", [2], 0.12, [0.08], 2, "x_error",
+            "true_posterior", "ti", FAST_TI, "full_rank",
+        )
+        with np.load(npz_path) as data:
+            assert str(data["aggregation_status_per_point"][0, 0]) \
+                == "INCOMPLETE"
+            assert data["planned_disorder_count"][0, 0] == 2
+            assert data["present_disorder_count"][0, 0] == 0
+            assert data["missing_disorder_count"][0, 0] == 2
+            assert data["paper_aggregation_fraction"][0, 0] == 0.0
+            assert data["numerical_pass_fraction"][0, 0] == 0.0
+            assert np.isnan(data["mean_q_top_estimate"][0, 0])
+            assert np.isnan(
+                data["q_top_crossing_input_per_disorder"][0, 0]
+            ).all()
 
 
-class TestV2RoutingAndIdentity:
+class TestV3RoutingAndIdentity:
     def test_auto_routes_all_three_production_paths(self):
         assert state_prep_protocol_for_sector("x_error") \
             == "plus_Zcheck_X"
@@ -781,6 +907,33 @@ class TestV2RoutingAndIdentity:
         assert json.loads(chunk.read_text(encoding="utf-8"))["protocol"] \
             == PROTOCOL_VERSION
 
+    def test_v2_chunk_with_matching_fingerprints_is_never_reused(
+        self, tmp_path
+    ):
+        output = tmp_path / "v2_isolation"
+        scan(
+            output, "surface", [2], 0.12, [0.08], 1,
+            engine="ti", engine_config=FAST_TI,
+        )
+        chunk = next((output / "chunks").glob("task_*.json"))
+        payload = json.loads(chunk.read_text(encoding="utf-8"))
+        payload["protocol"] = "exp101.scan.v2"
+        payload["result"]["scan_contract_version"] = "exp101.scan.v2"
+        payload["result"]["q_top_estimate"] = 999.0
+        chunk.write_text(json.dumps(payload), encoding="utf-8")
+
+        npz_path, report = scan(
+            output, "surface", [2], 0.12, [0.08], 1,
+            engine="ti", engine_config=FAST_TI,
+        )
+        assert report["computed"] == 1 and report["reused"] == 0
+        repaired = json.loads(chunk.read_text(encoding="utf-8"))
+        assert repaired["protocol"] == PROTOCOL_VERSION
+        assert repaired["result"]["scan_contract_version"] \
+            == PROTOCOL_VERSION
+        with np.load(npz_path) as data:
+            assert data["q_top_estimate_per_disorder"][0, 0, 0] != 999.0
+
     def test_model_cache_key_isolates_all_family_configuration(self):
         baseline = _model_cache_key(
             "expander34", 2, "x_error", "full_rank", 11
@@ -866,12 +1019,16 @@ class TestV2RoutingAndIdentity:
             assert "pt_instance_round_trips_insufficient" in str(
                 data["failure_reasons_per_disorder"][0, 0, 0]
             )
-            assert np.isnan(
-                data["map_success_lower_bound_per_disorder"][0, 0, 0]
-            )
-            assert np.isnan(
-                data["map_success_upper_bound_per_disorder"][0, 0, 0]
-            )
+            for name in (
+                "map_success_algebraic_lower_bound_per_disorder",
+                "map_success_algebraic_upper_bound_per_disorder",
+                "map_success_estimated_lower_bound_per_disorder",
+                "map_success_estimated_upper_bound_per_disorder",
+            ):
+                assert np.isnan(data[name][0, 0, 0])
+            assert str(data[
+                "map_success_bound_kind_per_disorder"
+            ][0, 0, 0]) == "unavailable"
             assert np.isnan(
                 data["q_top_crossing_input_per_disorder"][0, 0, 0]
             )

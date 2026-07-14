@@ -1,10 +1,12 @@
 # exp101 论文语义对齐报告
 
-日期：2026-07-13。物理权威：`PHYSICS_CONTRACT.md`（`exp101.physics.v2`）。
+物理对齐日期：2026-07-13；scan v3 聚合勘误：2026-07-14。物理权威：
+`PHYSICS_CONTRACT.md`（`exp101.physics.v2`）。
 
 本文把用户提供的 `文章.tex`、论文的 reduced canonical formula、代码接口和决定性测试逐项对应。
-它是可审计映射，不是第二份物理契约。当前状态为 **DONE**；下表测试均已在
-`validation/014_paper_alignment_20260713/` 留下完整证据。
+它是可审计映射，不是第二份物理契约。physics v2 状态为 **DONE**，并已在
+`validation/014_paper_alignment_20260713/` 留下完整证据；scan v3 publication aggregation 当前为
+**DONE**，由 `validation/015_aggregation_safety_20260714/` 认证。
 
 ## 1. 对齐结论
 
@@ -22,6 +24,8 @@
    掩盖了这一点，v2 删除该公共字段。
 6. 旧 large-k pairwise-TI 只能保留为 basis free-energy-gap diagnostics；不能构造 `m_u` 或
    `q_top`。生产 large-k 必须走 PT/q=0 多起点 observable sampling。
+7. 无偏 U-statistic 的有限样本实现可为负或越界，不能裁剪；只保留 valid realized estimates 的
+   条件均值有选择偏差。scan v3 因此要求参数点零 invalid、零 missing，并强制统一 publication loader。
 
 ## 2. 公式、代码与测试映射
 
@@ -32,7 +36,7 @@
 | `state preparation process` | 从 product `+` state 测 Z stabilizers，得到 preparation-induced X channel | 锁定 `x_error/H_Z/|+>_L` convention；channel 本身不逐步模拟 |
 | `Statistical Mechanical Mapping` | `Z(s,sigma_eta)=sum_c q(H_Z c+s)p(c+eta)` 与 logical-class MLD | 枚举原始 `a` 后以 `e=a xor F_total` 双射约化到 canonical posterior |
 | `Order Parameter` | `m_u` 是 sector posterior 的 Fourier transform；`q_top=(2^k-1)^-1 sum_{u!=0}m_u^2` | absolute/relative characters 与 normalized purity |
-| theorem `Logical Wilson loops and MLD success probability` | Fourier inversion、MAP 与 purity bounds | full weights 输出 `map_success_probability`，并检查 `purity <= MAP <= sqrt(purity)` |
+| theorem `Logical Wilson loops and MLD success probability` | Fourier inversion、MAP 与 purity bounds | exact/解析 posterior 输出 algebraic bounds；普通 TI/sampled 只输出明确无覆盖的 plug-in estimates |
 | `correction`, `eq:correct-Ou-nonlinear` / `eq:Ou-full-nonlinear` | 任意 section 下以 `c+r(Hc)` 读 logical class，Mattis sign 单独分离 | `m_absolute` 直接测量，`m_relative=sign*m_absolute`；不恢复旧 factorized shortcut |
 | proposition `boundary-shift-invariance` | section 逐 syndrome 加 boundary 时 sector posterior 不变 | 只锁定 boundary-only invariance，并增加一般 logical shift 非不变反例 |
 
@@ -55,17 +59,18 @@
 | posterior purity | `sum_l P(l)^2` | exact/TI/stat helpers | Parseval 与 characters 精确对拍 | 曾把 `q_top` 直接称 purity |
 | normalized `q_top` | `(2^k purity-1)/(2^k-1)` | `src/observables.py`, `src/sector_ti.py` | weights/characters 两路一致 | sampled 路径曾只平均 nonbasis，且直接平方有正偏 |
 | planted mass | `P(planted_logical_class)` | full-weight true-posterior outputs | posterior `(0.1,0.9)` planted=0 -> `0.1` | 公共名 `w0` 被误当 decoder success |
-| MAP success | `max_l P(l)` | exact/TI full weights | 上例 MAP=`0.9`；purity bounds | 未作为独立统计量输出 |
+| MAP success | exact posterior 上为 `max_l P(l)`；sampled 路径不声称直接 MAP | exact/解析端点；TI/sampled bounds metadata | 上例 MAP=`0.9`；非法 weights 拒绝；algebraic/estimated 字段互斥 | 未作为独立统计量输出，或把估计 bounds 混称 algebraic |
 | sampled character 总体均值 | `[sum_basis+(N-k)mean_nonbasis]/N` | `src/observables.py` | 人工 character 表精确命中 | nonbasis mean 冒充全部非零 character mean |
-| MCMC square 去偏 | 独立链 pair cross-product U-statistic | direct/q0/PT aggregation | Bernoulli 重复实验：raw 正偏、U-stat 无偏、jackknife 合理 | pooled chain mean 的平方保留有限样本正偏 |
+| MCMC square 去偏 | 独立链 pair cross-product U-statistic；raw 可负/越界 | direct/q0/PT aggregation | 零真值附近保留负估计；越界使 disorder INVALID；不 clipping | pooled chain mean 的平方保留有限样本正偏 |
 | full-sector TI | 仅 `k<=10` | `src/sector_ti.py`, preflight | `k>10 + ti` 建任务前报错 | 入口可在 large-k 落入 pairwise 路径 |
 | TI 不确定度 | 独立 sector chain 必须独立 block bootstrap | `src/sector_ti.py` | 人工同序 block 表证明共享 indices 会把 gap stderr 错压为 0 | 把独立链误当 paired samples，制造虚假 covariance |
 | TI data-noise 端点 | `p=0.5` uniform、`p=0` class-0 delta 的解析 full-sector 结果 | `src/sector_ti.py`, scan schema | auto 路由端到端 weights/q_top/zero stderr/infinite mask | finite-positive `K_p` guard 与公开概率边界不闭合 |
 | pairwise diagnostics | 仅 basis-sector free-energy gaps | 独立 diagnostics API | 输出 key 扫描不得含 `m_u/q_top` | 曾假定 sector free energy 可加并合成 q_top |
 | auto routing | small-k full TI；large-k q>0 PT；large-k q=0 8-start | `src/run_scan.py` | 三路参数化测试 | 默认 TI，PT 未进入统一 scan |
 | PT validity | 4 个独立实例；冷端 R-hat/ESS；每实例 round trip；min swap 与 worst basis acceptance | `src/pt.py`, `src/gates.py`, scan worker | 人工 round-trip failure -> `INVALID` | 单实例 transport summary 不足以认证二阶矩 |
-| scan identity | `exp101.scan.v2`, `scan_results.npz`, full task fingerprint | `src/run_scan.py` | v1 不复用；family/sector/config 隔离；80 characters 不截断 | v1 `sector_ti_results.npz`、cache/task identity 覆盖不足 |
-| aggregate | 只用 `valid_for_aggregation=true` | scan merge | INVALID 不改变 mean，valid/invalid/missing 计数正确 | 失败样本与 missing 的聚合语义不完整 |
+| scan identity | `exp101.scan.v3`, `scan_results.npz`, full task fingerprint | `src/run_scan.py` | v1/v2 不复用；family/sector/config 隔离；80 characters 不截断 | v1 `sector_ti_results.npz`、v2 fail-open schema、cache/task identity 覆盖不足 |
+| aggregate | 仅零 invalid、零 missing 的整点可 `REPORTABLE` | scan merge | all-valid/invalid/missing/legacy/single-disorder；planned denominator；整点 crossing fail-closed | v2 在部分 valid 时仍发布条件 mean/SEM/crossing |
+| publication read | 所选点必须全为 v3 true-posterior `REPORTABLE` | `src/scan_results.py` | 成功/point mask；v2、legacy、失败点、tampered schema 均硬拒绝 | 分析脚本可绕过 validity 字段直接读 NPZ |
 
 ## 3. 统计量关系的最小反例
 
@@ -98,9 +103,13 @@ golden test 枚举原始变量只是证明 reduced formula 与论文求和逐项
 ## 5. 证据状态
 
 - `validation/001`–`013`：`PRE_ALIGNMENT`；可保留真实历史数值，但不认证 v2。
-- `validation/014_paper_alignment_20260713/`：v2 权威认证目录；完整 pytest、exact JSON/Markdown、
-  PT/aggregation integration 与 reproducibility metadata 均为 PASS。
+- `validation/014_paper_alignment_20260713/`：physics v2 权威认证目录；完整 pytest、exact
+  JSON/Markdown、PT disorder-gate integration 与 reproducibility metadata 均为 PASS。其 scan v2
+  valid-only aggregation 只作历史审计，不认证 publication aggregation。
+- `validation/015_aggregation_safety_20260714/`：scan v3 唯一认证目录；deterministic
+  aggregation/bounds/loader evidence 与完整 conda `12` pytest 均已通过。
 - `report.md`：历史报告，顶部 erratum 控制解释；不得再引用旧“259 tests + V1–V6”作为当前通过。
 
-最终验收依据不是测试数量，而是本表每条物理等价、统计估计、路由、gate 与 schema 契约都有
-独立决定性测试且 014 留档完整；本次两项均已满足。
+最终验收依据不是测试数量：物理等价、模型接线与 disorder-level gate 由 014 留档；scan v3 的
+点级 fail-closed、bounds kind、loader 与 schema isolation 必须由 015 留档。只有两部分证据都有效，
+当前交付已标 `DONE — exp101.physics.v2 / exp101.scan.v3`。

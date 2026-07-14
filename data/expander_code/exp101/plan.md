@@ -1,84 +1,102 @@
-# exp101 v2 论文语义对齐与数值管线修复计划
+# exp101 scan v3：参数点级 Fail-Closed 与 MAP bounds 语义修正
 
-日期：2026-07-13。当前状态：`DONE`。唯一物理权威：
-`PHYSICS_CONTRACT.md`（`exp101.physics.v2`）；扫描协议：`exp101.scan.v2`。
+日期：2026-07-14。当前状态：`DONE`。唯一物理权威：
+`PHYSICS_CONTRACT.md`（`exp101.physics.v2`）；扫描协议：`exp101.scan.v3`。
+
+本轮不修改 physics v2，不重新解释或迁移 scan v2 结果。014 继续认证 physics v2；
+`validation/015_aggregation_safety_20260714/` 与完整测试已通过，scan v3 为 `DONE`。
 
 ## 1. 已冻结决策
 
-- 生产固定 `sector=x_error`、`ensemble=true_posterior`；不再询问 true/legacy 二选一。
-- x-error convention 是 `H_Z/H_X rows/logical_X/logical_Z/|+>_L`；对偶 z-error 对应 `|0>_L`。
-- exp101 实现 reduced MLD posterior，不实现完整 preparation/Clifford channel。
-- canonical energy 为 `Kp|e|+Kq|H_check e xor effective_syndrome|`，不直接读取真实错误。
-- 正式 ensemble 名是 `true_posterior`、`legacy_delta_only`；两个旧名只作 deprecated alias。
-- full TI 只允许 `k<=10`；large-k pairwise 只作 free-energy-gap diagnostics。
-- v1 chunk 永不复用；当前验证只认 `validation/014_paper_alignment_20260713/`。
+- 生产固定 `sector=x_error`、`ensemble=true_posterior`；canonical energy、矩阵接线和三类 section
+  边界保持 physics v2。
+- v1/v2 chunk 永不复用于 v3；v2 NPZ 只作审计，禁止进入 publication 分析。
+- 正式聚合零容忍 invalid/missing，不提供隐含阈值或自动重采样。
+- 本轮不实现 adaptive retry、checkpoint/续链、crossing 拟合或 FSS/data collapse。
+- sampled 的 `map_success_probability` 保持 `None`；只允许从有效估计 purity 生成明确无置信覆盖的
+  plug-in estimated bounds。
+- 后续若增加 adaptive sampling，必须以 pilot seed 选预算，再用独立 certification seed；不得接受
+  pilot 中第一个落回物理区间的估计。
 
 ## 2. 工作包与验收条件
 
 | 工作包 | 内容 | 当前状态 | 验收条件 |
 |---|---|---|---|
-| P0 契约与文档 | 唯一 physics contract、局部 AGENTS、notes、erratum、alignment report、validation index | PASS | 文档无双权威/错误 mapping/旧 PASS 冒充 |
-| P1 模型变量 | disorder 正式字段；Gibbs/planted wiring 拆分；canonical alias normalization | PASS | energy independence、true-vs-legacy、q=0、alias tests |
-| P2 section/observable | 三类 section 命名；absolute/relative 双输出；boundary-only invariance | PASS | domain guard、Mattis sign、logical-shift 反例 |
-| P3 统计量 | 删除 w0；purity/planted/MAP；basis/nonbasis 加权；U-stat/jackknife/FPC | PASS | 人工 posterior/character 表与 Bernoulli 重复实验 |
-| P4 engine/gates | auto 三路；TI hard guard；gap-only API；四实例 PT；INVALID 传播 | PASS | routing、large-k rejection、PT failure integration |
-| P5 scan v2 | 完整 task fingerprint/cache key；`scan_results.npz`；动态 character 维；valid-only aggregate | PASS | v1 isolation、80 chars、schema、invalid-safe mean |
-| P6 exact oracle | raw preparation/reduced canonical 枚举与完整 posterior statistics | PASS | 逐构型、Z、sector weights、q_top、MAP 全相等 |
-| P7 validation/交付 | conda 12 全测试、014 证据、report/status/实验报告、scoped commit/push | PASS | 014 权威证据；scoped commit/push 随本次交付完成 |
+| P0 protocol identity | protocol/task/chunk/manifest 升为 scan v3 | PASS | v1/v2 chunk isolation、fingerprint/schema tests |
+| P1 点级聚合 | REPORTABLE/SAMPLING_INSUFFICIENT/INCOMPLETE/FORMAL_ONLY | PASS | all-valid、invalid、missing、legacy、single-disorder tests |
+| P2 诊断与比例 | conditional valid-only mean/SEM；planned denominator；删除 pass_fraction | PASS | selection-bias 文档、counts/fractions/schema tests |
+| P3 MAP bounds | algebraic 与 estimated 字段分流；五种 kind；no-coverage metadata | PASS | exact/endpoint/TI/sampled/legacy/非法 weights tests |
+| P4 publication loader | 统一读取入口与 point mask；v2/legacy/failure/tamper 硬拒绝 | PASS | loader 成功和错误信息 tests |
+| P5 文档与认证 | 当前文档、015、完整 conda 12 pytest、实验报告 | PASS | 015 overall PASS，status 已更新为 DONE |
 
-## 3. 决定性测试矩阵
+## 3. scan v3 聚合契约
 
-### A. 物理语义
+设参数点 planned/present/valid/invalid/missing counts 为 `D/P/V/I/M`：
 
-1. 小 CSS 码遍历 `sigma_prep/measurement_error/epsilon_data_true/a`，验证 raw/reduced 单构型
-   weight、partition function、sector weights、q_top、MAP 完全相等。
-2. 固定 `effective_syndrome` 时 true energy 对 `epsilon_data_true` 不敏感。
-3. shifted-coordinate identity 逐构型成立。
-4. `H epsilon_data_true != 0` 时 true 与 legacy 不同；q=0 是 quenched coset vs clean kernel。
-5. alias 与 canonical 的 seed、task fingerprint、结果一致，manifest 只存 canonical。
-6. x/H_Z=`|+>_L`、z/H_X=`|0>_L` convention 锁死。
+1. `legacy_delta_only` -> `FORMAL_ONLY`；
+2. true posterior 且 `M>0` -> `INCOMPLETE`；
+3. true posterior 且 `M=0,I>0` -> `SAMPLING_INSUFFICIENT`；
+4. true posterior 且 `M=I=0` -> `REPORTABLE`。
 
-### B. logical statistics
+仅 `REPORTABLE` 点填正式 `mean_q_top_estimate`、`disorder_sem_q_top_estimate` 和逐 disorder
+crossing input。任何其它状态都令正式 mean/SEM 与整条 crossing input 为 NaN。单 disorder 点可以
+reportable，但 SEM 为 NaN。
 
-1. absolute/relative 每个 character 满足 planted sign；weights 是 sector translation。
-2. boundary-only section shift 不变；一般 logical shift 构造可观察反例。
-3. `(0.1,0.9)` 锁死 planted mass 0.1、MAP 0.9；purity/MAP bounds 成立。
-4. 人工 character 表验证 basis/nonbasis 总体加权。
-5. 独立 Bernoulli chains 验证 pooled square 正偏、cross-product 无偏、jackknife 合理。
-6. debiased purity 越界保留 raw、标 INVALID、无 success bounds。
+merge 仍先计算
+`conditional_mean_q_top_estimate_valid_only` 与
+`conditional_disorder_sem_q_top_estimate_valid_only`，但它们条件化在 gate 通过事件上，仅供诊断，
+不得用于 crossing/FSS。`paper_aggregation_fraction` 与 `numerical_pass_fraction` 均以 `D` 为分母；
+v3 删除 `pass_fraction`。manifest 的固定 `aggregation_policy` 明示上述规则。
 
-### C. engines、gates 与 schema
+## 4. MAP bounds 与 estimator 契约
 
-1. `k>10+ti` pre-task 报错；gap diagnostics keys 不含 `m_u/q_top`。
-2. auto 精确解析 small-k TI / large-k q>0 PT / large-k q=0 8-start。
-3. PT 任一实例无 round trip、min swap=0 或 cold convergence 失败 -> INVALID。
-4. INVALID 不改变 mean/SEM/crossing；valid/invalid/missing count 正确。
-5. `k=16,num_random_u=64` 保存全部 80 characters。
-6. manifest/NPZ 包含 contract、protocol、fingerprints、git SHA、全 estimator 与 PT diagnostics。
-7. family/sector/alias/engine/sampler 任一配置变化都隔离 chunk/cache identity。
+- `posterior_statistics()` 在输出 algebraic bounds 前检查 weights 全部有限、非负且
+  `abs(sum(weights)-1)<=1e-12`；不归一化、不裁剪，非法输入直接报错。
+- exact enumeration -> `exact_posterior_algebraic`；解析 p 端点 ->
+  `analytic_endpoint_algebraic`，且 `weights_are_exact_sector_posterior=true`。
+- 普通 TI -> `full_sector_ti_plugin_no_coverage`；sampled-valid ->
+  `sampled_u_statistic_plugin_no_coverage`，且 `weights_are_exact_sector_posterior=false`。
+- sampled-invalid、legacy 或不可得 -> `unavailable`。algebraic 与 estimated 字段永不同时填充。
+- 所有逐 disorder `map_success_bound_has_confidence_coverage=false`。plug-in 绘图标签固定为
+  `Estimated MAP-purity bounds (plug-in; no confidence coverage)`。
+- 无偏 U-statistic 的 finite-sample realization 可负或越界；raw 值必须保留，越界使 disorder
+  INVALID，不做 clipping。
 
-## 4. validation/014 产物
+## 5. publication loader
 
-目录 `validation/014_paper_alignment_20260713/` 至少保存：
+公开入口为：
 
-- 完整 pytest 输出与退出状态；
-- exact-enumeration JSON + Markdown；
-- PT/aggregation integration JSON + Markdown；
-- schema manifest 示例与字段审计；
-- 全仓错误叙述扫描结果；
-- 运行配置、git SHA 与生成脚本。
+```python
+load_publication_q_top(path, point_mask=None) -> PublicationQTopData
+```
 
-014 已保存全部上述证据并通过；复现时任一项失败都必须把 `status.md` 降回 `IN_PROGRESS`。
+loader 只接受 `exp101.scan.v3 + true_posterior`，并验证选中点全部 `REPORTABLE`、没有
+invalid/missing、正式 mean 与 crossing 数据一致。`point_mask` 用于预先指定分析区域，不是事后
+避开失败点的资格推断。错误必须列出 size、q 与 failure reasons；不提供 v2 条件均值 fallback。
 
-## 5. 文档与历史处置
+## 6. 015 决定性证据
 
-- `validation/001`–`013` raw 保留，统一标 `PRE_ALIGNMENT`，不修改历史数值。
-- report 保留旧性能/数值事实，但删除无条件“物理正确/已毕业/可直接生产”的结论。
-- 根 `AGENTS.md`、`CLAUDE.md` 与实验报告明确 v2 已认证，接手仍先读 physics contract。
-- `exp101修改说明/` 和 `文章.tex` 始终只读，不纳入本次提交。
+`validation/015_aggregation_safety_20260714/` 至少保存：
 
-## 6. 交付纪律
+- deterministic aggregation/bounds/loader evidence 的 JSON 与 Markdown；
+- 负 U-stat raw、点级四状态、planned denominator、整点 crossing fail-closed 证据；
+- exact/解析端点/TI/sampled/legacy bounds kind 与非法 weights 拒绝证据；
+- loader 的成功、point mask、v2/legacy/failure/tampered schema 拒绝证据；
+- v1/v2 chunk isolation、80-character、schema/fingerprint/mixed-engine 回归；
+- conda `12` 全部 exp101 pytest 的完整 stdout/stderr、退出码、log SHA256；
+- Python/NumPy、Git SHA/dirty、implementation fingerprint 与 evidence inventory。
 
-014 已全绿，status/report/实验报告已按真实证据更新。本次只提交 exp101 修复、相关根文档和
-小体积验证证据，使用清晰 commit message 并 push；无关 3D 数据、临时产物和用户提供的修改
-说明目录不加入提交。
+014 目录和内容原样保留，不用 v3 源码重跑覆盖。015 runner 的 `--skip-pytest` 若存在，只能产生
+`INCOMPLETE` 开发证据；不能用于最终认证。
+
+## 7. 文档与交付纪律
+
+- 根 `AGENTS.md`/`CLAUDE.md`、exp101 AGENTS、contract、status、validation index、notes 与报告
+  必须一致地区分 physics v2、scan v3、014 physics 证据和 015 aggregation 证据。
+- `笔记/实验报告.md` 已在 015 与完整测试通过后用中文更新，并记录实际测试数/fingerprint。
+- `exp101修改说明/` 和 `文章.tex` 始终只读，不纳入提交。
+- 最终只暂存相关源码、测试、文档与小体积 015 证据；不使用 `git add .`，不混入 exp41 或用户
+  未跟踪文件。
+- 015 overall 已 PASS，status 已改为
+  `DONE — exp101.physics.v2 / exp101.scan.v3`；使用 commit message
+  `fix(exp101): make scan v3 aggregation publication-safe` 并 push。

@@ -10,22 +10,24 @@
 ## 当前主线：expander code（exp101 起，2026-07-07~）
 
 项目从 3D toric 转向 quantum expander code（(3,4)-biregular 随机图 HGP）单发制备 q_top。
-**exp101 已完成 `exp101.physics.v2` / `exp101.scan.v2` 论文语义对齐并由
-`validation/014_paper_alignment_20260713/` 认证；旧 259 tests 与 V1–V6 仍全部是
-`PRE_ALIGNMENT`，不能替代 v2 证据。exp102 可复用当前管线，但必须遵守下列生产约束。**接手先读
+**exp101 的 `exp101.physics.v2` 已由 `validation/014_paper_alignment_20260713/` 认证；
+`exp101.scan.v3` 已由 `validation/015_aggregation_safety_20260714/` 认证，可用于严格门禁后的正式
+publication/FSS。014 中的 scan v2 聚合只作历史审计；旧 259 tests 与 V1–V6 仍全部是
+`PRE_ALIGNMENT`。exp102 复用当前管线时必须遵守下列生产约束。**接手先读
 `data/expander_code/exp101/PHYSICS_CONTRACT.md`（唯一物理权威）、`status.md` 和
 `validation/README.md`。关键硬约束：
 
 - **生产 convention 固定**：`sector=x_error`、`H_check=H_Z`、稳定子 move=`H_X` 行、logical move=`logical_X`、observable=`logical_Z`、制备态=`|+>_L`；对偶 `z_error/H_X` 才对应 `|0>_L`。现有矩阵接线不交换。
 - **生产 posterior 固定**：`pi(e|y_eff) ∝ exp[-K_p|e|-K_q|H_check e xor y_eff|]`，`y_eff=H_check epsilon_data_true xor measurement_error`；真实错误不得直接进入能量、Metropolis/TI/PT 比值。正式系综名为 `true_posterior`、`legacy_delta_only`，`paper_true_posterior/repo_compat` 只作先归一化的 deprecated alias。
 - **三种 section 不混用**：meta-check measurement-error decoder、preparation-chain representative、logical-sector section 的 domain/用途不同；q>0 的一般 `effective_syndrome` 不在 `im(H_check)`，禁止传给 logical-sector section。
-- **统计量不混称**：同时区分 absolute/relative characters、`posterior_mass_on_planted_class`、`posterior_purity` 与 `map_success_probability`；公共 `w0` 已废弃。只保证 boundary-only section shift 不变，不再声称任意 frame change 是 gauge。
-- **引擎和 gate**：full-sector TI 仅 `k<=10`；large-k pairwise 只输出 free-energy-gap diagnostics，不得有 `m_u/q_top`；`k>10,q>0` 用四独立 PT observable instances，`q=0` 用 validated 8-start。任一 gate 失败的 chunk 必须 `INVALID`，不得进入 mean/crossing。
-- **scan v2**：输出 `scan_results.npz`，v1 chunk 永不复用；sampled 二阶矩用独立链 U-statistic，basis/nonbasis 按总体数量加权，character 维不得截断。当前权威回归只认 `validation/014_paper_alignment_20260713/`。
+- **统计量不混称**：同时区分 absolute/relative characters、`posterior_mass_on_planted_class`、`posterior_purity` 与 `map_success_probability`；公共 `w0` 已废弃。exact/解析端点只填 algebraic MAP bounds，普通 TI 与 sampled 只填 plug-in estimated bounds，后者统一标注 `no confidence coverage`。只保证 boundary-only section shift 不变，不再声称任意 frame change 是 gauge。
+- **引擎和 disorder gate**：full-sector TI 仅 `k<=10`；large-k pairwise 只输出 free-energy-gap diagnostics，不得有 `m_u/q_top`；`k>10,q>0` 用四独立 PT observable instances，`q=0` 用 validated 8-start。任一 disorder gate 失败必须保存 raw 值并标 `INVALID`；无偏 U-statistic 在有限样本下可为负或越出物理区间，禁止裁剪。
+- **参数点级 fail-closed**：正式 mean、SEM 与 crossing/FSS 输入只在所有 planned disorders 均存在且 `valid_for_aggregation=true` 时输出。一个 invalid 即 `SAMPLING_INSUFFICIENT`，一个 missing 即 `INCOMPLETE`，整点正式输出全部为 NaN；valid-only 条件均值/SEM 仅供诊断，因条件选择偏差不得用于 crossing/FSS。所有 fraction 以 planned disorders 为分母，公共 `pass_fraction` 已删除。
+- **scan v3 与 loader**：输出仍为 `scan_results.npz`，但 v1/v2 chunk 和 v2 NPZ 永不复用为 v3 正式结果。publication/FSS 必须通过 `src.scan_results.load_publication_q_top` 读取；loader 只接受 `exp101.scan.v3 + true_posterior` 的 `REPORTABLE` 点，不从 v2 条件均值推断 eligibility。当前 scan v3 权威回归只认 `validation/015_aggregation_safety_20260714/`。
 - **运行坑仍有效**：本地 `conda run -n 12` 加 `--no-capture-output`；多进程显式传 `--num-workers N`，不要依赖 screen 内的 `$(nproc)`。
 
 下方「物理图像与 L·T·S 分解」及其 Gibbs 公式描述旧 3D toric 程序，只用于 legacy 3D 工作，
-不得覆盖 exp101 的 v2 契约。
+不得覆盖 exp101 的 `physics.v2 / scan.v3` 契约。
 
 ## 物理图像与 L·T·S 分解（核心概念对齐）
 

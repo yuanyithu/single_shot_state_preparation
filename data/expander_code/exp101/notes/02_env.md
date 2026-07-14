@@ -1,4 +1,4 @@
-# notes/02 — 环境与执行记录（exp101.scan.v2）
+# notes/02 — 环境与执行记录（exp101.scan.v3）
 
 本文只记录可复现实验所需的执行环境与调度事实。物理语义以
 `../PHYSICS_CONTRACT.md`（`exp101.physics.v2`）为唯一权威；本页不构成第二份物理契约。
@@ -22,17 +22,23 @@
     不会自动采用 `nproc`。
 - 运行规范（CLAUDE.md 全文适用）：env `11`、screen 后台、`conda run --no-capture-output`、复杂脚本先落 .py、结果 tar 回本地校验后清 scratch。
 
-## scan v2 执行约束
+## scan v3 执行约束
 
 - 默认 `engine=auto`：`k<=10` 解析为 full-sector TI；`k>10,q>0` 解析为四实例 PT
   observable sampling；`k>10,q=0` 解析为 validated 8-start sampling。manifest 必须同时记录
   requested 与 resolved engine。
-- chunk identity 必须包含 `exp101.physics.v2`、`exp101.scan.v2`、canonical ensemble、sector、
-  family rule/seed、code/implementation fingerprint 及完整 sampler/estimator 配置；v1 chunk 永不复用。
+- chunk identity 必须包含 `exp101.physics.v2`、`exp101.scan.v3`、canonical ensemble、sector、
+  family rule/seed、code/implementation fingerprint 及完整 sampler/estimator 配置；v1/v2 chunk 与
+  v2 NPZ 永不复用为 v3 正式结果。
 - 远端生产必须在 screen 外探测并显式烘焙 worker 数，在日志核对 `workers=N` 与实际负载；
   `screen`/cgroup 内的 `nproc` 可能误报 `1`。
-- 当前 v2 状态为 `DONE`；多进程、路由、fingerprint 与 validity 语义由
-  `validation/014_paper_alignment_20260713/` 认证。exp102 复用时仍须保留相同契约版本和 gate。
+- physics v2 的多进程、路由与 disorder-level gate 基础由
+  `validation/014_paper_alignment_20260713/` 认证；014 的 scan v2 valid-only 聚合只作历史审计。
+  scan v3 的点级 fail-closed、planned-denominator fractions、bounds kinds 与 publication loader 已由
+  `validation/015_aggregation_safety_20260714/` 和完整测试认证，当前状态为 `DONE`。
+
+- 正式分析只允许通过 `src.scan_results.load_publication_q_top` 读取选中区域内全部
+  `REPORTABLE` 的 v3 true-posterior 点；valid-only 条件统计仅供诊断。
 
 ## 版本记录规则
 

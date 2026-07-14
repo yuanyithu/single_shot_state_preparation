@@ -131,6 +131,21 @@ class TestFullTierAgainstEnum:
                 result["posterior_mass_on_planted_class"],
                 exact_weights[planted], atol=0.03,
             )
+            assert result["map_success_algebraic_lower_bound"] is None
+            assert result["map_success_algebraic_upper_bound"] is None
+            assert result["map_success_estimated_lower_bound"] == result[
+                "posterior_purity"
+            ]
+            assert np.isclose(
+                result["map_success_estimated_upper_bound"],
+                np.sqrt(result["posterior_purity"]),
+            )
+            assert result["map_success_bound_kind"] \
+                == "full_sector_ti_plugin_no_coverage"
+            assert result[
+                "map_success_bound_has_confidence_coverage"
+            ] is False
+            assert result["weights_are_exact_sector_posterior"] is False
         else:
             assert result["weights_absolute"] is None
             assert result["characters_absolute"] is None
@@ -146,6 +161,21 @@ class TestFullTierAgainstEnum:
             )
             assert result["posterior_mass_on_planted_class"] is None
             assert result["map_success_probability"] is None
+            for name in (
+                "map_success_algebraic_lower_bound",
+                "map_success_algebraic_upper_bound",
+                "map_success_estimated_lower_bound",
+                "map_success_estimated_upper_bound",
+            ):
+                assert result[name] is None
+            assert result["map_success_bound_kind"] == "unavailable"
+            assert result[
+                "map_success_bound_has_confidence_coverage"
+            ] is False
+            assert result["weights_are_exact_sector_posterior"] is False
+            assert result[
+                "formal_weights_are_exact_sector_posterior"
+            ] is False
 
     def test_toric2_true_ensemble_nontrivial_reference(self):
         """真类 ℓ_ref ≠ 0 的重排正确性（true 系综核心语义）。"""
@@ -284,6 +314,18 @@ class TestAnalyticEndpoints:
         assert result["q_top"] == 0.0
         assert result["q_top_stderr"] == 0.0
         assert result["grid_tv"] == 0.0
+        assert result["map_success_algebraic_lower_bound"] == 0.5
+        assert np.isclose(
+            result["map_success_algebraic_upper_bound"], np.sqrt(0.5)
+        )
+        assert result["map_success_estimated_lower_bound"] is None
+        assert result["map_success_estimated_upper_bound"] is None
+        assert result["map_success_bound_kind"] \
+            == "analytic_endpoint_algebraic"
+        assert result["map_success_bound_has_confidence_coverage"] is False
+        assert result["weights_are_exact_sector_posterior"] is True
+        assert "map_success_lower_bound" not in result
+        assert "map_success_upper_bound" not in result
 
     def test_p_zero_is_exact_absolute_class_zero_delta(self):
         model, frame = build_setup(repetition_parity_check_matrix(2))
@@ -294,6 +336,14 @@ class TestAnalyticEndpoints:
         assert np.allclose(result["characters_absolute"], [1.0])
         assert result["q_top"] == 1.0
         assert result["q_top_stderr"] == 0.0
+        assert result["map_success_algebraic_lower_bound"] == 1.0
+        assert result["map_success_algebraic_upper_bound"] == 1.0
+        assert result["map_success_estimated_lower_bound"] is None
+        assert result["map_success_estimated_upper_bound"] is None
+        assert result["map_success_bound_kind"] \
+            == "analytic_endpoint_algebraic"
+        assert result["map_success_bound_has_confidence_coverage"] is False
+        assert result["weights_are_exact_sector_posterior"] is True
 
     def test_p_zero_q_zero_nonzero_syndrome_has_no_support(self):
         model, frame = build_setup(repetition_parity_check_matrix(2))

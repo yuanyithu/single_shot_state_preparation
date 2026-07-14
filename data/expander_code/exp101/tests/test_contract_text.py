@@ -71,7 +71,7 @@ def test_current_contract_never_reverses_plus_zero_sector_mapping():
     assert wrong_z_mapping.search(text) is None
 
 
-def test_current_source_has_no_removed_pairwise_qtop_or_w0_output():
+def test_current_source_has_no_removed_or_ambiguous_outputs():
     source = "\n".join(
         path.read_text(encoding="utf-8")
         for path in sorted((EXP101_ROOT / "src").glob("*.py"))
@@ -80,7 +80,10 @@ def test_current_source_has_no_removed_pairwise_qtop_or_w0_output():
     assert "m_u_pairwise" not in source
     assert re.search(r"[\"']w0[\"']\s*:", source) is None
     assert "sector_ti_results.npz" not in source
-    assert 'PROTOCOL_VERSION = "exp101.scan.v2"' in source
+    assert 'PROTOCOL_VERSION = "exp101.scan.v3"' in source
+    assert "map_success_lower_bound" not in source
+    assert "map_success_upper_bound" not in source
+    assert re.search(r"(?<!numerical_)\bpass_fraction\b", source) is None
 
 
 def test_local_contract_does_not_leak_machine_environment_rules():
@@ -91,22 +94,28 @@ def test_local_contract_does_not_leak_machine_environment_rules():
     assert "macmini" not in local_agents.lower()
 
 
-def test_current_narratives_keep_v2_done_and_historical_boundary_explicit():
+def test_current_narratives_keep_physics_v2_and_scan_v3_boundaries_explicit():
     texts = {
         path.name: path.read_text(encoding="utf-8")
         for path in CURRENT_NARRATIVE_PATHS
     }
-    assert "ERRATUM" in texts["report.md"]
+    assert "AGGREGATION ERRATUM" in texts["report.md"]
     assert "PRE_ALIGNMENT" in texts["report.md"]
-    assert "DONE" in texts["report.md"]
     assert "DONE" in texts["paper_alignment_report.md"]
+    assert "exp101.scan.v3" in texts["paper_alignment_report.md"]
+    assert "015_aggregation_safety_20260714" in texts[
+        "paper_alignment_report.md"
+    ]
     assert "完整 Clifford" in texts["paper_alignment_report.md"]
     assert texts["prompt.md"].startswith("# PRE_ALIGNMENT")
     assert "已停用" in texts["prompt.md"]
-    assert "exp101.scan.v2" in texts["02_env.md"]
+    assert "exp101.scan.v3" in texts["02_env.md"]
     assert "ProcessPoolExecutor" in texts["02_env.md"]
-    assert "DONE" in texts["02_env.md"]
-    assert "当前 v2 认证：PASS" in texts["README.md"]
+    assert "015_aggregation_safety_20260714" in texts["02_env.md"]
+    assert "physics v2" in texts["README.md"]
+    assert "scan v3" in texts["README.md"]
+    assert "014" in texts["README.md"]
+    assert "015" in texts["README.md"]
     assert "001`–`013" in texts["README.md"]
 
 
@@ -146,3 +155,21 @@ def test_validation_014_runner_forces_fresh_auditable_evidence():
     assert "pytest_full_output.txt" in runner
     assert "pytest_exit_code.txt" in runner
     assert 'HERE / "summary.md"' in runner
+
+
+def test_validation_015_runner_captures_aggregation_safety_evidence():
+    runner = (
+        EXP101_ROOT / "validation" / "015_aggregation_safety_20260714" /
+        "run_aggregation_safety_evidence.py"
+    ).read_text(encoding="utf-8")
+    assert "exp101.scan.v3" in runner
+    assert "exp101.physics.v2" in runner
+    assert "CONDA_DEFAULT_ENV" in runner
+    assert "deterministic_aggregation_bounds_evidence.json" in runner
+    assert "deterministic_aggregation_bounds_evidence.md" in runner
+    assert "pytest_full_output.txt" in runner
+    assert "pytest_exit_code.txt" in runner
+    assert "environment.json" in runner
+    assert "implementation_fingerprint" in runner
+    assert 'HERE / "summary.md"' in runner
+    assert "--skip-pytest" in runner

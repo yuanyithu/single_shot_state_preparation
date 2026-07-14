@@ -1,4 +1,4 @@
-"""Focused v2 scan-estimator, validity, and flexible-schema tests."""
+"""Focused v3 scan-estimator, validity, and flexible-schema tests."""
 
 import json
 
@@ -73,8 +73,9 @@ class TestIndependentChainEstimator:
         assert "debiased_posterior_purity_out_of_range" in \
             result["estimator_failure_reasons"]
         assert result["map_success_probability"] is None
-        assert result["map_success_lower_bound"] is None
-        assert result["map_success_upper_bound"] is None
+        assert result["map_success_estimated_lower_bound"] is None
+        assert result["map_success_estimated_upper_bound"] is None
+        assert result["map_success_bound_kind"] == "unavailable"
 
     def test_fewer_than_four_independent_chains_is_not_aggregatable(self):
         obs = observable_set(1, [1], [0], tier="full")
@@ -105,6 +106,10 @@ class TestIndependentChainEstimator:
         assert result["weights_are_exact_sector_posterior"] is False
         assert result["largest_sector_mass"] is not None
         assert result["map_success_probability"] is None
+        assert result["map_success_estimated_lower_bound"] is not None
+        assert result["map_success_estimated_upper_bound"] is not None
+        assert result["map_success_bound_kind"] \
+            == "sampled_u_statistic_plugin_no_coverage"
 
     def test_legacy_sampled_estimator_exposes_formal_fields_only(self):
         obs = observable_set(2, [1, 2, 3], [0, 1], tier="full")
@@ -124,11 +129,16 @@ class TestIndependentChainEstimator:
             "chain_character_means_relative", "m2_u_debiased",
             "q_top_estimate", "q_top_absolute", "q_top_relative",
             "posterior_purity", "posterior_mass_on_planted_class",
-            "map_success_probability", "map_success_lower_bound",
-            "map_success_upper_bound", "weights_absolute",
+            "map_success_probability",
+            "map_success_algebraic_lower_bound",
+            "map_success_algebraic_upper_bound",
+            "map_success_estimated_lower_bound",
+            "map_success_estimated_upper_bound", "weights_absolute",
             "weights_relative",
         ):
             assert result[name] is None
+        assert result["map_success_bound_kind"] == "unavailable"
+        assert not result["map_success_bound_has_confidence_coverage"]
         assert result["formal_q_top"] is not None
         assert result["formal_sector_weights_absolute"] is not None
         assert result["formal_sector_characters_absolute"] is not None
@@ -152,6 +162,8 @@ def _write_result(spec, result):
 def _synthetic_result(spec, *, q_top, valid, character_count=1, k=1):
     values = np.linspace(0.1, 0.2, character_count).tolist()
     return {
+        "physics_contract_version": "exp101.physics.v2",
+        "scan_contract_version": PROTOCOL_VERSION,
         "task_fingerprint": spec["task_fingerprint"],
         "implementation_fingerprint": spec["implementation_fingerprint"],
         "git_commit_sha": "synthetic",
@@ -175,13 +187,15 @@ def _synthetic_result(spec, *, q_top, valid, character_count=1, k=1):
         "q_top_relative": q_top,
         "q_top_estimator_name": "synthetic",
         "valid_for_aggregation": valid,
+        "numerically_valid": valid,
+        "formal_only": False,
         "failure_reasons": [] if valid else ["synthetic_invalid"],
         "flags": "PASS" if valid else "INVALID:synthetic_invalid",
     }
 
 
 class TestMergeValidityAndShape:
-    def test_invalid_disorder_does_not_enter_mean(self, tmp_path):
+    def test_invalid_disorder_closes_publication_point(self, tmp_path):
         specs = _build_specs(
             tmp_path, "surface", [2], 0.1, [0.05], 2, "x_error",
             "true_posterior", "direct", {}, "full_rank", None, 64,
@@ -198,21 +212,36 @@ class TestMergeValidityAndShape:
             expected_specs=specs,
         )
         with np.load(path) as data:
-            assert np.isclose(data["mean_q_top_estimate"][0, 0], 0.2)
+            assert np.isnan(data["mean_q_top_estimate"][0, 0])
+            assert np.isnan(data["disorder_sem_q_top_estimate"][0, 0])
+            assert np.isclose(
+                data[
+                    "conditional_mean_q_top_estimate_valid_only"
+                ][0, 0],
+                0.2,
+            )
+            assert np.isnan(data[
+                "conditional_disorder_sem_q_top_estimate_valid_only"
+            ][0, 0])
             assert data["valid_disorder_count"][0, 0] == 1
+            assert data["planned_disorder_count"][0, 0] == 2
+            assert data["present_disorder_count"][0, 0] == 2
             assert data["invalid_disorder_count"][0, 0] == 1
             assert data["missing_disorder_count"][0, 0] == 0
             assert data["paper_aggregation_fraction"][0, 0] == 0.5
             assert data["numerical_pass_fraction"][0, 0] == 0.5
-            assert data["pass_fraction"][0, 0] == 0.5
-            assert np.isclose(
-                data["q_top_crossing_input_per_disorder"][0, 0, 0], 0.2
-            )
+            assert "pass_fraction" not in data.files
             assert np.isnan(
-                data["q_top_crossing_input_per_disorder"][0, 0, 1]
-            )
+                data["q_top_crossing_input_per_disorder"][0, 0]
+            ).all()
+            assert str(data["aggregation_status_per_point"][0, 0]) \
+                == "SAMPLING_INSUFFICIENT"
+            assert not data["reportable_for_crossing_fss"][0, 0]
+            assert str(data[
+                "aggregation_failure_reasons_per_point"
+            ][0, 0]) == "invalid_disorders_present"
 
-    def test_sem_uses_two_valid_samples_and_excludes_invalid(self, tmp_path):
+    def test_conditional_sem_is_diagnostic_when_point_has_invalid(self, tmp_path):
         specs = _build_specs(
             tmp_path, "surface", [2], 0.1, [0.05], 3, "x_error",
             "true_posterior", "direct", {}, "full_rank", None, 64,
@@ -231,8 +260,14 @@ class TestMergeValidityAndShape:
             expected_specs=specs,
         )
         with np.load(path) as data:
-            assert np.isclose(data["mean_q_top_estimate"][0, 0], 0.4)
-            assert np.isclose(data["disorder_sem_q_top_estimate"][0, 0], 0.2)
+            assert np.isnan(data["mean_q_top_estimate"][0, 0])
+            assert np.isnan(data["disorder_sem_q_top_estimate"][0, 0])
+            assert np.isclose(data[
+                "conditional_mean_q_top_estimate_valid_only"
+            ][0, 0], 0.4)
+            assert np.isclose(data[
+                "conditional_disorder_sem_q_top_estimate_valid_only"
+            ][0, 0], 0.2)
             assert data["valid_disorder_count"][0, 0] == 2
             assert data["invalid_disorder_count"][0, 0] == 1
             assert np.isclose(
@@ -241,6 +276,61 @@ class TestMergeValidityAndShape:
             assert np.isclose(
                 data["numerical_pass_fraction"][0, 0], 2 / 3
             )
+            assert np.isnan(
+                data["q_top_crossing_input_per_disorder"][0, 0]
+            ).all()
+
+    def test_all_valid_disorders_are_reportable(self, tmp_path):
+        specs = _build_specs(
+            tmp_path, "surface", [2], 0.1, [0.05], 2, "x_error",
+            "true_posterior", "direct", {}, "full_rank", None, 64,
+        )
+        for spec, value in zip(specs, (0.2, 0.6)):
+            _write_result(
+                spec, _synthetic_result(
+                    spec, q_top=value, valid=True
+                )
+            )
+        path = merge(
+            tmp_path, "surface", [2], 0.1, [0.05], 2, "x_error",
+            "true_posterior", "direct", {}, "full_rank",
+            expected_specs=specs,
+        )
+        with np.load(path) as data:
+            assert str(data["aggregation_status_per_point"][0, 0]) \
+                == "REPORTABLE"
+            assert data["reportable_for_crossing_fss"][0, 0]
+            assert np.isclose(data["mean_q_top_estimate"][0, 0], 0.4)
+            assert np.isclose(
+                data["disorder_sem_q_top_estimate"][0, 0], 0.2
+            )
+            assert np.isclose(data[
+                "conditional_mean_q_top_estimate_valid_only"
+            ][0, 0], 0.4)
+            assert np.allclose(
+                data["q_top_crossing_input_per_disorder"][0, 0],
+                [0.2, 0.6],
+            )
+
+    def test_one_valid_disorder_is_reportable_with_undefined_sem(self, tmp_path):
+        specs = _build_specs(
+            tmp_path, "surface", [2], 0.1, [0.05], 1, "x_error",
+            "true_posterior", "direct", {}, "full_rank", None, 64,
+        )
+        _write_result(
+            specs[0], _synthetic_result(
+                specs[0], q_top=0.3, valid=True
+            )
+        )
+        path = merge(
+            tmp_path, "surface", [2], 0.1, [0.05], 1, "x_error",
+            "true_posterior", "direct", {}, "full_rank",
+            expected_specs=specs,
+        )
+        with np.load(path) as data:
+            assert data["reportable_for_crossing_fss"][0, 0]
+            assert data["mean_q_top_estimate"][0, 0] == 0.3
+            assert np.isnan(data["disorder_sem_q_top_estimate"][0, 0])
 
     def test_unknown_git_dirty_state_uses_known_marker(self, tmp_path):
         specs = _build_specs(
@@ -281,6 +371,31 @@ class TestMergeValidityAndShape:
             assert data["character_means_absolute_per_disorder"].shape[-1] == 80
             assert data["character_count_per_disorder"][0, 0, 0] == 80
             assert data["character_mask_per_disorder"][0, 0, 0].sum() == 80
+
+    def test_mixed_engine_merge_keeps_per_disorder_routing(self, tmp_path):
+        specs = _build_specs(
+            tmp_path, "expander34", [2, 4], 0.1, [0.05], 1,
+            "x_error", "true_posterior", "auto", {}, "full_rank", None,
+            64,
+        )
+        for spec, value in zip(specs, (0.2, 0.4)):
+            _write_result(
+                spec, _synthetic_result(
+                    spec, q_top=value, valid=True
+                )
+            )
+        path = merge(
+            tmp_path, "expander34", [2, 4], 0.1, [0.05], 1,
+            "x_error", "true_posterior", "auto", {}, "full_rank",
+            expected_specs=specs,
+        )
+        with np.load(path) as data:
+            engines = data["resolved_engine_per_disorder"][:, 0, 0]
+            assert engines.tolist() == [
+                "full_sector_ti",
+                "parallel_tempering_observable_sampling",
+            ]
+            assert data["reportable_for_crossing_fss"][:, 0].all()
 
 
 def _fake_pt_result(seed, round_trips):

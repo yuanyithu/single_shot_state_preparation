@@ -1,0 +1,63 @@
+{
+  "captured_utc": "2026-07-14T09:59:00.398392+00:00",
+  "conda_default_env": "12",
+  "conda_environment_verified": true,
+  "conda_prefix": "/Users/jarvis/miniforge3/envs/12",
+  "evidence_assertion_count": 104,
+  "evidence_coverage_inventory": {
+    "aggregation_cases": {
+      "invalid": "SAMPLING_INSUFFICIENT",
+      "legacy": "FORMAL_ONLY",
+      "missing": "INCOMPLETE",
+      "reportable": "REPORTABLE",
+      "single": "REPORTABLE"
+    },
+    "bounds_producer_kinds": {
+      "analytic_endpoint": "analytic_endpoint_algebraic",
+      "exact": "exact_posterior_algebraic",
+      "legacy": "unavailable",
+      "ordinary_ti": "full_sector_ti_plugin_no_coverage",
+      "posterior_statistics": "exact_posterior_algebraic",
+      "sampled_invalid": "unavailable",
+      "sampled_valid": "sampled_u_statistic_plugin_no_coverage"
+    },
+    "invalid_weight_rejection_count": 5,
+    "loader_checks": {
+      "invalid": "PublicationPointNotReportableError",
+      "legacy": "NonPublicationEnsembleError",
+      "missing": "PublicationPointNotReportableError",
+      "reportable": "accepted",
+      "scan_v2": "UnsupportedScanContractError"
+    }
+  },
+  "evidence_json_sha256": "3b645483dbdf08f46fe943badcaf3b0ae8f8e79aec30af876d47a00b33c39521",
+  "git": {
+    "commit_query_exit_code": 0,
+    "commit_sha": "e31d8f0c9460dccecea50596930fd21f2ec7b048",
+    "status_query_exit_code": 0,
+    "worktree_dirty": true
+  },
+  "hostname": "ymini.local",
+  "implementation_fingerprint": "0e215bb1481310daf44f36f63dee129a838e625f56feb4b6a477fa508e8aa8fe",
+  "numpy_version": "2.4.1",
+  "overall_status": "PASS",
+  "physics_contract_version": "exp101.physics.v2",
+  "platform": "macOS-26.5.2-arm64-arm-64bit",
+  "pytest_command": [
+    "/Users/jarvis/miniforge3/envs/12/bin/python",
+    "-m",
+    "pytest",
+    "-q",
+    "/Users/jarvis/Desktop/sync/project D/data/expander_code/exp101/tests"
+  ],
+  "pytest_command_shell": "/Users/jarvis/miniforge3/envs/12/bin/python -m pytest -q '/Users/jarvis/Desktop/sync/project D/data/expander_code/exp101/tests'",
+  "pytest_cwd": "/Users/jarvis/Desktop/sync/project D/data/expander_code/exp101",
+  "pytest_exit_code": 0,
+  "pytest_log_sha256": "d26b9c5a1e59fdfb50051c886866eb3c0a8506ab494154c7d80d5baf969622a7",
+  "pytest_status": "PASS",
+  "pytest_version": "9.0.3",
+  "python_executable": "/Users/jarvis/miniforge3/envs/12/bin/python",
+  "python_version": "3.12.12",
+  "required_conda_environment": "12",
+  "scan_contract_version": "exp101.scan.v3"
+}

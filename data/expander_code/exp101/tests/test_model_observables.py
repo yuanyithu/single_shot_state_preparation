@@ -661,8 +661,34 @@ class TestV2PhysicsSemantics:
         assert stats["map_success_probability"] == 0.9
         assert stats["posterior_purity"] <= stats["map_success_probability"]
         assert stats["map_success_probability"] <= stats[
-            "map_success_upper_bound"
+            "map_success_algebraic_upper_bound"
         ]
+        assert stats["map_success_algebraic_lower_bound"] == stats[
+            "posterior_purity"
+        ]
+        assert stats["map_success_estimated_lower_bound"] is None
+        assert stats["map_success_estimated_upper_bound"] is None
+        assert stats["map_success_bound_kind"] \
+            == "exact_posterior_algebraic"
+        assert stats["map_success_bound_has_confidence_coverage"] is False
+        assert "map_success_lower_bound" not in stats
+        assert "map_success_upper_bound" not in stats
+
+    @pytest.mark.parametrize(
+        ("weights", "message"),
+        [
+            ([-0.1, 1.1], "nonnegative"),
+            ([0.1, 0.8], "sum to 1"),
+            ([0.5, 0.5 + 2e-12], "sum to 1"),
+            ([np.nan, 1.0], "finite"),
+            ([np.inf, 0.0], "finite"),
+        ],
+    )
+    def test_posterior_statistics_rejects_invalid_weights(
+        self, weights, message
+    ):
+        with pytest.raises(ValueError, match=message):
+            posterior_statistics(np.asarray(weights, dtype=np.float64))
 
 
 class TestSampledCharacterEstimators:
@@ -731,5 +757,30 @@ class TestSampledCharacterEstimators:
         )
         assert result["posterior_purity"] < 1.0 / (1 << obs.k)
         assert not result["posterior_purity_within_physical_bounds"]
-        assert result["map_success_lower_bound"] is None
-        assert result["map_success_upper_bound"] is None
+        assert result["map_success_algebraic_lower_bound"] is None
+        assert result["map_success_algebraic_upper_bound"] is None
+        assert result["map_success_estimated_lower_bound"] is None
+        assert result["map_success_estimated_upper_bound"] is None
+        assert result["map_success_bound_kind"] == "unavailable"
+        assert result["map_success_bound_has_confidence_coverage"] is False
+
+    def test_physical_u_statistic_uses_estimated_bounds(self, toric2_setup):
+        _, _, obs = toric2_setup
+        character_means = np.linspace(0.1, 0.3, obs.num_u)
+        result = aggregate_observables(
+            obs,
+            character_means,
+            m2_u_values=character_means**2,
+        )
+        assert result["map_success_algebraic_lower_bound"] is None
+        assert result["map_success_algebraic_upper_bound"] is None
+        assert result["map_success_estimated_lower_bound"] == result[
+            "posterior_purity"
+        ]
+        assert np.isclose(
+            result["map_success_estimated_upper_bound"],
+            np.sqrt(result["posterior_purity"]),
+        )
+        assert result["map_success_bound_kind"] \
+            == "sampled_u_statistic_plugin_no_coverage"
+        assert result["map_success_bound_has_confidence_coverage"] is False

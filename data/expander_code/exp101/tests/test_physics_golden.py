@@ -240,6 +240,14 @@ def test_exact_oracle_reports_distinct_v2_statistics_and_frames():
         "map_success_probability"
     ]
     assert result["map_success_probability"] <= result[
-        "map_success_upper_bound"
+        "map_success_algebraic_upper_bound"
     ]
+    assert result["map_success_algebraic_lower_bound"] == result[
+        "posterior_purity"
+    ]
+    assert result["map_success_estimated_lower_bound"] is None
+    assert result["map_success_estimated_upper_bound"] is None
+    assert result["map_success_bound_kind"] == "exact_posterior_algebraic"
+    assert result["map_success_bound_has_confidence_coverage"] is False
+    assert result["weights_are_exact_sector_posterior"] is True
     assert "w0" not in result

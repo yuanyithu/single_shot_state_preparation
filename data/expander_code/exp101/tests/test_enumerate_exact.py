@@ -264,11 +264,19 @@ class TestLegacyExactSchema:
             "posterior_purity",
             "posterior_mass_on_planted_class",
             "map_success_probability",
-            "map_success_lower_bound",
-            "map_success_upper_bound",
+            "map_success_algebraic_lower_bound",
+            "map_success_algebraic_upper_bound",
+            "map_success_estimated_lower_bound",
+            "map_success_estimated_upper_bound",
             "posterior_purity_within_physical_bounds",
         ):
             assert result[name] is None
+        assert result["map_success_bound_kind"] == "unavailable"
+        assert result["map_success_bound_has_confidence_coverage"] is False
+        assert result["weights_are_exact_sector_posterior"] is False
+        assert result["formal_weights_are_exact_sector_posterior"] is True
+        assert "map_success_lower_bound" not in result
+        assert "map_success_upper_bound" not in result
         weights = result["formal_sector_weights_absolute"]
         assert np.isclose(weights.sum(), 1.0)
         assert np.isclose(result["formal_sector_purity"], np.sum(weights**2))

@@ -1,4 +1,4 @@
-# notes/01 — exp101 v2 模型推导与统计规格
+# notes/01 — exp101 physics v2 推导与 scan v3 统计规格
 
 日期：2026-07-13。本文推导 `../PHYSICS_CONTRACT.md`，不另立物理权威。
 
@@ -145,13 +145,22 @@ P_MAP     = max_l P_abs(l),
 P_planted = P_abs(l_star).
 ```
 
-它们不相等；同时有
+它们不相等。对精确且归一化的 posterior，同时有
 
 ```text
 purity <= P_MAP <= sqrt(purity).
 ```
 
-只有 true-posterior full weights 才赋予 `P_MAP` 论文 MLD success 语义。legacy 的最大 mass 只能叫
+`posterior_statistics()` 必须先验证 weights 有限、非负且
+`abs(sum(weights)-1)<=1e-12`；非法输入直接报错，不静默归一化或裁剪。exact enumeration 与
+`p=0/0.5` 解析端点填 `map_success_algebraic_lower_bound/upper_bound`。普通 TI 或 sampled purity
+estimate 只能填 `map_success_estimated_lower_bound/upper_bound`，并以
+`map_success_bound_kind` 区分来源；两组字段互斥。
+
+所有 bounds metadata 都保存 `map_success_bound_has_confidence_coverage=false`。对 algebraic bounds，
+这是因为它们是确定性不等式而不是置信区间；对普通 TI/sampled，这是因为把估计 purity 代入只是
+plug-in estimate，没有 coverage guarantee。sampled 的 `map_success_probability` 保持 `None`。只有
+exact true-posterior weights 才直接赋予 `P_MAP` 论文 MLD success 语义；legacy 的最大 mass 只能叫
 `largest_sector_mass`。
 
 ## 7. sampled-character 总体估计
@@ -171,17 +180,26 @@ f_bar = [sum_basis f_u + (N-k) mean_sampled_nonbasis(f_u)] / N.
 m2_u = 2/[C(C-1)] sum_{a<b} m[a,u]m[b,u].
 ```
 
-delete-one-chain jackknife 给 chain-level 标准误。生产 sampled 路径 C>=4，q=0 默认 C=8。若聚合
-后的 debiased purity/q_top 落出物理区间，保留 raw 数值并标 INVALID，不裁剪。
+delete-one-chain jackknife 给 chain-level 标准误。生产 sampled 路径 C>=4，q=0 默认 C=8。该
+U-statistic 虽然无偏，但 finite-sample realization 在真值接近零时可以为负，也可使 debiased
+purity/q_top 越出物理区间；必须保留 raw 数值并标 INVALID，不裁剪。
+
+只保留落在物理区间且通过 gate 的 realized estimates 再平均，会条件化在“通过”事件上而产生
+selection bias。因此 valid-only mean/SEM 只能写入 `conditional_*_valid_only` 诊断字段，不能作为
+正式 publication/crossing/FSS 输入。
 
 ## 8. 数值方法的合法域
 
-- `k<=10`：full-sector TI 可由全部 weights 精确重建 characters、purity、MAP 与 q_top；
+- `k<=10`：full-sector TI 可由全部 sector-weight estimates 重建 characters、purity、MAP estimate 与
+  q_top estimate；只有 exact enumeration 和解析端点的 weights 是 exact posterior；
 - `k>10,q>0`：四独立 PT 实例采样 cold observable，二阶量用跨实例 U-statistic；
 - `k>10,q=0`：8-start validated q=0 sampling；
 - pairwise TI：只测 basis-sector free-energy gap，不提供 posterior Fourier transform。
 
-full TI、direct/q0、PT 的任何 convergence gate 失败，都使样本 `valid_for_aggregation=false`。
+full TI、direct/q0、PT 的任何 convergence gate 失败，都使 disorder
+`valid_for_aggregation=false`。scan v3 不再对剩余 valid disorders 发布正式条件均值：一个 invalid
+关闭整点；一个 missing 同样关闭整点。planned/present/valid/invalid/missing counts 全部保存，比例
+以 planned 为分母。
 
 ## 9. exact oracle 的必要输出
 
@@ -190,7 +208,7 @@ full TI、direct/q0、PT 的任何 convergence gate 失败，都使样本 `valid
 - `weights_absolute`、`weights_relative`；
 - 全部 nonzero characters 的 absolute/relative 值；
 - `posterior_purity`、`posterior_mass_on_planted_class`、
-  `map_success_probability`、bounds 与 `q_top`；
+  `map_success_probability`、algebraic bounds、bound kind、exact-weights marker 与 `q_top`；
 - raw-paper/reduced-canonical 的逐构型对应与 partition functions。
 
 golden test 要遍历 `sigma_prep`、`measurement_error`、`epsilon_data_true` 和 `a`，而不是只在
@@ -200,5 +218,6 @@ golden test 要遍历 `sigma_prep`、`measurement_error`、`epsilon_data_true` �
 
 旧 validation 证明的是旧字段和旧 estimator 下的内部一致性。特别是：旧 V1–V6、259 tests、
 Nishimori 数值、frame A/B、PT torture 与多节点 bit-identical 都不能替代本规格的 raw/reduced
-golden test、无偏二阶矩、四实例 PT、canonical alias、v2 schema 和 INVALID-safe aggregation。
-当前证据索引见 `../validation/README.md`。
+golden test、无偏二阶矩、四实例 PT 与 canonical alias。014 中 scan v2 的 valid-only aggregation
+只作历史审计；scan v3 已由 015 锁定点级 fail-closed、planned denominator、algebraic/plugin
+bounds、publication loader 与 v1/v2 chunk isolation。当前证据索引见 `../validation/README.md`。
