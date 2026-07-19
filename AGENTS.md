@@ -17,6 +17,13 @@ publication/FSS。014 中的 scan v2 聚合只作历史审计；旧 259 tests �
 `data/expander_code/exp101/PHYSICS_CONTRACT.md`（唯一物理权威）、`status.md` 和
 `validation/README.md`。关键硬约束：
 
+**exp102 当前为 `IMPLEMENTATION / PRE-PILOT`，不是已有物理结果。** 独立契约和实现位于
+`data/expander_code/exp102/`，版本为 `exp102.physics.v1 / exp102.q0_pt.v1 /
+exp102.scan.v1`；48-code registry 已冻结，但 pilot、held-out、远端 smoke 和 6144 个生产任务尚未
+运行。生产 worker 必须看到 `FROZEN_HELD_OUT_PASS` 才会启动，禁止手工绕过；正式读取只用
+`load_exp102_publication_q_top`，不得交给 exp101 loader。接手 exp102 先读该目录的
+`EXPERIMENT_CONTRACT.md` 与 `status.md`。
+
 - **生产 convention 固定**：`sector=x_error`、`H_check=H_Z`、稳定子 move=`H_X` 行、logical move=`logical_X`、observable=`logical_Z`、制备态=`|+>_L`；对偶 `z_error/H_X` 才对应 `|0>_L`。现有矩阵接线不交换。
 - **生产 posterior 固定**：`pi(e|y_eff) ∝ exp[-K_p|e|-K_q|H_check e xor y_eff|]`，`y_eff=H_check epsilon_data_true xor measurement_error`；真实错误不得直接进入能量、Metropolis/TI/PT 比值。正式系综名为 `true_posterior`、`legacy_delta_only`，`paper_true_posterior/repo_compat` 只作先归一化的 deprecated alias。
 - **三种 section 不混用**：meta-check measurement-error decoder、preparation-chain representative、logical-sector section 的 domain/用途不同；q>0 的一般 `effective_syndrome` 不在 `im(H_check)`，禁止传给 logical-sector section。

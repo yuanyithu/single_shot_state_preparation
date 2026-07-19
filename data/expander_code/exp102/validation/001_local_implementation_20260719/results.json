@@ -1,0 +1,14 @@
+{
+  "status": "PASS_PRE_PILOT_ONLY",
+  "registry_sha256": "883730e0ba548f6b358187d8f123fdd4d8aeb116f4bacda363c35c16d01ae40b",
+  "registry_codes": 48,
+  "codes_per_m": 8,
+  "task_units": 6144,
+  "task_fingerprints_unique": 6144,
+  "production_config_sha256": "758e2804476c5cb0422ef5813952a3779722c1a3ed47a7298f3948f9daee241f",
+  "exp102_tests": {"passed": 7, "failed": 0},
+  "exp101_key_regressions": {"passed": 76, "failed": 0},
+  "combined_regression": {"passed": 83, "failed": 0},
+  "production_authorized": false,
+  "missing_evidence": ["pilot_tuning", "held_out_pilot", "remote_smoke", "cross_node_determinism", "production"]
+}

@@ -39,6 +39,11 @@ data/**/*.pdf
 data/**/*.txt
 data/**/*.sh
 data/**/.gitignore
+!data/expander_code/exp102/config/*.json
+!data/expander_code/exp102/registry/*.json
+!data/expander_code/exp102/registry/*.csv
+!data/expander_code/exp102/registry/codes/*.npz
+!data/expander_code/exp102/validation/**/*.json
 data/3d_toric_code/with_measurement_noise/prod_*/
 data/3d_toric_code/with_measurement_noise/profile_*/
 data/3d_toric_code/with_measurement_noise/profile/
