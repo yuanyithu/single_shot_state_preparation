@@ -23,3 +23,9 @@ The plotted error bar is exactly `std(code_means,ddof=1)/sqrt(8)`.
 Registry selection accepts the first eight simple, full-row-rank, distinct classical matrices for
 each m. Pilot outcomes, distance, and MCMC difficulty never affect registry membership. Production
 workers reconstruct only frozen registry entries and refuse an un-certified PT configuration.
+
+The ordered ladder schedule is contract data, not a Cartesian product. It tries `R=8,12,16,24,32,48,64`
+at `p_hot=0.45`, then the same sequence at `0.475`, then `R=8,12,16,24,32,48,64,96,128`
+at `0.49`. The `R=96,128` tail was explicitly approved after the original schedule failed its swap
+gate on 2026-07-20. Every new configuration hash requires a clean-source pilot; raw validity from an
+older configuration or source commit is never reused.

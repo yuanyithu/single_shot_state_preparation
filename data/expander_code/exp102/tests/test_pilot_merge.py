@@ -17,6 +17,7 @@ from data.expander_code.exp102.exp102_pipeline.pilot import (
     _verify_report_evidence,
 )
 from data.expander_code.exp102.exp102_pipeline.pilot_cell import _gate
+from data.expander_code.exp102.exp102_pipeline.pilot_cell import run_cell
 from data.expander_code.exp102.exp102_pipeline.registry import load_registry
 from data.expander_code.exp102.exp102_pipeline.seeds import derive_seed
 
@@ -24,10 +25,50 @@ from data.expander_code.exp102.exp102_pipeline.seeds import derive_seed
 EXP102_ROOT = Path(__file__).resolve().parents[1]
 
 
+def test_config_allows_r96_r128_only_at_the_approved_ladder_tail(tmp_path):
+    path = EXP102_ROOT / "config/production.v1.json"
+    config = load_config(path)
+    assert config["pilot"]["ladder_candidates"][-2:] == [
+        {"p_hot": 0.49, "num_temperatures": 96},
+        {"p_hot": 0.49, "num_temperatures": 128},
+    ]
+
+    edited = json.loads(path.read_text(encoding="ascii"))
+    edited["pilot"]["ladder_candidates"].insert(
+        7, {"p_hot": 0.45, "num_temperatures": 96},
+    )
+    tampered = tmp_path / "production.json"
+    tampered.write_text(json.dumps(edited), encoding="ascii")
+    with pytest.raises(ValueError, match="ordered pilot ladder"):
+        load_config(tampered)
+
+    edited = json.loads(path.read_text(encoding="ascii"))
+    edited["production_gate"]["min_swap_rate"] = 0.0
+    tampered.write_text(json.dumps(edited), encoding="ascii")
+    with pytest.raises(ValueError, match="production gate"):
+        load_config(tampered)
+
+
+def test_pilot_cell_rejects_unapproved_ladder_pair_before_running(tmp_path):
+    candidate = {
+        "p_hot": 0.45, "num_temperatures": 96, "gamma": 1.0,
+        "burn_rounds": 500, "measurement_rounds": 2000,
+        "sweeps_per_round": 1, "logical_move_repeat": 1,
+    }
+    with pytest.raises(ValueError, match="ladder pair"):
+        run_cell(
+            EXP102_ROOT / "registry/registry.json",
+            EXP102_ROOT / "config/production.v1.json",
+            "m03_c00", 0.04, 0, candidate, 0, "ladder", "1" * 40,
+            tmp_path / "must-not-exist.npz",
+        )
+    assert not (tmp_path / "must-not-exist.npz").exists()
+
+
 def _write_valid_ladder_raw(path, registry, config, stored_valid=True):
     code = next(row for row in registry["codes"] if row["code_id"] == "m03_c00")
     candidate = _candidate(config, 0.45, 8, 1.0, [500, 2000])
-    source_commit = "test-source"
+    source_commit = "1" * 40
     namespace = "pilot_ladder_m3_attempt0"
     p = 0.04
     disorder = 0
@@ -118,7 +159,10 @@ def test_selection_uses_complete_prefix_and_recomputed_cell_results():
     config = {
         "p_values": [0.04, 0.05, 0.06, 0.07, 0.08, 0.09, 0.1],
         "pilot": {
-            "p_hot_candidates": [0.45], "num_temperatures_candidates": [8, 12],
+            "ladder_candidates": [
+                {"p_hot": 0.45, "num_temperatures": 8},
+                {"p_hot": 0.45, "num_temperatures": 12},
+            ],
             "gamma_candidates": [0.75, 1.0, 1.5], "round_candidates": [[500, 2000]],
         },
     }
@@ -139,6 +183,111 @@ def test_selection_uses_complete_prefix_and_recomputed_cell_results():
     assert selected["gamma"]["selected"]["gamma"] == 1.0
     assert selected["all_tuning_pass"] and selected["num_tuning_cells"] == 96
     assert selected["all_held_out_pass"] and selected["num_held_out_cells"] == 448
+
+
+def _fallback_selection_context():
+    config = {
+        "p_values": [0.04, 0.05, 0.06, 0.07, 0.08, 0.09, 0.1],
+        "pilot": {
+            "ladder_candidates": [
+                {"p_hot": 0.45, "num_temperatures": 8},
+                {"p_hot": 0.49, "num_temperatures": 12},
+            ],
+            "gamma_candidates": [0.75, 1.0, 1.5],
+            "round_candidates": [[500, 2000], [1000, 4000]],
+        },
+    }
+    registry = {"codes": [{"code_id": f"m03_c{i:02d}", "m": 3} for i in range(8)]}
+    return config, registry
+
+
+def test_held_out_max_round_failure_reselects_gamma_on_next_ladder():
+    config, registry = _fallback_selection_context()
+    first = _candidate(config, 0.45, 8, 1.0, [500, 2000])
+    first_long = _candidate(config, 0.45, 8, 1.0, [1000, 4000])
+    second = _candidate(config, 0.49, 12, 0.75, [500, 2000])
+    records = []
+    records += _records_for_group("ladder", 3, first, True, config)
+    records += _records_for_group(
+        "ladder", 3, _candidate(config, 0.49, 12, 1.0, [500, 2000]), True, config,
+    )
+    for gamma, core in ((0.75, 3.0), (1.0, 1.0), (1.5, 2.0)):
+        records += _records_for_group(
+            "gamma", 3, _candidate(config, 0.45, 8, gamma, [500, 2000]),
+            True, config, core_seconds=core,
+        )
+    for gamma, core in ((0.75, 1.0), (1.0, 2.0), (1.5, 3.0)):
+        records += _records_for_group(
+            "gamma", 3, _candidate(config, 0.49, 12, gamma, [500, 2000]),
+            True, config, core_seconds=core,
+        )
+    records += _records_for_group("rounds", 3, first, True, config)
+    records += _records_for_group("held_out", 3, first, False, config, attempt=0)
+    records += _records_for_group("rounds", 3, first_long, True, config)
+    records += _records_for_group("held_out", 3, first_long, False, config, attempt=1)
+    records += _records_for_group("rounds", 3, second, True, config)
+    records += _records_for_group("held_out", 3, second, True, config, attempt=2)
+
+    selected = _select_one_m(3, _group_records(records, registry, config), config)
+    assert selected["state"] == "PASSED"
+    assert [cycle["outcome"] for cycle in selected["cycles"]] == [
+        "held_out_exhausted", "passed",
+    ]
+    assert selected["ladder"]["selected"]["p_hot"] == 0.49
+    assert selected["gamma"]["selected"]["gamma"] == 0.75
+    assert selected["rounds"]["selected"] == second
+    assert selected["held_out"]["selected_attempt"] == 2
+    assert selected["all_tuning_pass"] and selected["num_tuning_cells"] == 96
+    assert selected["all_held_out_pass"] and selected["num_held_out_cells"] == 448
+
+
+def test_selection_does_not_jump_over_a_missing_ladder_prefix():
+    config, registry = _fallback_selection_context()
+    future = _candidate(config, 0.49, 12, 1.0, [500, 2000])
+    records = _records_for_group("ladder", 3, future, True, config)
+    for gamma in config["pilot"]["gamma_candidates"]:
+        records += _records_for_group(
+            "gamma", 3, _candidate(config, 0.49, 12, gamma, [500, 2000]),
+            True, config,
+        )
+    records += _records_for_group("rounds", 3, future, True, config)
+    records += _records_for_group("held_out", 3, future, True, config)
+
+    selected = _select_one_m(3, _group_records(records, registry, config), config)
+    assert selected["state"] == "WAITING_LADDER"
+    assert selected["next_action"]["candidate"]["p_hot"] == 0.45
+    assert selected["selected_config"] is None
+    assert not selected["all_tuning_pass"] and not selected["all_held_out_pass"]
+
+
+def test_held_out_attempt_candidate_mismatch_is_fail_closed():
+    config, registry = _fallback_selection_context()
+    base = _candidate(config, 0.45, 8, 1.0, [500, 2000])
+    wrong = _candidate(config, 0.45, 8, 1.0, [1000, 4000])
+    records = _records_for_group("ladder", 3, base, True, config)
+    for gamma in config["pilot"]["gamma_candidates"]:
+        records += _records_for_group(
+            "gamma", 3, _candidate(config, 0.45, 8, gamma, [500, 2000]),
+            True, config, core_seconds=1.0 if gamma == 1.0 else 2.0,
+        )
+    records += _records_for_group("rounds", 3, base, True, config)
+    records += _records_for_group("held_out", 3, wrong, True, config, attempt=0)
+
+    selected = _select_one_m(3, _group_records(records, registry, config), config)
+    assert selected["state"] == "CONFLICT"
+    assert selected["conflict_reason"] == "held_out_candidate_mismatch"
+    assert not selected["all_held_out_pass"]
+
+
+def test_held_out_attempt_gap_is_fail_closed():
+    config, registry = _fallback_selection_context()
+    candidate = _candidate(config, 0.45, 8, 1.0, [500, 2000])
+    records = _records_for_group("held_out", 3, candidate, True, config, attempt=1)
+
+    selected = _select_one_m(3, _group_records(records, registry, config), config)
+    assert selected["state"] == "CONFLICT"
+    assert selected["conflict_reason"] == "held_out_attempt_gap"
+    assert not selected["all_tuning_pass"] and not selected["all_held_out_pass"]
 
 
 def test_report_evidence_hash_is_rechecked(tmp_path):

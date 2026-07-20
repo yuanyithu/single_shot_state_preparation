@@ -2,12 +2,13 @@
 
 import argparse
 import json
+import re
 import time
 from pathlib import Path
 
 import numpy as np
 
-from .config import load_config
+from .config import load_config, validate_pilot_candidate
 from .diagnostics import evaluate_gate
 from .io import atomic_npz, sha256_json
 from .labels import initial_labels
@@ -31,28 +32,47 @@ def _gate(config, stage):
     return gate
 
 
-def run_cell(registry_path, config_path, code_id, p, disorder_index, candidate,
-             attempt, stage, source_commit, output_path):
-    registry, code, H = load_frozen_code(registry_path, code_id)
-    config = load_config(config_path)
-    candidate = dict(candidate)
-    pt_config = Q0PtConfig(**candidate)
-    namespace = (f"pilot_held_out_m{code['m']}_attempt{attempt}" if stage == "held_out"
-                 else f"pilot_{stage}_m{code['m']}_attempt{attempt}")
-    identity = {
-        "namespace": namespace, "stage": stage, "code_id": code_id, "p": float(p),
-        "disorder_index": int(disorder_index), "candidate": candidate,
-        "registry_sha256": registry["registry_sha256"],
-        "config_sha256": config["config_sha256"], "source_commit": source_commit,
+def pilot_task_identity(registry_sha256, config_sha256, code_id, m, p,
+                        disorder_index, candidate, attempt, stage, source_commit):
+    if re.fullmatch(r"[0-9a-f]{40}", source_commit) is None:
+        raise ValueError("source commit must be a full lowercase Git SHA")
+    if stage not in {"ladder", "gamma", "rounds", "held_out"}:
+        raise ValueError("unknown pilot stage")
+    namespace = (f"pilot_held_out_m{int(m)}_attempt{int(attempt)}"
+                 if stage == "held_out"
+                 else f"pilot_{stage}_m{int(m)}_attempt{int(attempt)}")
+    return {
+        "namespace": namespace, "stage": stage, "code_id": str(code_id),
+        "p": float(p), "disorder_index": int(disorder_index),
+        "candidate": candidate, "registry_sha256": str(registry_sha256),
+        "config_sha256": str(config_sha256), "source_commit": source_commit,
         "engine": "numba",
     }
+
+
+def run_cell(registry_path, config_path, code_id, p, disorder_index, candidate,
+             attempt, stage, source_commit, output_path):
+    config = load_config(config_path)
+    candidate = validate_pilot_candidate(candidate, config)
+    registry, code, H = load_frozen_code(registry_path, code_id)
+    pt_config = Q0PtConfig(**candidate)
+    identity = pilot_task_identity(
+        registry["registry_sha256"], config["config_sha256"], code_id, code["m"],
+        p, disorder_index, candidate, attempt, stage, source_commit,
+    )
+    namespace = identity["namespace"]
     fingerprint = sha256_json(identity)
     output_path = Path(output_path)
     if output_path.exists():
-        with np.load(output_path, allow_pickle=False) as old:
-            if str(old["task_fingerprint"].item()) == fingerprint:
-                return "reused"
-        raise ValueError("existing pilot output has a conflicting fingerprint")
+        # Resume only from a cell whose complete schema and gates can be
+        # independently reconstructed.  A fingerprint-only NPZ is a corrupt
+        # fragment, not reusable evidence.
+        from .pilot import _validate_raw
+
+        record = _validate_raw(output_path, registry, config, source_commit)
+        if record["task_fingerprint"] != fingerprint:
+            raise ValueError("existing pilot output has a conflicting fingerprint")
+        return "reused"
     model, frame = build_model(H)
     uniform_seed = derive_seed(namespace, registry["registry_sha256"], code_id,
                                disorder_index, "uniforms")

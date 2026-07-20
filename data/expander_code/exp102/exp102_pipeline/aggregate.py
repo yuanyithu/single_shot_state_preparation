@@ -1,5 +1,6 @@
 import argparse
 import csv
+from importlib import import_module
 import json
 import shutil
 from pathlib import Path
@@ -7,8 +8,16 @@ from pathlib import Path
 import numpy as np
 
 from .config import load_config
-from .io import atomic_json, atomic_npz, sha256_file, sha256_json
-from .registry import load_registry
+from .io import atomic_json, atomic_npz, sha256_file, sha256_json, verify_source_identity
+from .registry import load_frozen_code, load_registry
+from .pilot import recompute_frozen
+from .tasks import task_records
+from .worker import build_model, validate_production_raw
+
+
+build_production_manifest = import_module(
+    "data.expander_code.exp102.validation.002_numba_smoke_20260719.build_production_deployment"
+).build_manifest
 
 
 def _sem(values):
@@ -24,6 +33,110 @@ def _paired_z(differences):
     return mean / sem
 
 
+def _verify_production_raw_manifests(raw_dir, registry, config, frozen):
+    raw_dir = Path(raw_dir).resolve()
+    manifest_dir = raw_dir / "_manifests"
+    manifests = sorted(manifest_dir.glob("*.json")) if manifest_dir.is_dir() else []
+    expected_nodes = {"nd-1", "nd-2", "nd-3"}
+    if {path.stem for path in manifests} != expected_nodes:
+        raise ValueError("production raw manifests must cover nd-1, nd-2, and nd-3")
+    frozen_hash = sha256_json(frozen)
+    listed = {}
+    manifest_hashes = {}
+    for path in manifests:
+        manifest_hashes[path.stem] = sha256_file(path)
+        manifest = json.loads(path.read_text(encoding="ascii"))
+        if set(manifest) != {
+                "raw_manifest_version", "node", "registry_sha256", "config_sha256",
+                "frozen_config_sha256", "source_commit", "files"}:
+            raise ValueError(f"production raw manifest schema mismatch: {path}")
+        expected = {
+            "raw_manifest_version": "exp102.production.raw.v1",
+            "node": path.stem,
+            "registry_sha256": registry["registry_sha256"],
+            "config_sha256": config["config_sha256"],
+            "frozen_config_sha256": frozen_hash,
+            "source_commit": frozen["source_commit"],
+        }
+        if any(manifest.get(field) != value for field, value in expected.items()):
+            raise ValueError(f"production raw manifest identity mismatch: {path}")
+        files = manifest["files"]
+        if not isinstance(files, list) or not files:
+            raise ValueError(f"production raw manifest has no files: {path}")
+        for item in files:
+            if not isinstance(item, dict) or set(item) != {"path", "sha256"}:
+                raise ValueError(f"production raw manifest file entry is invalid: {path}")
+            raw_path = (raw_dir / item["path"]).resolve()
+            if raw_dir not in raw_path.parents or raw_path.suffix != ".npz" or not raw_path.is_file():
+                raise ValueError(f"production raw manifest path is invalid: {item['path']}")
+            if raw_path in listed:
+                raise ValueError(f"production raw file is listed more than once: {raw_path}")
+            if sha256_file(raw_path) != item["sha256"]:
+                raise ValueError(f"production stage raw hash mismatch: {raw_path}")
+            listed[raw_path] = item["sha256"]
+    actual = {path.resolve() for path in raw_dir.rglob("*.npz")}
+    if actual != set(listed) or len(listed) != 6144:
+        raise ValueError("production raw files differ from the three completed stage manifests")
+    return manifest_hashes
+
+
+def _verify_production_control(raw_dir, registry_path, config_path, frozen_path,
+                               registry, config, frozen):
+    raw_dir = Path(raw_dir).resolve()
+    run_root = raw_dir.parent.parent
+    if raw_dir != run_root / "raw" / "production":
+        raise ValueError("production raw directory must be RUN_ROOT/raw/production")
+    frozen_path = Path(frozen_path).resolve()
+    if frozen_path != run_root / "frozen.json":
+        raise ValueError("production freezer must be RUN_ROOT/frozen.json")
+    report_path = run_root / "pilot_report.json"
+    task_plan_path = run_root / "task_plan.json"
+    deployment_path = run_root / "production_deployment.json"
+    for path in (report_path, task_plan_path, deployment_path):
+        if not path.is_file():
+            raise ValueError(f"production control file is missing: {path.name}")
+    if frozen != recompute_frozen(report_path, registry_path, config_path):
+        raise ValueError("production freezer differs from pilot raw/report recomputation")
+    task_plan = json.loads(task_plan_path.read_text(encoding="ascii"))
+    if (task_plan.get("status") != "PRODUCTION" or task_plan.get("num_tasks") != 6144
+            or task_plan.get("registry_sha256") != registry["registry_sha256"]
+            or task_plan.get("config_sha256") != config["config_sha256"]
+            or task_plan.get("tasks") != task_records(registry, config, frozen)):
+        raise ValueError("production task plan identity or coverage mismatch")
+    deployment = json.loads(deployment_path.read_text(encoding="ascii"))
+    expected_deployment = build_production_manifest(
+        registry_path, config_path, frozen_path, report_path,
+    )
+    if deployment != expected_deployment:
+        raise ValueError("production deployment differs from held-out recomputation")
+    status_paths = {
+        node: run_root / "status" / f"production_{node}.json"
+        for node in ("nd-1", "nd-2", "nd-3")
+    }
+    if any(not path.is_file() for path in status_paths.values()):
+        raise ValueError("three-node production status coverage is incomplete")
+    file_hashes = {
+        "task_plan_sha256": sha256_file(task_plan_path),
+        "deployment_manifest_sha256": sha256_file(deployment_path),
+        "pilot_report_sha256_file": sha256_file(report_path),
+    }
+    statuses = {}
+    for node, path in status_paths.items():
+        status = json.loads(path.read_text(encoding="ascii"))
+        statuses[node] = status
+        if (status.get("status") != "SUCCESS" or status.get("node") != node
+                or status.get("source_commit") != frozen["source_commit"]
+                or status.get("registry_sha256") != registry["registry_sha256"]
+                or status.get("config_sha256") != config["config_sha256"]
+                or status.get("frozen_config_sha256") != sha256_json(frozen)
+                or any(status.get(field) != value for field, value in file_hashes.items())
+                or status.get("computed", 0) + status.get("reused", 0) != status.get("expected")):
+            raise ValueError(f"production status identity/count mismatch: {node}")
+    if sum(status["expected"] for status in statuses.values()) != 6144:
+        raise ValueError("production statuses do not cover exactly 6144 tasks")
+    return statuses
+
+
 def aggregate(raw_dir, registry_path, config_path, frozen_path, output_dir):
     raw_dir, output_dir = Path(raw_dir), Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -34,6 +147,16 @@ def aggregate(raw_dir, registry_path, config_path, frozen_path, output_dir):
             or frozen.get("registry_sha256") != registry["registry_sha256"]
             or frozen.get("config_sha256") != config["config_sha256"]):
         raise ValueError("invalid frozen production identity")
+    source_identity = verify_source_identity(Path.cwd(), frozen.get("source_commit", ""))
+    statuses = _verify_production_control(
+        raw_dir, registry_path, config_path, frozen_path, registry, config, frozen,
+    )
+    raw_manifest_hashes = _verify_production_raw_manifests(
+        raw_dir, registry, config, frozen,
+    )
+    if any(statuses[node].get("raw_manifest_sha256") != raw_manifest_hashes[node]
+           for node in raw_manifest_hashes):
+        raise ValueError("production status/raw manifest hash mismatch")
     frozen_hash = sha256_json(frozen)
     p_values = np.asarray(config["p_values"])
     codes = registry["codes"]
@@ -45,47 +168,22 @@ def aggregate(raw_dir, registry_path, config_path, frozen_path, output_dir):
     raw_qtop = np.full((len(codes), len(p_values), config["num_disorders"]), np.nan)
     raw_collision = raw_qtop.copy(); raw_planted = raw_qtop.copy()
     for code_index, code in enumerate(codes):
+        _, loaded_code, H = load_frozen_code(registry_path, code["code_id"])
+        if loaded_code != code:
+            raise ValueError(f"registry changed while loading {code['code_id']}")
+        model, frame = build_model(H)
         for disorder in range(config["num_disorders"]):
             path = raw_dir / code["code_id"] / f"d{disorder:03d}.npz"
             if not path.exists():
                 continue
-            with np.load(path, allow_pickle=False) as data:
-                expected = {"registry_sha256": registry["registry_sha256"], "config_sha256": config["config_sha256"],
-                            "frozen_config_sha256": frozen_hash, "code_id": code["code_id"], "disorder_index": disorder}
-                for field, value in expected.items():
-                    if str(data[field].item()) != str(value):
-                        raise ValueError(f"raw fingerprint mismatch in {path}: {field}")
-                scalar_expected = {
-                    "engine": "numba", "source_commit": frozen["source_commit"],
-                    "namespace": "production",
-                    "section_fingerprint": code["section_fingerprint"],
-                    "logical_frame_fingerprint": code["logical_frame_fingerprint"],
-                }
-                for field, value in scalar_expected.items():
-                    if field not in data or str(data[field].item()) != str(value):
-                        raise ValueError(f"raw production identity mismatch in {path}: {field}")
-                identity = {
-                    "code_id": code["code_id"], "disorder_index": disorder,
-                    "registry_sha256": registry["registry_sha256"],
-                    "config_sha256": config["config_sha256"],
-                    "frozen_config_sha256": frozen_hash, "namespace": "production",
-                }
-                if str(data["task_fingerprint"].item()) != sha256_json(identity):
-                    raise ValueError(f"raw task fingerprint mismatch in {path}")
-                required_shapes = {"p_values": (7,), "qtop": (7,), "collision_mass": (7,),
-                                   "planted_hit": (7,), "valid": (7,), "labels": (7, 4, frozen["by_m"][str(code["m"])]["measurement_rounds"])}
-                for field, expected_shape in required_shapes.items():
-                    if field not in data or data[field].shape != expected_shape:
-                        raise ValueError(f"raw shape mismatch in {path}: {field}")
-                if data["labels"].dtype != np.uint64 or data["valid"].dtype != np.bool_:
-                    raise ValueError(f"raw dtype mismatch in {path}")
-                if not np.array_equal(data["p_values"], p_values):
-                    raise ValueError(f"raw p grid mismatch in {path}")
-                present[code_index] += 1
-                raw_qtop[code_index, :, disorder] = data["qtop"]
-                raw_collision[code_index, :, disorder] = data["collision_mass"]
-                raw_planted[code_index, :, disorder] = data["planted_hit"]
-                valid_count[code_index] += data["valid"].astype(np.int16)
+            record = validate_production_raw(path, registry, code, config, frozen, model, frame)
+            if record["disorder_index"] != disorder:
+                raise ValueError(f"raw disorder identity mismatch in {path}")
+            present[code_index] += 1
+            raw_qtop[code_index, :, disorder] = record["qtop"]
+            raw_collision[code_index, :, disorder] = record["collision_mass"]
+            raw_planted[code_index, :, disorder] = record["planted_hit"]
+            valid_count[code_index] += record["valid"].astype(np.int16)
         for p_index in range(len(p_values)):
             if present[code_index, p_index] < config["num_disorders"]:
                 code_status[code_index, p_index] = "INCOMPLETE"
@@ -141,13 +239,23 @@ def aggregate(raw_dir, registry_path, config_path, frozen_path, output_dir):
     _write_tables(output_dir, codes, p_values, mu_code, sem_code, code_status, mu_m, sem_between, m_status)
     shutil.copy2(registry_path, output_dir / "registry.json")
     shutil.copy2(Path(registry_path).parent / "code_registry.csv", output_dir / "code_registry.csv")
+    shutil.copy2(config_path, output_dir / "production.v1.json")
+    shutil.copy2(frozen_path, output_dir / "frozen.json")
     manifest = {"aggregation_version": "exp102.aggregation.v1", "result_file": result_path.name,
                 "result_sha256": sha256_file(result_path), "registry_sha256": registry["registry_sha256"],
                 "config_sha256": config["config_sha256"], "frozen_config_sha256": frozen_hash,
                 "engine": "numba", "source_commit": frozen["source_commit"],
                 "planned_tasks": 6144, "present_tasks": int(np.min(present, axis=1).sum()),
                 "all_points_reportable": bool(np.all(m_status == "REPORTABLE")),
-                "main_errorbar_definition": "std(code_means,ddof=1)/sqrt(8)"}
+                "main_errorbar_definition": "std(code_means,ddof=1)/sqrt(8)",
+                "registry_file_sha256": sha256_file(output_dir / "registry.json"),
+                "config_file_sha256": sha256_file(output_dir / "production.v1.json"),
+                "frozen_file_sha256": sha256_file(output_dir / "frozen.json"),
+                "pilot_report_sha256": frozen["pilot_report_sha256"],
+                "pilot_raw_evidence_sha256": frozen["raw_evidence_sha256"],
+                "held_out_attempt_by_m": frozen["held_out_attempt_by_m"],
+                "production_raw_manifest_sha256": raw_manifest_hashes,
+                "source_identity": source_identity}
     atomic_json(output_dir / "aggregation_manifest.json", manifest)
     return manifest
 

@@ -1,6 +1,6 @@
 # exp102 status
 
-**PILOT LADDER FAILED / BLOCKED — production not started**
+**PILOT LADDER EXTENSION APPROVED / PRE-DEPLOY — production not started**
 
 The independent registry, bit-identical reference/Numba hard-coset q=0 PT, net-transport
 diagnostics, task identity/resume, fail-closed aggregation, publication loader, and pilot cell
@@ -12,8 +12,8 @@ scientific result is claimed.
 
 Production requires `engine=numba`; the reference engine is an oracle only. The full-round Numba
 kernel is bit-identical through the `k=64` boundary and gives about 177x--196x speedup in local
-benchmarks. The combined exp102/exp101 regression is 107/107 PASS, and the clean source passed
-cross-node preflight before the ladder search.
+benchmarks. The R96/R128 extension source passes 50 exp102 tests and all 365 exp101 regressions;
+the prior clean source also passed cross-node preflight before its ladder search.
 
 The clean full-round source `bbe72da` passed three-node preflight and produced 10,752/10,752
 ordered ladder cells. A post-run audit found that ladder/gamma had incorrectly inherited the
@@ -23,3 +23,8 @@ only `93/96,89/96,85/96,84/96,87/96` cells pass swap/hot/residual. Under the fro
 values must stop rather than proceed to gamma/rounds/held-out. No `FROZEN_HELD_OUT_PASS` exists.
 Resuming requires an explicitly reviewed pilot-contract change, such as expanding R or changing
 the ladder family, followed by a clean-SHA pilot rerun.
+
+On 2026-07-20 the user approved appending `(p_hot=0.49,R=96)` and then `R=128` after the original
+21 ladder pairs. This changes the production-config hash and therefore starts a new clean-SHA pilot;
+none of the `bbe72da` raw validity fields are eligible for the new report or freezer. Production
+remains blocked until the replacement gamma, rounds, and 448-cell-per-m held-out evidence passes.

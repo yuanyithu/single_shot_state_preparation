@@ -2,54 +2,138 @@
 
 import argparse
 import json
+import re
 from collections import Counter, defaultdict
 from itertools import product
 from pathlib import Path
 
 import numpy as np
 
-from .config import load_config
+from .config import PILOT_CANDIDATE_FIELDS, load_config, validate_pilot_candidate
 from .diagnostics import evaluate_gate
 from .io import atomic_json, canonical_json, sha256_file, sha256_json
-from .pilot_cell import _gate
+from .pilot_cell import _gate, pilot_task_identity
 from .registry import load_registry
 from .seeds import derive_seed
 
 
 TUNING_P_VALUES = (0.04, 0.07, 0.10)
 PILOT_STAGES = ("ladder", "gamma", "rounds", "held_out")
-CANDIDATE_FIELDS = {
-    "p_hot", "num_temperatures", "gamma", "burn_rounds", "measurement_rounds",
-    "sweeps_per_round", "logical_move_repeat",
+CANDIDATE_FIELDS = PILOT_CANDIDATE_FIELDS
+PILOT_RAW_FIELDS = {
+    "task_fingerprint", "namespace", "stage", "code_id", "m", "p",
+    "disorder_index", "candidate_json", "attempt", "valid", "failure_reason",
+    "labels", "swap_attempts", "swap_accepts", "swap_rates",
+    "logical_attempts", "logical_accepts", "logical_rates", "round_trips",
+    "sector_changing_round_trips", "residual", "rhat", "ess",
+    "constant_status", "core_seconds", "wall_seconds", "engine",
+    "source_commit", "model_fingerprint", "registry_sha256", "config_sha256",
+    "section_fingerprint", "logical_frame_fingerprint",
 }
+
+
+def _validate_status_raw(data, task):
+    """Reject readable pilot fragments before reporting operational completion."""
+    if set(data.files) != PILOT_RAW_FIELDS:
+        raise ValueError("pilot status raw schema mismatch")
+    fingerprint = sha256_json(task)
+    expected_scalars = {
+        "task_fingerprint": fingerprint,
+        **{field: task[field] for field in (
+            "namespace", "stage", "code_id", "p", "disorder_index", "engine",
+            "source_commit", "registry_sha256", "config_sha256",
+        )},
+        "candidate_json": _candidate_key(task["candidate"]),
+    }
+    for field, expected in expected_scalars.items():
+        if str(_scalar(data, field)) != str(expected):
+            raise ValueError(f"pilot status raw identity mismatch: {field}")
+    if int(_scalar(data, "attempt")) < 0 or int(_scalar(data, "m")) not in range(3, 9):
+        raise ValueError("pilot status raw m/attempt is invalid")
+    candidate = task["candidate"]
+    instances, temperatures = 4, int(candidate["num_temperatures"])
+    measurements = int(candidate["measurement_rounds"])
+    labels = _array(data, "labels", (instances, measurements), np.dtype(np.uint64))
+    swap_attempts = _array(data, "swap_attempts", (instances, temperatures - 1))
+    swap_accepts = _array(data, "swap_accepts", swap_attempts.shape)
+    logical_attempts = data["logical_attempts"].copy()
+    if (logical_attempts.ndim != 3 or logical_attempts.shape[:2] != (instances, temperatures)
+            or logical_attempts.shape[2] <= 0 or logical_attempts.shape[2] > 64):
+        raise ValueError("pilot status logical attempts have the wrong shape")
+    k = logical_attempts.shape[2]
+    logical_accepts = _array(data, "logical_accepts", logical_attempts.shape)
+    for attempts, accepts in ((swap_attempts, swap_accepts),
+                              (logical_attempts, logical_accepts)):
+        if (attempts.dtype.kind not in "iu" or accepts.dtype.kind not in "iu"
+                or np.any(attempts < 0) or np.any(accepts < 0)
+                or np.any(accepts > attempts)):
+            raise ValueError("pilot status counters are invalid")
+    if not np.array_equal(
+            _array(data, "swap_rates", swap_attempts.shape),
+            swap_accepts / np.maximum(swap_attempts, 1)):
+        raise ValueError("pilot status swap rates disagree with counters")
+    if not np.array_equal(
+            _array(data, "logical_rates", logical_attempts.shape),
+            logical_accepts / np.maximum(logical_attempts, 1)):
+        raise ValueError("pilot status logical rates disagree with counters")
+    for field in ("round_trips", "sector_changing_round_trips", "residual"):
+        values = _array(data, field, (instances,))
+        if values.dtype.kind not in "iu" or np.any(values < 0):
+            raise ValueError(f"pilot status {field} is invalid")
+    _array(data, "rhat", (k,)); _array(data, "ess", (k,))
+    if _array(data, "constant_status", (k,)).dtype.kind != "U":
+        raise ValueError("pilot status constant status dtype is invalid")
+    for field in ("failure_reason", "model_fingerprint", "section_fingerprint",
+                  "logical_frame_fingerprint"):
+        _scalar(data, field)
+    for field in ("core_seconds", "wall_seconds"):
+        value = float(_scalar(data, field))
+        if not np.isfinite(value) or value < 0:
+            raise ValueError("pilot status timing is invalid")
+    return fingerprint, bool(_scalar(data, "valid"))
 
 
 def pilot_status(expected_manifest, raw_dir):
     manifest = json.loads(Path(expected_manifest).read_text(encoding="ascii"))
     raw_dir = Path(raw_dir)
     counts = {key: 0 for key in ("expected", "computed", "reused", "invalid", "missing", "conflict")}
-    fingerprints = {}
-    tasks = manifest.get("tasks", manifest.get("tuning_tasks", []))
+    fingerprints = defaultdict(list)
+    tasks = manifest.get("tasks")
+    if not isinstance(tasks, list) or not tasks:
+        raise ValueError("pilot status requires a deployment manifest with concrete tasks")
     counts["expected"] = len(tasks)
-    for task in tasks:
-        fingerprint = sha256_json(task)
-        matches = list(raw_dir.rglob(f"{fingerprint}*.npz"))
+    expected = {sha256_json(task): task for task in tasks}
+    if len(expected) != len(tasks):
+        raise ValueError("pilot deployment manifest contains duplicate tasks")
+    for path in sorted(raw_dir.rglob("*.npz")):
+        try:
+            with np.load(path, allow_pickle=False) as data:
+                claimed = str(_scalar(data, "task_fingerprint"))
+                if claimed not in expected:
+                    raise ValueError("unexpected pilot task fingerprint")
+                fingerprint, valid = _validate_status_raw(data, expected[claimed])
+        except Exception:
+            counts["conflict"] += 1
+            continue
+        fingerprints[fingerprint].append({
+            "path": str(path), "sha256": sha256_file(path), "valid": valid,
+        })
+    files = {}
+    for fingerprint in expected:
+        matches = fingerprints.get(fingerprint, [])
         if not matches:
             counts["missing"] += 1
             continue
-        hashes = {sha256_file(path) for path in matches}
+        hashes = {item["sha256"] for item in matches}
         if len(hashes) > 1:
             counts["conflict"] += 1
             continue
-        with np.load(matches[0], allow_pickle=False) as data:
-            if str(data["task_fingerprint"].item()) != fingerprint:
-                counts["conflict"] += 1
-            elif not bool(data["valid"].item()):
-                counts["invalid"] += 1
-            else:
-                counts["reused" if len(matches) > 1 else "computed"] += 1
-        fingerprints[fingerprint] = sorted(str(path) for path in matches)
-    return {"pilot_status_version": "exp102.pilot.status.v1", **counts, "files": fingerprints}
+        if not all(item["valid"] for item in matches):
+            counts["invalid"] += 1
+        else:
+            counts["reused" if len(matches) > 1 else "computed"] += 1
+        files[fingerprint] = sorted(item["path"] for item in matches)
+    return {"pilot_status_version": "exp102.pilot.status.v1", **counts, "files": files}
 
 
 def pilot_schedule(registry_path, config_path, output_path):
@@ -67,17 +151,17 @@ def pilot_schedule(registry_path, config_path, output_path):
             for disorder in range(8):
                 held_out.append({"stage": "held_out", "namespace": "pilot_held_out_v1",
                                  "code_id": code["code_id"], "p": p, "disorder_index": disorder})
-    candidates = [{"p_hot": ph, "num_temperatures": r, "gamma": gamma,
+    candidates = [{"p_hot": ladder["p_hot"],
+                   "num_temperatures": ladder["num_temperatures"], "gamma": gamma,
                    "burn_rounds": rounds[0], "measurement_rounds": rounds[1],
                    "sweeps_per_round": 1, "logical_move_repeat": 1}
-                  for ph, r, gamma, rounds in product(
-                      config["pilot"]["p_hot_candidates"],
-                      config["pilot"]["num_temperatures_candidates"],
+                  for ladder, gamma, rounds in product(
+                      config["pilot"]["ladder_candidates"],
                       config["pilot"]["gamma_candidates"],
                       config["pilot"]["round_candidates"])]
     schedule = {"pilot_schedule_version": "exp102.pilot.v1",
                 "registry_sha256": registry["registry_sha256"], "config_sha256": config["config_sha256"],
-                "selection_policy": "raise_p_hot_and_R_then_min_core_time_gamma_then_raise_round_budget",
+                "selection_policy": "ordered_ladder_pairs_then_min_core_time_gamma_then_raise_round_budget",
                 "candidates": candidates, "tuning_tasks": tuning, "held_out_tasks": held_out}
     atomic_json(output_path, schedule)
     return schedule
@@ -100,32 +184,6 @@ def _candidate(config, p_hot, num_temperatures, gamma, rounds):
         "measurement_rounds": int(rounds[1]), "sweeps_per_round": 1,
         "logical_move_repeat": 1,
     }
-
-
-def _validate_candidate(candidate, config):
-    if set(candidate) != CANDIDATE_FIELDS:
-        raise ValueError("pilot candidate fields are incomplete")
-    normalized = {
-        "p_hot": float(candidate["p_hot"]),
-        "num_temperatures": int(candidate["num_temperatures"]),
-        "gamma": float(candidate["gamma"]),
-        "burn_rounds": int(candidate["burn_rounds"]),
-        "measurement_rounds": int(candidate["measurement_rounds"]),
-        "sweeps_per_round": int(candidate["sweeps_per_round"]),
-        "logical_move_repeat": int(candidate["logical_move_repeat"]),
-    }
-    pilot = config["pilot"]
-    if normalized["p_hot"] not in pilot["p_hot_candidates"]:
-        raise ValueError("pilot candidate p_hot is outside the frozen schedule")
-    if normalized["num_temperatures"] not in pilot["num_temperatures_candidates"]:
-        raise ValueError("pilot candidate temperature count is outside the frozen schedule")
-    if normalized["gamma"] not in pilot["gamma_candidates"]:
-        raise ValueError("pilot candidate gamma is outside the frozen schedule")
-    if [normalized["burn_rounds"], normalized["measurement_rounds"]] not in pilot["round_candidates"]:
-        raise ValueError("pilot candidate round budget is outside the frozen schedule")
-    if normalized["sweeps_per_round"] != 1 or normalized["logical_move_repeat"] != 1:
-        raise ValueError("pilot candidate move counts differ from the frozen schedule")
-    return normalized
 
 
 def _array(data, field, shape, dtype=None):
@@ -168,7 +226,7 @@ def _validate_raw(path, registry, config, expected_source_commit):
             candidate_unchecked = json.loads(str(_scalar(data, "candidate_json")))
         except (TypeError, json.JSONDecodeError) as exc:
             raise ValueError(f"invalid candidate JSON in {path}") from exc
-        candidate = _validate_candidate(candidate_unchecked, config)
+        candidate = validate_pilot_candidate(candidate_unchecked, config)
         if str(_scalar(data, "candidate_json")) != _candidate_key(candidate):
             raise ValueError(f"non-canonical candidate JSON in {path}")
         namespace = (f"pilot_held_out_m{m}_attempt{attempt}" if stage == "held_out"
@@ -183,13 +241,10 @@ def _validate_raw(path, registry, config, expected_source_commit):
         for field, expected in scalar_expected.items():
             if str(_scalar(data, field)) != str(expected):
                 raise ValueError(f"pilot raw identity mismatch in {path}: {field}")
-        identity = {
-            "namespace": namespace, "stage": stage, "code_id": code_id, "p": p,
-            "disorder_index": disorder, "candidate": candidate,
-            "registry_sha256": registry["registry_sha256"],
-            "config_sha256": config["config_sha256"], "source_commit": expected_source_commit,
-            "engine": "numba",
-        }
+        identity = pilot_task_identity(
+            registry["registry_sha256"], config["config_sha256"], code_id, m,
+            p, disorder, candidate, attempt, stage, expected_source_commit,
+        )
         fingerprint = sha256_json(identity)
         if str(_scalar(data, "task_fingerprint")) != fingerprint:
             raise ValueError(f"pilot task fingerprint mismatch in {path}")
@@ -277,6 +332,8 @@ def _load_records(paths, registry, config, expected_source_commit=None):
     if len(source_commits) != 1:
         raise ValueError("pilot raw mixes source commits")
     source_commit = source_commits.pop()
+    if re.fullmatch(r"[0-9a-f]{40}", source_commit) is None:
+        raise ValueError("pilot raw source commit must be a full lowercase Git SHA")
     if expected_source_commit is not None and source_commit != expected_source_commit:
         raise ValueError("pilot raw source commit differs from the report")
     records = [_validate_raw(path, registry, config, source_commit) for path in paths]
@@ -329,138 +386,200 @@ def _group_records(records, registry, config):
     return groups
 
 
-def _complete_group(groups, stage, m, candidate):
-    candidate_key = _candidate_key(candidate)
-    matches = [group for key, group in groups.items()
-               if key[0] == stage and key[1] == m and key[3] == candidate_key and group["complete"]]
-    if not matches:
-        return None
-    return min(matches, key=lambda group: group["attempt"])
-
-
 def _public_group(group):
     if group is None:
         return None
     return {key: value for key, value in group.items() if key not in {"candidate_key", "m"}}
 
 
+def _candidate_group(groups, stage, m, candidate):
+    """Return the sole raw group for a candidate, retaining partial attempts."""
+    candidate_key = _candidate_key(candidate)
+    matches = [group for key, group in groups.items()
+               if key[0] == stage and key[1] == m and key[3] == candidate_key]
+    if len(matches) > 1:
+        return None, "duplicate_candidate_attempts"
+    return (matches[0], None) if matches else (None, "missing")
+
+
+def _pending_trial(candidate, reason="missing"):
+    return {"candidate": candidate, "complete": False, "all_pass": False, "reason": reason}
+
+
 def _select_one_m(m, groups, config):
+    """Consume the adaptive pilot protocol in order for one code size.
+
+    Evidence after a missing prefix is never selected.  A failed held-out
+    attempt advances the round budget, and exhaustion of that budget advances
+    to the next ordered ladder pair where gamma is selected again.
+    """
     pilot = config["pilot"]
     base_rounds = pilot["round_candidates"][0]
-    ladder_trials = []
-    ladder_group = None
-    ladder_candidate = None
-    for p_hot in pilot["p_hot_candidates"]:
-        for temperatures in pilot["num_temperatures_candidates"]:
-            candidate = _candidate(config, p_hot, temperatures, 1.0, base_rounds)
-            group = _complete_group(groups, "ladder", m, candidate)
-            ladder_trials.append(_public_group(group) if group is not None else {
-                "candidate": candidate, "complete": False, "all_pass": False,
-            })
-            if group is None:
-                break
-            if group["all_pass"]:
-                ladder_group, ladder_candidate = group, candidate
-                break
-        if ladder_group is not None or (ladder_trials and not ladder_trials[-1]["complete"]):
-            break
+    ladder_trials, gamma_trials, rounds_trials, held_out_trials, cycles = [], [], [], [], []
+    active_ladder = active_gamma = active_rounds = None
+    final_tuning_group = held_out_group = final_candidate = None
 
-    gamma_trials = []
-    gamma_group = None
-    gamma_candidate = None
-    if ladder_candidate is not None:
-        gamma_groups = []
-        for gamma in pilot["gamma_candidates"]:
-            candidate = _candidate(config, ladder_candidate["p_hot"],
-                                   ladder_candidate["num_temperatures"], gamma, base_rounds)
-            group = _complete_group(groups, "gamma", m, candidate)
-            gamma_trials.append(_public_group(group) if group is not None else {
-                "candidate": candidate, "complete": False, "all_pass": False,
-            })
-            if group is not None:
-                gamma_groups.append(group)
-        if len(gamma_groups) == len(pilot["gamma_candidates"]):
-            passing = [group for group in gamma_groups if group["all_pass"]]
-            tie_order = {1.0: 0, 0.75: 1, 1.5: 2}
-            if passing:
-                gamma_group = min(passing, key=lambda group: (
-                    group["core_seconds"], tie_order[float(group["candidate"]["gamma"])]))
-                gamma_candidate = gamma_group["candidate"]
-
-    rounds_trials = []
-    rounds_group = None
-    rounds_candidate = None
-    if gamma_candidate is not None:
-        for rounds in pilot["round_candidates"]:
-            candidate = _candidate(config, gamma_candidate["p_hot"],
-                                   gamma_candidate["num_temperatures"], gamma_candidate["gamma"], rounds)
-            group = _complete_group(groups, "rounds", m, candidate)
-            rounds_trials.append(_public_group(group) if group is not None else {
-                "candidate": candidate, "complete": False, "all_pass": False,
-            })
-            if group is None:
-                break
-            if group["all_pass"]:
-                rounds_group, rounds_candidate = group, candidate
-                break
-
-    held_out_trials = []
-    held_out_group = None
-    final_tuning_group = rounds_group
-    final_candidate = rounds_candidate
     held_groups = sorted((group for key, group in groups.items()
                           if key[0] == "held_out" and key[1] == m),
                          key=lambda group: (group["attempt"], group["candidate_key"]))
     by_attempt = defaultdict(list)
     for group in held_groups:
         by_attempt[group["attempt"]].append(group)
-    expected_held_candidate = rounds_candidate
-    if held_groups and expected_held_candidate is not None:
-        max_attempt = max(by_attempt)
-        for attempt in range(max_attempt + 1):
-            candidates = by_attempt.get(attempt, [])
-            if len(candidates) != 1:
-                held_out_trials.append({"attempt": attempt, "complete": False, "all_pass": False,
-                                        "reason": "missing_or_ambiguous_attempt"})
-                break
-            group = candidates[0]
-            held_out_trials.append(_public_group(group))
-            if not group["complete"]:
-                break
-            if group["candidate_key"] != _candidate_key(expected_held_candidate):
-                break
-            matching_tuning = _complete_group(groups, "rounds", m, group["candidate"])
-            if matching_tuning is None or not matching_tuning["all_pass"]:
-                break
-            if group["all_pass"]:
-                held_out_group = group
-                final_tuning_group = matching_tuning
-                final_candidate = group["candidate"]
-                break
-            round_index = next(
-                index for index, rounds in enumerate(pilot["round_candidates"])
-                if list(rounds) == [expected_held_candidate["burn_rounds"],
-                                    expected_held_candidate["measurement_rounds"]]
-            )
-            if round_index + 1 >= len(pilot["round_candidates"]):
-                break
-            expected_held_candidate = _candidate(
-                config, gamma_candidate["p_hot"], gamma_candidate["num_temperatures"],
-                gamma_candidate["gamma"], pilot["round_candidates"][round_index + 1],
-            )
+    if by_attempt:
+        expected_attempts = set(range(max(by_attempt) + 1))
+        if set(by_attempt) != expected_attempts:
+            conflict = "held_out_attempt_gap"
+        elif any(len(candidates) != 1 for candidates in by_attempt.values()):
+            conflict = "ambiguous_held_out_attempt"
+        else:
+            conflict = None
+    else:
+        conflict = None
+    held_attempt = 0
 
-    return {
-        "ladder": {"selected": ladder_candidate, "trials": ladder_trials},
-        "gamma": {"selected": gamma_candidate, "trials": gamma_trials},
-        "rounds": {"selected": rounds_candidate, "trials": rounds_trials},
-        "held_out": {"selected_attempt": None if held_out_group is None else held_out_group["attempt"],
-                     "trials": held_out_trials},
-        "all_tuning_pass": bool(final_tuning_group is not None and final_tuning_group["all_pass"]),
-        "all_held_out_pass": bool(held_out_group is not None and held_out_group["all_pass"]),
-        "num_tuning_cells": 0 if final_tuning_group is None else final_tuning_group["present_cells"],
-        "num_held_out_cells": 0 if held_out_group is None else held_out_group["present_cells"],
-        "selected_config": final_candidate,
-    }
+    def result(state, next_action=None, conflict_reason=None):
+        return {
+            "ladder": {"selected": active_ladder, "trials": ladder_trials},
+            "gamma": {"selected": active_gamma, "trials": gamma_trials},
+            "rounds": {"selected": active_rounds, "trials": rounds_trials},
+            "held_out": {
+                "selected_attempt": None if held_out_group is None else held_out_group["attempt"],
+                "trials": held_out_trials,
+            },
+            "all_tuning_pass": bool(final_tuning_group is not None and final_tuning_group["all_pass"]),
+            "all_held_out_pass": bool(held_out_group is not None and held_out_group["all_pass"]),
+            "num_tuning_cells": 0 if final_tuning_group is None else final_tuning_group["present_cells"],
+            "num_held_out_cells": 0 if held_out_group is None else held_out_group["present_cells"],
+            "selected_config": final_candidate,
+            "state": state, "next_action": next_action, "cycles": cycles,
+            "conflict_reason": conflict_reason,
+        }
+
+    if conflict is not None:
+        return result("CONFLICT", conflict_reason=conflict)
+
+    tie_order = {1.0: 0, 0.75: 1, 1.5: 2}
+    for ladder_index, ladder in enumerate(pilot["ladder_candidates"]):
+        active_ladder = active_gamma = active_rounds = None
+        final_tuning_group = final_candidate = None
+        ladder_candidate = _candidate(
+            config, ladder["p_hot"], ladder["num_temperatures"], 1.0, base_rounds,
+        )
+        cycle = {"ladder_index": ladder_index, "ladder_candidate": ladder_candidate,
+                 "gamma_selected": None, "outcome": None}
+        cycles.append(cycle)
+        ladder_group, reason = _candidate_group(groups, "ladder", m, ladder_candidate)
+        ladder_trials.append(_public_group(ladder_group) if ladder_group is not None
+                             else _pending_trial(ladder_candidate, reason))
+        if reason == "duplicate_candidate_attempts":
+            cycle["outcome"] = "conflict"
+            return result("CONFLICT", conflict_reason="duplicate_ladder_candidate")
+        if ladder_group is None or not ladder_group["complete"]:
+            cycle["outcome"] = "waiting_ladder"
+            return result("WAITING_LADDER", {
+                "stage": "ladder", "candidate": ladder_candidate,
+                "reason": reason if ladder_group is None else "partial",
+            })
+        if not ladder_group["all_pass"]:
+            cycle["outcome"] = "ladder_failed"
+            continue
+        active_ladder = ladder_candidate
+
+        gamma_groups = []
+        missing_gamma = []
+        for gamma in pilot["gamma_candidates"]:
+            candidate = _candidate(
+                config, ladder["p_hot"], ladder["num_temperatures"], gamma, base_rounds,
+            )
+            group, reason = _candidate_group(groups, "gamma", m, candidate)
+            gamma_trials.append(_public_group(group) if group is not None
+                                else _pending_trial(candidate, reason))
+            if reason == "duplicate_candidate_attempts":
+                cycle["outcome"] = "conflict"
+                return result("CONFLICT", conflict_reason="duplicate_gamma_candidate")
+            if group is None or not group["complete"]:
+                missing_gamma.append({"candidate": candidate,
+                                      "reason": reason if group is None else "partial"})
+            else:
+                gamma_groups.append(group)
+        if missing_gamma:
+            cycle["outcome"] = "waiting_gamma"
+            return result("WAITING_GAMMA", {"stage": "gamma", "candidates": missing_gamma})
+        passing_gamma = [group for group in gamma_groups if group["all_pass"]]
+        if not passing_gamma:
+            cycle["outcome"] = "gamma_failed"
+            continue
+        gamma_group = min(passing_gamma, key=lambda group: (
+            group["core_seconds"], tie_order[float(group["candidate"]["gamma"])]))
+        active_gamma = gamma_group["candidate"]
+        cycle["gamma_selected"] = active_gamma
+
+        for round_index, rounds in enumerate(pilot["round_candidates"]):
+            candidate = _candidate(
+                config, ladder["p_hot"], ladder["num_temperatures"],
+                active_gamma["gamma"], rounds,
+            )
+            round_group, reason = _candidate_group(groups, "rounds", m, candidate)
+            rounds_trials.append(_public_group(round_group) if round_group is not None
+                                 else _pending_trial(candidate, reason))
+            if reason == "duplicate_candidate_attempts":
+                cycle["outcome"] = "conflict"
+                return result("CONFLICT", conflict_reason="duplicate_rounds_candidate")
+            if round_group is None or not round_group["complete"]:
+                active_rounds = None
+                cycle["outcome"] = "waiting_rounds"
+                return result("WAITING_ROUNDS", {
+                    "stage": "rounds", "candidate": candidate,
+                    "reason": reason if round_group is None else "partial",
+                })
+            if not round_group["all_pass"]:
+                continue
+
+            active_rounds = candidate
+            final_tuning_group, final_candidate = round_group, candidate
+            held_candidates = by_attempt.get(held_attempt, [])
+            if not held_candidates:
+                cycle["outcome"] = "waiting_held_out"
+                return result("WAITING_HELD_OUT", {
+                    "stage": "held_out", "attempt": held_attempt, "candidate": candidate,
+                })
+            held_group = held_candidates[0]
+            if held_group["candidate_key"] != _candidate_key(candidate):
+                cycle["outcome"] = "conflict"
+                return result("CONFLICT", conflict_reason="held_out_candidate_mismatch")
+            held_out_trials.append(_public_group(held_group))
+            if not held_group["complete"]:
+                cycle["outcome"] = "waiting_held_out"
+                return result("WAITING_HELD_OUT", {
+                    "stage": "held_out", "attempt": held_attempt,
+                    "candidate": candidate, "reason": "partial",
+                })
+            held_attempt += 1
+            if held_group["all_pass"]:
+                if held_attempt != len(by_attempt):
+                    cycle["outcome"] = "conflict"
+                    return result("CONFLICT", conflict_reason="held_out_after_pass")
+                held_out_group = held_group
+                cycle["outcome"] = "passed"
+                return result("PASSED")
+
+            # This candidate is rejected by held-out evidence.  The next round
+            # budget, or the next ladder pair after the maximum, must earn new
+            # tuning evidence before another held-out attempt can be consumed.
+            final_tuning_group = final_candidate = active_rounds = None
+            cycle["outcome"] = ("held_out_failed" if round_index + 1 < len(pilot["round_candidates"])
+                                else "held_out_exhausted")
+
+        if cycle["outcome"] == "held_out_failed":
+            cycle["outcome"] = "rounds_exhausted_after_held_out"
+        elif cycle["outcome"] is None:
+            cycle["outcome"] = "rounds_exhausted"
+
+    active_ladder = active_gamma = active_rounds = None
+    final_tuning_group = final_candidate = None
+    if held_attempt != len(by_attempt):
+        return result("CONFLICT", conflict_reason="unconsumed_held_out_attempt")
+    return result("EXHAUSTED")
 
 
 def _analyze_records(records, registry, config):
@@ -480,12 +599,48 @@ def _relative_evidence(paths, report_path):
     return evidence
 
 
+def _verified_stage_raw_paths(raw_dir):
+    """Bind merge-select to the hash manifests emitted by completed stages."""
+    raw_dir = Path(raw_dir).resolve()
+    manifests = sorted(raw_dir.rglob("raw_manifest.json"))
+    if not manifests:
+        raise ValueError("pilot merge-select found no stage raw manifests")
+    listed = {}
+    for manifest_path in manifests:
+        manifest = json.loads(manifest_path.read_text(encoding="ascii"))
+        if set(manifest) != {
+                "raw_manifest_version", "node", "stage", "attempt", "source_commit",
+                "registry_sha256", "config_sha256", "files"}:
+            raise ValueError(f"pilot raw manifest schema mismatch: {manifest_path}")
+        if manifest["raw_manifest_version"] != "exp102.pilot.raw.v1":
+            raise ValueError(f"pilot raw manifest version mismatch: {manifest_path}")
+        files = manifest["files"]
+        if not isinstance(files, list) or not files:
+            raise ValueError(f"pilot raw manifest has no files: {manifest_path}")
+        for item in files:
+            if not isinstance(item, dict) or set(item) != {"path", "sha256"}:
+                raise ValueError(f"pilot raw manifest file entry is invalid: {manifest_path}")
+            path = (manifest_path.parent / item["path"]).resolve()
+            if (manifest_path.parent.resolve() not in path.parents or path.suffix != ".npz"
+                    or not path.is_file()):
+                raise ValueError(f"pilot raw manifest path is invalid: {item['path']}")
+            if path in listed:
+                raise ValueError(f"pilot raw file is listed more than once: {path}")
+            if sha256_file(path) != item["sha256"]:
+                raise ValueError(f"pilot stage raw hash mismatch: {path}")
+            listed[path] = item["sha256"]
+    actual = {path.resolve() for path in raw_dir.rglob("*.npz")}
+    if actual != set(listed):
+        raise ValueError("pilot raw files differ from completed stage manifests")
+    return sorted(listed)
+
+
 def merge_select(raw_dir, registry_path, config_path, output_path):
     raw_dir = Path(raw_dir)
     output_path = Path(output_path)
     registry = load_registry(registry_path)
     config = load_config(config_path)
-    paths = sorted(raw_dir.rglob("*.npz"))
+    paths = _verified_stage_raw_paths(raw_dir)
     records, source_commit = _load_records(paths, registry, config)
     report = {
         "report_version": "exp102.pilot.report.v1", "generated_by": "pilot.merge-select.v1",
@@ -530,7 +685,7 @@ def _assert_report_matches_recomputed(report, by_m):
         raise ValueError("pilot report selection or pass fields were edited after merge-select")
 
 
-def freeze_from_report(report_path, output_path, registry_path=None, config_path=None):
+def recompute_frozen(report_path, registry_path=None, config_path=None):
     report = json.loads(Path(report_path).read_text(encoding="ascii"))
     if report.get("report_version") != "exp102.pilot.report.v1":
         raise ValueError("wrong pilot report version")
@@ -558,9 +713,11 @@ def freeze_from_report(report_path, output_path, registry_path=None, config_path
         "status": "FROZEN_HELD_OUT_PASS", "pilot_report_sha256": sha256_json(report),
         "raw_evidence_sha256": sha256_json(report["raw_evidence"]),
         **{key: report[key] for key in required_identity}, "by_m": {},
+        "held_out_attempt_by_m": {},
     }
     for m, record in by_m.items():
-        if not record["all_tuning_pass"] or not record["all_held_out_pass"]:
+        if (record.get("state") != "PASSED" or not record["all_tuning_pass"]
+                or not record["all_held_out_pass"]):
             raise ValueError(f"m={m} did not pass both recomputed pilot stages")
         if record["num_tuning_cells"] != 96 or record["num_held_out_cells"] != 448:
             raise ValueError(f"m={m} recomputed pilot cell count is incomplete")
@@ -568,6 +725,12 @@ def freeze_from_report(report_path, output_path, registry_path=None, config_path
         if not isinstance(selected, dict) or set(selected) != CANDIDATE_FIELDS:
             raise ValueError(f"m={m} selected config fields are incomplete")
         frozen["by_m"][m] = selected
+        frozen["held_out_attempt_by_m"][m] = int(record["held_out"]["selected_attempt"])
+    return frozen
+
+
+def freeze_from_report(report_path, output_path, registry_path=None, config_path=None):
+    frozen = recompute_frozen(report_path, registry_path, config_path)
     atomic_json(output_path, frozen)
     return frozen
 

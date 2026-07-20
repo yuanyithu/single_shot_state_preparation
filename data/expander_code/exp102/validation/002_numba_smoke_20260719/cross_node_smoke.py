@@ -13,10 +13,11 @@ model, frame = build_model(cycle_parity_check_matrix(2))
 error = np.zeros(model.num_qubits, dtype=np.uint8)
 error[0] = 1
 syndrome = (model.H_check.astype(np.int64) @ error.astype(np.int64) % 2).astype(np.uint8)
-config = Q0PtConfig(0.45, 4, 1.0, 5, 20)
+config = Q0PtConfig(0.49, 128, 1.0, 5, 20)
 results = [run_q0_pt_instance(model, frame, syndrome, 0.1, config, 12345, 0, engine=engine)
            for engine in ("reference", "numba")]
-fields = ("labels", "swap_attempts", "swap_accepts", "logical_attempts", "logical_accepts",
+fields = ("labels", "ladder_K", "ladder_p", "swap_attempts", "swap_accepts",
+          "logical_attempts", "logical_accepts",
           "hot_arrival_labels", "hot_departure_labels")
 digest = hashlib.sha256()
 for field in fields:
