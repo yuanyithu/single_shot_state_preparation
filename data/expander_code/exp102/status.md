@@ -12,7 +12,7 @@ scientific result is claimed.
 
 Production requires `engine=numba`; the reference engine is an oracle only. The full-round Numba
 kernel is bit-identical through the `k=64` boundary and gives about 177x--196x speedup in local
-benchmarks. The R96/R128 extension source passes 50 exp102 tests and all 365 exp101 regressions;
+benchmarks. The R96/R128 extension source passes 52 exp102 tests and all 365 exp101 regressions;
 the prior clean source also passed cross-node preflight before its ladder search.
 
 The clean full-round source `bbe72da` passed three-node preflight and produced 10,752/10,752

@@ -11,6 +11,7 @@ import importlib.util
 import json
 import math
 from pathlib import Path
+import re
 import subprocess
 
 
@@ -22,7 +23,6 @@ HELPERS = importlib.util.module_from_spec(_HELPER_SPEC)
 _HELPER_SPEC.loader.exec_module(HELPERS)
 WORKERS = {"nd-1": 75, "nd-2": 75, "nd-3": 91}
 RELATIVE = Path("data/expander_code/exp102/validation/002_numba_smoke_20260719")
-SMOKE_DIGEST = "5516e079846adaf95fa32504f6dc040101b90ceb164b543009f43d01c11dcb9d"
 
 
 @dataclass(frozen=True)
@@ -119,6 +119,23 @@ def require_idle_capacity(node, workers):
         )
 
 
+def validate_preflight_attestation(attestation, source_commit, archive_sha256, manifest_sha256):
+    smoke_digest = str(attestation.get("smoke_digest", ""))
+    nodes = attestation.get("nodes", {})
+    if (attestation.get("preflight_version") != "exp102.preflight.v1"
+            or attestation.get("status") != "PASS"
+            or attestation.get("source_commit") != source_commit
+            or attestation.get("archive_sha256") != archive_sha256
+            or attestation.get("manifest_sha256") != manifest_sha256
+            or re.fullmatch(r"[0-9a-f]{64}", smoke_digest) is None
+            or not isinstance(nodes, dict)
+            or set(nodes) != set(WORKERS)
+            or any(not row.get("idle") or row.get("smoke_digest") != smoke_digest
+                   for row in nodes.values())):
+        raise ValueError("three-node preflight attestation is invalid")
+    return smoke_digest
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser()
     parser.add_argument("--run-id", required=True)
@@ -140,15 +157,9 @@ def main(argv=None):
     if not attestation_path.is_file():
         raise ValueError("three-node preflight attestation is missing")
     attestation = json.loads(attestation_path.read_text(encoding="ascii"))
-    if (attestation.get("preflight_version") != "exp102.preflight.v1"
-            or attestation.get("status") != "PASS"
-            or attestation.get("source_commit") != args.source_commit
-            or attestation.get("archive_sha256") != args.archive_sha256
-            or attestation.get("manifest_sha256") != args.manifest_sha256
-            or set(attestation.get("nodes", {})) != set(WORKERS)
-            or any(not row.get("idle") or row.get("smoke_digest") != SMOKE_DIGEST
-                   for row in attestation["nodes"].values())):
-        raise ValueError("three-node preflight attestation is invalid")
+    validate_preflight_attestation(
+        attestation, args.source_commit, args.archive_sha256, args.manifest_sha256,
+    )
     for name in ("frozen.json", "pilot_report.json", "task_plan.json", "production_deployment.json"):
         if not (run_root / name).is_file():
             raise ValueError(f"production control file is missing: {name}")

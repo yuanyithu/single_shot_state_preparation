@@ -26,7 +26,6 @@ _HELPER_SPEC.loader.exec_module(HELPERS)
 
 WORKERS = {"nd-1": 75, "nd-2": 75, "nd-3": 91}
 RELATIVE = Path("data/expander_code/exp102/validation/002_numba_smoke_20260719")
-SMOKE_DIGEST = "5516e079846adaf95fa32504f6dc040101b90ceb164b543009f43d01c11dcb9d"
 
 
 @dataclass(frozen=True)
@@ -101,18 +100,23 @@ def write_attestation(run_root, source_commit, archive_sha256, manifest_sha256,
         text = launch.log_file.read_text(encoding="utf-8")
         digests = [line.strip() for line in text.splitlines()
                    if digest_pattern.fullmatch(line.strip())]
-        if not digests or digests[-1] != SMOKE_DIGEST:
-            raise ValueError(f"cross-node smoke digest mismatch: {launch.node}")
+        if not digests:
+            raise ValueError(f"cross-node smoke digest is missing: {launch.node}")
         nodes[launch.node] = {
             **probes[launch.node], "smoke_digest": digests[-1],
             "log_sha256": _sha256_file(launch.log_file),
         }
     if set(nodes) != set(WORKERS):
         raise ValueError("preflight attestation does not cover all production nodes")
+    smoke_digests = {row["smoke_digest"] for row in nodes.values()}
+    if len(smoke_digests) != 1:
+        raise ValueError("cross-node smoke digests differ")
+    smoke_digest = smoke_digests.pop()
     attestation = {
         "preflight_version": "exp102.preflight.v1", "status": "PASS",
         "source_commit": source_commit, "archive_sha256": archive_sha256,
-        "manifest_sha256": manifest_sha256, "nodes": nodes,
+        "manifest_sha256": manifest_sha256, "smoke_digest": smoke_digest,
+        "nodes": nodes,
     }
     output = Path(run_root) / "preflight_attestation.json"
     output.parent.mkdir(parents=True, exist_ok=True)

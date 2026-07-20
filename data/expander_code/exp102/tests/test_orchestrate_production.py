@@ -46,3 +46,22 @@ def test_reconciles_exactly_6144_tasks_with_common_identity(tmp_path):
     path.write_text(json.dumps(tampered), encoding="ascii")
     with pytest.raises(ValueError, match="differ"):
         ORCHESTRATOR.reconcile_statuses(run_root)
+
+
+def test_preflight_attestation_binds_one_three_node_digest():
+    digest = "a" * 64
+    attestation = {
+        "preflight_version": "exp102.preflight.v1", "status": "PASS",
+        "source_commit": "1" * 40, "archive_sha256": "2" * 64,
+        "manifest_sha256": "3" * 64, "smoke_digest": digest,
+        "nodes": {node: {"idle": True, "smoke_digest": digest}
+                  for node in ORCHESTRATOR.WORKERS},
+    }
+    assert ORCHESTRATOR.validate_preflight_attestation(
+        attestation, "1" * 40, "2" * 64, "3" * 64,
+    ) == digest
+    attestation["nodes"]["nd-3"]["smoke_digest"] = "b" * 64
+    with pytest.raises(ValueError, match="invalid"):
+        ORCHESTRATOR.validate_preflight_attestation(
+            attestation, "1" * 40, "2" * 64, "3" * 64,
+        )

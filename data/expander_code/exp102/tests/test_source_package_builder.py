@@ -3,11 +3,18 @@ from importlib import import_module
 import json
 import os
 from pathlib import Path
+import shutil
 import subprocess
 
 import pytest
 
 from data.expander_code.exp102.exp102_pipeline.io import verify_source_identity
+
+
+pytestmark = pytest.mark.skipif(
+    shutil.which("git") is None,
+    reason="source-package builder tests require the build host's Git CLI",
+)
 
 
 builder = import_module(
