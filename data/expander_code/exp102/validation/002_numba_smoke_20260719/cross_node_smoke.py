@@ -21,11 +21,13 @@ fields = ("labels", "ladder_K", "ladder_p", "swap_attempts", "swap_accepts",
           "hot_arrival_labels", "hot_departure_labels")
 digest = hashlib.sha256()
 for field in fields:
-    assert np.array_equal(results[0][field], results[1][field]), field
+    if not np.array_equal(results[0][field], results[1][field]):
+        raise RuntimeError(f"reference/Numba mismatch: {field}")
     value = np.ascontiguousarray(results[1][field])
     digest.update(field.encode("ascii")); digest.update(value.dtype.str.encode("ascii"))
     digest.update(np.asarray(value.shape, dtype=np.int64).tobytes()); digest.update(value.tobytes())
 for field in ("round_trips", "sector_changing_round_trips", "max_hard_coset_residual"):
-    assert results[0][field] == results[1][field], field
+    if results[0][field] != results[1][field]:
+        raise RuntimeError(f"reference/Numba mismatch: {field}")
     digest.update(field.encode("ascii")); digest.update(np.int64(results[1][field]).tobytes())
 print(digest.hexdigest())

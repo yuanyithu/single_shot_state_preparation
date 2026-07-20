@@ -55,7 +55,12 @@ trap 'exit 70' INT TERM
 
 # Reject both changed archived files and untracked shadow files before Python
 # can import sitecustomize or any project module.
-tar -tf "$archive" | sed -e '/\/$/d' -e 's#^\./##' | LC_ALL=C sort >"$archive_files"
+tar_list_args=(-tf "$archive")
+if tar --help 2>&1 | grep -q -- '--quoting-style'; then
+  # GNU tar escapes non-ASCII names by default, unlike bsdtar and find.
+  tar_list_args=(--quoting-style=literal -tf "$archive")
+fi
+tar "${tar_list_args[@]}" | sed -e '/\/$/d' -e 's#^\./##' | LC_ALL=C sort >"$archive_files"
 (
   cd "$source_dir"
   find . \( -type f -o -type l \) -print | sed 's#^\./##' | LC_ALL=C sort
@@ -75,6 +80,7 @@ cleanup
 cd "$source_dir"
 export PYTHONPATH=.
 export PYTHONDONTWRITEBYTECODE=1
+unset PYTHONOPTIMIZE
 export EXP102_SOURCE_COMMIT=$expected_commit
 export PYTEST_ADDOPTS="-p no:cacheprovider"
 export NUMBA_CACHE_DIR="$deployment_root/numba-cache-${HOSTNAME:-unknown}"

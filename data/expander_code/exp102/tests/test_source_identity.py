@@ -22,13 +22,16 @@ def test_deployed_source_manifest_binds_commit_and_file_hashes(tmp_path):
     source.mkdir(parents=True)
     tracked = source / "tracked.py"
     tracked.write_text("VALUE = 1\n", encoding="ascii")
+    unicode_file = source / "中文.txt"
+    unicode_file.write_text("portable filename\n", encoding="ascii")
     commit = "a" * 40
     archive = deployment / "SOURCE.tar"
     with tarfile.open(archive, "w") as handle:
-        content = tracked.read_bytes()
-        info = tarfile.TarInfo("tracked.py")
-        info.size = len(content)
-        handle.addfile(info, io.BytesIO(content))
+        for path in (tracked, unicode_file):
+            content = path.read_bytes()
+            info = tarfile.TarInfo(path.name)
+            info.size = len(content)
+            handle.addfile(info, io.BytesIO(content))
     archive_sha256 = sha256_file(archive)
     (deployment / "SOURCE_COMMIT").write_text(commit + "\n", encoding="ascii")
     (deployment / "ARCHIVE_SHA256").write_text(archive_sha256 + "\n", encoding="ascii")
@@ -36,11 +39,14 @@ def test_deployed_source_manifest_binds_commit_and_file_hashes(tmp_path):
         "source_identity_version": "exp102.source.v1",
         "source_commit": commit,
         "archive_sha256": archive_sha256,
-        "files": [{"path": "tracked.py", "sha256": sha256_file(tracked)}],
+        "files": [
+            {"path": "tracked.py", "sha256": sha256_file(tracked)},
+            {"path": "中文.txt", "sha256": sha256_file(unicode_file)},
+        ],
     })
 
     identity = verify_source_identity(source, commit)
-    assert identity["mode"] == "archive" and identity["file_count"] == 1
+    assert identity["mode"] == "archive" and identity["file_count"] == 2
     assert identity["manifest_sha256"] == sha256_file(deployment / "SOURCE_MANIFEST.json")
 
     verifier = (

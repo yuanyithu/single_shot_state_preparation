@@ -59,3 +59,4 @@ data/3d_toric_code/with_measurement_noise/profile/
 # Local launcher/collector scratch outputs.
 runs/
 logs/
+data/expander_code/exp102/deployment/

@@ -1,5 +1,10 @@
 """Run source, test, and R128 smoke gates on all three compute nodes."""
 
+import sys
+
+# Loading the shared launcher helper must not mutate the verified source tree.
+sys.dont_write_bytecode = True
+
 import argparse
 from dataclasses import dataclass
 import hashlib
