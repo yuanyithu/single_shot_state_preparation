@@ -1,6 +1,16 @@
 # exp102 status
 
-**PILOT LADDER EXHAUSTED AT R128 / BLOCKED — production not started**
+**PT V2 DISCOVERY IMPLEMENTED / FORMAL PILOT STILL BLOCKED — production not started**
+
+The fixed Q32 nonuniform-ladder and multi-swap implementation is now isolated under
+`exp102.discovery.v2`. It adds certified transport that requires a real hot-rung local update
+after a hot touch, per-replica transport counters, exact attempt validation, candidate-independent
+disorder seeds, candidate-bound trajectory seeds, and a launcher whose markers bind the immutable
+source/control/ownership identity. Local reference/Numba tests and a discovery-cell smoke pass.
+Discovery has not yet produced two confirmed, distinct ladder configurations, so the formal
+contract remains `exp102.q0_pt.v1` for the exhausted historical pilot and no v2 production config,
+formal pilot report, freezer, or production task plan exists. Discovery raw is design evidence only
+and is rejected by the formal pilot path.
 
 The independent registry, bit-identical reference/Numba hard-coset q=0 PT, net-transport
 diagnostics, task identity/resume, fail-closed aggregation, publication loader, and pilot cell

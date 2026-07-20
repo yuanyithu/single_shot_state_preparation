@@ -14,6 +14,16 @@ python -m data.expander_code.exp102.exp102_pipeline.aggregate RAW REGISTRY CONFI
 python -m data.expander_code.exp102.exp102_pipeline.plot FINAL_RESULTS/exp102_results.npz FINAL_RESULTS
 ```
 
+The in-progress PT-v2 design search has a separate entry point and config:
+
+```bash
+python -m data.expander_code.exp102.exp102_pipeline.discovery analyze \
+  DISCOVERY_RAW data/expander_code/exp102/registry/registry.json \
+  data/expander_code/exp102/config/discovery.v2.json SOURCE_COMMIT DISCOVERY_REPORT
+```
+
+Discovery output cannot be passed to `pilot merge-select` or `pilot freeze`.
+
 Production is intentionally blocked until pilot/held-out validation writes a configuration whose
 status is `FROZEN_HELD_OUT_PASS`. Do not hand-edit that status to bypass pilot gates.
 Production workers are launched only through the report-verifying production stage runner; direct

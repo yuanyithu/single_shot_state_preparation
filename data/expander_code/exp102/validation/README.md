@@ -10,4 +10,7 @@ Current status is pre-pilot, not scientific certification.
   including the `m=8,k=64` boundary. Local speedup is about 177x--196x.
 - `004_pilot_ladder_20260720/`: clean-SHA three-node preflight and the complete configured ladder
   search. The maximum candidate fails m=4..8, so the pilot is fail-closed before gamma/held-out.
+- `005_pt_v2_discovery_20260720/`: isolated Q32-ladder/multi-swap discovery implementation,
+  cross-node digest runner, immutable ownership launcher, and discovery-only raw validation. Local
+  implementation checks pass; remote screen/transport/confirmation results are not yet recorded.
 - Held-out and production evidence do not exist. Their absence is an active production blocker.

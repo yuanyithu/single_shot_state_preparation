@@ -29,3 +29,11 @@ at `p_hot=0.45`, then the same sequence at `0.475`, then `R=8,12,16,24,32,48,64,
 at `0.49`. The `R=96,128` tail was explicitly approved after the original schedule failed its swap
 gate on 2026-07-20. Every new configuration hash requires a clean-source pilot; raw validity from an
 older configuration or source commit is never reused.
+
+## PT v2 discovery boundary
+
+`exp102.discovery.v2` is an isolated design search for a future `exp102.q0_pt.v2` contract. Its
+Q32 ladders, multi-swap trajectories, raw files, reports, and namespaces are not formal pilot or
+production evidence. A v2 production config may be generated only after discovery confirms both a
+primary and a backup with different `ladder_id` values. Until that happens, the version header above
+continues to describe the exhausted v1 production contract and no freezer may be created.

@@ -1,6 +1,48 @@
 import numpy as np
 
 
+TRANSPORT_VECTOR_FIELDS = (
+    "hot_touches_per_replica",
+    "hot_updated_visits_per_replica",
+    "uncertified_round_trips_per_replica",
+    "round_trips_per_replica",
+    "sector_changing_round_trips_per_replica",
+)
+TRANSPORT_TOTAL_FIELDS = (
+    "hot_touches",
+    "hot_updated_visits",
+    "uncertified_round_trips",
+    "round_trips",
+    "sector_changing_round_trips",
+)
+
+
+def validate_transport_counters(result, num_replicas):
+    """Fail closed on impossible or internally inconsistent PT transport counts."""
+    vectors = {}
+    for field in TRANSPORT_VECTOR_FIELDS:
+        value = np.asarray(result[field])
+        if (value.shape != (int(num_replicas),) or value.dtype.kind not in "iu"
+                or np.any(value < 0)):
+            raise ValueError(f"invalid transport vector: {field}")
+        vectors[field] = value
+    for total_field, vector_field in zip(TRANSPORT_TOTAL_FIELDS, TRANSPORT_VECTOR_FIELDS):
+        total = result[total_field]
+        if (isinstance(total, (bool, np.bool_)) or not isinstance(total, (int, np.integer))
+                or int(total) < 0 or int(total) != int(vectors[vector_field].sum())):
+            raise ValueError(f"transport total disagrees with per-replica counts: {total_field}")
+
+    touch = vectors["hot_touches_per_replica"]
+    updated = vectors["hot_updated_visits_per_replica"]
+    uncertified = vectors["uncertified_round_trips_per_replica"]
+    certified = vectors["round_trips_per_replica"]
+    changing = vectors["sector_changing_round_trips_per_replica"]
+    if (np.any(changing > certified) or np.any(certified > updated)
+            or np.any(updated + uncertified > touch)):
+        raise ValueError("transport counters violate certification inequalities")
+    return True
+
+
 def basis_character_traces(label_traces, k):
     traces = np.asarray(label_traces, dtype=np.uint64)
     return np.stack([
@@ -50,6 +92,12 @@ def evaluate_gate(results, gate, k, require_trace_gate=True):
     if len({int(result["seed"]) for result in results}) != 4:
         failures.append("duplicate_instance_seed")
     for index, result in enumerate(results):
+        transport_fields = set(TRANSPORT_VECTOR_FIELDS) | set(TRANSPORT_TOTAL_FIELDS)
+        present_transport = transport_fields & set(result)
+        if set(TRANSPORT_VECTOR_FIELDS) & set(result):
+            if present_transport != transport_fields:
+                raise ValueError("result has an incomplete transport schema")
+            validate_transport_counters(result, len(result["hot_touches_per_replica"]))
         if result["max_hard_coset_residual"]:
             failures.append(f"instance_{index}:hard_coset")
         rates = result["swap_accepts"] / np.maximum(result["swap_attempts"], 1)
