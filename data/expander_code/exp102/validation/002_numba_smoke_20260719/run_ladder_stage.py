@@ -10,8 +10,6 @@ from data.expander_code.exp102.exp102_pipeline.pilot_cell import run_cell
 from data.expander_code.exp102.exp102_pipeline.registry import load_registry
 
 
-RUN_ID = "exp102_pilot_20260719_70191fb"
-COMMIT = "70191fb"
 CAPACITY = {"nd-2": 75, "nd-3": 91}
 
 
@@ -26,14 +24,17 @@ def ownership(codes):
 
 
 def execute(task):
-    registry, config, output, code_id, p, disorder, candidate, attempt, stage = task
+    (registry, config, output, code_id, p, disorder, candidate, attempt, stage,
+     source_commit) = task
     return run_cell(registry, config, code_id, p, disorder, candidate, attempt,
-                    stage, COMMIT, output)
+                    stage, source_commit, output)
 
 
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("node", choices=tuple(CAPACITY)); parser.add_argument("--num-workers", type=int, required=True)
+    parser.add_argument("--run-id", required=True)
+    parser.add_argument("--source-commit", required=True)
     parser.add_argument("--stage", choices=("ladder", "gamma", "rounds", "held_out"), default="ladder")
     parser.add_argument("--attempt", type=int, required=True)
     parser.add_argument("--p-hot", type=float)
@@ -70,7 +71,7 @@ def main():
     registry = load_registry(registry_path)
     config_data = load_config(config_path)
     assigned, loads = ownership(registry["codes"])
-    run_root = Path.home() / ".single_shot/runs" / RUN_ID
+    run_root = Path.home() / ".single_shot/runs" / args.run_id
     output_root = run_root / args.stage / f"attempt_{args.attempt:03d}" / args.node
     tasks = []
     for code in registry["codes"]:
@@ -83,9 +84,9 @@ def main():
                 output = output_root / code["code_id"] / f"p{p:.2f}_d{disorder:02d}.npz"
                 tasks.append((str(registry_path), str(config_path), str(output),
                               code["code_id"], p, disorder, candidates[code["m"]],
-                              args.attempt, args.stage))
+                              args.attempt, args.stage, args.source_commit))
     atomic_json(run_root / f"deployment_manifest_{args.stage}_{args.attempt:03d}.json", {
-        "run_id": RUN_ID, "source_commit": COMMIT,
+        "run_id": args.run_id, "source_commit": args.source_commit,
         "by_m_config": {str(m): candidates[m] for m in sorted(candidates)},
         "stage": args.stage, "attempt": args.attempt,
         "capacity": CAPACITY, "normalized_load": loads, "code_owner": assigned,
