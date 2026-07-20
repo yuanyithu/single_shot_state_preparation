@@ -1,6 +1,6 @@
 # exp102 status
 
-**PILOT LADDER EXTENSION APPROVED / PRE-DEPLOY — production not started**
+**PILOT LADDER EXHAUSTED AT R128 / BLOCKED — production not started**
 
 The independent registry, bit-identical reference/Numba hard-coset q=0 PT, net-transport
 diagnostics, task identity/resume, fail-closed aggregation, publication loader, and pilot cell
@@ -25,6 +25,13 @@ Resuming requires an explicitly reviewed pilot-contract change, such as expandin
 the ladder family, followed by a clean-SHA pilot rerun.
 
 On 2026-07-20 the user approved appending `(p_hot=0.49,R=96)` and then `R=128` after the original
-21 ladder pairs. This changes the production-config hash and therefore starts a new clean-SHA pilot;
-none of the `bbe72da` raw validity fields are eligible for the new report or freezer. Production
-remains blocked until the replacement gamma, rounds, and 448-cell-per-m held-out evidence passes.
+21 ladder pairs. Clean source `2b01d9dcb463ec47a1b30202fc9105430b95e18c` passed three-node
+preflight; all nodes produced Linux smoke digest
+`b9a5c8b22d8b2421723705b1567b825a5a1775a8efd20748e884436f8bee959f`. Run
+`exp102_pilot_20260720_2b01d9d` completed all 13,056 planned ladder cells through the conditional
+R128 attempt, with hashes verified locally against 13,270 remote files. Fresh merge-select chose
+m=3 at `(0.45,64)` and m=4 at `(0.49,96)`, but the maximum R128 candidate left m=5..8 at
+`94/96,94/96,93/96,94/96`; every failure was the `p=0.04` minimum swap-rate gate. Those sizes are
+therefore `EXHAUSTED` under the frozen 23-pair policy. Gamma, rounds, held-out, freezer, task plan,
+and production were not started. Resuming requires an explicitly reviewed new pilot/config
+contract; lowering gates, hand-writing a freezer, or launching a reduced production is forbidden.

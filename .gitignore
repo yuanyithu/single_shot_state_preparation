@@ -60,3 +60,4 @@ data/3d_toric_code/with_measurement_noise/profile/
 runs/
 logs/
 data/expander_code/exp102/deployment/
+data/expander_code/exp102/raw/
