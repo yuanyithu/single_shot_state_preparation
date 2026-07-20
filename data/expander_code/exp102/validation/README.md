@@ -8,5 +8,6 @@ Current status is pre-pilot, not scientific certification.
   pilot pass. The deliberately tiny round budget fails mixing gates as expected.
 - `003_numba_engine_20260720/`: full-round Numba/reference bit-identity and performance benchmark,
   including the `m=8,k=64` boundary. Local speedup is about 177x--196x.
-- The old-source cross-node digest passed, but pilot tuning must restart and cross-node determinism
-  must be repeated for the new clean SHA. Held-out and production evidence do not yet exist.
+- `004_pilot_ladder_20260720/`: clean-SHA three-node preflight and the complete configured ladder
+  search. The maximum candidate fails m=4..8, so the pilot is fail-closed before gamma/held-out.
+- Held-out and production evidence do not exist. Their absence is an active production blocker.
