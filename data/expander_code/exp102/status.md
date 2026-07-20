@@ -1,16 +1,24 @@
 # exp102 status
 
-**PT V2 DISCOVERY IMPLEMENTED / FORMAL PILOT STILL BLOCKED — production not started**
+**PT V2 DISCOVERY EXHAUSTED / FORMAL PILOT BLOCKED — production not started**
 
-The fixed Q32 nonuniform-ladder and multi-swap implementation is now isolated under
-`exp102.discovery.v2`. It adds certified transport that requires a real hot-rung local update
-after a hot touch, per-replica transport counters, exact attempt validation, candidate-independent
-disorder seeds, candidate-bound trajectory seeds, and a launcher whose markers bind the immutable
-source/control/ownership identity. Local reference/Numba tests and a discovery-cell smoke pass.
-Discovery has not yet produced two confirmed, distinct ladder configurations, so the formal
-contract remains `exp102.q0_pt.v1` for the exhausted historical pilot and no v2 production config,
-formal pilot report, freezer, or production task plan exists. Discovery raw is design evidence only
-and is rejected by the formal pilot path.
+Clean source `da69528b43f4a9d1635083c21d713ba63ccec4ab` passed the three-node PT-v2
+preflight and completed the frozen screen plus transport stages. The 45-cell screen passed D0,
+D2, D3, and D4 at 9/9; D1 passed 8/9 and was rejected by one sub-0.20 swap edge. The 24-cell
+transport stage then tested those four ladders at `S=4,16,64` on both hard cells. All 12 candidate
+groups passed their long-run swap/hot-logical/residual gates (group minima for swap rate were
+0.156--0.392), but all failed transport: across 96 instance trajectories only 13 ever received a
+hot-rung update, there were 27 such visits, and there were zero uncertified, certified, or
+sector-changing round trips.
+
+Every `S=64` candidate has at least one instance with zero hot-updated visits, so the frozen
+conditional rule does not permit `S=128`. The PT-v2 route therefore stops before the 17-cell
+confirmation panel. It produced no primary/backup pair, formal v2 config, formal pilot, held-out,
+freezer, task plan, or production run. The formal contract remains `exp102.q0_pt.v1` for the
+exhausted historical pilot; discovery raw remains design evidence and is rejected by the formal
+pilot path. The hardened analyzer independently verifies the exact NPZ set against node raw
+manifests, control and LPT ownership hashes, source archive identity, stage fingerprints, statuses,
+and exclusive SUCCESS markers before recomputing every counter and gate.
 
 The independent registry, bit-identical reference/Numba hard-coset q=0 PT, net-transport
 diagnostics, task identity/resume, fail-closed aggregation, publication loader, and pilot cell
@@ -22,8 +30,10 @@ scientific result is claimed.
 
 Production requires `engine=numba`; the reference engine is an oracle only. The full-round Numba
 kernel is bit-identical through the `k=64` boundary and gives about 177x--196x speedup in local
-benchmarks. The R96/R128 extension source passes 52 exp102 tests and all 365 exp101 regressions;
-the prior clean source also passed cross-node preflight before its ladder search.
+benchmarks. The PT-v2 implementation plus hardened evidence analyzer passes 77 exp102 tests and all
+365 exp101 regressions locally. The discovery source passed the then-current exp102 suite on all
+three nodes; its Linux PT-v2 digest was
+`38f29fe037bcce399883b6f6d20b4500f54ba11e94ea5e8b98b586e8e402f659` everywhere.
 
 The clean full-round source `bbe72da` passed three-node preflight and produced 10,752/10,752
 ordered ladder cells. A post-run audit found that ladder/gamma had incorrectly inherited the

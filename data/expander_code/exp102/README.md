@@ -14,7 +14,9 @@ python -m data.expander_code.exp102.exp102_pipeline.aggregate RAW REGISTRY CONFI
 python -m data.expander_code.exp102.exp102_pipeline.plot FINAL_RESULTS/exp102_results.npz FINAL_RESULTS
 ```
 
-The in-progress PT-v2 design search has a separate entry point and config:
+The exhausted PT-v2 design search has a separate entry point and config. `DISCOVERY_RAW` must
+include the remote `control/` evidence plus every node's raw manifest, status, SUCCESS marker, and
+exact NPZ set:
 
 ```bash
 python -m data.expander_code.exp102.exp102_pipeline.discovery analyze \
@@ -23,6 +25,8 @@ python -m data.expander_code.exp102.exp102_pipeline.discovery analyze \
 ```
 
 Discovery output cannot be passed to `pilot merge-select` or `pilot freeze`.
+The frozen search stopped at transport with zero certified round trips, so it did not produce a
+formal v2 configuration; see `validation/005_pt_v2_discovery_20260720/README.md`.
 
 Production is intentionally blocked until pilot/held-out validation writes a configuration whose
 status is `FROZEN_HELD_OUT_PASS`. Do not hand-edit that status to bypass pilot gates.

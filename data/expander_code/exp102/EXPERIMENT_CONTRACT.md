@@ -37,3 +37,9 @@ Q32 ladders, multi-swap trajectories, raw files, reports, and namespaces are not
 production evidence. A v2 production config may be generated only after discovery confirms both a
 primary and a backup with different `ladder_id` values. Until that happens, the version header above
 continues to describe the exhausted v1 production contract and no freezer may be created.
+
+The frozen 2026-07-20 search is itself `EXHAUSTED`: D0/D2/D3/D4 passed the short ladder screen,
+but all `S=4,16,64` transport candidates produced zero certified round trips on the two hard cells.
+Because every S64 candidate also had an instance with no hot-updated visit, the conditional S128
+branch was not legal and the confirmation panel was not run. Resuming requires a newly reviewed
+algorithm/contract rather than more rounds, S128, weaker gates, or reuse of this discovery raw.

@@ -1,0 +1,52 @@
+{
+  "analysis_sha256": "957142537155e3bf57e03620a6e11cc2cfa1df24c5fa4e4b04f1e7fd9e4987a6",
+  "confirmation_started": false,
+  "formal_config_ready": false,
+  "production_started": false,
+  "report_version": "exp102.discovery.report.v3",
+  "run_id": "exp102_discovery_v2_20260720_da69528",
+  "screen": {
+    "cells": 45,
+    "control_sha256": "27dc31ddf0eb74356f735d18dbcef1583505000ceaf4fe4226b7b7284d907fe7",
+    "ownership_sha256": "5b9f3c129c5aba93b2c851e30103a0fa7aaf72989b80b0b8c52e7b3197a7d72d",
+    "pass_cells_by_ladder": {
+      "D0": 9,
+      "D1": 8,
+      "D2": 9,
+      "D3": 9,
+      "D4": 9
+    },
+    "passing_ladder_ids": [
+      "D0",
+      "D2",
+      "D3",
+      "D4"
+    ],
+    "stage_fingerprint": "7e188ef9c72234b36ea6d25cec9150d1b68d5cb75b1e48be1907c044b63f9588"
+  },
+  "source_commit": "da69528b43f4a9d1635083c21d713ba63ccec4ab",
+  "source_identity": {
+    "archive_sha256": "5ce2f669258088669a3f9c19af840ce9b580aa56cd3c55ed33ae6ddbb3142c6b",
+    "file_count": 719,
+    "manifest_sha256": "2643d84f31b9c7f0fa1320f9fd4055e12c7c922dd043a03c360a04722dbd1240"
+  },
+  "status": "EXHAUSTED",
+  "transport": {
+    "candidate_groups": 12,
+    "certified_round_trips": 0,
+    "cells": 24,
+    "conditional_s128_allowed": false,
+    "control_sha256": "5480511a57d144644c308a4298f515ffc1d09afebefaeb09aceca1b64c89437b",
+    "group_min_swap_rate_max": 0.39155,
+    "group_min_swap_rate_min": 0.156053125,
+    "hot_updated_instance_trajectories": 13,
+    "hot_updated_visits": 27,
+    "instance_trajectories": 96,
+    "ownership_sha256": "43b4b21e4cbb55f1dbe06bc2ddf5b2e2f94a98952ccdca9ed9d84c6c2c5b0b47",
+    "passing_cells": 0,
+    "sector_changing_round_trips": 0,
+    "stage_fingerprint": "9b9173558da83a7e4f4eda8d4169059ade702117cbb0f2fc0d8c3513af85d1ba",
+    "uncertified_round_trips": 0
+  },
+  "validation_version": "exp102.pt_v2.discovery.result.v1"
+}

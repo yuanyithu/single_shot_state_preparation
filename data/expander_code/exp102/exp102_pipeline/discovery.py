@@ -34,9 +34,10 @@ from .worker import build_model
 
 DISCOVERY_VERSION = "exp102.discovery.v2"
 DISCOVERY_RAW_VERSION = "exp102.discovery.raw.v2"
-DISCOVERY_REPORT_VERSION = "exp102.discovery.report.v2"
+DISCOVERY_REPORT_VERSION = "exp102.discovery.report.v3"
 DISCOVERY_PT_VERSION = "exp102.q0_pt.v2"
 DISCOVERY_STAGES = ("screen", "transport", "confirmation")
+DISCOVERY_NODE_CAPACITY = {"nd-1": 75, "nd-2": 75, "nd-3": 91}
 OLD_RUN_ID = "exp102_pilot_20260720_2b01d9d"
 OLD_SOURCE_COMMIT = "2b01d9dcb463ec47a1b30202fc9105430b95e18c"
 OLD_ATTEMPT = 22
@@ -489,11 +490,300 @@ def validate_discovery_raw(path, registry, config, expected_source_commit=None):
     }
 
 
+def _load_json_object(path, description):
+    try:
+        value = json.loads(Path(path).read_text(encoding="ascii"))
+    except Exception as exc:
+        raise ValueError(f"cannot read {description}: {path}") from exc
+    if not isinstance(value, dict):
+        raise ValueError(f"{description} must be a JSON object: {path}")
+    return value
+
+
+def _validate_discovery_source_identity(identity, source_commit):
+    expected_fields = {
+        "source_commit", "mode", "archive_sha256", "manifest_sha256", "file_count",
+    }
+    if (not isinstance(identity, dict) or set(identity) != expected_fields
+            or identity["source_commit"] != source_commit or identity["mode"] != "archive"
+            or re.fullmatch(r"[0-9a-f]{64}", str(identity["archive_sha256"])) is None
+            or re.fullmatch(r"[0-9a-f]{64}", str(identity["manifest_sha256"])) is None
+            or isinstance(identity["file_count"], bool)
+            or not isinstance(identity["file_count"], int)
+            or identity["file_count"] <= 0):
+        raise ValueError("discovery source identity is invalid")
+    return dict(identity)
+
+
+def _validate_discovery_control(path, registry, config, source_commit):
+    control = _load_json_object(path, "discovery control")
+    if set(control) != {
+            "manifest_version", "stage", "source_commit", "registry_sha256",
+            "discovery_config_sha256", "tasks"}:
+        raise ValueError(f"discovery control schema mismatch: {path}")
+    if (control["manifest_version"] != "exp102.discovery.tasks.v2"
+            or control["stage"] not in DISCOVERY_STAGES
+            or control["source_commit"] != source_commit
+            or control["registry_sha256"] != registry["registry_sha256"]
+            or control["discovery_config_sha256"] != config["discovery_config_sha256"]
+            or not isinstance(control["tasks"], list) or not control["tasks"]):
+        raise ValueError(f"discovery control identity mismatch: {path}")
+    task_by_fingerprint = {}
+    for task in control["tasks"]:
+        if not isinstance(task, dict):
+            raise ValueError(f"discovery control task is invalid: {path}")
+        expected = discovery_task_identity(
+            registry, config, source_commit, control["stage"],
+            task.get("cell"), task.get("candidate"),
+        )
+        if task != expected:
+            raise ValueError(f"discovery control task is noncanonical: {path}")
+        fingerprint = sha256_json(task)
+        if fingerprint in task_by_fingerprint:
+            raise ValueError(f"discovery control has duplicate tasks: {path}")
+        task_by_fingerprint[fingerprint] = task
+    return control, task_by_fingerprint
+
+
+def _discovery_task_cost(task):
+    candidate = task["candidate"]
+    m = int(task["cell"]["code_id"][1:3])
+    return float(
+        m * m * candidate["num_temperatures"]
+        * (candidate["burn_rounds"] + candidate["measurement_rounds"])
+    )
+
+
+def _validate_discovery_ownership(path, control_sha256, control, task_by_fingerprint,
+                                  source_commit):
+    ownership = _load_json_object(path, "discovery ownership")
+    if set(ownership) != {
+            "ownership_version", "source_commit", "control_sha256", "stage", "nodes",
+            "task_owner", "candidate_transport", "m_values", "stage_fingerprint",
+            "weighted_load", "capacity"}:
+        raise ValueError(f"discovery ownership schema mismatch: {path}")
+    nodes = ownership["nodes"]
+    if (ownership["ownership_version"] != "exp102.discovery.ownership.v2"
+            or ownership["source_commit"] != source_commit
+            or ownership["control_sha256"] != control_sha256
+            or ownership["stage"] != control["stage"]
+            or not isinstance(nodes, list) or len(nodes) < 2
+            or len(nodes) != len(set(nodes))
+            or not set(nodes) <= set(DISCOVERY_NODE_CAPACITY)):
+        raise ValueError(f"discovery ownership identity mismatch: {path}")
+    expected_capacity = {node: DISCOVERY_NODE_CAPACITY[node] for node in nodes}
+    if ownership["capacity"] != expected_capacity:
+        raise ValueError(f"discovery ownership capacity mismatch: {path}")
+
+    loads = {node: 0.0 for node in nodes}
+    expected_owner = {}
+    tasks_in_lpt_order = sorted(
+        task_by_fingerprint.items(),
+        key=lambda item: (-_discovery_task_cost(item[1]), item[0]),
+    )
+    for fingerprint, task in tasks_in_lpt_order:
+        node = min(
+            nodes,
+            key=lambda name: (loads[name] / DISCOVERY_NODE_CAPACITY[name], name),
+        )
+        expected_owner[fingerprint] = node
+        loads[node] += _discovery_task_cost(task)
+    if ownership["task_owner"] != expected_owner or ownership["weighted_load"] != loads:
+        raise ValueError(f"discovery ownership LPT assignment mismatch: {path}")
+
+    expected_transport = [list(value) for value in sorted({
+        (task["ladder_fingerprint"], task["candidate"]["swap_sweeps_per_round"])
+        for task in task_by_fingerprint.values()
+    })]
+    expected_m_values = sorted({
+        int(task["cell"]["code_id"][1:3]) for task in task_by_fingerprint.values()
+    })
+    if (ownership["candidate_transport"] != expected_transport
+            or ownership["m_values"] != expected_m_values):
+        raise ValueError(f"discovery ownership task summary mismatch: {path}")
+    fingerprint_identity = {
+        "source_commit": source_commit,
+        "control_sha256": control_sha256,
+        "stage": control["stage"],
+        "nodes": nodes,
+        "task_owner": expected_owner,
+        "candidate_transport": expected_transport,
+        "m_values": expected_m_values,
+    }
+    if ownership["stage_fingerprint"] != sha256_json(fingerprint_identity):
+        raise ValueError(f"discovery ownership stage fingerprint mismatch: {path}")
+    return ownership
+
+
+def _verified_discovery_paths(raw_dir, registry, config, source_commit):
+    """Verify completed stage manifests before opening any discovery NPZ."""
+    raw_dir = Path(raw_dir).resolve()
+    manifests = sorted(raw_dir.rglob("raw_manifest.json"))
+    if not manifests:
+        raise ValueError("discovery analyzer found no stage raw manifests")
+    control_root = raw_dir / "control"
+    if not control_root.is_dir():
+        raise ValueError("discovery analyzer is missing the remote control evidence")
+    evidence_by_sha256 = {}
+    for path in sorted(control_root.glob("*.json")):
+        digest = sha256_file(path)
+        if digest in evidence_by_sha256:
+            raise ValueError("discovery control evidence has duplicate content hashes")
+        evidence_by_sha256[digest] = path.resolve()
+
+    listed_paths = {}
+    listed_task_fingerprints = {}
+    seen_stage_nodes = set()
+    ownership_nodes = defaultdict(set)
+    ownership_cache = {}
+    source_identity = None
+    manifest_evidence = []
+    referenced_control_hashes = set()
+    referenced_ownership_hashes = set()
+    for manifest_path in manifests:
+        manifest = _load_json_object(manifest_path, "discovery raw manifest")
+        if set(manifest) != {
+                "raw_manifest_version", "node", "stage", "stage_fingerprint",
+                "source_commit", "control_sha256", "ownership_sha256",
+                "source_identity", "files"}:
+            raise ValueError(f"discovery raw manifest schema mismatch: {manifest_path}")
+        node = manifest["node"]
+        stage = manifest["stage"]
+        control_sha256 = manifest["control_sha256"]
+        ownership_sha256 = manifest["ownership_sha256"]
+        if (manifest["raw_manifest_version"] != DISCOVERY_RAW_VERSION
+                or node not in DISCOVERY_NODE_CAPACITY
+                or manifest_path.parent.name != node
+                or stage not in DISCOVERY_STAGES
+                or manifest["source_commit"] != source_commit
+                or re.fullmatch(r"[0-9a-f]{64}", str(control_sha256)) is None
+                or re.fullmatch(r"[0-9a-f]{64}", str(ownership_sha256)) is None
+                or re.fullmatch(r"[0-9a-f]{64}", str(manifest["stage_fingerprint"])) is None
+                or not isinstance(manifest["files"], list)):
+            raise ValueError(f"discovery raw manifest identity mismatch: {manifest_path}")
+        current_source_identity = _validate_discovery_source_identity(
+            manifest["source_identity"], source_commit,
+        )
+        if source_identity is None:
+            source_identity = current_source_identity
+        elif current_source_identity != source_identity:
+            raise ValueError("discovery stages used inconsistent verified source archives")
+
+        control_path = evidence_by_sha256.get(control_sha256)
+        ownership_path = evidence_by_sha256.get(ownership_sha256)
+        if control_path is None or ownership_path is None:
+            raise ValueError("discovery raw manifest references missing control evidence")
+        cache_key = (control_sha256, ownership_sha256)
+        if cache_key not in ownership_cache:
+            control, tasks = _validate_discovery_control(
+                control_path, registry, config, source_commit,
+            )
+            ownership = _validate_discovery_ownership(
+                ownership_path, control_sha256, control, tasks, source_commit,
+            )
+            ownership_cache[cache_key] = (control, tasks, ownership)
+        control, tasks, ownership = ownership_cache[cache_key]
+        if (stage != control["stage"] or node not in ownership["nodes"]
+                or manifest["stage_fingerprint"] != ownership["stage_fingerprint"]):
+            raise ValueError(f"discovery raw manifest stage binding mismatch: {manifest_path}")
+        stage_node = (ownership_sha256, node)
+        if stage_node in seen_stage_nodes:
+            raise ValueError("discovery evidence has duplicate node stage manifests")
+        seen_stage_nodes.add(stage_node)
+        ownership_nodes[ownership_sha256].add(node)
+        referenced_control_hashes.add(control_sha256)
+        referenced_ownership_hashes.add(ownership_sha256)
+
+        raw_manifest_sha256 = sha256_file(manifest_path)
+        status_path = manifest_path.parent / "stage_status.json"
+        success_path = manifest_path.parent / "SUCCESS"
+        if (not status_path.is_file() or not success_path.is_file()
+                or (manifest_path.parent / "RUNNING").exists()
+                or (manifest_path.parent / "FAILED").exists()):
+            raise ValueError(f"discovery stage has no exclusive SUCCESS state: {manifest_path}")
+        status = _load_json_object(status_path, "discovery stage status")
+        success = _load_json_object(success_path, "discovery SUCCESS marker")
+        if set(status) != {
+                "status", "node", "stage_fingerprint", "expected", "computed", "reused",
+                "raw_manifest_sha256"}:
+            raise ValueError(f"discovery stage status schema mismatch: {status_path}")
+        count_values = (status["expected"], status["computed"], status["reused"])
+        if (status["status"] != "SUCCESS" or status["node"] != node
+                or status["stage_fingerprint"] != ownership["stage_fingerprint"]
+                or status["raw_manifest_sha256"] != raw_manifest_sha256
+                or any(isinstance(value, bool) or not isinstance(value, int) or value < 0
+                       for value in count_values)
+                or status["expected"] != len(manifest["files"])
+                or status["computed"] + status["reused"] != status["expected"]):
+            raise ValueError(f"discovery stage status identity mismatch: {status_path}")
+        if (set(success) != {"stage_fingerprint", "completed_utc"}
+                or success["stage_fingerprint"] != ownership["stage_fingerprint"]
+                or not isinstance(success["completed_utc"], str)
+                or not success["completed_utc"]):
+            raise ValueError(f"discovery SUCCESS marker identity mismatch: {success_path}")
+
+        node_tasks = {
+            fingerprint for fingerprint, owner in ownership["task_owner"].items()
+            if owner == node
+        }
+        manifest_tasks = set()
+        for item in manifest["files"]:
+            if not isinstance(item, dict) or set(item) != {
+                    "task_fingerprint", "path", "sha256"}:
+                raise ValueError(f"discovery raw manifest file entry is invalid: {manifest_path}")
+            task_fingerprint = item["task_fingerprint"]
+            if (task_fingerprint in manifest_tasks or task_fingerprint not in node_tasks
+                    or re.fullmatch(r"[0-9a-f]{64}", str(item["sha256"])) is None
+                    or not isinstance(item["path"], str)):
+                raise ValueError(f"discovery raw manifest task coverage is invalid: {manifest_path}")
+            manifest_tasks.add(task_fingerprint)
+            relative = Path(item["path"])
+            path = (manifest_path.parent / relative).resolve()
+            if (relative.is_absolute() or ".." in relative.parts
+                    or manifest_path.parent.resolve() not in path.parents
+                    or path.suffix != ".npz" or not path.is_file()):
+                raise ValueError(f"discovery raw manifest path is invalid: {item['path']}")
+            if path in listed_paths:
+                raise ValueError(f"discovery raw file is listed more than once: {path}")
+            if sha256_file(path) != item["sha256"]:
+                raise ValueError(f"discovery stage raw hash mismatch: {path}")
+            listed_paths[path] = item["sha256"]
+            listed_task_fingerprints[path] = task_fingerprint
+        if manifest_tasks != node_tasks:
+            raise ValueError(f"discovery node manifest does not cover assigned tasks: {manifest_path}")
+        manifest_evidence.append({
+            "path": manifest_path.relative_to(raw_dir).as_posix(),
+            "sha256": raw_manifest_sha256,
+            "control_sha256": control_sha256,
+            "ownership_sha256": ownership_sha256,
+            "stage_fingerprint": ownership["stage_fingerprint"],
+        })
+
+    for (_, ownership_sha256), (_, _, ownership) in ownership_cache.items():
+        if ownership_nodes[ownership_sha256] != set(ownership["nodes"]):
+            raise ValueError("discovery evidence is missing a node stage manifest")
+    actual_paths = {path.resolve() for path in raw_dir.rglob("*.npz")}
+    if actual_paths != set(listed_paths):
+        raise ValueError("discovery raw files differ from completed stage manifests")
+    return {
+        "paths": sorted(listed_paths),
+        "task_fingerprints": listed_task_fingerprints,
+        "source_identity": source_identity,
+        "manifest_evidence": sorted(manifest_evidence, key=lambda item: item["path"]),
+        "control_sha256": sorted(referenced_control_hashes),
+        "ownership_sha256": sorted(referenced_ownership_hashes),
+    }
+
+
 def analyze_discovery(raw_dir, registry_path, config_path, source_commit, output_path=None):
     registry = load_registry(registry_path)
     config = load_discovery_config(config_path, registry)
-    paths = sorted(Path(raw_dir).rglob("*.npz"))
+    verified = _verified_discovery_paths(raw_dir, registry, config, source_commit)
+    paths = verified["paths"]
     records = [validate_discovery_raw(path, registry, config, source_commit) for path in paths]
+    if any(verified["task_fingerprints"][Path(record["path"])]
+           != record["task_fingerprint"] for record in records):
+        raise ValueError("discovery raw task differs from its stage manifest")
     fingerprints = [record["task_fingerprint"] for record in records]
     if len(fingerprints) != len(set(fingerprints)):
         raise ValueError("discovery evidence contains duplicate task fingerprints")
@@ -503,10 +793,14 @@ def analyze_discovery(raw_dir, registry_path, config_path, source_commit, output
     confirmation = _confirmation_analysis(groups, config, transport["ranked_candidates"])
     report = {
         "report_version": DISCOVERY_REPORT_VERSION,
-        "generated_by": "discovery.analyze.v2",
+        "generated_by": "discovery.analyze.v3",
         "registry_sha256": registry["registry_sha256"],
         "discovery_config_sha256": config["discovery_config_sha256"],
         "source_commit": source_commit,
+        "source_identity": verified["source_identity"],
+        "stage_manifest_evidence": verified["manifest_evidence"],
+        "control_sha256": verified["control_sha256"],
+        "ownership_sha256": verified["ownership_sha256"],
         "raw_evidence": [{"path": record["path"], "sha256": record["sha256"]}
                          for record in records],
         "screen": screen,
@@ -516,6 +810,10 @@ def analyze_discovery(raw_dir, registry_path, config_path, source_commit, output
         and confirmation["backup"] is not None,
     }
     report["analysis_sha256"] = sha256_json({
+        "source_identity": verified["source_identity"],
+        "stage_manifest_evidence": verified["manifest_evidence"],
+        "control_sha256": verified["control_sha256"],
+        "ownership_sha256": verified["ownership_sha256"],
         "screen": screen, "transport": transport, "confirmation": confirmation,
     })
     if output_path is not None:
