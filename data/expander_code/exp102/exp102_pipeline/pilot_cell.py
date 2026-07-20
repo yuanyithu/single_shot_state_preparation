@@ -69,7 +69,10 @@ def run_cell(registry_path, config_path, code_id, p, disorder_index, candidate,
         result["seed"] = seed
         results.append(result)
     core_seconds, wall_seconds = time.process_time() - core_start, time.monotonic() - wall_start
-    valid, failures, rhats, esses, statuses = evaluate_gate(results, _gate(config, stage), model.k)
+    valid, failures, rhats, esses, statuses = evaluate_gate(
+        results, _gate(config, stage), model.k,
+        require_trace_gate=stage not in {"ladder", "gamma"},
+    )
     swap_attempts = np.asarray([r["swap_attempts"] for r in results])
     swap_accepts = np.asarray([r["swap_accepts"] for r in results])
     logical_attempts = np.asarray([r["logical_attempts"] for r in results])

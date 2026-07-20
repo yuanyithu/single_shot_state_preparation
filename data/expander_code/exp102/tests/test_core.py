@@ -1,6 +1,7 @@
 import numpy as np
 import pytest
 
+from data.expander_code.exp102.exp102_pipeline.diagnostics import evaluate_gate
 from data.expander_code.exp102.exp102_pipeline.labels import (
     bits_to_uint64, initial_labels, pairwise_collision, uint64_to_bits,
 )
@@ -27,6 +28,29 @@ def test_collision_uses_six_independent_pairs_without_clipping():
     collision, qtop = pairwise_collision(traces, 1)
     assert collision == pytest.approx(0.5)
     assert qtop == pytest.approx(0.0)
+
+
+def test_ladder_gate_does_not_require_character_trace_convergence():
+    results = []
+    for instance, label in enumerate((0, 1, 0, 1)):
+        results.append({
+            "labels": np.full(20, label, dtype=np.uint64), "seed": instance,
+            "max_hard_coset_residual": 0,
+            "swap_attempts": np.full(2, 100), "swap_accepts": np.full(2, 50),
+            "logical_attempts": np.full((3, 1), 100),
+            "logical_accepts": np.full((3, 1), 50),
+            "round_trips": 0, "sector_changing_round_trips": 0,
+        })
+    gate = {
+        "min_swap_rate": 0.15, "min_swap_accepts": 20,
+        "min_round_trips": 0, "min_sector_changing_round_trips": 0,
+        "min_hot_logical_rate": 0.01, "min_hot_logical_accepts_per_basis": 20,
+        "max_rhat": np.inf, "min_ess": 0, "max_instance_mean_spread": np.inf,
+    }
+    strict, strict_failures, *_ = evaluate_gate(results, gate, 1)
+    ladder, ladder_failures, *_ = evaluate_gate(results, gate, 1, require_trace_gate=False)
+    assert not strict and strict_failures == ["basis_0:constant_untrusted"]
+    assert ladder and ladder_failures == []
 
 
 def test_ladder_and_swap_formula():

@@ -234,7 +234,10 @@ def _validate_raw(path, registry, config, expected_source_commit):
                 "sector_changing_round_trips": int(changing_round_trips[instance]),
                 "max_hard_coset_residual": int(residual[instance]), "seed": seed,
             })
-        valid, failures, rhats, esses, statuses = evaluate_gate(results, _gate(config, stage), k)
+        valid, failures, rhats, esses, statuses = evaluate_gate(
+            results, _gate(config, stage), k,
+            require_trace_gate=stage not in {"ladder", "gamma"},
+        )
         if bool(_scalar(data, "valid")) != valid:
             raise ValueError(f"pilot stored validity disagrees with recomputed gates in {path}")
         if str(_scalar(data, "failure_reason")) != ";".join(failures):

@@ -51,7 +51,9 @@ def _write_valid_ladder_raw(path, registry, config, stored_valid=True):
             "seed": derive_seed(namespace, registry["registry_sha256"], code["code_id"],
                                 disorder, f"p={p:.8f}", instance),
         })
-    valid, failures, rhats, esses, statuses = evaluate_gate(results, _gate(config, "ladder"), code["k"])
+    valid, failures, rhats, esses, statuses = evaluate_gate(
+        results, _gate(config, "ladder"), code["k"], require_trace_gate=False,
+    )
     assert valid and not failures
     identity = {
         "namespace": namespace, "stage": "ladder", "code_id": code["code_id"], "p": p,

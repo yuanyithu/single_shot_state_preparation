@@ -44,7 +44,7 @@ def bulk_ess(chains):
     return float(min(total, total / max(1.0 + 2.0 * rho_sum, 1.0)))
 
 
-def evaluate_gate(results, gate, k):
+def evaluate_gate(results, gate, k, require_trace_gate=True):
     failures = []
     traces = np.stack([result["labels"] for result in results])
     if len({int(result["seed"]) for result in results}) != 4:
@@ -81,10 +81,13 @@ def evaluate_gate(results, gate, k):
                 rhats[bit], esses[bit] = 1.0, float(values.size)
             else:
                 statuses[bit] = "constant_rejected"
-                failures.append(f"basis_{bit}:constant_untrusted")
+                if require_trace_gate:
+                    failures.append(f"basis_{bit}:constant_untrusted")
         else:
             rhats[bit], esses[bit] = split_rhat(values), bulk_ess(values)
             spread = np.ptp(values.mean(axis=1))
-            if rhats[bit] > gate["max_rhat"] or esses[bit] < gate["min_ess"] or spread > gate["max_instance_mean_spread"]:
+            if require_trace_gate and (
+                    rhats[bit] > gate["max_rhat"] or esses[bit] < gate["min_ess"]
+                    or spread > gate["max_instance_mean_spread"]):
                 failures.append(f"basis_{bit}:trace")
     return not failures, sorted(set(failures)), rhats, esses, statuses

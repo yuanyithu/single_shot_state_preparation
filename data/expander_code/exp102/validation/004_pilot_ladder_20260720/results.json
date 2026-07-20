@@ -1,9 +1,10 @@
 {
-  "status": "PILOT_LADDER_FAILED",
+  "status": "PILOT_LADDER_FAILED_SWAP_CONFIRMED",
   "source_commit": "bbe72da",
   "raw_cells": 10752,
   "canonical_digest": "9af48083dff55741b662aed24815a88b82a2bf3d484e8231064f0b2dee753827",
-  "pilot_report_sha256": "c343cf402d2c4f722b8a8e2d5d6e87c931cae9ecbc30e40eb37b019f546b963e",
+  "historical_pilot_report_sha256": "c343cf402d2c4f722b8a8e2d5d6e87c931cae9ecbc30e40eb37b019f546b963e",
+  "trace_gate_overapplied_in_source": true,
   "selected_ladder": {
     "3": {"p_hot": 0.45, "num_temperatures": 64},
     "4": null,
@@ -12,7 +13,7 @@
     "7": null,
     "8": null
   },
-  "max_candidate_valid_cells": {"4": 90, "5": 88, "6": 80, "7": 72, "8": 37},
+  "max_candidate_swap_hot_residual_valid_cells": {"4": 93, "5": 89, "6": 85, "7": 84, "8": 87},
   "cells_per_m_candidate": 96,
   "held_out_started": false,
   "frozen_config_created": false,
