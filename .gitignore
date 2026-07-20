@@ -31,6 +31,10 @@ data/**/*.zarr/
 data/**/*.sqlite
 data/**/*.db
 data/**/*.log
+data/**/RUNNING
+data/**/SUCCESS
+data/**/FAILED
+data/**/stage.lock
 data/**/*.tsv
 data/**/*.csv
 data/**/*.json
@@ -44,6 +48,7 @@ data/**/.gitignore
 !data/expander_code/exp102/registry/*.csv
 !data/expander_code/exp102/registry/codes/*.npz
 !data/expander_code/exp102/validation/**/*.json
+!data/expander_code/exp102/validation/**/*.sh
 data/3d_toric_code/with_measurement_noise/prod_*/
 data/3d_toric_code/with_measurement_noise/profile_*/
 data/3d_toric_code/with_measurement_noise/profile/

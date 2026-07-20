@@ -57,12 +57,21 @@ def aggregate(raw_dir, registry_path, config_path, frozen_path, output_dir):
                         raise ValueError(f"raw fingerprint mismatch in {path}: {field}")
                 scalar_expected = {
                     "engine": "numba", "source_commit": frozen["source_commit"],
+                    "namespace": "production",
                     "section_fingerprint": code["section_fingerprint"],
                     "logical_frame_fingerprint": code["logical_frame_fingerprint"],
                 }
                 for field, value in scalar_expected.items():
                     if field not in data or str(data[field].item()) != str(value):
                         raise ValueError(f"raw production identity mismatch in {path}: {field}")
+                identity = {
+                    "code_id": code["code_id"], "disorder_index": disorder,
+                    "registry_sha256": registry["registry_sha256"],
+                    "config_sha256": config["config_sha256"],
+                    "frozen_config_sha256": frozen_hash, "namespace": "production",
+                }
+                if str(data["task_fingerprint"].item()) != sha256_json(identity):
+                    raise ValueError(f"raw task fingerprint mismatch in {path}")
                 required_shapes = {"p_values": (7,), "qtop": (7,), "collision_mass": (7,),
                                    "planted_hit": (7,), "valid": (7,), "labels": (7, 4, frozen["by_m"][str(code["m"])]["measurement_rounds"])}
                 for field, expected_shape in required_shapes.items():

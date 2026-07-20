@@ -1,0 +1,17 @@
+{
+  "benchmark": "exp102.q0_pt.full_round.v1",
+  "bit_identical": true,
+  "burn_rounds": 5,
+  "code_id": "m08_c00",
+  "compile_and_warm_seconds": 0.14737308293115348,
+  "k": 64,
+  "m": 8,
+  "measurement_rounds": 20,
+  "n": 1600,
+  "nopython_kernel": true,
+  "num_temperatures": 8,
+  "numba_median_seconds": 0.002305208006873727,
+  "reference_median_seconds": 0.45248854206874967,
+  "repeats": 3,
+  "speedup": 196.28968002866034
+}

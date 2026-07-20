@@ -7,6 +7,8 @@ Stable module entry points (run from the project root with conda environment `12
 
 ```bash
 python -m data.expander_code.exp102.exp102_pipeline.registry data/expander_code/exp102/registry
+python -m data.expander_code.exp102.exp102_pipeline.pilot merge-select PILOT_RAW REGISTRY CONFIG PILOT_REPORT
+python -m data.expander_code.exp102.exp102_pipeline.pilot freeze PILOT_REPORT FROZEN --registry REGISTRY --config CONFIG
 python -m data.expander_code.exp102.exp102_pipeline.tasks REGISTRY CONFIG TASK_PLAN
 python -m data.expander_code.exp102.exp102_pipeline.worker REGISTRY CONFIG FROZEN CODE_ID DISORDER OUTPUT
 python -m data.expander_code.exp102.exp102_pipeline.aggregate RAW REGISTRY CONFIG FROZEN FINAL_RESULTS

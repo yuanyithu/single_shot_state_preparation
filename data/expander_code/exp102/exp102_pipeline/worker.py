@@ -1,5 +1,6 @@
 import argparse
 import json
+import time
 from pathlib import Path
 
 import numpy as np
@@ -54,6 +55,7 @@ def run_task(registry_path, config_path, frozen_path, code_id, disorder_index, o
             if str(old["task_fingerprint"].item()) == task_fingerprint:
                 return "reused"
         raise ValueError("existing task output has a conflicting fingerprint")
+    wall_start, core_start = time.monotonic(), time.process_time()
     model, frame = build_model(H)
     if model.k != code["k"] or model.k > 64:
         raise ValueError("registry/model logical dimension mismatch")
@@ -63,6 +65,7 @@ def run_task(registry_path, config_path, frozen_path, code_id, disorder_index, o
     valid, reasons, rhats, esses = [], [], [], []
     all_labels = []
     diagnostics = []
+    constant_statuses = []
     seeds = np.zeros((len(config["p_values"]), 4), dtype=np.int64)
     for p_index, p in enumerate(config["p_values"]):
         epsilon = (uniforms < p).astype(np.uint8)
@@ -90,11 +93,14 @@ def run_task(registry_path, config_path, frozen_path, code_id, disorder_index, o
         planted.append(float(np.mean([np.mean(trace == np.uint64(planted_uint)) for trace in traces])))
         char_u.append(char_estimate); valid.append(is_valid); reasons.append(";".join(failure))
         rhats.append(rhat); esses.append(ess); all_labels.append(np.stack(traces))
+        constant_statuses.append(statuses)
         diagnostics.append(instance_results)
     swap_attempts = np.asarray([[r["swap_attempts"] for r in group] for group in diagnostics])
     swap_accepts = np.asarray([[r["swap_accepts"] for r in group] for group in diagnostics])
     logical_attempts = np.asarray([[r["logical_attempts"] for r in group] for group in diagnostics])
     logical_accepts = np.asarray([[r["logical_accepts"] for r in group] for group in diagnostics])
+    core_seconds = time.process_time() - core_start
+    wall_seconds = time.monotonic() - wall_start
     atomic_npz(output_path,
         task_fingerprint=np.array(task_fingerprint), code_id=np.array(code_id),
         disorder_index=np.array(disorder_index, dtype=np.int16), m=np.array(code["m"], dtype=np.int8),
@@ -103,6 +109,7 @@ def run_task(registry_path, config_path, frozen_path, code_id, disorder_index, o
         character_u_statistic=np.asarray(char_u), valid=np.asarray(valid, dtype=np.bool_),
         failure_reason=np.asarray(reasons, dtype="U4096"), labels=np.asarray(all_labels, dtype=np.uint64),
         rhat=np.asarray(rhats), ess=np.asarray(esses), instance_seeds=seeds,
+        constant_status=np.asarray(constant_statuses, dtype="U40"),
         swap_attempts=swap_attempts, swap_accepts=swap_accepts,
         swap_rates=swap_accepts / np.maximum(swap_attempts, 1),
         logical_attempts=logical_attempts, logical_accepts=logical_accepts,
@@ -111,6 +118,12 @@ def run_task(registry_path, config_path, frozen_path, code_id, disorder_index, o
         sector_changing_round_trips=np.asarray([[r["sector_changing_round_trips"] for r in group] for group in diagnostics]),
         max_hard_coset_residual=np.asarray([[r["max_hard_coset_residual"] for r in group] for group in diagnostics]),
         engine=np.array(config["engine"]), source_commit=np.array(frozen["source_commit"]),
+        namespace=np.array(namespace), core_seconds=np.array(core_seconds),
+        wall_seconds=np.array(wall_seconds), model_fingerprint=np.array(sha256_json({
+            "code_id": code_id, "n": model.num_qubits, "k": model.k,
+            "section": code["section_fingerprint"],
+            "logical_frame": code["logical_frame_fingerprint"],
+        })),
         section_fingerprint=np.array(code["section_fingerprint"]),
         logical_frame_fingerprint=np.array(code["logical_frame_fingerprint"]),
         registry_sha256=np.array(registry["registry_sha256"]), config_sha256=np.array(config["config_sha256"]),

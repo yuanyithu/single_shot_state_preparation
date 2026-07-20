@@ -4,8 +4,10 @@ import pytest
 from data.expander_code.exp102.exp102_pipeline.labels import (
     bits_to_uint64, initial_labels, pairwise_collision, uint64_to_bits,
 )
-from data.expander_code.exp102.exp102_pipeline.q0_pt import coupling_ladder, swap_log_acceptance
-from data.expander_code.exp102.exp102_pipeline.q0_pt import Q0PtConfig, run_q0_pt_instance
+from data.expander_code.exp102.exp102_pipeline.q0_pt import (
+    Q0PtConfig, _run_q0_pt_numba_core, coupling_ladder,
+    run_q0_pt_instance, swap_log_acceptance,
+)
 from data.expander_code.exp102.exp102_pipeline.registry import candidate_seed
 from data.expander_code.exp102.exp102_pipeline.seeds import derive_seed
 from data.expander_code.exp102.exp102_pipeline.worker import build_model
@@ -72,6 +74,47 @@ def test_reference_and_numba_engines_are_bit_identical():
         assert np.array_equal(reference[field], accelerated[field]), field
     for field in ("round_trips", "sector_changing_round_trips", "max_hard_coset_residual"):
         assert reference[field] == accelerated[field], field
+    assert accelerated["numba_enabled"]
+    assert _run_q0_pt_numba_core.nopython_signatures
+
+
+@pytest.mark.parametrize(
+    "burn_rounds,sweeps_per_round,logical_move_repeat,seed",
+    [(0, 1, 1, 0), (1, 2, 1, 1), (5, 2, 2, 2**63 - 1)],
+)
+def test_numba_full_round_kernel_matches_oracle_across_rng_protocol(
+    burn_rounds, sweeps_per_round, logical_move_repeat, seed,
+):
+    from data.expander_code.exp102.exp102_pipeline.exp101_bridge import load_exp101
+    load_exp101()
+    from exp101_certified_src.graphs import cycle_parity_check_matrix
+
+    model, frame = build_model(cycle_parity_check_matrix(3))
+    epsilon = np.zeros(model.num_qubits, dtype=np.uint8)
+    epsilon[[0, 2]] = 1
+    syndrome = (model.H_check.astype(np.int64) @ epsilon % 2).astype(np.uint8)
+    config = Q0PtConfig(
+        0.475, 5, 1.5, burn_rounds, 17,
+        sweeps_per_round, logical_move_repeat,
+    )
+    results = [
+        run_q0_pt_instance(
+            model, frame, syndrome, 0.1, config, seed, np.uint64(1), engine=engine,
+        )
+        for engine in ("reference", "numba")
+    ]
+    array_fields = (
+        "labels", "ladder_K", "ladder_p", "swap_attempts", "swap_accepts",
+        "logical_attempts", "logical_accepts", "hot_arrival_labels",
+        "hot_departure_labels",
+    )
+    scalar_fields = (
+        "round_trips", "sector_changing_round_trips", "max_hard_coset_residual",
+    )
+    for field in array_fields:
+        assert np.array_equal(results[0][field], results[1][field]), field
+    for field in scalar_fields:
+        assert results[0][field] == results[1][field], field
 
 
 def test_common_uniforms_are_nested_across_p():
