@@ -1,6 +1,21 @@
 # exp102 status
 
-**PA DISCOVERY EXHAUSTED / PRE-PILOT — formal pilot blocked, production not started**
+**GLOBAL-SAMPLING DISCOVERY IMPLEMENTED / PRE-RUN — formal pilot blocked, production not started**
+
+The reviewed successor to the exhausted PT-v2 and PA routes is now implemented under
+`exp102.q0_global.discovery.v1`; its frozen contract is `GLOBAL_DISCOVERY_CONTRACT.md` and its
+config SHA256 is `1d0a453f2bf8445ad6587c612c2eabb3049e76e2d73b59c230b8b1358b06e565`.
+It adds deterministic low-weight logical catalogs, rejection-free hard-coset cluster Gibbs,
+joint stabilizer-logical block heatbath, an independent fixed-clock defect-trace mechanism,
+full-sector TI anchors for m3, exact small-code oracles, three-node digest/runtime consensus,
+immutable 72-hour controls, and an independently replayed character-U-statistic analyzer.
+
+This is an implementation state, not a discovery result. No three-node global preflight, screen,
+method freeze, HARD2 fresh run, confirmation, resolution, or TI anchor has completed yet; therefore
+there is no `READY_FOR_FORMAL`, no new formal sampler, and no `FROZEN_HELD_OUT_PASS`. The old PT/PA
+raw remains barred from this workflow and from formal merge/freezer/production. A successful
+global discovery could only authorize a later fresh tuning and held-out campaign; it could not
+authorize the 6144 production tasks directly.
 
 The reviewed successor to the exhausted PT-v2 route was executed under the isolated
 `exp102.q0_pa.discovery.v1` contract. Worker source

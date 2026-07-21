@@ -23,4 +23,11 @@ Current status is pre-pilot, not scientific certification.
   `INCONCLUSIVE` because conditioned attempts are insufficient; all four PA methods fail both hard
   cells through catastrophic genealogy collapse. The frozen zero-pass branch is `EXHAUSTED`, so
   rescue and blinded confirmation were not run and this is not `READY_FOR_FORMAL`.
+- `007_q0_global_discovery_20260721/`: isolated global-sampling successor implementation. It
+  includes deterministic logical catalogs, hard-coset cluster/joint heatbath kernels, independent
+  defect trace, exact HGP/WMC oracles, no-pickle raw replay, character/D2 gates, m3 full-sector TI
+  anchors, three-node preflight/runtime/digest consensus, immutable stage ownership, 72-hour
+  schedule, postselection/control freezes, and fail-closed readiness. Local implementation tests
+  pass; remote preflight and all discovery stages are still pending, so this directory currently
+  certifies code readiness only and contains no physics result.
 - Held-out and production evidence do not exist. Their absence is an active production blocker.

@@ -49,6 +49,7 @@ data/**/.gitignore
 !data/expander_code/exp102/registry/codes/*.npz
 !data/expander_code/exp102/validation/**/*.json
 !data/expander_code/exp102/validation/**/*.sh
+data/expander_code/exp102/validation/**/local_development_smoke/
 data/3d_toric_code/with_measurement_noise/prod_*/
 data/3d_toric_code/with_measurement_noise/profile_*/
 data/3d_toric_code/with_measurement_noise/profile/

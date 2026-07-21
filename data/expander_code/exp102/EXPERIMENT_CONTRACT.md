@@ -59,3 +59,18 @@ screen, one legal rescue branch, blinded 17-cell confirmation, six-cell N256/N51
 panel, genealogy/ESS gates, U-statistic, jackknife MCSE, runtime budget, and fail-closed stopping
 rules are contract data. Success can produce only `READY_FOR_FORMAL`; a later clean contract,
 tuning, and held-out campaign are still required before any `FROZEN_HELD_OUT_PASS` can exist.
+
+## Global-sampling discovery boundary
+
+`GLOBAL_DISCOVERY_CONTRACT.md` freezes the next isolated search under
+`exp102.q0_global.discovery.v1`. It combines one hard-coset global mechanism (cluster Gibbs or
+joint stabilizer-logical heatbath) with the independently implemented fixed-clock defect-trace
+mechanism. It uses new raw versions, seed namespaces, controls, schedule, analyzer, and readiness
+combiner; no PT/PA discovery raw or formal-v1 raw can be reused.
+
+The frozen HARD2/EASY3/CONF17/RES6/GAP8/SMALL6 panels, two 16-trajectory initialization families,
+T/2T resources, character and distribution gates, three-node runtime/digest consensus, m3
+full-sector TI anchors, and 72-hour fail-closed decision tree are contract data. The implementation
+exists but the remote discovery has not run. Its strongest possible success is
+`READY_FOR_FORMAL`, which still requires a later clean `exp102.q0_global.v1` tuning and held-out
+campaign before production can be considered.
