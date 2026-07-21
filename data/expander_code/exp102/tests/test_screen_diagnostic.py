@@ -141,6 +141,30 @@ def test_default_config_freezes_scope_panel_methods_resources_and_counts(
     assert {key: frozen[key] for key in expected} == expected
 
 
+def test_cross_node_digest_binds_the_full_portable_gamma_schedule():
+    cross = importlib.import_module(RUNTIME_PACKAGE + ".cross_node_screen")
+    common = importlib.import_module(RUNTIME_PACKAGE + ".common")
+    result = cross.canonical_digest(
+        REGISTRY_PATH, SCREEN_CONFIG_PATH, SOURCE_COMMIT,
+    )
+    assert result["digest_version"] == common.DIGEST_NODE_VERSION
+    assert result["canonical_digest"] == (
+        "1344414d156f459dcb2d8d1dfe686762229a6873eed95426b14a1a97471291d6"
+    )
+    records = [
+        row for row in result["records"]
+        if row["kind"] == "DT16_bias_tuning"
+    ]
+    assert records == [{
+        "kind": "DT16_bias_tuning",
+        "digest": "4837e175e659f6d3a876866b2a193468fc89858bb4db8697ef4889f6e83bb6cf",
+        "gamma_count": 4096,
+        "gamma_sha256": (
+            "a2c459ec9438e23f863c44528ac093c5b93d891b6a8bec0278b873fe47f2459a"
+        ),
+    }]
+
+
 def test_config_loader_rejects_global_or_tampered_protocol(
         tmp_path, diagnostic_protocol):
     registry, config, _ = diagnostic_protocol

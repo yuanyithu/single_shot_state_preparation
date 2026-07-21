@@ -52,6 +52,11 @@ runtime consensus 只读取 sampler timing，选择三节点均合格的最大�
 measurement 22h、analysis 24h。任何 deadline、source/archive/manifest SHA、control 或 ownership
 不一致都 fail closed；已有失败 marker 的 deployment 不得原地重跑。
 
+`gamma_t=min(.1,.5/(t+10)^.6)` 中 `.6` 按精确的 `3/5` 解释。4096 项 schedule 必须由
+`exp102.q0_defect_gamma_schedule.v1` 的平台无关 Decimal 整数五次根路径生成，其完整 versioned
+SHA256 固定为 `a2c459ec9438e23f863c44528ac093c5b93d891b6a8bec0278b873fe47f2459a`，并进入
+三节点 digest；不得调用平台 `libm` fractional power 或按 ULP 容差放行。
+
 ## 4. 隔离 identity、seed 与 raw
 
 本契约拥有独立版本：
@@ -71,6 +76,8 @@ measurement 22h、analysis 24h。任何 deadline、source/archive/manifest SHA�
 
 defect measurement 必须逐 cell/method/tier 绑定已经 replay 验证的 bias task fingerprint、raw SHA
 和 bias SHA。measurement manifest 只能在 15 个 bias raw 全部存在且正确后物化。
+完整 gamma 数组保存在 bias raw 中并参与 raw 文件 SHA；validator 必须重新生成 gamma、逐位 replay
+全部 tuning transcript，measurement 再绑定该 raw SHA，因此不得仅凭 final bias SHA 接受 tuning。
 
 ## 5. 统计门禁与预先选择规则
 

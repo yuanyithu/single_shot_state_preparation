@@ -1,4 +1,5 @@
 import concurrent.futures
+import decimal
 import itertools
 import importlib
 import json
@@ -30,13 +31,17 @@ from data.expander_code.exp102.exp102_pipeline.global_discovery import (
 )
 from data.expander_code.exp102.exp102_pipeline.io import atomic_npz, sha256_json
 from data.expander_code.exp102.exp102_pipeline.q0_global import (
+    DEFECT_GAMMA_4096_SHA256,
     DEFECT_METHODS,
     HARD_METHODS,
     CharacterSet,
+    DEFECT_GAMMA_SCHEDULE_VERSION,
     DefectTraceConfig,
     GlobalSeedIdentity,
     HardCosetConfig,
     _reference_cluster_move,
+    _tuning_gamma_values,
+    _tuning_gammas,
     build_joint_blocks,
     build_logical_proposal_catalog,
     canonical_global_trajectory_digest,
@@ -50,6 +55,7 @@ from data.expander_code.exp102.exp102_pipeline.q0_global import (
     reduce_logical_basis,
     run_defect_trace_trajectory,
     run_hardcoset_trajectory,
+    tuning_gamma_sha256,
     tune_defect_bias,
     uniform_hard_coset_state,
 )
@@ -375,11 +381,12 @@ def test_fixed_bias_worm_reference_numba_fixed_clock_and_excursions_match():
     assert np.array_equal(results[0]["fixed_clock_d0_mask"], results[0]["measurement_defect_counts"] == 0)
 
 
-def test_bias_tuning_reference_numba_is_bit_identical_and_seed_isolated():
+@pytest.mark.parametrize("method", DEFECT_METHODS)
+def test_bias_tuning_reference_numba_is_bit_identical_and_seed_isolated(method):
     model, _ = _model([[1, 1, 1]])
     syndrome = np.zeros(model.num_checks, dtype=np.uint8)
-    config = DefectTraceConfig("DT16", 0.10, 4, 8)
-    identities = [_seed("DT16", "TUNE", index, "bias") for index in range(8)]
+    config = DefectTraceConfig(method, 0.10, 4, 8)
+    identities = [_seed(method, "TUNE", index, "bias") for index in range(8)]
     reference = tune_defect_bias(model, syndrome, config, identities, engine="reference")
     accelerated = tune_defect_bias(model, syndrome, config, identities, engine="numba")
     for field in (
@@ -387,8 +394,35 @@ def test_bias_tuning_reference_numba_is_bit_identical_and_seed_isolated():
             "tuning_final_residuals", "tuning_final_defects", "gammas"):
         assert np.array_equal(reference[field], accelerated[field]), field
     assert reference["bias_sha256"] == accelerated["bias_sha256"]
+    assert reference["gamma_sha256"] == accelerated["gamma_sha256"]
     assert identities[0].seed("tuning") != identities[0].seed("burn")
     assert identities[0].seed("burn") != identities[0].seed("measurement")
+
+
+def test_defect_tuning_gamma_schedule_is_bit_frozen_and_portable():
+    gammas = _tuning_gammas(4096)
+    assert DEFECT_GAMMA_SCHEDULE_VERSION == "exp102.q0_defect_gamma_schedule.v1"
+    assert DEFECT_GAMMA_4096_SHA256 == (
+        "a2c459ec9438e23f863c44528ac093c5b93d891b6a8bec0278b873fe47f2459a"
+    )
+    assert tuning_gamma_sha256(gammas) == DEFECT_GAMMA_4096_SHA256
+    bits = gammas.view(np.uint64)
+    assert int(bits[3171]) == 0x3F7035D7EDF654F5
+    assert int(bits[4082]) == 0x3F6BDFBB6C83CF4B
+    assert np.array_equal(gammas[:5], np.full(5, 0.1))
+    assert gammas[5] < 0.1
+    assert np.all(np.diff(gammas[4:]) < 0.0)
+    gammas[0] = 0.0
+    _tuning_gamma_values.cache_clear()
+    with decimal.localcontext() as context:
+        context.prec = 6
+        context.rounding = decimal.ROUND_FLOOR
+        regenerated = _tuning_gammas(4096)
+    assert regenerated[0] == 0.1
+    assert tuning_gamma_sha256(regenerated) == DEFECT_GAMMA_4096_SHA256
+    for invalid in (True, -1, 1.5, 4095):
+        with pytest.raises(ValueError, match="exactly 4096"):
+            _tuning_gammas(invalid)
 
 
 @pytest.mark.parametrize(

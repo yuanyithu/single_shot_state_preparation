@@ -26,6 +26,7 @@ from data.expander_code.exp102.exp102_pipeline.q0_global import (
     frozen_character_set,
     run_defect_trace_trajectory,
     run_hardcoset_trajectory,
+    tuning_gamma_sha256,
     tune_defect_bias,
 )
 from data.expander_code.exp102.exp102_pipeline.registry import load_frozen_code
@@ -155,12 +156,20 @@ def canonical_digest(registry_path, config_path, source_commit):
         for engine in ("reference", "numba")
     ]
     if (tuned[0]["bias_sha256"] != tuned[1]["bias_sha256"]
+            or tuned[0]["gamma_sha256"] != tuned[1]["gamma_sha256"]
+            or not np.array_equal(tuned[0]["gammas"], tuned[1]["gammas"])
             or not np.array_equal(
                 tuned[0]["tuning_histogram"], tuned[1]["tuning_histogram"],
             )):
         raise AssertionError("diagnostic bias tuning digest mismatch")
+    gamma_sha256 = tuning_gamma_sha256(tuned[0]["gammas"])
+    if gamma_sha256 != tuned[0]["gamma_sha256"]:
+        raise AssertionError("diagnostic gamma schedule digest mismatch")
     records.append({
-        "kind": "DT16_bias_tuning", "digest": tuned[0]["bias_sha256"],
+        "kind": "DT16_bias_tuning",
+        "digest": tuned[0]["bias_sha256"],
+        "gamma_count": int(tuned[0]["gammas"].size),
+        "gamma_sha256": gamma_sha256,
     })
     digest = hashlib.sha256(canonical_json(records).encode("ascii")).hexdigest()
     return {

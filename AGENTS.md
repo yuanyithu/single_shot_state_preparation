@@ -17,7 +17,7 @@ publication/FSS。014 中的 scan v2 聚合只作历史审计；旧 259 tests �
 `data/expander_code/exp101/PHYSICS_CONTRACT.md`（唯一物理权威）、`status.md` 和
 `validation/README.md`。关键硬约束：
 
-**exp102 当前为 `Q=0 GLOBAL DISCOVERY RUNTIME_EXHAUSTED / PRE-PILOT`，不是已有物理结果。** 正式历史契约仍为
+**exp102 当前为 `Q=0 DIAGNOSTIC SCREEN RESTART PENDING / PRE-PILOT`，不是已有物理结果。** 正式历史契约仍为
 `exp102.physics.v1 / exp102.q0_pt.v1 / exp102.scan.v1`。固定 Q32 + multi-swap PT-v2 已因 96 条轨迹
 认证往返总数为 0 而 `EXHAUSTED`；不得追加 S128、延长轮数或复用 raw。随后
 `exp102.q0_pa.discovery.v1` 的四个 transport autopsy 因条件 attempts<200 均为 `INCONCLUSIVE`，
@@ -35,15 +35,27 @@ runtime/preflight status=PASS。** 旧 combiner 对合法 exhausted report 抛�
 `RUNTIME_EXHAUSTED`，但下游 PASS 门槛未变。完整证据见
 `validation/010_q0_global_runtime_exhausted_20260721/`；前两次基础设施失败审计见 008/009，不得原地
 重跑。当前全范围结论只能是 `UNRESOLVED_WITHIN_ALGORITHM_AND_72H_BUDGET`，不能写 `IMPOSSIBLE`，
-也不能外推为某个参数点的物理失败。screen/HARD2/confirmation/resolution/TI sampler raw 均不存在。
+也不能外推为某个参数点的物理失败。该 discovery 自身的 screen/HARD2/confirmation/resolution/TI
+sampler raw 均不存在。
 
-接手先读 `GLOBAL_DISCOVERY_CONTRACT.md`；若要继续，须另立经审查的新科学契约与 fresh
-tuning/held-out，不得把重复计时、删困难 disorder、缩范围或改窗口包装成原 discovery 成功。
+用户随后批准了独立 `exp102.q0_global.screen_diagnostic.v1` 的 `HARD2+EASY3` 测试，最高权限仅为
+`DIAGNOSTIC_SCREEN_PAIR_FOUND`。首个 run `exp102_q0_screen_diagnostic_20260721_5e1f5aa` 已通过三节点
+preflight 并完成 15 个 bias raw，但 nd-0 在 measurement-control replay 发现 nd-1/nd-3 的旧
+`libm` fractional-power gamma schedule 有 1--2 ULP 差异，故以
+`CONFLICT_CROSS_NODE_GAMMA_LIBM` 在 1280 条 measurement 全部启动前关闭；这不是 sampler 收敛失败。
+修复后 `.6` 固定解释为精确 `3/5`，4096 项 Decimal schedule 的 versioned SHA 为
+`a2c459ec9438e23f863c44528ac093c5b93d891b6a8bec0278b873fe47f2459a`，必须运行时自检并进入
+三节点 digest v2。旧 run/bias 永不续跑或复用；只能用 fresh commit/archive/run/schedule 从 preflight
+与 bias 重来。接手先读 `GLOBAL_SCREEN_DIAGNOSTIC_CONTRACT.md`、`validation/011_*` 和 `status.md`。
+
+诊断通过后若要继续正式实验，仍须另立经审查的新科学契约与 fresh tuning/held-out，不得把重复计时、
+删困难 disorder、缩范围或改窗口包装成原 discovery 成功。
 PT/PA/global discovery raw 均不得进入正式 merge/freezer。48-code registry 已冻结，但正式新
 sampler config、pilot、held-out 和 6144 个生产任务均不存在。生产 worker 必须看到
 `FROZEN_HELD_OUT_PASS` 才会启动，禁止手工绕过；
 正式读取只用 `load_exp102_publication_q_top`，不得交给 exp101 loader。接手 exp102 先读该目录的
-`EXPERIMENT_CONTRACT.md`、`GLOBAL_DISCOVERY_CONTRACT.md` 与 `status.md`。
+`EXPERIMENT_CONTRACT.md`、`GLOBAL_DISCOVERY_CONTRACT.md`、
+`GLOBAL_SCREEN_DIAGNOSTIC_CONTRACT.md` 与 `status.md`。
 
 - **生产 convention 固定**：`sector=x_error`、`H_check=H_Z`、稳定子 move=`H_X` 行、logical move=`logical_X`、observable=`logical_Z`、制备态=`|+>_L`；对偶 `z_error/H_X` 才对应 `|0>_L`。现有矩阵接线不交换。
 - **生产 posterior 固定**：`pi(e|y_eff) ∝ exp[-K_p|e|-K_q|H_check e xor y_eff|]`，`y_eff=H_check epsilon_data_true xor measurement_error`；真实错误不得直接进入能量、Metropolis/TI/PT 比值。正式系综名为 `true_posterior`、`legacy_delta_only`，`paper_true_posterior/repo_compat` 只作先归一化的 deprecated alias。

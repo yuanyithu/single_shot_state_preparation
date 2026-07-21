@@ -122,6 +122,10 @@ bias_d <- bias_d + gamma_t (rho_d - observed_fraction_d)
 gamma_t = min(.1, .5/(t+10)^.6)
 ```
 
+这里 `.6` 是精确的 `3/5`。实现必须用冻结的
+`exp102.q0_defect_gamma_schedule.v1` 平台无关生成器，并把完整 schedule SHA 纳入跨节点
+digest；禁止使用平台 `libm` fractional power 或用 ULP 容差掩盖差异。
+
 Tuning, burn, and measurement have independent seed roles. The complete bias raw
 is validated, frozen by SHA, and bound into every measurement task before that
 task exists.

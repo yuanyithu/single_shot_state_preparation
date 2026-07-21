@@ -22,9 +22,9 @@ RUNTIME_NODE_VERSION = "exp102.q0_global.screen_diagnostic.runtime_node.v1"
 RUNTIME_CONSENSUS_VERSION = (
     "exp102.q0_global.screen_diagnostic.runtime_consensus.v1"
 )
-DIGEST_NODE_VERSION = "exp102.q0_global.screen_diagnostic.digest_node.v1"
+DIGEST_NODE_VERSION = "exp102.q0_global.screen_diagnostic.digest_node.v2"
 DIGEST_CONSENSUS_VERSION = (
-    "exp102.q0_global.screen_diagnostic.digest_consensus.v1"
+    "exp102.q0_global.screen_diagnostic.digest_consensus.v2"
 )
 PREFLIGHT_NODE_VERSION = (
     "exp102.q0_global.screen_diagnostic.preflight_node.v1"

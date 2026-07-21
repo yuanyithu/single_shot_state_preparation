@@ -1,6 +1,21 @@
 # exp102 status
 
-**Q=0 GLOBAL DISCOVERY RUNTIME_EXHAUSTED / PRE-PILOT — formal pilot blocked, production not started**
+**Q=0 DIAGNOSTIC SCREEN RESTART PENDING / PRE-PILOT — formal pilot blocked, production not started**
+
+The user authorized the isolated `exp102.q0_global.screen_diagnostic.v1` HARD2+EASY3 test. Its
+first immutable run, `exp102_q0_screen_diagnostic_20260721_5e1f5aa`, passed three-node preflight
+and completed all 15 bias tasks, but nd-0 measurement-control replay found that platform `libm`
+had produced two distinct 4096-value gamma bit patterns on nd-1 and nd-3. The run is permanently
+closed as `CONFLICT_CROSS_NODE_GAMMA_LIBM` before measurement: zero of 1280 trajectories ran, and
+no sampler-convergence or physics conclusion exists. Metadata-only evidence is in
+`validation/011_q0_global_screen_diagnostic_20260721/failed_run_evidence/`.
+
+The repaired source interprets the frozen exponent as exact `3/5`, uses platform-independent
+Decimal fifth-root arithmetic, self-checks gamma SHA
+`a2c459ec9438e23f863c44528ac093c5b93d891b6a8bec0278b873fe47f2459a`, and binds the complete
+schedule in three-node digest v2. It requires a fresh commit, archive, run ID, schedule, preflight,
+bias stage, and measurement stage. Even a passing screen can only emit
+`DIAGNOSTIC_SCREEN_PAIR_FOUND`; it cannot authorize formal tuning, held-out, or production.
 
 The reviewed successor to the exhausted PT-v2 and PA routes is now implemented under
 `exp102.q0_global.discovery.v1`; its frozen contract is `GLOBAL_DISCOVERY_CONTRACT.md` and its

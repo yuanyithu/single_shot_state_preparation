@@ -12,6 +12,8 @@ implementation; Numba consumes the same PortablePrng stream.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from decimal import Decimal, ROUND_HALF_EVEN, localcontext
+from functools import lru_cache
 import hashlib
 import itertools
 import math
@@ -38,6 +40,10 @@ DEFECT_BIAS_RAW_VERSION = "exp102.q0_defect_bias.raw.v1"
 CATALOG_VERSION = "exp102.q0_logical_catalog.v1"
 JOINT_BLOCK_VERSION = "exp102.q0_joint_blocks.v1"
 CHARACTER_SET_VERSION = "exp102.q0_characters.v1"
+DEFECT_GAMMA_SCHEDULE_VERSION = "exp102.q0_defect_gamma_schedule.v1"
+DEFECT_GAMMA_4096_SHA256 = (
+    "a2c459ec9438e23f863c44528ac093c5b93d891b6a8bec0278b873fe47f2459a"
+)
 
 HARD_METHODS = ("RC8-QC1", "RC8-QC4", "RC8-J08", "RC8-J12", "RC8-J16")
 DEFECT_METHODS = ("DT16", "DT32", "DT64")
@@ -1586,11 +1592,58 @@ def _run_defect_stage_numba(state, label, syndrome, config, bias, seed,
     )
 
 
+@lru_cache(maxsize=8)
+def _tuning_gamma_values(num_sweeps):
+    """Generate the frozen schedule without platform libm fractional powers."""
+    values = []
+    with localcontext() as context:
+        context.prec = 96
+        context.rounding = ROUND_HALF_EVEN
+        four = Decimal(4)
+        five = Decimal(5)
+        half = Decimal("0.5")
+        cap = Decimal("0.1")
+        for sweep in range(num_sweeps):
+            offset = sweep + 10
+            if offset <= 14:
+                values.append(float(cap))
+                continue
+
+            # x^0.6 = (fifth_root(x))^3.  Fixed-count Decimal Newton steps
+            # avoid the 1--2 ULP cross-libm drift seen on the Linux nodes.
+            root = Decimal(1 << ((offset.bit_length() + 4) // 5))
+            decimal_offset = Decimal(offset)
+            for _ in range(32):
+                root = (
+                    four * root
+                    + decimal_offset / (root * root * root * root)
+                ) / five
+            values.append(float(min(cap, half / (root * root * root))))
+    return tuple(values)
+
+
+def tuning_gamma_sha256(gammas):
+    """Return the portable digest of a complete defect-tuning schedule."""
+    values = np.asarray(gammas, dtype=np.float64)
+    if values.ndim != 1 or not np.all(np.isfinite(values)):
+        raise ValueError("defect tuning gammas must be a finite vector")
+    return _sha256_arrays(
+        DEFECT_GAMMA_SCHEDULE_VERSION,
+        (values.astype(">f8"),),
+        (values.size,),
+    )
+
+
 def _tuning_gammas(num_sweeps):
-    return np.asarray([
-        min(0.1, 0.5 / ((sweep + 10) ** 0.6))
-        for sweep in range(int(num_sweeps))
-    ], dtype=np.float64)
+    if isinstance(num_sweeps, (bool, np.bool_)):
+        raise ValueError("defect tuning schedule requires exactly 4096 sweeps")
+    count = int(num_sweeps)
+    if count != num_sweeps or count != 4096:
+        raise ValueError("defect tuning schedule requires exactly 4096 sweeps")
+    values = np.asarray(_tuning_gamma_values(count), dtype=np.float64)
+    if tuning_gamma_sha256(values) != DEFECT_GAMMA_4096_SHA256:
+        raise GlobalConflictError("frozen defect gamma schedule SHA mismatch")
+    return values
 
 
 def tune_defect_bias(model, syndrome, config, seed_identities, *, engine="numba"):
@@ -1610,6 +1663,7 @@ def tune_defect_bias(model, syndrome, config, seed_identities, *, engine="numba"
     ], dtype=np.uint8)
     defects = residuals.sum(axis=1).astype(np.int32)
     gammas = _tuning_gammas(config.tuning_sweeps)
+    gamma_sha256 = tuning_gamma_sha256(gammas)
     load_exp101()
     from exp101_certified_src.prng import PortablePrng
 
@@ -1669,6 +1723,7 @@ def tune_defect_bias(model, syndrome, config, seed_identities, *, engine="numba"
         "tuning_final_residuals": np.asarray(final_residuals, dtype=np.uint8),
         "tuning_final_defects": np.asarray(final_defects, dtype=np.int32),
         "gammas": gammas,
+        "gamma_sha256": gamma_sha256,
         "bias_sha256": digest,
         "engine": engine,
     }
