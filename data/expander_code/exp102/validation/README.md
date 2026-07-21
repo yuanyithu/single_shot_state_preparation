@@ -34,4 +34,9 @@ Current status is pre-pilot, not scientific certification.
   preflight plus its repair. It fixes archive git provenance, deterministic legacy-section testing,
   source-tree writes by the spec example test, cold-JIT TI projection, and post-worker source
   reverification. A fresh commit/deployment/run/schedule is required; this is not a sampler result.
+- `009_q0_global_runtime_gate_separation_20260721/`: immutable evidence from the failed second
+  preflight. A live performance fixture fluctuated at the TI wall boundary and incorrectly failed
+  the deterministic regression suite before the persisted three-node runtime gate. Tests now
+  validate live-report self-consistency while the unchanged dedicated consensus alone decides
+  machine eligibility. The same-node postmortem passed T3; no sampler task ran.
 - Held-out and production evidence do not exist. Their absence is an active production blocker.

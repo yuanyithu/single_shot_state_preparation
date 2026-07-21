@@ -1,7 +1,9 @@
 # exp102 q=0 global preflight portability repair
 
-Status: `REPAIR IMPLEMENTED / FRESH PREFLIGHT PENDING`.  This validation is
-infrastructure evidence only and contains no sampler discovery result.
+Status: `FIRST FAILURE AUDIT / REPAIR COMPLETE`.  The next immutable attempt
+exposed a separate runtime-test separation issue documented in validation 009.
+This validation is infrastructure evidence only and contains no sampler
+discovery result.
 
 ## Failed immutable attempt
 

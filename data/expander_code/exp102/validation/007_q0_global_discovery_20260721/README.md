@@ -1,8 +1,9 @@
 # exp102 q=0 global-sampling discovery
 
 Status: `IMPLEMENTED / FRESH PREFLIGHT PENDING`. The first immutable remote
-attempt failed its Linux portability preflight and is permanently closed; see
-`../008_q0_global_preflight_portability_20260721/`. This directory does not
+attempts failed before sampler work and are permanently closed; see
+`../008_q0_global_preflight_portability_20260721/` and
+`../009_q0_global_runtime_gate_separation_20260721/`. This directory does not
 contain a three-node discovery result and does not establish
 `READY_FOR_FORMAL`.
 

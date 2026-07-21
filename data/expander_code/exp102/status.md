@@ -17,9 +17,14 @@ or sampler raw was accepted. The archived evidence and repair audit are in
 repair makes archive provenance explicit, removes source-tree test writes, fixes the optional
 BP-LSD cross-check, warms the TI timing probe, canonicalizes verifier cache paths, and reverifies
 source identity after every worker.
-A fresh commit/deployment/run/schedule is required. No screen, method freeze, HARD2 fresh run,
-confirmation, resolution, or TI anchor has completed; therefore there is no `READY_FOR_FORMAL`, no
-new formal sampler, and no `FROZEN_HELD_OUT_PASS`. The old PT/PA
+A second immutable attempt, `exp102_q0_global_20260721_c6c26b9`, then exposed a volatile live
+runtime assertion inside the regression suite. A same-node persisted postmortem passed T3; the
+repair leaves every real runtime/TI threshold unchanged and reserves machine qualification for
+the dedicated three-node consensus. Evidence is in
+`validation/009_q0_global_runtime_gate_separation_20260721/`. A fresh
+commit/deployment/run/schedule is required. No screen, method freeze, HARD2 fresh run, confirmation,
+resolution, or TI anchor has completed; therefore there is no `READY_FOR_FORMAL`, no new formal
+sampler, and no `FROZEN_HELD_OUT_PASS`. The old PT/PA
 raw remains barred from this workflow and from formal merge/freezer/production. A successful
 global discovery could only authorize a later fresh tuning and held-out campaign; it could not
 authorize the 6144 production tasks directly.

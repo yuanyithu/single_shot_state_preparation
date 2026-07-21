@@ -31,6 +31,10 @@ heatbath、独立 defect trace、m3 full-sector TI、三节点 digest/runtime、
 provenance、可选 BP-LSD cross-check、测试写 source tree 与 cold-JIT TI projection 问题永久 FAILED；
 没有产生合格 runtime/digest/WMC 或 sampler raw，不得删 marker 原地复跑。修复证据见
 `validation/008_q0_global_preflight_portability_20260721/`，必须用 fresh commit/deployment/run/schedule。
+第二个 immutable run `exp102_q0_global_20260721_c6c26b9` 又因 regression 内的 live TI runtime
+断言在 22h 边界波动而永久 FAILED；同节点持久化 postmortem 为 T3 PASS，证据见
+`validation/009_q0_global_runtime_gate_separation_20260721/`。机器 runtime 资格只能由专用三节点
+persisted consensus 判定，单元测试只验报告自洽；真实门槛、安全系数和 deadline 均未降低。
 screen/HARD2/confirmation/resolution/TI 尚未运行，因此仍没有新物理结果。
 接手必须先读 `GLOBAL_DISCOVERY_CONTRACT.md`；不得在运行前改 panels/gates/T/2T/bias 规则，也不得把
 实现完成写成 `READY_FOR_FORMAL`。即使 discovery 全过，也只能另建正式 tuning/held-out 契约，不能
