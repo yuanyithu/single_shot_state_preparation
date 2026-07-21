@@ -17,16 +17,17 @@ publication/FSS。014 中的 scan v2 聚合只作历史审计；旧 259 tests �
 `data/expander_code/exp101/PHYSICS_CONTRACT.md`（唯一物理权威）、`status.md` 和
 `validation/README.md`。关键硬约束：
 
-**exp102 当前为 `PA DISCOVERY IMPLEMENTED / REMOTE GATES PENDING / PRE-PILOT`，不是已有物理
-结果。** 正式历史契约仍为 `exp102.physics.v1 / exp102.q0_pt.v1 / exp102.scan.v1`。2026-07-20
-的固定 Q32 + multi-swap PT-v2 discovery 已因 96 条实例轨迹认证往返总数为 0 而按冻结规则
-`EXHAUSTED`；不得追加 S128、延长轮数或复用其 raw。其后经审查冻结的独立 PA 搜索见
-`data/expander_code/exp102/PA_DISCOVERY_CONTRACT.md`：`exp102.q0_pa.discovery.v1` 和 PT transport
-autopsy 已完成本地实现认证，但 clean-source 三节点 digest、Linux runtime gate、四条 autopsy
-task、64 条 hard-screen population task、条件 rescue 与 blinded confirmation 尚未形成证据。
-PA/PT discovery raw 均不得进入正式 merge/freezer；即使 PA 输出 `READY_FOR_FORMAL`，仍不等于
-`FROZEN_HELD_OUT_PASS`。48-code registry 已冻结，但正式 PA config、pilot、held-out 和 6144 个
-生产任务均不存在。生产 worker 必须看到 `FROZEN_HELD_OUT_PASS` 才会启动，禁止手工绕过；
+**exp102 当前为 `PA DISCOVERY EXHAUSTED / PRE-PILOT`，不是已有物理结果。** 正式历史契约仍为
+`exp102.physics.v1 / exp102.q0_pt.v1 / exp102.scan.v1`。2026-07-20 的固定 Q32 + multi-swap PT-v2
+discovery 已因 96 条实例轨迹认证往返总数为 0 而 `EXHAUSTED`；不得追加 S128、延长轮数或复用
+其 raw。随后 `exp102.q0_pa.discovery.v1` 的三节点 digest、Linux runtime、四任务 PT transport
+autopsy 和 64-task PA hard screen 已全部完成：四个 autopsy 均因所需条件 attempts<200 而
+`INCONCLUSIVE`；`C192-2/B96-1/B192-1/B96-2` 全部在两个 hard cells 上因 genealogy 灾难性塌缩
+失败（median family ESS≈1、distinct families=1--2）。按冻结零通过分支，PA 同样 `EXHAUSTED`，
+禁止 B384-2 rescue，confirmation/resolution manifests 未创建，也没有 `READY_FOR_FORMAL`。
+PA/PT discovery raw 均不得进入正式 merge/freezer。48-code registry 已冻结，但正式 PA config、
+pilot、held-out 和 6144 个生产任务均不存在。生产 worker 必须看到 `FROZEN_HELD_OUT_PASS` 才会
+启动，禁止手工绕过；
 正式读取只用 `load_exp102_publication_q_top`，不得交给 exp101 loader。接手 exp102 先读该目录的
 `EXPERIMENT_CONTRACT.md`、`PA_DISCOVERY_CONTRACT.md` 与 `status.md`。
 
@@ -38,6 +39,7 @@ PA/PT discovery raw 均不得进入正式 merge/freezer；即使 PA 输出 `READ
 - **参数点级 fail-closed**：正式 mean、SEM 与 crossing/FSS 输入只在所有 planned disorders 均存在且 `valid_for_aggregation=true` 时输出。一个 invalid 即 `SAMPLING_INSUFFICIENT`，一个 missing 即 `INCOMPLETE`，整点正式输出全部为 NaN；valid-only 条件均值/SEM 仅供诊断，因条件选择偏差不得用于 crossing/FSS。所有 fraction 以 planned disorders 为分母，公共 `pass_fraction` 已删除。
 - **scan v3 与 loader**：输出仍为 `scan_results.npz`，但 v1/v2 chunk 和 v2 NPZ 永不复用为 v3 正式结果。publication/FSS 必须通过 `src.scan_results.load_publication_q_top` 读取；loader 只接受 `exp101.scan.v3 + true_posterior` 的 `REPORTABLE` 点，不从 v2 条件均值推断 eligibility。当前 scan v3 权威回归只认 `validation/015_aggregation_safety_20260714/`。
 - **运行坑仍有效**：本地 `conda run -n 12` 加 `--no-capture-output`；多进程显式传 `--num-workers N`，不要依赖 screen 内的 `$(nproc)`。
+- **clean-source tree 不得直接跑 Python**：远端 `repos/<run>/source/` 必须保持与 archive 逐文件一致；生成 control、benchmark 和 orchestrator 都要走 `run_verified_source.sh`（或至少显式禁止 bytecode）。直接运行会留下 `__pycache__`，随后所有节点会被 verified wrapper 以 exit 67 fail-closed；不得删除 FAILED marker 原地重跑，须用 fresh run/deployment 留审计链。
 
 下方「物理图像与 L·T·S 分解」及其 Gibbs 公式描述旧 3D toric 程序，只用于 legacy 3D 工作，
 不得覆盖 exp101 的 `physics.v2 / scan.v3` 契约。

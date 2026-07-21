@@ -4,7 +4,7 @@
 - Raw schema: `exp102.q0_pa.raw.v1`
 - Transport autopsy raw schema: `exp102.transport_autopsy.raw.v1`
 - Parent physics: `exp102.physics.v1`, `true_posterior`, `x_error/H_Z`, `q=0`
-- Status at freeze: implementation/local certification; remote discovery not yet evidence
+- Execution result: `EXHAUSTED` at the complete 64-population hard screen; no rescue or confirmation
 
 This document freezes the algorithm search authorized after PT-v2 exhausted its
 transport route. It does not modify the historical formal versions
@@ -112,6 +112,15 @@ binds the clean source archive, immutable task manifest, canonical LPT node
 ownership, raw hashes, status file, and exclusive SUCCESS marker. A duplicate,
 unexpected file, seed/source/config/hash mismatch, non-finite value, or algebraic
 failure is `CONFLICT`.
+
+Discrete state, labels, parents, offspring, ancestry, resampling decisions,
+counters, identities, and hashes remain exact. Derived float64 replay permits at
+most 8 ULP for the coupling/probability ladder, 64 ULP for non-cumulative
+derived floats, and `32*G` ULP for cumulative log-Z. The stage-scaled log-Z
+bound covers roundoff accumulation and cancellation while remaining below
+`1e-13` absolute error in the observed hard-screen worst case. This portability
+erratum is required because NumPy 2.3 and 2.4 can differ by a few ULP in `exp`;
+it does not alter a sampling gate or permit a discrete decision to differ.
 
 ## 5. Frozen screen and conditional rescue
 

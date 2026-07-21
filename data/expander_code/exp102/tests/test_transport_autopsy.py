@@ -1,3 +1,4 @@
+import json
 from pathlib import Path
 
 import numpy as np
@@ -19,6 +20,7 @@ from data.expander_code.exp102.exp102_pipeline.transport_autopsy import (
     PARENT_SOURCE_COMMIT,
     PARENT_TRANSPORT_CONTROL,
     _run_trace_instance,
+    _serializable_autopsy_evidence,
     classify_transport,
     load_autopsy_config,
 )
@@ -161,3 +163,13 @@ def test_autopsy_classifier_obeys_frozen_precedence_and_attempt_floor():
         hot_updates=2, frontier=4, inbound_attempts=199, inbound_accepts=100,
     )
     assert classify_transport([result], _classification_config())[0] == "INCONCLUSIVE"
+
+
+def test_autopsy_remote_evidence_is_json_serializable(tmp_path):
+    evidence = _serializable_autopsy_evidence({
+        "paths": [tmp_path / "trace.npz"],
+        "source_identity": {"source_commit": "a" * 40},
+        "stage_fingerprint": "b" * 64,
+    }, tmp_path)
+    encoded = json.dumps(evidence, sort_keys=True)
+    assert '"trace.npz"' in encoded

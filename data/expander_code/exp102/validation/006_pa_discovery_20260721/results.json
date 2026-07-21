@@ -1,0 +1,81 @@
+{
+  "analyzer_portability": {
+    "discrete_transcript_exact": true,
+    "ladder_max_ulps": 8,
+    "log_z_max_ulps_per_stage": 32,
+    "noncumulative_max_ulps": 64,
+    "observed_log_z_max_abs_error": 5.684341886080802e-14,
+    "observed_log_z_max_ulps": 4096
+  },
+  "autopsy": {
+    "analysis_sha256": "895ee92a92f10eae019a8bd6d6768082d2ced0f4048fb73d6f430ca0c2d747fc",
+    "classification_counts": {
+      "INCONCLUSIVE": 4
+    },
+    "control_sha256": "2208bc89b82da5ab118ea7d5dd0a05ff70fc695cd5e309d19ae4392098bac272",
+    "evidence_status": "PASS",
+    "hot_updated_visits": 8,
+    "ownership_sha256": "64979f158472a2f10550f0215d0b7d9c085bf46808996681eaf3ca5bc551f81c",
+    "reason": "required outbound conditional attempts below 200",
+    "report_file_sha256": "6885fd7d6d161cf83408e49aac219cd96d0dfbee9d5067dbbd61c71fb731bdff",
+    "round_trips": 0,
+    "stage_fingerprint": "fddbf66d035d334a824c07bb6faf3580c30678aa3546de518f4264d6ce623325",
+    "tasks": 4
+  },
+  "cross_node": {
+    "canonical_digest": "f4ed9fff7512f8995a4f70c60072c1bba054aaf75e0440a4d00545880305f478",
+    "node_report_sha256": {
+      "nd-1": "ff2bc10b0722ce630acab0c717b312b509c9d927c9b4e3431ca8b64988adb52d",
+      "nd-2": "6447f545e0f47c9a23df098792788511899659016b2e220afb2fe309ee02b809",
+      "nd-3": "371355a7272ce63f9001ede6cb4f265f8c0695c18d2532c88dff4a8c8b245027"
+    }
+  },
+  "discovery_config_sha256": "42b196f6fec02cbb94160375982850fca0f4f2734a5e750d7bbb9093106c746a",
+  "failed_launch_audit": {
+    "raw_tasks_started": 0,
+    "reason": "shared source was dirtied by Python bytecode and verified-source rejected it with exit 67",
+    "run_id": "exp102_pa_discovery_20260721_f0dff0f"
+  },
+  "formal_config_ready": false,
+  "frozen_held_out_pass": false,
+  "hard_screen": {
+    "analysis_sha256": "835ce35b0c4276f0c6617d2b5578087fe90524dba19201628966736603c105a6",
+    "base_passing_methods": [],
+    "complete": true,
+    "conditional_ess_failures": 12,
+    "control_sha256": "61760a5233d7d3b2d2f80f390741d6f24784c482782fd75e22b8ecbe9b4715a0",
+    "genealogy_failures": 64,
+    "max_particle_weight_failures": 2,
+    "method_passed_cells": {
+      "B192-1": 0,
+      "B96-1": 0,
+      "B96-2": 0,
+      "C192-2": 0
+    },
+    "ownership_sha256": "e6cb687ef187d6b6cd8efa9de5cf85fe38bb884797b5f010d856df95c4ee5205",
+    "population_tasks": 64,
+    "report_file_sha256": "a0c3ec5d25bd39fa5a52908c6461592cd122cad493b86b2595e761909ee05b13",
+    "stage_fingerprint": "21c20331772b0de9f95aa3a2408ad9150c705905094ad1461823dea8072eea0f"
+  },
+  "production_started": false,
+  "registry_sha256": "883730e0ba548f6b358187d8f123fdd4d8aeb116f4bacda363c35c16d01ae40b",
+  "rescue_started": false,
+  "run_id": "exp102_pa_discovery_20260721_f0dff0f_r2",
+  "runtime": {
+    "max_population_minutes": 0.37296579706666677,
+    "m8_slowest_particle_sweep_us": 56.9100642496745,
+    "projected_minutes_with_safety_factor_2": 1.064189980526908,
+    "report_sha256": "3e05745155f8ff95ce125b70216928f51962f071730679be74cf75eb52ccaf82",
+    "startup_seconds": 1.7974757896736264,
+    "status": "PASS"
+  },
+  "source_commit": "f0dff0f8d3e055227b75c999a73c751e2a576768",
+  "source_identity": {
+    "archive_sha256": "57811c43662b379524fb4f5099346f042d5577cc1e2c69a31299a11fd9c01324",
+    "file_count": 737,
+    "manifest_sha256": "ef1327bfe56349cabdb999e591b3c7401f9f879ec766c2834393ee64e7fc0941"
+  },
+  "status": "EXHAUSTED",
+  "transport_autopsy_config_sha256": "3ba36c85e481f94ad36f1e0bccee5d9b961e1ff32a0688160ac6be236ae86f17",
+  "validation_version": "exp102.q0_pa.discovery.result.v1"
+}

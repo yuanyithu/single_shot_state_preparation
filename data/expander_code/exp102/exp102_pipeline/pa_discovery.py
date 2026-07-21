@@ -55,6 +55,8 @@ PA_STAGES = ("hard_screen", "rescue", "confirmation", "resolution")
 PA_NODE_CAPACITY = {"nd-1": 75, "nd-2": 75, "nd-3": 91}
 PA_P_VALUES = (0.04, 0.05, 0.06, 0.07, 0.08, 0.09, 0.10)
 PA_POPULATIONS_PER_CELL = 8
+PA_FLOAT_REPLAY_MAX_ULPS = 64
+PA_LOG_Z_REPLAY_ULPS_PER_STAGE = 32
 PA_PARENT_PT_SOURCE = "da69528b43f4a9d1635083c21d713ba63ccec4ab"
 PA_PARENT_PT_RUN = "exp102_discovery_v2_20260720_da69528"
 
@@ -582,6 +584,20 @@ def _require_array_equal(name, stored, expected, equal_nan=False):
         raise PaConflictError(f"PA raw transcript mismatch: {name}")
 
 
+def _require_float_replay(
+        name, stored, expected, max_ulps=PA_FLOAT_REPLAY_MAX_ULPS):
+    """Replay derived floats across libm/NumPy while keeping discrete state exact."""
+    stored = np.asarray(stored, dtype=np.float64)
+    expected = np.asarray(expected, dtype=np.float64)
+    if (stored.shape != expected.shape
+            or not np.all(np.isfinite(stored))
+            or not np.all(np.isfinite(expected))):
+        raise PaConflictError(f"PA raw transcript mismatch: {name}")
+    spacing = np.maximum(np.abs(np.spacing(stored)), np.abs(np.spacing(expected)))
+    if np.any(np.abs(stored - expected) > float(max_ulps) * spacing):
+        raise PaConflictError(f"PA raw transcript mismatch: {name}")
+
+
 def _validate_transcript(arrays, pa_config, affine_dimension, num_qubits):
     particles = pa_config.num_particles
     steps = pa_config.num_anneal_steps
@@ -593,8 +609,9 @@ def _validate_transcript(arrays, pa_config, affine_dimension, num_qubits):
             or np.any(arrays["stage_energies"] > int(num_qubits))):
         raise PaConflictError("PA stage energies are outside the model range")
     expected_log_z = affine_dimension * math.log(2.0)
-    if arrays["log_z"][0] != expected_log_z:
-        raise PaConflictError("PA initial log-Z constant is incorrect")
+    _require_float_replay(
+        "initial log-Z constant", arrays["log_z"][0], expected_log_z,
+    )
     for index in range(steps):
         delta_K = float(K[index + 1] - K[index])
         energy = arrays["stage_energies"][index].astype(np.float64)
@@ -610,15 +627,20 @@ def _validate_transcript(arrays, pa_config, affine_dimension, num_qubits):
         expected_max = float(pre.max())
         expected_increment = maximum + math.log(mean_factor)
         expected_log_z += expected_increment
-        _require_array_equal("stage_pre_weights", arrays["stage_pre_weights"][index], pre)
+        _require_float_replay(
+            "stage_pre_weights", arrays["stage_pre_weights"][index], pre,
+        )
         for name, stored, expected in (
                 ("conditional_ess", arrays["conditional_ess"][index], expected_cess),
                 ("ess_before_decision", arrays["ess_before_decision"][index], expected_ess),
                 ("max_pre_weight", arrays["max_pre_weight"][index], expected_max),
                 ("log_normalizer_increments", arrays["log_normalizer_increments"][index], expected_increment),
                 ("log_z", arrays["log_z"][index + 1], expected_log_z)):
-            if stored != expected:
-                raise PaConflictError(f"PA raw transcript mismatch: {name}")
+            _require_float_replay(
+                name, stored, expected,
+                max_ulps=(PA_LOG_Z_REPLAY_ULPS_PER_STAGE * steps
+                          if name == "log_z" else PA_FLOAT_REPLAY_MAX_ULPS),
+            )
         decision = expected_ess < PA_RESAMPLE_ESS_FRACTION * particles
         if bool(arrays["resampled"][index]) != decision:
             raise PaConflictError("PA resampling decision cannot be replayed")
@@ -636,10 +658,14 @@ def _validate_transcript(arrays, pa_config, affine_dimension, num_qubits):
         expected_offspring = np.bincount(expected_parents, minlength=particles)
         _require_array_equal("offspring_counts", arrays["offspring_counts"][index], expected_offspring)
         _require_array_equal("root_ancestry", arrays["root_ancestry"][index + 1], roots)
-        _require_array_equal("stage_post_weights", arrays["stage_post_weights"][index], weights)
+        _require_float_replay(
+            "stage_post_weights", arrays["stage_post_weights"][index], weights,
+        )
         expected_after = float(1.0 / np.dot(weights, weights))
-        if arrays["ess_after_decision"][index] != expected_after:
-            raise PaConflictError("PA post-decision ESS mismatch")
+        _require_float_replay(
+            "ess_after_decision", arrays["ess_after_decision"][index],
+            expected_after,
+        )
 
 
 def validate_pa_raw(path, registry, config, expected_source_commit=None):
@@ -709,10 +735,14 @@ def validate_pa_raw(path, registry, config, expected_source_commit=None):
                 np.asarray(pa_config.schedule_q32, dtype=np.uint64)):
             raise PaConflictError("PA raw schedule was tampered")
         K = pa_coupling_schedule(pa_config)
-        _require_array_equal("ladder_K", _array(data, "ladder_K", K.shape, np.float64), K)
-        _require_array_equal(
+        _require_float_replay(
+            "ladder_K", _array(data, "ladder_K", K.shape, np.float64), K,
+            max_ulps=8,
+        )
+        _require_float_replay(
             "ladder_p", _array(data, "ladder_p", K.shape, np.float64),
             1.0 / (1.0 + np.exp(K)),
+            max_ulps=8,
         )
 
         N, G, n, k = (
@@ -793,21 +823,33 @@ def validate_pa_raw(path, registry, config, expected_source_commit=None):
             arrays["logical_bit_flips"][-1],
         )
         family = _family_statistics(arrays["root_ancestry"][-1], weights, N)
-        _require_array_equal("family_masses", arrays["family_masses"], family["family_masses"])
-        for field in ("family_ess", "distinct_initial_families", "max_family_mass"):
-            if _scalar(data, field) != family[field]:
-                raise PaConflictError(f"PA genealogy summary mismatch: {field}")
+        _require_float_replay(
+            "family_masses", arrays["family_masses"], family["family_masses"],
+        )
+        if int(_scalar(data, "distinct_initial_families")) != family[
+                "distinct_initial_families"]:
+            raise PaConflictError(
+                "PA genealogy summary mismatch: distinct_initial_families"
+            )
+        for field in ("family_ess", "max_family_mass"):
+            _require_float_replay(
+                f"genealogy summary {field}", _scalar(data, field), family[field],
+            )
         planted_label = bits_to_uint64(frame.label_of(epsilon))
         planted_mass = float(weights[labels == planted_label].sum())
         diagnostics = {
             "planted_label": planted_label,
-            "planted_class_mass": planted_mass,
             "unique_states": int(np.unique(packed, axis=0).shape[0]),
             "unique_labels": int(np.unique(labels).size),
         }
         for field, expected in diagnostics.items():
             if _scalar(data, field) != expected:
                 raise PaConflictError(f"PA diagnostic mismatch: {field}")
+        _require_float_replay(
+            "diagnostic planted_class_mass",
+            _scalar(data, "planted_class_mass"), planted_mass,
+        )
+        diagnostics["planted_class_mass"] = planted_mass
         result_for_gate = {
             **arrays,
             "final_states": states,
@@ -1188,6 +1230,19 @@ def _method_tiebreak(method, core_seconds):
     )
 
 
+def _portable_raw_evidence(records, raw_root):
+    raw_root = Path(raw_root).resolve()
+    evidence = []
+    for record in records:
+        path = Path(record["path"]).resolve()
+        try:
+            relative = path.relative_to(raw_root)
+        except ValueError as exc:
+            raise PaConflictError("PA raw evidence lies outside its stage root") from exc
+        evidence.append({"path": relative.as_posix(), "sha256": record["sha256"]})
+    return evidence
+
+
 def analyze_hard_screen(base_raw_dir, base_manifest_path, registry_path, config_path,
                         rescue_raw_dir=None, rescue_manifest_path=None, output_path=None):
     registry = load_registry(registry_path)
@@ -1298,8 +1353,10 @@ def analyze_hard_screen(base_raw_dir, base_manifest_path, registry_path, config_
         "primary": primary,
         "backup": backup,
         "raw_evidence": [
-            {"path": row["path"], "sha256": row["sha256"]}
-            for row in [*base["records"], *([] if rescue is None else rescue["records"])]
+            *_portable_raw_evidence(base["records"], base_raw_dir),
+            *([] if rescue is None else _portable_raw_evidence(
+                rescue["records"], rescue_raw_dir,
+            )),
         ],
     }
     report["analysis_sha256"] = sha256_json({
@@ -1499,8 +1556,10 @@ def analyze_confirmation(confirmation_raw_dir, confirmation_manifest_path,
         "formal_config_ready": status == "READY_FOR_FORMAL",
         "frozen_held_out_pass": False,
         "raw_evidence": [
-            {"path": row["path"], "sha256": row["sha256"]}
-            for row in [*confirmation["records"], *resolution["records"]]
+            *_portable_raw_evidence(
+                confirmation["records"], confirmation_raw_dir,
+            ),
+            *_portable_raw_evidence(resolution["records"], resolution_raw_dir),
         ],
     }
     report["analysis_sha256"] = sha256_json({

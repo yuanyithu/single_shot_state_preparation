@@ -1099,8 +1099,21 @@ def _verified_autopsy_paths(raw_root, config, source_commit):
             "stage_fingerprint": ownership["stage_fingerprint"]}
 
 
+def _serializable_autopsy_evidence(verified, raw_root):
+    if verified is None:
+        return None
+    raw_root = Path(raw_root).resolve()
+    return {
+        "paths": [path.relative_to(raw_root).as_posix()
+                  for path in verified["paths"]],
+        "source_identity": verified["source_identity"],
+        "stage_fingerprint": verified["stage_fingerprint"],
+    }
+
+
 def analyze_autopsy(raw_dir, registry_path, discovery_config_path,
                      autopsy_config_path, source_commit, parent_root, output_path=None):
+    raw_root = Path(raw_dir).resolve()
     registry = load_registry(registry_path)
     discovery = load_discovery_config(discovery_config_path, registry)
     config = load_autopsy_config(autopsy_config_path, registry, discovery)
@@ -1115,6 +1128,8 @@ def analyze_autopsy(raw_dir, registry_path, discovery_config_path,
         )
         for path in paths
     ]
+    for record in records:
+        record["path"] = Path(record["path"]).relative_to(raw_root).as_posix()
     expected = {sha256_json(task) for task in autopsy_tasks(config, source_commit)}
     actual = [record["task_fingerprint"] for record in records]
     if len(actual) != len(set(actual)) or not set(actual) <= expected:
@@ -1129,7 +1144,7 @@ def analyze_autopsy(raw_dir, registry_path, discovery_config_path,
         "discovery_config_sha256": discovery["discovery_config_sha256"],
         "autopsy_config_sha256": config["autopsy_config_sha256"],
         "expected_tasks": len(expected), "present_tasks": len(actual),
-        "remote_evidence": verified,
+        "remote_evidence": _serializable_autopsy_evidence(verified, raw_root),
         "tasks": records,
     }
     report["analysis_sha256"] = sha256_json(report)

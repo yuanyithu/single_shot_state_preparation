@@ -11,6 +11,8 @@ from data.expander_code.exp102.exp102_pipeline.pa_discovery import (
     CONFIRMATION_PANEL_SHA256,
     PA_RAW_FIELDS,
     RESOLUTION_PANEL_SHA256,
+    _portable_raw_evidence,
+    _require_float_replay,
     load_pa_discovery_config,
     pa_task_identity,
     run_pa_task,
@@ -354,12 +356,52 @@ def test_pa_raw_is_no_pickle_self_validating_and_discovery_only(valid_pa_raw):
     assert len(record["population_digest"]) == 64
 
 
+def test_pa_analyzer_accepts_bounded_cross_libm_rounding(valid_pa_raw, tmp_path):
+    path, registry, config, _ = valid_pa_raw
+    with np.load(path, allow_pickle=False) as data:
+        arrays = {name: data[name].copy() for name in data.files}
+    ladder_p = arrays["ladder_p"].copy()
+    ladder_p[1:-1] = np.nextafter(ladder_p[1:-1], np.inf)
+    arrays["ladder_p"] = ladder_p
+    rounded = tmp_path / "rounded_ladder_p.npz"
+    atomic_npz(rounded, **arrays)
+    validate_pa_raw(rounded, registry, config, SOURCE_COMMIT)
+
+    expected = np.array([0.4, 0.08, 100.0], dtype=np.float64)
+    replayed = expected.copy()
+    for _ in range(8):
+        replayed = np.nextafter(replayed, np.inf)
+    _require_float_replay("cross-libm", replayed, expected, max_ulps=8)
+    with pytest.raises(ValueError, match="cross-libm"):
+        _require_float_replay(
+            "cross-libm", expected + np.array([1e-10, 0.0, 0.0]), expected,
+            max_ulps=8,
+        )
+
+
+def test_pa_report_raw_evidence_uses_portable_paths(tmp_path):
+    raw = tmp_path / "stage/node/population.npz"
+    raw.parent.mkdir(parents=True)
+    raw.touch()
+    evidence = _portable_raw_evidence([
+        {"path": str(raw.resolve()), "sha256": "a" * 64},
+    ], tmp_path)
+    assert evidence == [{
+        "path": "stage/node/population.npz", "sha256": "a" * 64,
+    }]
+    with pytest.raises(ValueError, match="outside"):
+        _portable_raw_evidence([
+            {"path": str(tmp_path.parent / "outside.npz"), "sha256": "b" * 64},
+        ], tmp_path)
+
+
 @pytest.mark.parametrize(
     "field,mutator,match",
     [
         ("schedule_q32", lambda value: np.where(
             np.arange(value.size) == 1, value + np.uint64(1), value
         ), "schedule"),
+        ("ladder_p", lambda value: value * (1.0 + 1e-10), "ladder_p"),
         ("final_weights", lambda value: value * np.linspace(0.9, 1.1, value.size), "weights"),
         ("root_ancestry", lambda value: np.zeros_like(value), "root_ancestry|family"),
         ("root_ancestry", lambda value: np.vstack((

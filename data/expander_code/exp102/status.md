@@ -1,20 +1,38 @@
 # exp102 status
 
-**PA DISCOVERY IMPLEMENTED / REMOTE GATES PENDING — formal pilot blocked, production not started**
+**PA DISCOVERY EXHAUSTED / PRE-PILOT — formal pilot blocked, production not started**
 
-The reviewed successor to the exhausted PT-v2 route is now frozen in
-`PA_DISCOVERY_CONTRACT.md` as `exp102.q0_pa.discovery.v1`. Its implementation has independent
-Q32 schedules, task/raw schemas, clone-safe seed namespace, exact/reference/Numba tests,
-fail-closed analyzer, immutable remote ownership, and blinded confirmation/resolution manifests.
-The associated `exp102.transport_autopsy.raw.v1` trace replays old PT randomness without changing
-the parent schema. Local implementation tests pass, and one full D0/m06 parent task has already
-reproduced every old label/counter/residual bit-for-bit as a development diagnostic.
+The reviewed successor to the exhausted PT-v2 route was executed under the isolated
+`exp102.q0_pa.discovery.v1` contract. Worker source
+`f0dff0f8d3e055227b75c999a73c751e2a576768` used archive SHA256
+`57811c43662b379524fb4f5099346f042d5577cc1e2c69a31299a11fd9c01324`. The nd-1/2/3 canonical
+digest was identical (`f4ed9fff7512f8995a4f70c60072c1bba054aaf75e0440a4d00545880305f478`),
+and the authoritative nd-2 runtime report passed all four gates: slowest m8 kernel
+`56.91 us/particle-sweep`, startup `1.80 s`, maximum population projection `0.373 min`, and
+factor-two full-schedule projection `1.064 min`.
 
-This is not yet a PA physics result. The clean-source three-node digest, Linux runtime gate, full
-four-task autopsy, 64-population hard screen, conditional rescue decision, and any blinded
-confirmation have not yet completed. PA discovery raw is barred from the formal PT freezer. Even a
-future two-method pass may produce only `READY_FOR_FORMAL`; the formal versions remain
-`exp102.q0_pt.v1 / exp102.scan.v1`, and `FROZEN_HELD_OUT_PASS` still does not exist.
+All four transport-autopsy tasks passed identity and bit-for-bit parent replay. All classified
+`INCONCLUSIVE`, because the required outbound phase-conditioned attempts fell below 200 near the
+hot end. D0/D4 on m6 observed 3/5 certified hot updates but zero returns; both m8 tasks observed
+zero hot updates. Thus the autopsy confirms that high aggregate edge rates did not provide enough
+conditioned transport evidence, but it cannot assign one of the three causal labels.
+
+The complete 64-population PA hard screen produced zero passing methods. Every population failed
+the frozen genealogy gate: median final family ESS was about 1 and median surviving initial
+families was 1--2, versus required 8 and 16. Some B96 populations also failed CESS and one maximum
+particle-weight gate. Therefore `C192-2`, `B96-1`, `B192-1`, and `B96-2` all failed both hard cells.
+The zero-pass branch is final `EXHAUSTED`: `B384-2` rescue is forbidden, confirmation/resolution
+manifests were not created, and neither `READY_FOR_FORMAL` nor `FROZEN_HELD_OUT_PASS` exists.
+Discovery raw remains barred from every formal merge/freezer; the formal versions remain
+`exp102.q0_pt.v1 / exp102.scan.v1`.
+
+The post-run analyzer audit fixed two evidence-only portability defects without changing raw or
+any numerical gate: NumPy 2.3.4 versus 2.4.1 differed by up to 2 ULP in stored `ladder_p` and up to
+4096 ULP (`5.68e-14` absolute) in accumulated log-Z replay, and autopsy evidence paths were not
+JSON serializable.
+Discrete transcripts remain exact; derived float replay is bounded at 8 ULP for ladders, 64 ULP
+for non-cumulative values, and `32*G` ULP for cumulative log-Z. Local and remote analyzers agree
+on the zero-pass outcome.
 
 Clean source `da69528b43f4a9d1635083c21d713ba63ccec4ab` passed the three-node PT-v2
 preflight and completed the frozen screen plus transport stages. The 45-cell screen passed D0,
