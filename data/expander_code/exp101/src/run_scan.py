@@ -12,7 +12,9 @@ import argparse
 import hashlib
 import json
 import math
+import os
 import platform
+import re
 import subprocess
 import time
 from dataclasses import asdict, fields
@@ -174,6 +176,29 @@ def _atomic_write_json(path, data):
 
 
 def _git_provenance():
+    archive_commit = os.environ.get("EXP102_SOURCE_COMMIT", "")
+    deployment_root = _REPOSITORY_ROOT.parent
+    marker = deployment_root / "SOURCE_COMMIT"
+    manifest_path = deployment_root / "SOURCE_MANIFEST.json"
+    if (not (_REPOSITORY_ROOT / ".git").exists()
+            and re.fullmatch(r"[0-9a-f]{40}", archive_commit)
+            and marker.is_file() and manifest_path.is_file()):
+        try:
+            manifest = json.loads(manifest_path.read_text(encoding="ascii"))
+            marker_commit = marker.read_text(encoding="ascii").strip()
+        except (OSError, UnicodeError, json.JSONDecodeError):
+            pass
+        else:
+            if (marker_commit == archive_commit
+                    and manifest.get("source_commit") == archive_commit
+                    and manifest.get("source_identity_version")
+                    == "exp102.source.v1"):
+                # run_verified_source.sh has already compared every source file
+                # with this immutable archive before exporting the commit.
+                return {
+                    "git_commit_sha": archive_commit,
+                    "git_worktree_dirty": False,
+                }
     try:
         sha = subprocess.run(
             ["git", "rev-parse", "HEAD"], capture_output=True, text=True,

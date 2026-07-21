@@ -121,14 +121,19 @@ def compute_exact_logical_observable_means(
         syndrome_error_probability,
         data_error_probability,
         logical_observable_masks,
-        chunk_size=DEFAULT_EXACT_ENUMERATION_CHUNK_SIZE):
+        chunk_size=DEFAULT_EXACT_ENUMERATION_CHUNK_SIZE,
+        syndrome_representative_section=None):
     """
     分块枚举所有 2^n 个 c，精确计算 m_u、q_top 与 posterior normalization。
     """
     num_checks, num_qubits = parity_check_matrix.shape
     parity_check_matrix_uint8 = parity_check_matrix.astype(np.uint8)
     logical_observable_masks_uint8 = logical_observable_masks.astype(np.uint8)
-    section_data = build_syndrome_representative_section(parity_check_matrix)
+    section_data = syndrome_representative_section
+    if section_data is None:
+        section_data = build_syndrome_representative_section(
+            parity_check_matrix
+        )
     disorder_syndrome_bits = (
         parity_check_matrix_uint8 @ disorder_data_error_bits.astype(np.uint8)
     ) % 2

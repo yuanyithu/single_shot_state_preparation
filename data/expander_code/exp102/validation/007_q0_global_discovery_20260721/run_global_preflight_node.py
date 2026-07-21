@@ -56,6 +56,8 @@ def main(argv=None):
     test_log_path.write_text(test_log, encoding="utf-8")
     if completed.returncode:
         raise RuntimeError(f"Linux regression suite failed on {args.node}")
+    if verify_source_identity(source, args.source_commit) != source_identity:
+        raise RuntimeError("Linux regression suite changed the verified source tree")
 
     digest = cross_node_global.canonical_digest(
         registry, config, args.source_commit,
@@ -94,6 +96,9 @@ def main(argv=None):
         })
         wmc_path = node_root / "wmc.json"
         atomic_json(wmc_path, wmc)
+
+    if verify_source_identity(source, args.source_commit) != source_identity:
+        raise RuntimeError("global preflight changed the verified source tree")
 
     report = {
         "report_version": "exp102.q0_global.preflight_node.v1",

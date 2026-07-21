@@ -172,6 +172,9 @@ def _timed_ti_anchor(registry_path, registry, config, source_commit):
             f"{source_commit}:q0_global_ti_runtime".encode("ascii")
         ).digest()[:8], "big",
     ) & ((1 << 63) - 1)
+    warmup_start = time.perf_counter()
+    run_sector_ti(model, frame, wiring, probe, seed=seed ^ 1)
+    warmup_wall = time.perf_counter() - warmup_start
     wall_start, core_start = time.perf_counter(), time.process_time()
     run_sector_ti(model, frame, wiring, probe, seed=seed)
     probe_wall = time.perf_counter() - wall_start
@@ -182,8 +185,11 @@ def _timed_ti_anchor(registry_path, registry, config, source_commit):
         int(frozen["num_burn_in_sweeps"]) + int(frozen["num_measurements"])
     )
     ratio = frozen_work / probe_work
-    projected = probe_wall * ratio
+    # Compilation is a one-time stage startup, not work that scales with every
+    # TI sweep.  Warm first, then retain one startup charge in the projection.
+    projected = warmup_wall + probe_wall * ratio
     return {
+        "warmup_wall_seconds": warmup_wall,
         "probe_wall_seconds": probe_wall,
         "probe_core_seconds": probe_core,
         "probe_work_units": probe_work,

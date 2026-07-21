@@ -17,7 +17,7 @@ publication/FSS。014 中的 scan v2 聚合只作历史审计；旧 259 tests �
 `data/expander_code/exp101/PHYSICS_CONTRACT.md`（唯一物理权威）、`status.md` 和
 `validation/README.md`。关键硬约束：
 
-**exp102 当前为 `GLOBAL-SAMPLING DISCOVERY IMPLEMENTED / PRE-RUN`，不是已有物理结果。** 正式历史契约仍为
+**exp102 当前为 `GLOBAL-SAMPLING DISCOVERY PREFLIGHT REPAIR / PRE-RUN`，不是已有物理结果。** 正式历史契约仍为
 `exp102.physics.v1 / exp102.q0_pt.v1 / exp102.scan.v1`。2026-07-20 的固定 Q32 + multi-swap PT-v2
 discovery 已因 96 条实例轨迹认证往返总数为 0 而 `EXHAUSTED`；不得追加 S128、延长轮数或复用
 其 raw。随后 `exp102.q0_pa.discovery.v1` 的三节点 digest、Linux runtime、四任务 PT transport
@@ -27,7 +27,11 @@ autopsy 和 64-task PA hard screen 已全部完成：四个 autopsy 均因所需
 禁止 B384-2 rescue，confirmation/resolution manifests 未创建，也没有 `READY_FOR_FORMAL`。
 新的 `exp102.q0_global.discovery.v1` 已实现低权重 logical catalog、hard-coset cluster/joint
 heatbath、独立 defect trace、m3 full-sector TI、三节点 digest/runtime、72h schedule 与 control freeze，
-但三节点 preflight/screen/HARD2/confirmation/resolution/TI 尚未运行，因此仍没有新物理结果。
+首个 immutable run `exp102_q0_global_20260721_6f26fd5` 已在 Linux preflight 阶段因 archive
+provenance、可选 BP-LSD cross-check、测试写 source tree 与 cold-JIT TI projection 问题永久 FAILED；
+没有产生合格 runtime/digest/WMC 或 sampler raw，不得删 marker 原地复跑。修复证据见
+`validation/008_q0_global_preflight_portability_20260721/`，必须用 fresh commit/deployment/run/schedule。
+screen/HARD2/confirmation/resolution/TI 尚未运行，因此仍没有新物理结果。
 接手必须先读 `GLOBAL_DISCOVERY_CONTRACT.md`；不得在运行前改 panels/gates/T/2T/bias 规则，也不得把
 实现完成写成 `READY_FOR_FORMAL`。即使 discovery 全过，也只能另建正式 tuning/held-out 契约，不能
 直接启动 production。PT/PA/global discovery raw 均不得进入正式 merge/freezer。48-code registry

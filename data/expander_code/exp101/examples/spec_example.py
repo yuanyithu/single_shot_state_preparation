@@ -14,7 +14,7 @@ if str(EXP101_ROOT) not in sys.path:
 from src.instance import build_quantum_expander_code_instance  # noqa: E402
 
 
-def main():
+def main(output_dir=None):
     instance = build_quantum_expander_code_instance(
         m=2,
         d_A=3,
@@ -44,9 +44,14 @@ def main():
     ]
     text = "\n".join(lines)
     print(text)
-    output_path = Path(__file__).resolve().parent / "spec_example_output.txt"
+    output_root = (
+        Path(__file__).resolve().parent
+        if output_dir is None else Path(output_dir)
+    )
+    output_root.mkdir(parents=True, exist_ok=True)
+    output_path = output_root / "spec_example_output.txt"
     output_path.write_text(text + "\n", encoding="utf-8")
-    instance.save_json(Path(__file__).resolve().parent / "spec_example_instance.json")
+    instance.save_json(output_root / "spec_example_instance.json")
     return instance
 
 

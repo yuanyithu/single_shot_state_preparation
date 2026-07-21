@@ -1,6 +1,6 @@
 # exp102 status
 
-**GLOBAL-SAMPLING DISCOVERY IMPLEMENTED / PRE-RUN — formal pilot blocked, production not started**
+**GLOBAL-SAMPLING DISCOVERY PREFLIGHT REPAIR / PRE-RUN — formal pilot blocked, production not started**
 
 The reviewed successor to the exhausted PT-v2 and PA routes is now implemented under
 `exp102.q0_global.discovery.v1`; its frozen contract is `GLOBAL_DISCOVERY_CONTRACT.md` and its
@@ -10,9 +10,15 @@ joint stabilizer-logical block heatbath, an independent fixed-clock defect-trace
 full-sector TI anchors for m3, exact small-code oracles, three-node digest/runtime consensus,
 immutable 72-hour controls, and an independently replayed character-U-statistic analyzer.
 
-This is an implementation state, not a discovery result. No three-node global preflight, screen,
-method freeze, HARD2 fresh run, confirmation, resolution, or TI anchor has completed yet; therefore
-there is no `READY_FOR_FORMAL`, no new formal sampler, and no `FROZEN_HELD_OUT_PASS`. The old PT/PA
+This is an implementation state, not a discovery result. The first immutable clean-source attempt,
+`exp102_q0_global_20260721_6f26fd5`, failed its Linux preflight before any runtime/digest/WMC report
+or sampler raw was accepted. The archived evidence and repair audit are in
+`validation/008_q0_global_preflight_portability_20260721/`; its FAILED markers are permanent. The
+repair makes archive provenance explicit, removes source-tree test writes, fixes the optional
+BP-LSD cross-check, warms the TI timing probe, and reverifies source identity after every worker.
+A fresh commit/deployment/run/schedule is required. No screen, method freeze, HARD2 fresh run,
+confirmation, resolution, or TI anchor has completed; therefore there is no `READY_FOR_FORMAL`, no
+new formal sampler, and no `FROZEN_HELD_OUT_PASS`. The old PT/PA
 raw remains barred from this workflow and from formal merge/freezer/production. A successful
 global discovery could only authorize a later fresh tuning and held-out campaign; it could not
 authorize the 6144 production tasks directly.

@@ -115,7 +115,7 @@ class TestSerializationAndReproduction:
 
 
 class TestSpecExampleScript:
-    def test_spec_example_runs_and_reports(self):
+    def test_spec_example_runs_and_reports(self, tmp_path):
         import importlib.util
         from pathlib import Path
 
@@ -125,14 +125,15 @@ class TestSpecExampleScript:
         spec = importlib.util.spec_from_file_location("spec_example", example_path)
         module = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(module)
-        instance = module.main()
+        instance = module.main(output_dir=tmp_path)
         assert instance.parameters.n == 100
         assert instance.parameters.k == 4
         assert instance.css_commutation_ok
         assert instance.expansion_result.passed  # γ=1/10 在 n_A=8 下空真通过
         assert instance.expansion_result.vacuous_left
-        output = example_path.parent / "spec_example_output.txt"
+        output = tmp_path / "spec_example_output.txt"
         assert output.exists()
+        assert (tmp_path / "spec_example_instance.json").exists()
         content = output.read_text(encoding="utf-8")
         for token in ("seed = 12345", "n = 100", "k = 4", "CSS commutation holds: True"):
             assert token in content

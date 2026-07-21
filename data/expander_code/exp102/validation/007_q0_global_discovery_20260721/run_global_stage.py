@@ -155,6 +155,8 @@ def main(argv=None):
             "path": output.relative_to(evidence_root).as_posix(),
             "sha256": sha256_file(output),
         })
+    if verify_source_identity(source, args.source_commit) != source_identity:
+        raise ValueError("global stage changed the verified source tree")
     marker_root = (
         evidence_root / "node_manifests" / args.control_sha256[:12] / args.node
     )

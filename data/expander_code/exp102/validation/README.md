@@ -28,6 +28,10 @@ Current status is pre-pilot, not scientific certification.
   defect trace, exact HGP/WMC oracles, no-pickle raw replay, character/D2 gates, m3 full-sector TI
   anchors, three-node preflight/runtime/digest consensus, immutable stage ownership, 72-hour
   schedule, postselection/control freezes, and fail-closed readiness. Local implementation tests
-  pass; remote preflight and all discovery stages are still pending, so this directory currently
-  certifies code readiness only and contains no physics result.
+  pass; the first remote preflight failed before sampler work and is superseded by the portability
+  repair below. No discovery stage has completed, so this directory contains no physics result.
+- `008_q0_global_preflight_portability_20260721/`: immutable evidence from the failed first global
+  preflight plus its repair. It fixes archive git provenance, deterministic legacy-section testing,
+  source-tree writes by the spec example test, cold-JIT TI projection, and post-worker source
+  reverification. A fresh commit/deployment/run/schedule is required; this is not a sampler result.
 - Held-out and production evidence do not exist. Their absence is an active production blocker.

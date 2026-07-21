@@ -348,13 +348,21 @@ class TestMainProjectCrossCheck:
                           expected_log_Z, atol=1e-9)
 
     def test_m_u_matches_main_in_decoder_frame(self):
-        """Legacy-only characters match the historical API in its decoder frame."""
+        """Legacy characters match in an independently built linear frame."""
         compute_main, build_masks = self._main_module()
         model, frame = build_setup(cycle_parity_check_matrix(2))
         p, q = 0.13, 0.09
         disorder, _ = make_wiring(model, frame, p, q, seed=19)
         H_main = model.H_check.astype(bool)
         masks = build_masks(H_main, model.logical_obs_basis.astype(bool), None)
+        from linear_section import build_syndrome_representative_section
+
+        # Optional BP-LSD versions can choose different valid representatives
+        # in separate decoder instances.  The deterministic linear fallback
+        # keeps this cross-project observable-frame comparison well-defined.
+        main_section = build_syndrome_representative_section(
+            H_main, prefer_bplsd=False,
+        )
         main_result = compute_main(
             parity_check_matrix=H_main,
             observed_syndrome_bits=disorder.effective_syndrome.astype(bool),
@@ -362,6 +370,7 @@ class TestMainProjectCrossCheck:
             syndrome_error_probability=q,
             data_error_probability=p,
             logical_observable_masks=masks,
+            syndrome_representative_section=main_section,
         )
         # 本地小 n 直接枚举（decoder frame、legacy 权重）
         from src.section import (
@@ -373,7 +382,9 @@ class TestMainProjectCrossCheck:
 
         dec_frame = DecoderObservableFrame(
             model.H_check, model.logical_obs_basis,
-            LogicalSectorQubitChainSection(model.H_check),
+            LogicalSectorQubitChainSection(
+                model.H_check, prefer_bplsd=False,
+            ),
         )
         K_p = coupling_from_probability(p)
         K_q = coupling_from_probability(q)

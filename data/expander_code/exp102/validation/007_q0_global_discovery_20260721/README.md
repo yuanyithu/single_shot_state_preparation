@@ -1,8 +1,10 @@
 # exp102 q=0 global-sampling discovery
 
-Status: `IMPLEMENTED / PRE-RUN`. This directory currently contains code and
-local validation only. It does not contain a three-node discovery result and
-does not establish `READY_FOR_FORMAL`.
+Status: `IMPLEMENTED / FRESH PREFLIGHT PENDING`. The first immutable remote
+attempt failed its Linux portability preflight and is permanently closed; see
+`../008_q0_global_preflight_portability_20260721/`. This directory does not
+contain a three-node discovery result and does not establish
+`READY_FOR_FORMAL`.
 
 ## Frozen scope
 
@@ -38,7 +40,8 @@ freezers are incompatible with this workflow.
 
 Every compute-node Python command is entered through the archived
 `run_verified_source.sh`. Direct execution inside `repos/<run>/source` is
-forbidden because it changes the verified tree.
+forbidden because it changes the verified tree. Preflight and stage workers
+also reverify the complete archive identity before writing SUCCESS.
 
 ## Local validation
 

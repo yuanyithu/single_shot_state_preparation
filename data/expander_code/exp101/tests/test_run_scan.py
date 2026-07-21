@@ -6,6 +6,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 
+import src.run_scan as run_scan_module
 from src.run_scan import (
     ENGINE_FULL_TI,
     ENGINE_PT,
@@ -29,6 +30,28 @@ FAST_TI = dict(num_kp_grid_points=9, num_burn_in_sweeps=40,
                num_measurements=120, block_count=6, num_bootstrap=60)
 FAST_DIRECT = dict(num_burn_in_sweeps=150, num_measurements=1200,
                    num_starts=4)
+
+
+def test_verified_archive_provenance_is_known_clean(monkeypatch, tmp_path):
+    source = tmp_path / "source"
+    source.mkdir()
+    commit = "a" * 40
+    (tmp_path / "SOURCE_COMMIT").write_text(commit + "\n", encoding="ascii")
+    (tmp_path / "SOURCE_MANIFEST.json").write_text(json.dumps({
+        "source_identity_version": "exp102.source.v1",
+        "source_commit": commit,
+    }), encoding="ascii")
+    monkeypatch.setattr(run_scan_module, "_REPOSITORY_ROOT", source)
+    monkeypatch.setenv("EXP102_SOURCE_COMMIT", commit)
+    assert run_scan_module._git_provenance() == {
+        "git_commit_sha": commit,
+        "git_worktree_dirty": False,
+    }
+
+    monkeypatch.setenv("EXP102_SOURCE_COMMIT", "b" * 40)
+    unknown = run_scan_module._git_provenance()
+    assert unknown["git_commit_sha"] == "unknown"
+    assert unknown["git_worktree_dirty"] is None
 
 
 class TestTaskSeeds:
