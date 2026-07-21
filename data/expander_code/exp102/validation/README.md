@@ -15,4 +15,11 @@ Current status is pre-pilot, not scientific certification.
   three-node screen completed, but all 12 transport candidates produced zero certified round
   trips; the frozen route is `EXHAUSTED` before S128/confirmation. Report-v3 also binds every raw
   file to its source/control/ownership/marker evidence.
+- `006_pa_discovery_20260721/`: reviewed successor search using fixed-schedule q=0 population
+  annealing plus a no-extra-randomness replay of 16 old PT trajectories. The implementation,
+  frozen Q32 schedules/panels, exact oracles, reference/Numba identity, raw analyzer, immutable
+  node ownership, marker verification, and runtime tools are locally certified. Remote benchmark,
+  four-task autopsy, 64-task hard screen, conditional rescue, and blinded confirmation are separate
+  stage evidence and must remain fail-closed; until those reports exist this directory is not a
+  `READY_FOR_FORMAL` result.
 - Held-out and production evidence do not exist. Their absence is an active production blocker.

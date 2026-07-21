@@ -43,3 +43,19 @@ but all `S=4,16,64` transport candidates produced zero certified round trips on 
 Because every S64 candidate also had an instance with no hot-updated visit, the conditional S128
 branch was not legal and the confirmation panel was not run. Resuming requires a newly reviewed
 algorithm/contract rather than more rounds, S128, weaker gates, or reuse of this discovery raw.
+
+## PA discovery boundary
+
+`PA_DISCOVERY_CONTRACT.md` freezes the reviewed successor algorithm search under
+`exp102.q0_pa.discovery.v1`, with an independent `exp102.q0_pa.raw.v1` schema and seed namespace.
+It also freezes a no-extra-randomness replay of 16 old PT trajectories under
+`exp102.transport_autopsy.raw.v1`. These are discovery evidence only: they do not modify the
+formal version header above and cannot be passed to the PT pilot, freezer, scan-v1 merge, or
+production worker.
+
+The PA route uses exactly uniform hard-coset populations at K=0, fixed theta/Q32 annealing,
+systematic resampling, and coordinate or exact block4 heatbath mutation. Its four-method hard
+screen, one legal rescue branch, blinded 17-cell confirmation, six-cell N256/N512 resolution
+panel, genealogy/ESS gates, U-statistic, jackknife MCSE, runtime budget, and fail-closed stopping
+rules are contract data. Success can produce only `READY_FOR_FORMAL`; a later clean contract,
+tuning, and held-out campaign are still required before any `FROZEN_HELD_OUT_PASS` can exist.

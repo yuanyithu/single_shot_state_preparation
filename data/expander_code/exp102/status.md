@@ -1,6 +1,20 @@
 # exp102 status
 
-**PT V2 DISCOVERY EXHAUSTED / FORMAL PILOT BLOCKED — production not started**
+**PA DISCOVERY IMPLEMENTED / REMOTE GATES PENDING — formal pilot blocked, production not started**
+
+The reviewed successor to the exhausted PT-v2 route is now frozen in
+`PA_DISCOVERY_CONTRACT.md` as `exp102.q0_pa.discovery.v1`. Its implementation has independent
+Q32 schedules, task/raw schemas, clone-safe seed namespace, exact/reference/Numba tests,
+fail-closed analyzer, immutable remote ownership, and blinded confirmation/resolution manifests.
+The associated `exp102.transport_autopsy.raw.v1` trace replays old PT randomness without changing
+the parent schema. Local implementation tests pass, and one full D0/m06 parent task has already
+reproduced every old label/counter/residual bit-for-bit as a development diagnostic.
+
+This is not yet a PA physics result. The clean-source three-node digest, Linux runtime gate, full
+four-task autopsy, 64-population hard screen, conditional rescue decision, and any blinded
+confirmation have not yet completed. PA discovery raw is barred from the formal PT freezer. Even a
+future two-method pass may produce only `READY_FOR_FORMAL`; the formal versions remain
+`exp102.q0_pt.v1 / exp102.scan.v1`, and `FROZEN_HELD_OUT_PASS` still does not exist.
 
 Clean source `da69528b43f4a9d1635083c21d713ba63ccec4ab` passed the three-node PT-v2
 preflight and completed the frozen screen plus transport stages. The 45-cell screen passed D0,

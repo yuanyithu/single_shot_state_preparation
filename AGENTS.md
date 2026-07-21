@@ -17,16 +17,18 @@ publication/FSS。014 中的 scan v2 聚合只作历史审计；旧 259 tests �
 `data/expander_code/exp101/PHYSICS_CONTRACT.md`（唯一物理权威）、`status.md` 和
 `validation/README.md`。关键硬约束：
 
-**exp102 当前为 `PT V2 DISCOVERY EXHAUSTED / PRE-PILOT`，不是已有物理结果。** 独立契约和
-实现位于 `data/expander_code/exp102/`；正式历史契约仍为 `exp102.physics.v1 /
-exp102.q0_pt.v1 / exp102.scan.v1`。2026-07-20 的固定 Q32 + multi-swap discovery 中，D0/D2/D3/D4
-虽通过 screen，但在两个 hard cell 上测试 `S=4,16,64` 的 96 条实例轨迹认证往返总数仍为 0；
-所有 S64 候选又都有实例未经历 hot-rung update，故按冻结规则不得追加 S128，确认面板也未运行。
-不得以更长轮数掩盖该失败；若继续须重新审查算法/契约。48-code registry 已冻结，但 v2 正式
-config、pilot、held-out 和 6144 个生产任务均不存在；discovery raw 不得进入正式 merge/freezer。
-生产 worker 必须看到 `FROZEN_HELD_OUT_PASS` 才会启动，禁止手工绕过；正式读取只用
-`load_exp102_publication_q_top`，不得交给 exp101 loader。接手 exp102 先读该目录的
-`EXPERIMENT_CONTRACT.md` 与 `status.md`。
+**exp102 当前为 `PA DISCOVERY IMPLEMENTED / REMOTE GATES PENDING / PRE-PILOT`，不是已有物理
+结果。** 正式历史契约仍为 `exp102.physics.v1 / exp102.q0_pt.v1 / exp102.scan.v1`。2026-07-20
+的固定 Q32 + multi-swap PT-v2 discovery 已因 96 条实例轨迹认证往返总数为 0 而按冻结规则
+`EXHAUSTED`；不得追加 S128、延长轮数或复用其 raw。其后经审查冻结的独立 PA 搜索见
+`data/expander_code/exp102/PA_DISCOVERY_CONTRACT.md`：`exp102.q0_pa.discovery.v1` 和 PT transport
+autopsy 已完成本地实现认证，但 clean-source 三节点 digest、Linux runtime gate、四条 autopsy
+task、64 条 hard-screen population task、条件 rescue 与 blinded confirmation 尚未形成证据。
+PA/PT discovery raw 均不得进入正式 merge/freezer；即使 PA 输出 `READY_FOR_FORMAL`，仍不等于
+`FROZEN_HELD_OUT_PASS`。48-code registry 已冻结，但正式 PA config、pilot、held-out 和 6144 个
+生产任务均不存在。生产 worker 必须看到 `FROZEN_HELD_OUT_PASS` 才会启动，禁止手工绕过；
+正式读取只用 `load_exp102_publication_q_top`，不得交给 exp101 loader。接手 exp102 先读该目录的
+`EXPERIMENT_CONTRACT.md`、`PA_DISCOVERY_CONTRACT.md` 与 `status.md`。
 
 - **生产 convention 固定**：`sector=x_error`、`H_check=H_Z`、稳定子 move=`H_X` 行、logical move=`logical_X`、observable=`logical_Z`、制备态=`|+>_L`；对偶 `z_error/H_X` 才对应 `|0>_L`。现有矩阵接线不交换。
 - **生产 posterior 固定**：`pi(e|y_eff) ∝ exp[-K_p|e|-K_q|H_check e xor y_eff|]`，`y_eff=H_check epsilon_data_true xor measurement_error`；真实错误不得直接进入能量、Metropolis/TI/PT 比值。正式系综名为 `true_posterior`、`legacy_delta_only`，`paper_true_posterior/repo_compat` 只作先归一化的 deprecated alias。
