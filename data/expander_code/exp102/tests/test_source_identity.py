@@ -1,4 +1,5 @@
 import io
+import os
 import subprocess
 import tarfile
 from importlib import import_module
@@ -53,10 +54,12 @@ def test_deployed_source_manifest_binds_commit_and_file_hashes(tmp_path):
         Path(__file__).resolve().parents[1]
         / "validation/002_numba_smoke_20260719/run_verified_source.sh"
     )
+    relative_deployment = os.path.relpath(deployment, Path.cwd())
     command = (
-        "bash", str(verifier), str(deployment), commit, archive_sha256,
+        "bash", str(verifier), relative_deployment, commit, archive_sha256,
         sha256_file(deployment / "SOURCE_MANIFEST.json"),
-        "sh", "-c", "printf verified",
+        "sh", "-c",
+        "case $NUMBA_CACHE_DIR in /*) ;; *) exit 9;; esac; printf verified",
     )
     completed = subprocess.run(command, check=True, capture_output=True, text=True)
     assert completed.stdout == "verified"

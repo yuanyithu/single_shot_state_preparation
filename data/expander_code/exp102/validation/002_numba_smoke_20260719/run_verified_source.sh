@@ -12,6 +12,12 @@ expected_archive_sha256=$3
 expected_manifest_sha256=$4
 shift 4
 
+[[ -d $deployment_root ]] || {
+  echo "deployment root is not a directory" >&2
+  exit 66
+}
+deployment_root=$(cd "$deployment_root" && pwd -P)
+
 source_dir=$deployment_root/source
 archive=$deployment_root/SOURCE.tar
 manifest=$deployment_root/SOURCE_MANIFEST.json

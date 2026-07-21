@@ -15,7 +15,8 @@ This is an implementation state, not a discovery result. The first immutable cle
 or sampler raw was accepted. The archived evidence and repair audit are in
 `validation/008_q0_global_preflight_portability_20260721/`; its FAILED markers are permanent. The
 repair makes archive provenance explicit, removes source-tree test writes, fixes the optional
-BP-LSD cross-check, warms the TI timing probe, and reverifies source identity after every worker.
+BP-LSD cross-check, warms the TI timing probe, canonicalizes verifier cache paths, and reverifies
+source identity after every worker.
 A fresh commit/deployment/run/schedule is required. No screen, method freeze, HARD2 fresh run,
 confirmation, resolution, or TI anchor has completed; therefore there is no `READY_FOR_FORMAL`, no
 new formal sampler, and no `FROZEN_HELD_OUT_PASS`. The old PT/PA

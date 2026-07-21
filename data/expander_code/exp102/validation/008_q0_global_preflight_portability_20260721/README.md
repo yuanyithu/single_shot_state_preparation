@@ -34,6 +34,10 @@ or repaired in place.
 4. The TI timing probe multiplied one-time cold JIT startup by the full sweep
    ratio.  It now warms once, times steady-state work, and charges startup once
    in the projection.
+5. The post-repair local archive test passed all 590 tests but caught Numba
+   cache files under `source/` when the verifier received a relative deployment
+   path.  The verifier now canonicalizes its root before deriving cache paths;
+   that deployment was never uploaded or assigned a schedule.
 
 The captured schedule, gzip-compressed node pytest/orchestrator logs, and
 immutable FAILED markers are in `failed_run_evidence/`.  A fresh clean commit,
