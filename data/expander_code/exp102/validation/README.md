@@ -47,9 +47,11 @@ Current status is pre-pilot, not scientific certification.
   `UNRESOLVED_WITHIN_ALGORITHM_AND_72H_BUDGET`; no sampler raw or physics result exists. The audit
   repair persists this legal aggregate terminal status without weakening any downstream gate.
 - `011_q0_global_screen_diagnostic_20260721/`: isolated HARD2+EASY3 screen authorized after the
-  full discovery runtime stop. The first immutable run passed preflight and all 15 bias tasks but
-  closed before all 1280 measurement trajectories because platform fractional powers generated
-  two gamma bit patterns. Its metadata-only conflict evidence is frozen; the repaired source uses
-  exact `3/5` Decimal arithmetic, a self-checked full-schedule SHA, and digest v2. A fresh remote
-  run is required, and the strongest possible result remains diagnostic rather than formal.
+  full discovery runtime stop. The first immutable run remains a metadata-only gamma-libm
+  conflict. The repaired fresh run `exp102_q0_screen_diagnostic_20260721_342dd5b` passed the
+  three-node digest/runtime preflight, then completed and replay-validated 15 bias tasks plus all
+  1280 T3 trajectories. Its verified terminal status is `UNRESOLVED_NO_HARD_COSET_PASS`: all five
+  hard-coset candidates and all three defect-trace candidates passed 0/5 cells, so no method pair
+  was selected. Completed metadata evidence includes an independent archive replay; this remains
+  diagnostic only and grants no formal, held-out, or production authority.
 - Held-out and production evidence do not exist. Their absence is an active production blocker.

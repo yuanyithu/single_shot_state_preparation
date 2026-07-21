@@ -1,21 +1,41 @@
 # exp102 status
 
-**Q=0 DIAGNOSTIC SCREEN RESTART PENDING / PRE-PILOT — formal pilot blocked, production not started**
+**Q=0 DIAGNOSTIC SCREEN UNRESOLVED / PRE-PILOT — formal pilot blocked, production not started**
 
-The user authorized the isolated `exp102.q0_global.screen_diagnostic.v1` HARD2+EASY3 test. Its
-first immutable run, `exp102_q0_screen_diagnostic_20260721_5e1f5aa`, passed three-node preflight
-and completed all 15 bias tasks, but nd-0 measurement-control replay found that platform `libm`
-had produced two distinct 4096-value gamma bit patterns on nd-1 and nd-3. The run is permanently
-closed as `CONFLICT_CROSS_NODE_GAMMA_LIBM` before measurement: zero of 1280 trajectories ran, and
-no sampler-convergence or physics conclusion exists. Metadata-only evidence is in
-`validation/011_q0_global_screen_diagnostic_20260721/failed_run_evidence/`.
+The fresh immutable run `exp102_q0_screen_diagnostic_20260721_342dd5b` completed the isolated
+`exp102.q0_global.screen_diagnostic.v1` HARD2+EASY3 screen. Source
+`342dd5bc0fb2c7694dbc58a8d0f2d92689c24991`, archive SHA256
+`4a54ba28f3ee2add94e93dd052e4bda567d5e008691f84a098c21768b4fe11f3`, manifest SHA256
+`2b8ab6d238d6319ea73c4c5da0ecf815a3d2e2ea28932dddc30bd40afe158b01`, and schedule-file SHA256
+`f9aeccd95640a56fabe813796d0e1ce388cffa1bcccf2405a6bafcd913520832` are frozen. The three-node
+preflight passed at T3; canonical digest was identically
+`080b3170ca168dc3f237d22a4d18403eb2c0b0b2455e6d1e3ca876aae39c86a9`, including the exact
+4096-value gamma SHA `a2c459ec9438e23f863c44528ac093c5b93d891b6a8bec0278b873fe47f2459a`.
+All 15 bias tasks and all 1280 fresh measurement trajectories completed with no reuse and passed
+identity, SHA, algebra, and bitwise raw replay.
 
-The repaired source interprets the frozen exponent as exact `3/5`, uses platform-independent
-Decimal fifth-root arithmetic, self-checks gamma SHA
-`a2c459ec9438e23f863c44528ac093c5b93d891b6a8bec0278b873fe47f2459a`, and binds the complete
-schedule in three-node digest v2. It requires a fresh commit, archive, run ID, schedule, preflight,
-bias stage, and measurement stage. Even a passing screen can only emit
-`DIAGNOSTIC_SCREEN_PAIR_FOUND`; it cannot authorize formal tuning, held-out, or production.
+The verified terminal status is `UNRESOLVED_NO_HARD_COSET_PASS`, with `selected_pair=null` and
+terminal package identity SHA256
+`0e0fb2f950eb609c984b29f5647321694c82f8f7a6810609fd1742d1472a990a`. Each of
+`RC8-QC1/QC4/J08/J12/J16` passed 0/5 cells: all 25 method/cell summaries exceeded the absolute
+P-versus-U `q_top` difference limit, every U family had `Rhat>1.05` and bulk ESS<400, and
+`|delta q_top|` ranged from 0.06695 to 0.991999 against the 0.04 gate. `DT16/DT32/DT64` also
+passed 0/5: all 480 defect-trace chains had zero fixed-clock D=0 observations and zero complete
+leave-return excursions, so no conditional estimator existed. Thus both mechanisms failed within
+the frozen T3 budget `(burn 8192, measurement 32768)`; the terminal name follows the prescribed
+hard-coset-first decision order. This is a sampler-convergence failure within the tested algorithm
+and budget, not an infrastructure failure, mathematical impossibility, or formal physics result.
+
+A local conda-12 replay from the same verified archive independently revalidated every raw and
+reproduced the same gates and terminal status. The two reports differ only in 62 derived
+`core_seconds` values and 18 derived ESS values by at most 4 ULP (maximum absolute difference
+`1.82e-12`); raw replay remains exact. Completed metadata evidence and its fail-closed verifier are
+in `validation/011_q0_global_screen_diagnostic_20260721/completed_run_evidence/`. The predecessor
+`exp102_q0_screen_diagnostic_20260721_5e1f5aa` remains permanently archived as
+`CONFLICT_CROSS_NODE_GAMMA_LIBM`; none of its 15 bias raws was reused. There is still no
+`READY_FOR_FORMAL`, formal sampler, held-out campaign, `FROZEN_HELD_OUT_PASS`, or production
+authorization. The five explicit blockers remain `NO_T_VS_2T`, `NO_FRESH_HARD2_CONFIRMATION`,
+`NO_CONF17_RES6_GAP8_SMALL6`, `NO_TI_OR_REVIEWED_INDEPENDENT_ORACLE`, and `NO_HELD_OUT`.
 
 The reviewed successor to the exhausted PT-v2 and PA routes is now implemented under
 `exp102.q0_global.discovery.v1`; its frozen contract is `GLOBAL_DISCOVERY_CONTRACT.md` and its

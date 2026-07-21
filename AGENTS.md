@@ -17,7 +17,7 @@ publication/FSS。014 中的 scan v2 聚合只作历史审计；旧 259 tests �
 `data/expander_code/exp101/PHYSICS_CONTRACT.md`（唯一物理权威）、`status.md` 和
 `validation/README.md`。关键硬约束：
 
-**exp102 当前为 `Q=0 DIAGNOSTIC SCREEN RESTART PENDING / PRE-PILOT`，不是已有物理结果。** 正式历史契约仍为
+**exp102 当前为 `Q=0 DIAGNOSTIC SCREEN UNRESOLVED / PRE-PILOT`，不是已有物理结果。** 正式历史契约仍为
 `exp102.physics.v1 / exp102.q0_pt.v1 / exp102.scan.v1`。固定 Q32 + multi-swap PT-v2 已因 96 条轨迹
 认证往返总数为 0 而 `EXHAUSTED`；不得追加 S128、延长轮数或复用 raw。随后
 `exp102.q0_pa.discovery.v1` 的四个 transport autopsy 因条件 attempts<200 均为 `INCONCLUSIVE`，
@@ -39,16 +39,24 @@ runtime/preflight status=PASS。** 旧 combiner 对合法 exhausted report 抛�
 sampler raw 均不存在。
 
 用户随后批准了独立 `exp102.q0_global.screen_diagnostic.v1` 的 `HARD2+EASY3` 测试，最高权限仅为
-`DIAGNOSTIC_SCREEN_PAIR_FOUND`。首个 run `exp102_q0_screen_diagnostic_20260721_5e1f5aa` 已通过三节点
-preflight 并完成 15 个 bias raw，但 nd-0 在 measurement-control replay 发现 nd-1/nd-3 的旧
-`libm` fractional-power gamma schedule 有 1--2 ULP 差异，故以
-`CONFLICT_CROSS_NODE_GAMMA_LIBM` 在 1280 条 measurement 全部启动前关闭；这不是 sampler 收敛失败。
-修复后 `.6` 固定解释为精确 `3/5`，4096 项 Decimal schedule 的 versioned SHA 为
-`a2c459ec9438e23f863c44528ac093c5b93d891b6a8bec0278b873fe47f2459a`，必须运行时自检并进入
-三节点 digest v2。旧 run/bias 永不续跑或复用；只能用 fresh commit/archive/run/schedule 从 preflight
-与 bias 重来。接手先读 `GLOBAL_SCREEN_DIAGNOSTIC_CONTRACT.md`、`validation/011_*` 和 `status.md`。
+`DIAGNOSTIC_SCREEN_PAIR_FOUND`。修复后的 fresh run
+`exp102_q0_screen_diagnostic_20260721_342dd5b`（source `342dd5bc0fb2c7694dbc58a8d0f2d92689c24991`）
+已通过三节点 preflight/digest/runtime，选择 T3，并完整运行、逐位 replay 15/15 bias 与 1280/1280
+measurement raw（`reused=0`）。终态为 **`UNRESOLVED_NO_HARD_COSET_PASS`**、`selected_pair=null`：
+`RC8-QC1/QC4/J08/J12/J16` 和 `DT16/DT32/DT64` 均为 0/5。hard-coset 的 25/25 cell summaries
+均超过 P/U `q_top` 差的绝对 0.04 门槛，全部 U family 均 `Rhat>1.05` 且 ESS<400；480 条 defect-trace chains 的
+fixed-clock D=0 observation 与完整 excursion 均为 0。故这是冻结 T3 预算内的 sampler 收敛失败，
+不是基础设施失败、`IMPOSSIBLE` 或正式参数点结论；不得追加链长、改 gate 或直接进入 full-range。
 
-诊断通过后若要继续正式实验，仍须另立经审查的新科学契约与 fresh tuning/held-out，不得把重复计时、
+本地 conda-12 verified-archive replay 的 raw/state/label/counter 仍逐位一致，所有门禁与终态一致；仅
+62 个派生 `core_seconds` 和 18 个派生 ESS 跨平台相差最多 4 ULP。证据比较必须分别验证 report/package
+self-hash，并只对这两个白名单字段允许已审计的 4-ULP 上限，不能把整个 report 做 byte equality，
+更不能对 gamma/raw replay 使用 ULP 容差。4096 项 Decimal gamma 的 versioned SHA 仍固定为
+`a2c459ec9438e23f863c44528ac093c5b93d891b6a8bec0278b873fe47f2459a`；禁止恢复平台 `libm`
+fractional power。首个 `5e1f5aa` run 保持 `CONFLICT_CROSS_NODE_GAMMA_LIBM` 审计，15 个旧 bias raw
+永不复用。接手先读 `GLOBAL_SCREEN_DIAGNOSTIC_CONTRACT.md`、`validation/011_*` 和 `status.md`。
+
+若要继续正式实验，须另立经审查的新算法/科学契约与 fresh tuning/held-out，不得把重复 T3、延长链、
 删困难 disorder、缩范围或改窗口包装成原 discovery 成功。
 PT/PA/global discovery raw 均不得进入正式 merge/freezer。48-code registry 已冻结，但正式新
 sampler config、pilot、held-out 和 6144 个生产任务均不存在。生产 worker 必须看到

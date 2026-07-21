@@ -1,25 +1,86 @@
 # exp102 q=0 global sampler diagnostic screen
 
-Status: `CONFLICT_CROSS_NODE_GAMMA_LIBM` for immutable run
-`exp102_q0_screen_diagnostic_20260721_5e1f5aa`; portable remediation awaits a
-fresh remote run. The old run passed three-node preflight and produced all 15
-bias raws, but measurement-control replay found two platform-dependent gamma
-bit patterns and stopped. Therefore all 1280 measurement trajectories, report,
-decision, and terminal package are absent. This is not a sampler-convergence or
-physics result, and the old run must never continue.
+Status: `UNRESOLVED_NO_HARD_COSET_PASS` for completed immutable run
+`exp102_q0_screen_diagnostic_20260721_342dd5b`. The run completed normally;
+this is a frozen sampler-screen result, not an infrastructure failure.
 
-The repaired implementation interprets `.6` as exact `3/5`, generates the
-4096-value schedule with fixed-precision Decimal fifth-root arithmetic, freezes
-versioned gamma SHA
-`a2c459ec9438e23f863c44528ac093c5b93d891b6a8bec0278b873fe47f2459a`,
-and binds it into digest v2. The metadata-only old-run audit is under
-`failed_run_evidence/`; the 15 NPZ files remain ignored and retained locally and
-on the server. A new commit, archive, run ID, and schedule are mandatory.
+## Verified remediation run
 
-This workflow tests whether any hard-coset sampler and any defect-trace sampler
-mix on `HARD2+EASY3`. Its strongest possible result is
-`DIAGNOSTIC_SCREEN_PAIR_FOUND`; it cannot create formal-readiness, held-out, or
+- Source commit: `342dd5bc0fb2c7694dbc58a8d0f2d92689c24991`.
+- Archive SHA256: `4a54ba28f3ee2add94e93dd052e4bda567d5e008691f84a098c21768b4fe11f3`.
+- Source-manifest SHA256: `2b8ab6d238d6319ea73c4c5da0ecf815a3d2e2ea28932dddc30bd40afe158b01`
+  with 854 files.
+- Schedule file/identity SHA256:
+  `f9aeccd95640a56fabe813796d0e1ce388cffa1bcccf2405a6bafcd913520832` /
+  `cd09b4701d54b061f59db5ce50df191edac0b23da62e411ccc5a597400426cb9`.
+- Three-node canonical digest:
+  `080b3170ca168dc3f237d22a4d18403eb2c0b0b2455e6d1e3ca876aae39c86a9`.
+- Portable 4096-value gamma SHA256:
+  `a2c459ec9438e23f863c44528ac093c5b93d891b6a8bec0278b873fe47f2459a`.
+- Selected resource tier: T3 (`burn=8192`, `measurement=32768`).
+- Completed raw: 15/15 bias and 1280/1280 measurement trajectories, with
+  `reused=0`, seven exclusive node SUCCESS markers, and complete raw replay.
+- Terminal package file/identity SHA256:
+  `83155d17e54fa2597ba8bce48ac99a8667a3dfc4296589a93e89dcc0cfd5cae7` /
+  `0e0fb2f950eb609c984b29f5647321694c82f8f7a6810609fd1742d1472a990a`.
+
+## Screen outcome
+
+| mechanism | methods | passed cells | frozen failure |
+|---|---|---:|---|
+| hard coset | `RC8-QC1/QC4/J08/J12/J16` | each `0/5` | P/U initialization, D2, and family gates |
+| defect trace | `DT16/DT32/DT64` | each `0/5` | no fixed-clock D=0 observations |
+
+All 25 hard-coset method/cell summaries fail P/U `q_top` and D2 consistency;
+23/25 also fail normalized-weight consistency. Every U family has `Rhat>1.05`
+and bulk ESS below 400. The observed P/U `|delta q_top|` spans
+`0.06695..0.991999`, versus the frozen 0.04 limit. QC4 is closest on every
+cell but still fails, including `delta q_top=0.91815` on `m08_c06,p=.04`.
+
+All 480 defect-trace measurement chains have `d0_count=0` and zero complete
+leave-return excursions. Thus no D=0 conditional estimate or D0 ESS exists;
+342/480 chains also exceed the 0.10 Dmax-boundary occupancy gate. All 75
+cross-mechanism comparisons are consequently invalid. The prescribed decision
+order names the terminal state `UNRESOLVED_NO_HARD_COSET_PASS`, although neither
+mechanism produced a passing method. This means unresolved within these
+algorithms and the T3 budget; it does not mean `IMPOSSIBLE` or establish a
+formal physical failure at any parameter point.
+
+## Independent evidence audit
+
+The complete 485 MiB raw tree is retained locally and in the remote `runs/`
+backup but is not committed. `completed_run_evidence/` contains controls,
+preflight/stage metadata, all four node raw manifests, a 1295-entry raw SHA
+manifest, the driver log, original terminal artifacts, an independent local
+verified-archive replay, and a fail-closed verifier. The replay again validates
+every raw bit-for-bit and reproduces every gate and terminal field. Its report
+differs only in 62 derived `core_seconds` and 18 derived ESS values by at most
+4 ULP (maximum absolute difference `1.82e-12`); the corresponding self-hashes
+are independently valid. Run:
+
+```bash
+conda run -n 12 --no-capture-output python \
+  data/expander_code/exp102/validation/011_q0_global_screen_diagnostic_20260721/completed_run_evidence/verify_evidence.py
+```
+
+The completed evidence closure manifest has SHA256
+`7e01c730a13cd0b20df2080aacf25d46a6b2fad42350a0398c3130d0ffe93c96`.
+
+The terminal decision has `selected_pair=null`, `formal_authorization=false`,
+and `production_authorization=false`. Its remaining blockers are
+`NO_T_VS_2T`, `NO_FRESH_HARD2_CONFIRMATION`,
+`NO_CONF17_RES6_GAP8_SMALL6`, `NO_TI_OR_REVIEWED_INDEPENDENT_ORACLE`, and
+`NO_HELD_OUT`. This workflow can never create formal-readiness, held-out, or
 production authority.
+
+## Predecessor conflict
+
+The first immutable run `exp102_q0_screen_diagnostic_20260721_5e1f5aa`
+remains closed as `CONFLICT_CROSS_NODE_GAMMA_LIBM`: it completed 15 bias raws
+but stopped before all 1280 measurement trajectories. None of those raws was
+reused. Its metadata-only audit remains under `failed_run_evidence/`. The fresh
+run above uses exact `3/5` Decimal fifth-root arithmetic and digest v2; platform
+`libm` fractional power must not be restored.
 
 ## Frozen scope
 

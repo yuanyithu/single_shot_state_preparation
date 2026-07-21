@@ -1,0 +1,49 @@
+bash: warning: setlocale: LC_ALL: cannot change locale (C.UTF-8)
+bash: warning: setlocale: LC_ALL: cannot change locale (C.UTF-8)
+/usr/bin/bash: warning: setlocale: LC_ALL: cannot change locale (C.UTF-8)
+{"deadlines_unix": {"analysis": 1784736475.2073057, "bias": 1784693275.2073057, "measurement": 1784729275.2073057, "preflight": 1784678875.2073057}, "output": "/home/DATA1/users/yuany/.single_shot/runs/exp102_q0_screen_diagnostic_20260721_342dd5b/control/SCREEN_DIAGNOSTIC_24H_SCHEDULE.json", "schedule_file_sha256": "f9aeccd95640a56fabe813796d0e1ce388cffa1bcccf2405a6bafcd913520832", "schedule_sha256": "cd09b4701d54b061f59db5ce50df191edac0b23da62e411ccc5a597400426cb9", "started_unix": 1784650075.2073057, "status": "FROZEN_24H_DIAGNOSTIC"}
+bash: warning: setlocale: LC_ALL: cannot change locale (C.UTF-8)
+/usr/bin/bash: warning: setlocale: LC_ALL: cannot change locale (C.UTF-8)
+bash: warning: setlocale: LC_ALL: cannot change locale (C.UTF-8)
+/bin/sh: warning: setlocale: LC_ALL: cannot change locale (C.UTF-8)
+launched node=nd-1 screen=exp102_sd_e3887d73_pre_32884c4f_nd-1
+bash: warning: setlocale: LC_ALL: cannot change locale (C.UTF-8)
+/bin/sh: warning: setlocale: LC_ALL: cannot change locale (C.UTF-8)
+launched node=nd-2 screen=exp102_sd_e3887d73_pre_32884c4f_nd-2
+launched node=nd-3 screen=exp102_sd_e3887d73_pre_32884c4f_nd-3
+nd-1=RUNNING nd-2=RUNNING nd-3=MISSING
+nd-1=RUNNING nd-2=RUNNING nd-3=RUNNING
+nd-1=SUCCESS nd-2=SUCCESS nd-3=RUNNING
+nd-1=SUCCESS nd-2=SUCCESS nd-3=SUCCESS
+{"canonical_digest": "080b3170ca168dc3f237d22a4d18403eb2c0b0b2455e6d1e3ca876aae39c86a9", "report": "/home/DATA1/users/yuany/.single_shot/runs/exp102_q0_screen_diagnostic_20260721_342dd5b/control/screen_preflight_report.json", "selected_resource_tier": "T3", "status": "PASS"}
+bash: warning: setlocale: LC_ALL: cannot change locale (C.UTF-8)
+/usr/bin/bash: warning: setlocale: LC_ALL: cannot change locale (C.UTF-8)
+{"kind": "bias", "output": "/home/DATA1/users/yuany/.single_shot/runs/exp102_q0_screen_diagnostic_20260721_342dd5b/control/screen_bias_input.json", "resource_tier": "T3", "sha256": "5661ba2d718c70f730355433fe1fe7f8a25e0d849e5d40575bd071c168621837", "task_count": 15}
+bash: warning: setlocale: LC_ALL: cannot change locale (C.UTF-8)
+/usr/bin/bash: warning: setlocale: LC_ALL: cannot change locale (C.UTF-8)
+nd-1_load1=0.00 nd-3_load1=0.85
+bash: warning: setlocale: LC_ALL: cannot change locale (C.UTF-8)
+/bin/sh: warning: setlocale: LC_ALL: cannot change locale (C.UTF-8)
+launched node=nd-1 workers=75 screen=exp102_sd_e3887d73_bias_5661ba2d_nd-1
+launched node=nd-3 workers=91 screen=exp102_sd_e3887d73_bias_5661ba2d_nd-3
+nd-1=RUNNING nd-3=MISSING
+nd-1=RUNNING nd-3=RUNNING
+nd-1=SUCCESS nd-3=RUNNING
+nd-1=SUCCESS nd-3=SUCCESS
+{"control": "/home/DATA1/users/yuany/.single_shot/runs/exp102_q0_screen_diagnostic_20260721_342dd5b/control/screen_bias_5661ba2d718c.json", "control_sha256": "5661ba2d718c70f730355433fe1fe7f8a25e0d849e5d40575bd071c168621837", "evidence": "/home/DATA1/users/yuany/.single_shot/runs/exp102_q0_screen_diagnostic_20260721_342dd5b/control/screen_bias_evidence_5661ba2d718c.json", "evidence_sha256": "5ecfce4eeb888ad3a50ef317d3bd006b1b6e54c717138b6ed77a26266f3056c7", "loads": {"nd-1": [0.0, 0.19, 0.21], "nd-3": [0.85, 0.87, 0.53]}, "nodes": ["nd-1", "nd-3"], "ownership": "/home/DATA1/users/yuany/.single_shot/runs/exp102_q0_screen_diagnostic_20260721_342dd5b/control/screen_ownership_5661ba2d718c.json", "ownership_sha256": "7264d2753bf251919f20bea37de6fdb7be9098448b2b0430d07dcae97cd8744f", "predicted_wall_seconds_with_safety_factor_2": 0.6334337193788175, "runtime_report_sha256": "5776a8c309b8599e2abeff930e46fd60a6f89dfe5e403c1e753e0a4e030d3cd7", "stage": "bias", "stage_fingerprint": "a0933e485c0337c9633d7afe6b4afffbae78ce6ae67b43e9e437f8c87641f9d4", "status": "SUCCESS"}
+{"kind": "measurement", "output": "/home/DATA1/users/yuany/.single_shot/runs/exp102_q0_screen_diagnostic_20260721_342dd5b/control/screen_measurement_input.json", "resource_tier": "T3", "sha256": "16d19159c05766ed229be8b451ed71f0cae61b26d7bc024d3fcde84c171b4c9b", "task_count": 1280}
+bash: warning: setlocale: LC_ALL: cannot change locale (C.UTF-8)
+/usr/bin/bash: warning: setlocale: LC_ALL: cannot change locale (C.UTF-8)
+nd-1_load1=0.09 nd-3_load1=1.06
+bash: warning: setlocale: LC_ALL: cannot change locale (C.UTF-8)
+/bin/sh: warning: setlocale: LC_ALL: cannot change locale (C.UTF-8)
+launched node=nd-1 workers=75 screen=exp102_sd_e3887d73_measurement_16d19159_nd-1
+launched node=nd-3 workers=91 screen=exp102_sd_e3887d73_measurement_16d19159_nd-3
+nd-1=RUNNING nd-3=MISSING
+nd-1=RUNNING nd-3=RUNNING
+nd-1=SUCCESS nd-3=RUNNING
+nd-1=SUCCESS nd-3=SUCCESS
+{"control": "/home/DATA1/users/yuany/.single_shot/runs/exp102_q0_screen_diagnostic_20260721_342dd5b/control/screen_measurement_16d19159c057.json", "control_sha256": "16d19159c05766ed229be8b451ed71f0cae61b26d7bc024d3fcde84c171b4c9b", "evidence": "/home/DATA1/users/yuany/.single_shot/runs/exp102_q0_screen_diagnostic_20260721_342dd5b/control/screen_measurement_evidence_16d19159c057.json", "evidence_sha256": "f682c42306b367891cc63965c6b6fe5c069990e5f0302156cf6276b5189143b8", "loads": {"nd-1": [0.09, 0.2, 0.21], "nd-3": [1.06, 0.99, 0.61]}, "nodes": ["nd-1", "nd-3"], "ownership": "/home/DATA1/users/yuany/.single_shot/runs/exp102_q0_screen_diagnostic_20260721_342dd5b/control/screen_ownership_16d19159c057.json", "ownership_sha256": "31f9b49c3b301f21de92f779490e39cfc0d9b0d37bb6432d36bbef69c5b9d2f3", "predicted_wall_seconds_with_safety_factor_2": 1075.8645068735175, "runtime_report_sha256": "5776a8c309b8599e2abeff930e46fd60a6f89dfe5e403c1e753e0a4e030d3cd7", "stage": "measurement", "stage_fingerprint": "e89ec6bfbb5cc3d90bcfdd4f836ac3914c079ff22ea0ab3970ebdfad740224d5", "status": "SUCCESS"}
+{"decision": "/home/DATA1/users/yuany/.single_shot/runs/exp102_q0_screen_diagnostic_20260721_342dd5b/control/screen_decision.json", "package": "/home/DATA1/users/yuany/.single_shot/runs/exp102_q0_screen_diagnostic_20260721_342dd5b/control/screen_terminal_package.json", "package_sha256": "0e0fb2f950eb609c984b29f5647321694c82f8f7a6810609fd1742d1472a990a", "report": "/home/DATA1/users/yuany/.single_shot/runs/exp102_q0_screen_diagnostic_20260721_342dd5b/control/screen_report.json", "selected_pair": null, "status": "UNRESOLVED_NO_HARD_COSET_PASS"}
+SCREEN_DRIVER_COMPLETE
+SCREEN_DRIVER_EXIT status=0 unix=1784653573
