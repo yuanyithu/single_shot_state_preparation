@@ -240,6 +240,21 @@ def test_three_node_runtime_and_digest_consensus_are_fail_closed(
     digest_consensus = cross.combine_digest_reports(digest_paths)
     assert runtime_consensus["status"] == "PASS"
     assert digest_consensus["status"] == "PASS"
+
+    exhausted = json.loads(runtime_paths["nd-3"].read_text(encoding="ascii"))
+    exhausted["ti_anchor_projection"]["pass"] = False
+    exhausted["checks"]["ti_anchor_fits_confirmation_window"] = False
+    exhausted["status"] = "RUNTIME_EXHAUSTED"
+    atomic_json(runtime_paths["nd-3"], exhausted)
+    exhausted_path = tmp_path / "runtime_consensus_exhausted.json"
+    runtime_consensus = benchmark.combine_runtime_reports(
+        runtime_paths, exhausted_path,
+    )
+    assert runtime_consensus["status"] == "RUNTIME_EXHAUSTED"
+    assert runtime_consensus["selected_resource_tier"] == "T3"
+    assert not runtime_consensus["ti_anchor_projection"]["pass"]
+    assert json.loads(exhausted_path.read_text(encoding="ascii")) == runtime_consensus
+
     tampered = json.loads(runtime_paths["nd-3"].read_text(encoding="ascii"))
     tampered["source_identity"]["archive_sha256"] = "c" * 64
     atomic_json(runtime_paths["nd-3"], tampered)

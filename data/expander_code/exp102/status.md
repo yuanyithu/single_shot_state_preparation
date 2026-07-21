@@ -1,6 +1,6 @@
 # exp102 status
 
-**GLOBAL-SAMPLING DISCOVERY PREFLIGHT REPAIR / PRE-RUN — formal pilot blocked, production not started**
+**Q=0 GLOBAL DISCOVERY RUNTIME_EXHAUSTED / PRE-PILOT — formal pilot blocked, production not started**
 
 The reviewed successor to the exhausted PT-v2 and PA routes is now implemented under
 `exp102.q0_global.discovery.v1`; its frozen contract is `GLOBAL_DISCOVERY_CONTRACT.md` and its
@@ -10,24 +10,34 @@ joint stabilizer-logical block heatbath, an independent fixed-clock defect-trace
 full-sector TI anchors for m3, exact small-code oracles, three-node digest/runtime consensus,
 immutable 72-hour controls, and an independently replayed character-U-statistic analyzer.
 
-This is an implementation state, not a discovery result. The first immutable clean-source attempt,
-`exp102_q0_global_20260721_6f26fd5`, failed its Linux preflight before any runtime/digest/WMC report
-or sampler raw was accepted. The archived evidence and repair audit are in
-`validation/008_q0_global_preflight_portability_20260721/`; its FAILED markers are permanent. The
-repair makes archive provenance explicit, removes source-tree test writes, fixes the optional
-BP-LSD cross-check, warms the TI timing probe, canonicalizes verifier cache paths, and reverifies
-source identity after every worker.
-A second immutable attempt, `exp102_q0_global_20260721_c6c26b9`, then exposed a volatile live
-runtime assertion inside the regression suite. A same-node persisted postmortem passed T3; the
-repair leaves every real runtime/TI threshold unchanged and reserves machine qualification for
-the dedicated three-node consensus. Evidence is in
-`validation/009_q0_global_runtime_gate_separation_20260721/`. A fresh
-commit/deployment/run/schedule is required. No screen, method freeze, HARD2 fresh run, confirmation,
-resolution, or TI anchor has completed; therefore there is no `READY_FOR_FORMAL`, no new formal
-sampler, and no `FROZEN_HELD_OUT_PASS`. The old PT/PA
-raw remains barred from this workflow and from formal merge/freezer/production. A successful
-global discovery could only authorize a later fresh tuning and held-out campaign; it could not
-authorize the 6144 production tasks directly.
+The third immutable clean-source attempt, `exp102_q0_global_20260721_204b37d`, is the terminal
+execution of this discovery contract. Source `204b37d8e00e7d11ffa2b6766b90d947892e179d`, archive
+SHA256 `1583dce6b8bb81ad7780f323d21300b158ad435d710f3c0226b7b3028b8eb7f7`, manifest SHA256
+`b69290798a11a3bf548483c6e223f96a64e0d9c7be0e48b89fa6e54a28a57ea3`, and schedule-file SHA256
+`7874a0d967ba866d8834cf380b408947af614bdf3bec7b50c0f30fb4a332465c` are frozen. The local clean
+archive passed 590 combined exp102+exp101 tests and post-test source reverification. All three
+Linux workers completed with exclusive SUCCESS markers; their canonical digest was identically
+`a3730d7380575976f88e35f5490b24a9b6949e3817b2fb3880775736cf2ad364`. WMC returned six
+`INCONCLUSIVE_WIDTH` diagnostics.
+
+Every hard-coset and defect-trace candidate was T3-eligible, with factor-two complete-schedule
+projections of 1.307/2.441/2.055 hours on nd-1/2/3. The mandatory m3 full-sector-TI contingency,
+however, projected to 78,705/116,275/251,241 seconds against the frozen 79,200-second window.
+nd-2 and nd-3 therefore correctly reported `RUNTIME_EXHAUSTED`; worst-node consensus stops the
+workflow before bias tuning or screen. No sampler raw, method freeze, HARD2 fresh run,
+confirmation, resolution, or TI anchor exists. Evidence and an independent verifier are in
+`validation/010_q0_global_runtime_exhausted_20260721/`. The combiner audit now persists this legal
+terminal status instead of throwing, while every downstream stage still requires aggregate PASS;
+the run was not retried and no threshold, safety factor, tier, or deadline changed.
+
+The full-range conclusion is `UNRESOLVED_WITHIN_ALGORITHM_AND_72H_BUDGET`, not `IMPOSSIBLE` and not
+a parameter-specific physical failure. The two preceding infrastructure-only preflights remain
+permanently archived in `validation/008_q0_global_preflight_portability_20260721/` and
+`validation/009_q0_global_runtime_gate_separation_20260721/`. There is no `READY_FOR_FORMAL`, new
+formal sampler, held-out campaign, `FROZEN_HELD_OUT_PASS`, or production authorization. PT/PA/global
+discovery raw remains barred from formal merge/freezer/production. Any later reduced range or new
+global campaign requires a separately reviewed scientific contract and fresh tuning/held-out; it
+cannot be presented as completion of this discovery.
 
 The reviewed successor to the exhausted PT-v2 route was executed under the isolated
 `exp102.q0_pa.discovery.v1` contract. Worker source

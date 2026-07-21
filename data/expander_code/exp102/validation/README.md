@@ -28,8 +28,9 @@ Current status is pre-pilot, not scientific certification.
   defect trace, exact HGP/WMC oracles, no-pickle raw replay, character/D2 gates, m3 full-sector TI
   anchors, three-node preflight/runtime/digest consensus, immutable stage ownership, 72-hour
   schedule, postselection/control freezes, and fail-closed readiness. Local implementation tests
-  pass; the first remote preflight failed before sampler work and is superseded by the portability
-  repair below. No discovery stage has completed, so this directory contains no physics result.
+  pass; three immutable preflight attempts are audited below. The final attempt stopped at the
+  frozen runtime gate before sampler work. No discovery stage completed, so this directory
+  contains no physics result.
 - `008_q0_global_preflight_portability_20260721/`: immutable evidence from the failed first global
   preflight plus its repair. It fixes archive git provenance, deterministic legacy-section testing,
   source-tree writes by the spec example test, cold-JIT TI projection, and post-worker source
@@ -39,4 +40,10 @@ Current status is pre-pilot, not scientific certification.
   the deterministic regression suite before the persisted three-node runtime gate. Tests now
   validate live-report self-consistency while the unchanged dedicated consensus alone decides
   machine eligibility. The same-node postmortem passed T3; no sampler task ran.
+- `010_q0_global_runtime_exhausted_20260721/`: immutable evidence from the third clean preflight.
+  All node workers and canonical digests passed and all hard/defect methods fit T3, but the
+  required full-sector-TI contingency exceeded its frozen 79,200-second window on nd-2 and nd-3.
+  The discovery therefore closes before screen as
+  `UNRESOLVED_WITHIN_ALGORITHM_AND_72H_BUDGET`; no sampler raw or physics result exists. The audit
+  repair persists this legal aggregate terminal status without weakening any downstream gate.
 - Held-out and production evidence do not exist. Their absence is an active production blocker.

@@ -1,0 +1,20 @@
+........................................................................ [ 12%]
+........................................................................ [ 24%]
+.................................................................sss.... [ 36%]
+........................................................................ [ 48%]
+........................................................................ [ 61%]
+........................................................................ [ 73%]
+........................................................................ [ 85%]
+........................................................................ [ 97%]
+..............                                                           [100%]
+=============================== warnings summary ===============================
+data/expander_code/exp101/tests/test_run_scan.py::TestScanEndToEnd::test_alias_is_canonical_before_seed_and_manifest
+  /home/DATA1/users/yuany/.single_shot/repos/exp102_q0_global_20260721_204b37d/source/data/expander_code/exp101/src/run_scan.py:1049: DeprecationWarning: ensemble 'paper_true_posterior' is deprecated; use 'true_posterior'
+    canonical_ensemble = normalize_ensemble(ensemble)
+
+data/expander_code/exp101/tests/test_run_scan.py::TestScanEndToEnd::test_alias_is_canonical_before_seed_and_manifest
+  /home/DATA1/users/yuany/.single_shot/repos/exp102_q0_global_20260721_204b37d/source/data/expander_code/exp101/src/run_scan.py:1049: DeprecationWarning: ensemble 'repo_compat' is deprecated; use 'legacy_delta_only'
+    canonical_ensemble = normalize_ensemble(ensemble)
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+587 passed, 3 skipped, 2 warnings in 565.64s (0:09:25)

@@ -360,10 +360,26 @@ def combine_runtime_reports(report_paths, output_path=None):
         first.get("discovery_config_sha256"),
     )
     source_identity = first.get("source_identity")
+    check_names = {
+        "at_least_T1_fits", "hard_method_available",
+        "defect_method_available", "all_numeric_finite",
+        "ti_anchor_fits_confirmation_window",
+    }
     for node, report in reports.items():
+        checks = report.get("checks")
+        checks_valid = (
+            isinstance(checks, dict)
+            and set(checks) == check_names
+            and all(isinstance(value, bool) for value in checks.values())
+        )
+        expected_status = (
+            "PASS" if checks_valid and all(checks.values())
+            else "RUNTIME_EXHAUSTED"
+        )
         if (report.get("benchmark_version") != "exp102.q0_global.runtime.v1"
                 or report.get("node") != node
-                or report.get("status") != "PASS"
+                or not checks_valid
+                or report.get("status") != expected_status
                 or report.get("environment", {}).get("system") != "Linux"
                 or (report.get("source_commit"), report.get("registry_sha256"),
                     report.get("discovery_config_sha256")) != axes
@@ -373,8 +389,10 @@ def combine_runtime_reports(report_paths, output_path=None):
                 or source_identity.get("source_commit") != axes[0]
                 or not np.isfinite(float(report.get("completed_unix", np.nan)))):
             raise ValueError(f"runtime report is not verified consensus evidence: {node}")
-        if not report.get("ti_anchor_projection", {}).get("pass"):
-            raise ValueError(f"TI anchor runtime projection failed: {node}")
+        if (not checks["all_numeric_finite"]
+                or report.get("ti_anchor_projection", {}).get("pass")
+                is not checks["ti_anchor_fits_confirmation_window"]):
+            raise ValueError(f"runtime report has invalid numeric/check evidence: {node}")
     projections = []
     common_by_tier = {}
     for tier in RESOURCE_TIERS:
@@ -432,6 +450,11 @@ def combine_runtime_reports(report_paths, output_path=None):
         common_by_tier[tier] = common
     passing_tiers = [value for value in projections if value["pass"]]
     selected = passing_tiers[-1]["resource_tier"] if passing_tiers else None
+    ti_pass = all(
+        report["ti_anchor_projection"]["pass"] for report in reports.values()
+    )
+    all_nodes_pass = all(report["status"] == "PASS" for report in reports.values())
+    consensus_pass = selected is not None and ti_pass and all_nodes_pass
     result = {
         "benchmark_version": "exp102.q0_global.runtime_consensus.v1",
         "source_commit": axes[0],
@@ -466,13 +489,13 @@ def combine_runtime_reports(report_paths, output_path=None):
                     "factor_two_stage_seconds_two_node_contingency"
                 ]) for report in reports.values()
             ),
-            "pass": True,
+            "pass": bool(ti_pass),
         },
         "selected_resource_tier": selected,
         "selected_eligible_methods": (
             [] if selected is None else common_by_tier[selected]
         ),
-        "status": "PASS" if selected is not None else "RUNTIME_EXHAUSTED",
+        "status": "PASS" if consensus_pass else "RUNTIME_EXHAUSTED",
     }
     if output_path is not None:
         atomic_json(output_path, result)

@@ -188,7 +188,7 @@ def main(argv=None):
         raise TimeoutError("preflight completed after the frozen eight-hour deadline")
     report = {
         "report_version": "exp102.q0_global.preflight.v1",
-        "status": "PASS",
+        "status": runtime["status"],
         **identity,
         "schedule_sha256": schedule["schedule_sha256"],
         "node_report_sha256": {

@@ -1,0 +1,4 @@
+bash: warning: setlocale: LC_ALL: cannot change locale (C.UTF-8)
+bash: warning: setlocale: LC_ALL: cannot change locale (C.UTF-8)
+/usr/bin/bash: warning: setlocale: LC_ALL: cannot change locale (C.UTF-8)
+{"node": "nd-1", "status": "PASS", "wall_seconds": 282.2105886936188}

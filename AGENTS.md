@@ -17,30 +17,31 @@ publication/FSS。014 中的 scan v2 聚合只作历史审计；旧 259 tests �
 `data/expander_code/exp101/PHYSICS_CONTRACT.md`（唯一物理权威）、`status.md` 和
 `validation/README.md`。关键硬约束：
 
-**exp102 当前为 `GLOBAL-SAMPLING DISCOVERY PREFLIGHT REPAIR / PRE-RUN`，不是已有物理结果。** 正式历史契约仍为
-`exp102.physics.v1 / exp102.q0_pt.v1 / exp102.scan.v1`。2026-07-20 的固定 Q32 + multi-swap PT-v2
-discovery 已因 96 条实例轨迹认证往返总数为 0 而 `EXHAUSTED`；不得追加 S128、延长轮数或复用
-其 raw。随后 `exp102.q0_pa.discovery.v1` 的三节点 digest、Linux runtime、四任务 PT transport
-autopsy 和 64-task PA hard screen 已全部完成：四个 autopsy 均因所需条件 attempts<200 而
-`INCONCLUSIVE`；`C192-2/B96-1/B192-1/B96-2` 全部在两个 hard cells 上因 genealogy 灾难性塌缩
-失败（median family ESS≈1、distinct families=1--2）。按冻结零通过分支，PA 同样 `EXHAUSTED`，
-禁止 B384-2 rescue，confirmation/resolution manifests 未创建，也没有 `READY_FOR_FORMAL`。
-新的 `exp102.q0_global.discovery.v1` 已实现低权重 logical catalog、hard-coset cluster/joint
-heatbath、独立 defect trace、m3 full-sector TI、三节点 digest/runtime、72h schedule 与 control freeze，
-首个 immutable run `exp102_q0_global_20260721_6f26fd5` 已在 Linux preflight 阶段因 archive
-provenance、可选 BP-LSD cross-check、测试写 source tree 与 cold-JIT TI projection 问题永久 FAILED；
-没有产生合格 runtime/digest/WMC 或 sampler raw，不得删 marker 原地复跑。修复证据见
-`validation/008_q0_global_preflight_portability_20260721/`，必须用 fresh commit/deployment/run/schedule。
-第二个 immutable run `exp102_q0_global_20260721_c6c26b9` 又因 regression 内的 live TI runtime
-断言在 22h 边界波动而永久 FAILED；同节点持久化 postmortem 为 T3 PASS，证据见
-`validation/009_q0_global_runtime_gate_separation_20260721/`。机器 runtime 资格只能由专用三节点
-persisted consensus 判定，单元测试只验报告自洽；真实门槛、安全系数和 deadline 均未降低。
-screen/HARD2/confirmation/resolution/TI 尚未运行，因此仍没有新物理结果。
-接手必须先读 `GLOBAL_DISCOVERY_CONTRACT.md`；不得在运行前改 panels/gates/T/2T/bias 规则，也不得把
-实现完成写成 `READY_FOR_FORMAL`。即使 discovery 全过，也只能另建正式 tuning/held-out 契约，不能
-直接启动 production。PT/PA/global discovery raw 均不得进入正式 merge/freezer。48-code registry
-已冻结，但正式新 sampler config、pilot、held-out 和 6144 个生产任务均不存在。生产 worker 必须看到 `FROZEN_HELD_OUT_PASS` 才会
-启动，禁止手工绕过；
+**exp102 当前为 `Q=0 GLOBAL DISCOVERY RUNTIME_EXHAUSTED / PRE-PILOT`，不是已有物理结果。** 正式历史契约仍为
+`exp102.physics.v1 / exp102.q0_pt.v1 / exp102.scan.v1`。固定 Q32 + multi-swap PT-v2 已因 96 条轨迹
+认证往返总数为 0 而 `EXHAUSTED`；不得追加 S128、延长轮数或复用 raw。随后
+`exp102.q0_pa.discovery.v1` 的四个 transport autopsy 因条件 attempts<200 均为 `INCONCLUSIVE`，
+`C192-2/B96-1/B192-1/B96-2` 又在两个 hard cells 上因 genealogy 塌缩全部失败；PA 零通过分支同样
+`EXHAUSTED`，禁止 B384-2 rescue。
+
+`exp102.q0_global.discovery.v1` 已实现 logical catalog、hard-coset cluster/joint heatbath、独立
+defect trace、m3 full-sector TI、三节点 digest/runtime、72h schedule 与 control freeze。其第三个且
+终止性的 immutable run `exp102_q0_global_20260721_204b37d`（source
+`204b37d8e00e7d11ffa2b6766b90d947892e179d`）三节点 worker 与 canonical digest 全过，所有 hard/defect
+候选也都可用 T3；但必需的 TI contingency 在 nd-2/nd-3 投影为 116275/251241 秒，超过冻结的
+79200 秒窗口，故专用 worst-node consensus 为 `RUNTIME_EXHAUSTED`，在 bias/screen 前终止。**节点
+worker 的 SUCCESS 只表示测试与报告生成成功，不等于 preflight PASS；后续 stage 必须看到 aggregate
+runtime/preflight status=PASS。** 旧 combiner 对合法 exhausted report 抛异常的问题已修为持久化
+`RUNTIME_EXHAUSTED`，但下游 PASS 门槛未变。完整证据见
+`validation/010_q0_global_runtime_exhausted_20260721/`；前两次基础设施失败审计见 008/009，不得原地
+重跑。当前全范围结论只能是 `UNRESOLVED_WITHIN_ALGORITHM_AND_72H_BUDGET`，不能写 `IMPOSSIBLE`，
+也不能外推为某个参数点的物理失败。screen/HARD2/confirmation/resolution/TI sampler raw 均不存在。
+
+接手先读 `GLOBAL_DISCOVERY_CONTRACT.md`；若要继续，须另立经审查的新科学契约与 fresh
+tuning/held-out，不得把重复计时、删困难 disorder、缩范围或改窗口包装成原 discovery 成功。
+PT/PA/global discovery raw 均不得进入正式 merge/freezer。48-code registry 已冻结，但正式新
+sampler config、pilot、held-out 和 6144 个生产任务均不存在。生产 worker 必须看到
+`FROZEN_HELD_OUT_PASS` 才会启动，禁止手工绕过；
 正式读取只用 `load_exp102_publication_q_top`，不得交给 exp101 loader。接手 exp102 先读该目录的
 `EXPERIMENT_CONTRACT.md`、`GLOBAL_DISCOVERY_CONTRACT.md` 与 `status.md`。
 

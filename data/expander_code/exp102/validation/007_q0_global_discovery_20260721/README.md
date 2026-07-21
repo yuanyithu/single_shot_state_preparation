@@ -1,11 +1,14 @@
 # exp102 q=0 global-sampling discovery
 
-Status: `IMPLEMENTED / FRESH PREFLIGHT PENDING`. The first immutable remote
-attempts failed before sampler work and are permanently closed; see
+Status: `IMPLEMENTED / REMOTE PREFLIGHT RUNTIME_EXHAUSTED`. The first two
+immutable remote attempts failed before sampler work and are permanently closed; see
 `../008_q0_global_preflight_portability_20260721/` and
-`../009_q0_global_runtime_gate_separation_20260721/`. This directory does not
-contain a three-node discovery result and does not establish
-`READY_FOR_FORMAL`.
+`../009_q0_global_runtime_gate_separation_20260721/`. The third clean attempt
+completed all three node workers and canonical digest checks, but nd-2 and nd-3
+failed the frozen full-sector-TI runtime window; see
+`../010_q0_global_runtime_exhausted_20260721/`. The discovery is closed before
+screening as `UNRESOLVED_WITHIN_ALGORITHM_AND_72H_BUDGET`. This directory does
+not establish `READY_FOR_FORMAL`.
 
 ## Frozen scope
 
@@ -69,7 +72,8 @@ freezes, parallel analyzer replay, TI comparison, and readiness.
 2. Copy that deployment to `~/.single_shot/repos/<run>/` on nd-0, freeze
    `GLOBAL_72H_SCHEDULE.json` immediately, and never replace it.
 3. Run `orchestrate_global_preflight.py`; require all three Linux test suites,
-   runtime consensus, digest consensus, and the bounded WMC report.
+   runtime consensus, digest consensus, and the bounded WMC report. The executed
+   attempt stopped here with aggregate `RUNTIME_EXHAUSTED`.
 4. Run every runtime-eligible bias and measurement candidate on
    `HARD2+EASY3`, verify remote evidence, and analyze all raw.
 5. Before hour 20, freeze selection, postselection plan, bias/TI controls, and
