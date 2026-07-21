@@ -17,6 +17,7 @@ from data.expander_code.exp102.exp102_pipeline.transport_autopsy import (
     AUTOPSY_RAW_VERSION,
     AUTOPSY_VERSION,
     PARENT_SOURCE_COMMIT,
+    PARENT_TRANSPORT_CONTROL,
     _run_trace_instance,
     classify_transport,
     load_autopsy_config,
@@ -52,6 +53,12 @@ def test_autopsy_config_binds_exact_four_parent_raw_identities():
     ]
     assert all(len(row["parent_raw_sha256"]) == 64 for row in config["parents"])
     assert all(len(row["instance_seeds"]) == 4 for row in config["parents"])
+    assert all(
+        row["parent_relative_path"].startswith(
+            f"transport/{PARENT_TRANSPORT_CONTROL}/nd-"
+        )
+        for row in config["parents"]
+    )
 
 
 def test_trace_instrumentation_consumes_no_randomness_and_replays_pt_core():

@@ -40,6 +40,7 @@ AUTOPSY_TASKS_VERSION = "exp102.transport_autopsy.tasks.v1"
 AUTOPSY_NODE_CAPACITY = {"nd-1": 75, "nd-2": 75, "nd-3": 91}
 PARENT_SOURCE_COMMIT = "da69528b43f4a9d1635083c21d713ba63ccec4ab"
 PARENT_RUN_ID = "exp102_discovery_v2_20260720_da69528"
+PARENT_TRANSPORT_CONTROL = "5480511a57d1"
 AUTOPSY_LADDERS = ("D0", "D4")
 AUTOPSY_CELLS = (
     {"code_id": "m06_c00", "p": 0.04, "disorder_index": 0,
@@ -48,10 +49,10 @@ AUTOPSY_CELLS = (
      "disorder_source": "attempt022"},
 )
 PARENT_RELATIVE_PATHS = {
-    ("D0", "m06_c00"): "transport/nd-3/D0_S64_b2000_m8000/m06_c00/p0.04_d00.npz",
-    ("D0", "m08_c06"): "transport/nd-2/D0_S64_b2000_m8000/m08_c06/p0.04_d00.npz",
-    ("D4", "m06_c00"): "transport/nd-3/D4_S64_b2000_m8000/m06_c00/p0.04_d00.npz",
-    ("D4", "m08_c06"): "transport/nd-1/D4_S64_b2000_m8000/m08_c06/p0.04_d00.npz",
+    ("D0", "m06_c00"): f"transport/{PARENT_TRANSPORT_CONTROL}/nd-3/D0_S64_b2000_m8000/m06_c00/p0.04_d00.npz",
+    ("D0", "m08_c06"): f"transport/{PARENT_TRANSPORT_CONTROL}/nd-2/D0_S64_b2000_m8000/m08_c06/p0.04_d00.npz",
+    ("D4", "m06_c00"): f"transport/{PARENT_TRANSPORT_CONTROL}/nd-3/D4_S64_b2000_m8000/m06_c00/p0.04_d00.npz",
+    ("D4", "m08_c06"): f"transport/{PARENT_TRANSPORT_CONTROL}/nd-1/D4_S64_b2000_m8000/m08_c06/p0.04_d00.npz",
 }
 
 AUTOPSY_RAW_FIELDS = {
@@ -359,6 +360,21 @@ def _default_parent_root():
     return Path(__file__).resolve().parents[1] / "raw" / "discovery" / PARENT_RUN_ID
 
 
+def _resolve_parent_path(parent_root, relative):
+    """Resolve the canonical server path or the deliberately flattened local cache."""
+    root = Path(parent_root)
+    relative = Path(relative)
+    canonical = root / relative
+    if canonical.is_file():
+        return canonical
+    parts = relative.parts
+    if len(parts) >= 3 and parts[:2] == ("transport", PARENT_TRANSPORT_CONTROL):
+        flattened = root / "transport" / Path(*parts[2:])
+        if flattened.is_file():
+            return flattened
+    return canonical
+
+
 def build_autopsy_config(registry_path, discovery_config_path, parent_root=None):
     registry = load_registry(registry_path)
     discovery = load_discovery_config(discovery_config_path, registry)
@@ -367,7 +383,7 @@ def build_autopsy_config(registry_path, discovery_config_path, parent_root=None)
     for ladder_id in AUTOPSY_LADDERS:
         for cell in AUTOPSY_CELLS:
             relative = PARENT_RELATIVE_PATHS[(ladder_id, cell["code_id"])]
-            path = root / relative
+            path = _resolve_parent_path(root, relative)
             with np.load(path, allow_pickle=False) as data:
                 if str(data["raw_version"].item()) != DISCOVERY_RAW_VERSION:
                     raise ValueError("autopsy parent raw version mismatch")
@@ -676,7 +692,7 @@ def run_autopsy_task(registry_path, discovery_config_path, autopsy_config_path,
     if task != expected:
         raise ValueError("autopsy task identity is noncanonical or tampered")
     fingerprint = sha256_json(expected)
-    parent_path = Path(parent_root) / expected["parent_relative_path"]
+    parent_path = _resolve_parent_path(parent_root, expected["parent_relative_path"])
     if not parent_path.is_file() or sha256_file(parent_path) != expected["parent_raw_sha256"]:
         raise ValueError("autopsy parent raw is missing or has the wrong SHA256")
     validated_parent = validate_discovery_raw(
@@ -818,7 +834,7 @@ def validate_autopsy_raw(path, registry, discovery, config, source_commit,
                 raise ValueError(f"autopsy raw identity mismatch: {field}")
         if not np.array_equal(data["instance_seeds"], parent["instance_seeds"]):
             raise ValueError("autopsy instance seeds mismatch")
-        parent_path = Path(parent_root) / parent["parent_relative_path"]
+        parent_path = _resolve_parent_path(parent_root, parent["parent_relative_path"])
         if sha256_file(parent_path) != parent_sha:
             raise ValueError("autopsy parent SHA no longer matches")
         with np.load(parent_path, allow_pickle=False) as old:

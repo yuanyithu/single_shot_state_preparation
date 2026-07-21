@@ -236,6 +236,8 @@ raw SHA, old task fingerprint, old uniform and instance seeds, and parent source
 `da69528b43f4a9d1635083c21d713ba63ccec4ab`. It records round permutations,
 replica weights/labels/phases, within-round rung extrema, phase/direction edge
 counters, endpoint events, first passages, churn, and post-hot return lags.
+Parent paths retain the canonical `transport/5480511a57d1/` control-hash layer;
+only the local read-only cache resolver may accept the flattened retrieval layout.
 Instrumentation consumes no randomness and must reproduce every parent label,
 swap/logical counter, transport total, and residual bit-for-bit.
 
