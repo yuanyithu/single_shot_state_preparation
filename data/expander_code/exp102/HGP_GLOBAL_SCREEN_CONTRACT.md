@@ -21,9 +21,11 @@ cannot launch any of the 6144 production disorder tasks. In particular, MAP
 agreement on `HARD2` does not independently certify `EASY3`. A successful
 screen only permits a separately reviewed discovery/formal-sampler contract.
 
-This v2 contract is `PRE-RUN`: no v2 server preflight, measurement control,
-measurement raw, report or result exists. It must not be described as launched
-or passed merely because its implementation or local tests exist.
+This contract has now been executed once, without changing any frozen input or
+gate. Run `exp102_q0_hgp_screen_v2_20260722_4d134ee` terminated as
+`UNRESOLVED_MAP_MIXTURE_FAIL`; Section 8 records the outcome. This historical
+execution note does not retroactively alter the preregistered methods,
+statistics, branch order or authority boundary.
 
 The predecessor v1 run
 `exp102_q0_hgp_screen_20260722_2e6ba2a` used source
@@ -577,3 +579,66 @@ NO_FROZEN_HELD_OUT_PASS
 Thus this contract can identify a promising hard-cell sampler pair and an HP
 candidate worth broader testing, but it cannot report the full
 `p=.04..10,m=3..8` range and cannot start production.
+
+## 8. Completed execution record
+
+The sole v2 execution used source
+`4d134ee7ca25125d341eb11cbfa34d6856514101`, archive SHA256
+`ad72d2c7039192be721b87ce7c96c5da577af05acd37cacd9167e26a773d9027`
+and source-manifest SHA256
+`5bafae76b06ff46557ae8315bb281a42256e7e4e50ed2e9dae868695114b8ff8`.
+All three Linux preflight reports reached exact consensus, the common tier was
+T3, and the mandatory macmini audit returned `PORTABLE_PASS`. Fixed ownership
+then produced all 384 trajectory raw and both IS raw. Full nd-3 replay and the
+independent local audit validated the exact control-derived 386-file set.
+
+The terminal method counts were:
+
+```text
+HP32       3/5 cells pass
+HP64       5/5 cells pass
+MAM-IMH8   1/2 HARD2 cells pass
+HP32/MAM   0/4 family-cell comparisons pass
+HP64/MAM   0/4 family-cell comparisons pass
+```
+
+HP64 is therefore a promising same-mechanism candidate, but no independent
+pair passed. MAM failed `m08_c06,p=.04` on family/B Rhat and ESS, B-character
+agreement, and HP/MAM `q_top` agreement. Its ordinary state-change gate did
+pass: the minimum trajectory had 520 burn changes, 1947 measurement changes
+and measurement change rate `.0594`. This confirms the contract's statement
+that generic transition counts are not substitutes for slow-variable and
+distribution gates.
+
+Post-run inspection of the already frozen raw identified the structural
+failure mode. The two distinct minimum-weight m8 anchors have identical
+all-zero logical coordinates. The 16 P trajectories made 39899 measurement
+state changes but only 330 logical-label changes; U made 40735 and 288. Thus
+the proposal's apparently adequate acceptance was overwhelmingly
+within-sector. Components with `theta_logical=.08,.25,.5` accepted no
+proposals. The `.02` component had 22 accepted proposals across both families,
+but only 11 actual same-sector state changes (P/U: 4/7) and no logical change.
+This forensics did not change any gate or terminal branch.
+
+The result also validates the conservative purpose of cross-mechanism
+comparison. On m6, both methods individually passed and both P/U families
+agreed internally, yet HP64 and MAM estimated `q_top=0.14587` and `0.16241`;
+their absolute difference passed `.04` but failed the paired uncertainty gate.
+On m8 they estimated `0.91317` and `0.99273`, failing both inequalities.
+Neither aggregate acceptance, global IS ESS, normalized weight nor aggregate
+D2 alone would establish the required logical distribution agreement.
+
+The terminal-package identity is
+`233e31e599180153f979a30dc971e8e8128be64505fd0572d68bc1ae87a64041`,
+the joint-terminal SHA is
+`7e9bd8d7efb657649c4a0b4f0d146b72063d4584b291479a49c805e6834ab4f1`,
+and the local terminal attestation is
+`386e8a0eeadb5c24b376014b522dec36322456abf3b0d636c1ad16cc7681c755`.
+Formal and production authorization are both false.
+
+A successor must not simply lengthen this MAM configuration. It first needs a
+separately reviewed, result-independent construction with deterministic
+logical-signature coverage and a viability gate on accepted cross-signature
+transport. P/U remain necessary legal adversarial starts; additional starts
+should be legal and signature-stratified. The physical all-zero string remains
+outside all five nonzero-syndrome hard cosets and is not a valid replacement.

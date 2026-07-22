@@ -60,6 +60,10 @@ Current status is pre-pilot, not scientific certification.
 - `013_q0_hgp_global_screen_20260722/`: isolated HP32/HP64 plus MAM-IMH8 HARD2 diagnostic with
   adversarial P/U starts, exact small-HGP oracles, canonical frame binding, explicit collapsed-B
   slow-variable gates, immutable MAP artifacts, three-node runtime/digest consensus, and a
-  two-phase preflight/local-attestation/measurement workflow. It is currently `PRE-RUN`; even a
-  full pass can produce only `DIAGNOSTIC_HARD_PAIR_FOUND`, not formal readiness.
+  two-phase preflight/local-attestation/measurement workflow. Fresh v2 completed all 384 sampler
+  and two IS raw with full remote replay plus local audit. Terminal status is
+  `UNRESOLVED_MAP_MIXTURE_FAIL`: HP64 passed 5/5 controls, HP32 passed 3/5, MAM passed 1/2 hard
+  cells, and both HP/MAM pairs passed 0/4 agreement comparisons. Post-run raw shows that m8 MAM
+  state changes were overwhelmingly within one logical sector because both minimum-weight anchors
+  had the same logical signature. This remains diagnostic only and grants no formal readiness.
 - Held-out and production evidence do not exist. Their absence is an active production blocker.

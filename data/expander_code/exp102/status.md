@@ -1,97 +1,110 @@
 # exp102 status
 
-**Q=0 HGP HARD-PAIR DIAGNOSTIC V2 / PRE-RUN -- formal work remains blocked**
+**Q=0 HGP HARD-PAIR DIAGNOSTIC V2 UNRESOLVED -- formal work remains blocked**
 
-The currently authorized contract is `exp102.q0_hgp_global.screen.v2`, with
-config `q0_hgp_global.screen.v2.json` and canonical config SHA256
+The immutable v2 run `exp102_q0_hgp_screen_v2_20260722_4d134ee` completed the
+authorized `exp102.q0_hgp_global.screen.v2` diagnostic. It used source
+`4d134ee7ca25125d341eb11cbfa34d6856514101`, archive SHA256
+`ad72d2c7039192be721b87ce7c96c5da577af05acd37cacd9167e26a773d9027`,
+source-manifest SHA256
+`5bafae76b06ff46557ae8315bb281a42256e7e4e50ed2e9dae868695114b8ff8`
+and config SHA256
 `38092ec030f6c283f163c0ddb3eed612aa850c76ce34f130520522646fa883dc`.
-V2 has not been launched: no v2 server preflight, measurement control,
-measurement raw, report or result exists.
+The verified terminal status is `UNRESOLVED_MAP_MIXTURE_FAIL`, not an
+infrastructure conflict and not a mathematical impossibility.
 
-Its predecessor v1 run, `exp102_q0_hgp_screen_20260722_2e6ba2a`, used source
-`2e6ba2a864d7db6ae04e79867d1678dbcfe42580`, archive SHA256
-`6c5aae08c43a196426c27c41d58e6ad5f6a6f94cc8e494519641794ccf99c5e4`
-and source-manifest SHA256
-`42ceb8b8619cf5de1d9dc0de16fac31a4f88165d1f6cbeaa038d63accf1046cb`.
-All three Linux preflight workers passed, aggregate status was `PASS`, and T3
-was selected. The required macOS conda-12 audit first found that the verifier
-incorrectly treated stored remote solver provenance as a local-version
-requirement. Continuing the audit after isolating that verifier error found a
-one-ULP difference in MAM `log_q`/acceptance fields and full-digest drift in
-both 50000-draw IS probes. Those drifts, not the solver-provenance verifier
-error, make v1 terminal `CONFLICT`. It produced no
-measurement control, measurement raw or result and cannot be resumed in place.
+All three Linux preflight workers reached exact full-payload consensus and
+selected `T3=(burn 8192, measurement 32768)`. The full and portable aggregate
+payload SHAs were
+`dfae05939b89af92c9ba7f758933dd99230f233d4db17b0aaae06414b11f1bd4`
+and `4d1704e2efdb0f105e31aed552ca83587a1d47e3d3d27de7f82b5a0e8bb44e8d`.
+The mandatory macmini conda-12 preflight audit was `PORTABLE_PASS`: all
+declared discrete fields and four MAM acceptance-decision transcripts agreed
+exactly. The 12 full-payload mismatches were exactly the preregistered
+nonportable `log_q`, `log_acceptance` and IS floating fields. Re-enumerating
+the actual deployment identities produced 31682 unique formal RNG streams,
+all disjoint from auxiliary streams.
 
-V2 replaces the old cross-platform full-payload equality claim with two exact,
-explicit evidence layers. The three Linux nodes must first reach full-Linux
-exact consensus, including the frozen floating transcript. Only after that may
-macmini perform a portable-local exact projection over the exhaustive declared
-discrete fields. There is no ULP, absolute, relative or rounding tolerance.
-Any mismatch in a portable field or MAM acceptance decision is `CONFLICT`;
-nonportable floats stay present in the Linux full evidence and local mismatch
-diagnostics rather than being silently rounded away.
+The fixed ownership run completed 384/384 fresh sampler trajectories and 2/2
+frozen IS diagnostics without migration, replacement, retry or resampling.
+The nd-3 full analyzer and an independent local audit validated all 386 raw
+files, their identities, hashes, algebra and declared transcript projections.
+The measurement acceptance-manifest SHA is
+`42e12338dac640b725728f25c46b4d853a23e02392b2c9f2471f519ffcf5bba1`;
+the joint-terminal SHA is
+`7e9bd8d7efb657649c4a0b4f0d146b72063d4584b291479a49c805e6834ab4f1`;
+the terminal-package identity is
+`233e31e599180153f979a30dc971e8e8128be64505fd0572d68bc1ae87a64041`;
+and the local terminal attestation is
+`386e8a0eeadb5c24b376014b522dec36322456abf3b0d636c1ad16cc7681c755`.
 
-V2 uses anchor catalog `exp102.q0_map_mixture.anchors.v3` and fresh v2 sampler
-and auxiliary namespaces. Preflight includes four fixed MAM portability probes:
-the two `HARD2` cells from both `P` and `U`, each with `burn=256` and
-`measurement=2048`. MAM binds proposal states, uniforms, acceptance decisions,
-actual state changes and resulting fixed-clock states. HP does not expose each
-internal categorical uniform/decision, so its portable claim is intentionally
-limited to exact fixed-clock discrete outputs and transport counters; it may
-not be reported as per-hidden-decision bit identity.
+`HP64` passed all 5/5 frozen cells and is the clear promising candidate.
+`HP32` passed 3/5: `m03_c00,p=.10` missed one B-character absolute threshold
+by only `0.0004396` while its uncertainty gate and all other B diagnostics
+passed, but `m05_c00,p=.10` clearly retained a slow B mode (`U` maximum Rhat
+`1.1552`, minimum B ESS `327.0`, pooled Rhat `1.1172`). `HP64` removed both
+failures. On the two hard cells HP32 and HP64 also agreed closely:
+`q_top=0.14575/0.14587` for m6 and `0.91356/0.91317` for m8. These are two
+ladder sizes of one mechanism, not independent confirmation.
 
-The frozen measurement scope remains 384 fresh trajectories: HP32 and HP64
-each run `HARD2+EASY3` with 16 `P` and 16 `U` starts per cell (320 total), while
-MAM-IMH8 runs only `HARD2` (64 total). MAP artifacts and 50000-draw IS
-diagnostics are also HARD2-only. HP analytically collapses one HGP block,
-samples its exact likelihood-power marginal and reconstructs the eliminated
-block conditionally; MAM uses a frozen full-support multi-anchor independence
-proposal with the complete Hastings ratio. MAM transport counts accepted
-proposals only when the state actually changes; an accepted self-proposal is
-an MH self-loop, not transport.
+`MAM-IMH8` passed only 1/2 hard cells. On `m08_c06,p=.04`, its P family had
+Rhat `1.06088` and minimum bulk ESS `379.74`; the targeted B projections were
+also slow in both families (maximum Rhat `1.08245/1.05662`, minimum ESS
+`275.33/361.16`, pooled Rhat `1.05568`). Sixteen B characters differed between
+P and U, with maximum mean difference `0.05157`. In contrast, its ordinary
+transition counters looked healthy: every trajectory changed state at least
+520 times during burn and 1947 times during measurement, with state-change
+rate at least `0.0594`. This is direct evidence that generic acceptance and
+state-change counts did not measure the relevant global transport.
 
-The initialization question is constrained by the target support, not by a
-generic preference for simple starts. All five sentinel syndromes are nonzero,
-so the physical all-zero bit string is outside their q=0 hard cosets. Starting
-all chains from zero would test the wrong support. `P` (planted hard-coset
-state) and `U` (exact K=0 uniform hard-coset state) are two legal, deliberately
-opposed families; their purpose is to expose retained initialization memory,
-not to optimize apparent convergence. The planted error never enters energy,
-proposal, acceptance or anchor construction.
+The cross-mechanism gate failed all four HP64/MAM family-cell comparisons.
+For m6, MAM estimated `q_top=0.16241` versus HP64 `0.14587`; the absolute
+difference `0.01647--0.01660` was below `.04` but about 30 standard errors and
+therefore failed the preregistered consistency inequality. For m8, MAM gave
+`q_top=0.99273` versus HP64 `0.91317`; both P and U differences were about
+`.0795`, failing both the absolute and uncertainty gates. Weight and aggregate
+D2 gates alone would not have exposed these discrepancies.
 
-Scientific correctness and finite-budget mixing remain separate gates. Exact
-small-code stationarity/detailed-balance tests establish the target kernel;
-P/U agreement, transport, Rhat, ESS, characters and weights test whether it
-mixes within the selected tier. Raw replay reconstructs HP's collapsed B
-bottleneck and gates every B bit, row/column parity, 64 dense characters,
-`|B|` and `L(B)`, including per-character differences so a frozen component
-cannot be hidden by aggregate `q_top` or D2. B is not assumed to be the only
-slow variable, so full logical/energy/weight gates remain mandatory. A finite
-character catalog and 16 `U` starts still cannot rule out an unsampled
-higher-order mode or a tiny-volume, high-posterior-mass basin shared by both
-methods; this residual common-mode risk is why any pass remains diagnostic.
-A failure is unresolved within this algorithm and budget, not mathematical
-impossibility.
+Post-run raw forensics explains why a longer identical MAM run is not the
+default remedy. The two distinct minimum-weight m8 MAP anchors have the same
+all-zero 64-bit logical coordinate. Across the 16 P trajectories, 39899
+measurement state changes contained only 330 logical-label changes (`0.827%`);
+the 16 U trajectories had 40735 state changes but only 288 logical-label
+changes (`0.707%`). A typical chain visited only three logical labels, and all
+32 ended with the same label as their first measurement state. Proposal
+components with logical flip probabilities `.08`, `.25` and `.5` had zero
+accepted proposals within each family's 524288 aggregate attempts. The `.02`
+component had 11 accepted proposals per family, but these produced only 4 P
+and 7 U actual same-sector state changes and no logical-label change.
+The apparent MAM acceptance was dominated by same-sector moves around anchors
+that lacked logical-signature coverage.
 
-The first two 013 launch attempts remain infrastructure-only history. Source
-`7654bcced23688705f396695370661199b81648a` stopped before a run root because
-`nd-0` lacks `screen`; source
-`df97fb5a7d38543beb515444b5692427dd28cc41` persisted the guarded nd-0
-orchestrator but hit Bash 4.2 empty-array expansion before a run root. Neither
-produced preflight or sampler raw. The later v1 run above did reach aggregate
-preflight PASS before the independent local audit correctly stopped it.
+The initialization red-team remains important. All five frozen syndromes have
+nonzero weights (`83,160,39,58,125`), so the physical all-zero bit string lies
+outside every target hard coset. If one shifts explicitly by the planted error,
+`x=e xor epsilon_true`, then `x=0` is exactly the existing planted `P` start,
+not a new initialization. The 16 P trajectories share that legal state but use
+independent RNG streams; the 16 U trajectories use independent exact K=0
+hard-coset states. Replacing P/U by one common zero start would therefore
+either sample the wrong support or hide initialization memory; it would not
+establish convergence. Future diagnostics should retain P/U and add legal,
+deterministically signature-stratified starts rather than making every chain
+identical.
 
-The schedule remains `exp102.q0_hgp_global.screen.schedule.v2`: only nd-0
-`CLOCK_BOOTTIME + boot_id` authorizes the 6/8/22/24-hour boundaries because the
-node epochs are unsynchronized. A terminal package is valid only together with
-the measurement acceptance manifest and the exact control-derived set of 384
-trajectory raw plus two IS raw. Missing, extra, symlinked or hash-mismatched
-evidence fails closed.
+The next meaningful development target is an independent confirmer with
+preregistered logical-signature coverage: for example, deterministic
+logical-sector-constrained anchors or a genuinely different reverse-collapse
+oracle. Its viability gate must count accepted cross-signature moves and
+logical-character mixing by proposal component, not total acceptance, total
+state changes or global IS ESS. Merely extending MAM T3, changing its start to
+zero, or treating HP32/HP64 as independent confirmation would optimize the
+wrong quantity.
 
-The maximum possible outcome remains only `DIAGNOSTIC_HARD_PAIR_FOUND`.
-`EASY3` lacks independent-method confirmation, and one sentinel disorder
-cannot certify any `(m,p)` point. V2 cannot create `READY_FOR_FORMAL`,
-`FROZEN_HELD_OUT_PASS`, publication data or any of the 6144 production tasks.
+This run certifies no `(m,p)` point. `EASY3` still lacks an independent method,
+each panel entry is only one sentinel disorder, and no fresh T/2T,
+CONF17/RES6/GAP8/SMALL6, formal 96-cell tuning or 448-cell held-out campaign
+exists. There is no `READY_FOR_FORMAL`, `FROZEN_HELD_OUT_PASS`, publication
+result or authorization for any of the 6144 production tasks.
 
 **Q=0 DIAGNOSTIC SCREEN UNRESOLVED / PRE-PILOT — formal pilot blocked, production not started**
 

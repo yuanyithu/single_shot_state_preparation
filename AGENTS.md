@@ -18,7 +18,7 @@ publication/FSS。014 中的 scan v2 聚合只作历史审计；旧 259 tests �
 `data/expander_code/exp101/PHYSICS_CONTRACT.md`（唯一物理权威）、`status.md` 和
 `validation/README.md`。关键硬约束：
 
-**exp102 当前为 `Q=0 HGP HARD-PAIR DIAGNOSTIC / PRE-RUN`，不是已有物理结果。** 正式历史契约仍为
+**exp102 当前为 `Q=0 HGP HARD-PAIR DIAGNOSTIC UNRESOLVED / PRE-PILOT`，不是已有物理结果。** 正式历史契约仍为
 `exp102.physics.v1 / exp102.q0_pt.v1 / exp102.scan.v1`。固定 Q32 + multi-swap PT-v2 已因 96 条轨迹
 认证往返总数为 0 而 `EXHAUSTED`；不得追加 S128、延长轮数或复用 raw。随后
 `exp102.q0_pa.discovery.v1` 的四个 transport autopsy 因条件 attempts<200 均为 `INCONCLUSIVE`，
@@ -57,41 +57,45 @@ self-hash，并只对这两个白名单字段允许已审计的 4-ULP 上限，�
 fractional power。首个 `5e1f5aa` run 保持 `CONFLICT_CROSS_NODE_GAMMA_LIBM` 审计，15 个旧 bias raw
 永不复用。接手先读 `GLOBAL_SCREEN_DIAGNOSTIC_CONTRACT.md`、`validation/011_*` 和 `status.md`。
 
-2026-07-22 用户批准的隔离 HGP 诊断当前已升级为 **PRE-RUN**
-`exp102.q0_hgp_global.screen.v2`，config 为 `q0_hgp_global.screen.v2.json`，canonical config SHA 为
-`38092ec030f6c283f163c0ddb3eed612aa850c76ce34f130520522646fa883dc`。其前身 v1 fresh run
-`exp102_q0_hgp_screen_20260722_2e6ba2a`（source
-`2e6ba2a864d7db6ae04e79867d1678dbcfe42580`、archive
-`6c5aae08c43a196426c27c41d58e6ad5f6a6f94cc8e494519641794ccf99c5e4`、manifest
-`42ceb8b8619cf5de1d9dc0de16fac31a4f88165d1f6cbeaa038d63accf1046cb`）在 nd-1/2/3 的 full Linux
-preflight 全部 PASS 并选择 T3，
-但 macmini conda-12 审计先发现 frozen artifact 的 solver provenance 被误当成本地版本要求，修正审计
-路径后又确认 MAM `log_q/acceptance` 有 1 ULP 跨平台差、两个 50000-draw IS full digest 也漂移；v1
-真正因后两项漂移而终止为 `CONFLICT`，solver provenance verifier 错误本身不是终止证据；v1 **从未生成
-measurement control、measurement raw 或结果**，不得补丁式续跑。
+2026-07-22 隔离 HGP v2 诊断已经完成，fresh immutable run 为
+`exp102_q0_hgp_screen_v2_20260722_4d134ee`（source
+`4d134ee7ca25125d341eb11cbfa34d6856514101`、archive
+`ad72d2c7039192be721b87ce7c96c5da577af05acd37cacd9167e26a773d9027`、manifest
+`5bafae76b06ff46557ae8315bb281a42256e7e4e50ed2e9dae868695114b8ff8`）。三 Linux 节点 full exact
+consensus PASS 并选中 T3，本地 conda-12 对 portable projection 与四条 MAM acceptance-decision probes
+逐位复核为 `PORTABLE_PASS`；12 个 full mismatch 全部且仅是预注册的 nonportable float。固定 ownership
+下 384/384 measurement 与 2/2 IS 完成，nd-3 full replay 和本地 terminal audit 验证 386/386 raw；终态为
+**`UNRESOLVED_MAP_MIXTURE_FAIL`**，不是 infrastructure `CONFLICT` 或 `IMPOSSIBLE`。terminal package
+identity 为 `233e31e599180153f979a30dc971e8e8128be64505fd0572d68bc1ae87a64041`。
 
-v2 保持 HP32/HP64 exact collapsed marginal + likelihood-power replica exchange 与 HARD2-only
-MAM-IMH8 full-support independence MH，但使用 anchor catalog `exp102.q0_map_mixture.anchors.v3`、fresh v2 sampler/auxiliary namespaces
-以及分离的证据投影：三 Linux 节点必须对 full transcript 逐位一致，本地只可在 remote full consensus
-成立后对明确列出的 portable discrete transcript 与 MAM acceptance decisions 逐位复核；非 portable
-float 仍在 Linux full evidence 中逐位冻结，**没有 ULP tolerance**。portable preflight 另固定运行
-HARD2 两 cell × P/U 的四条 MAM probes，每条 `burn=256,measurement=2048`。HP 没有暴露逐内部
-uniform/decision transcript，故其 portable claim 只能是固定时钟离散输出和 transport counters 一致，
-不得写成“内部每个决定逐位复现”。冻结 measurement 规模仍是 HP 320 + MAM 64 = 384 条，MAP
-artifact/50000-draw IS 仍只限 HARD2，最高权限仍仅 `DIAGNOSTIC_HARD_PAIR_FOUND`。
+方法结果：HP64 为 5/5，是明确的 promising candidate；HP32 为 3/5，其中 m3 只是单个 B-character
+`0.0404396>.04` 的边缘 fail，m5 则是明确 B 慢模态（U max Rhat `1.1552`、min ESS `327.0`、pooled
+Rhat `1.1172`）。MAM-IMH8 仅 1/2，m8 的普通 P family 与 P/U B family 均未过 Rhat/ESS，16 个 B
+characters 初始化族不一致。HP64/MAM 的四个 HARD2 family-cell comparison 全为 0/4：m6 的
+`q_top=.14587/.16241` 绝对差虽小于 .04 但约 30 SE，m8 为 `.91317/.99273`，绝对差约 .0795。
+因此一个 sentinel `(m,p)` 也未认证，HP32/HP64 属同一机制，不能互相当独立确认。
 
-五个 sentinel syndrome 均非零，物理全零 bit string 不在其 q=0 hard-coset 支持上；不得把“所有链从
-0 开始”包装成收敛优化。P planted 与 U exact K=0 hard-coset uniform 是合法且对抗性的两族初态。
-MAM transport 门只认 accepted 且 proposal 不同于当前 state 的真实 state change，accepted self-loop
-仅作 MH 诊断。HP 每轮精确重抽 `A|B` 会制造新鲜条件噪声，不能用 full-state ESS 掩盖 collapsed B
-卡住；013 raw 必须独立重建并门禁全部 B-bit、行列 parity、64 个 dense characters、`|B|`、`L(B)`，
-且逐 character 的 P/U 与 HP/MAM 差不能被平均 D2 稀释。接手先读
+本 run 暴露的新关键坑是：**真实 state change 不等于 logical transport**。m8 的每条 MAM 链虽至少有
+1947 次 measurement state changes、rate 至少 `.0594`，P/U 合计分别有 39899/40735 次，但其中只有
+330/288 次改变 logical label（约 `.827%/.707%`）；典型链只见 3 个 label。两个不同的最小权重 m8
+MAP anchors 的 64-bit logical coordinate 完全相同，`theta_logical=.08/.25/.5` 的 proposal components
+在每族 524288 次总 attempts 中零接受，global IS ESS/总 acceptance 主要测到同扇区运动。后续 MAM
+viability 必须预注册 anchor signature coverage、逐 component 的 accepted cross-signature moves 和
+logical-character mixing；不得直接加长 T3 或只优化总 acceptance/state changes。
+
+五个 sentinel syndrome 权重为 `83,160,39,58,125`，物理全零 bit string 全不在目标 hard coset；只有
+显式定义 `x=e xor epsilon_true` 时，`x=0` 才对应现有 P 初态，并不是新的起点。16 条 P 链共享该合法
+planted state 但 RNG 独立，16 条 U 链使用独立 exact-K0 hard-coset states。不得用“所有链从 0 开始”
+制造表面收敛，也不得删掉 P/U；若扩充初态，应增加合法、结果无关、按 logical signature 分层的对抗
+初态。HP 每轮精确重抽 `A|B` 仍可能用条件噪声掩盖 B，故 B-bit/row-column/dense-character 与 full
+logical/energy/weight 门都必须保留。有限 characters 和 16 个 U 仍可能共同漏 basin，HP64 通过也不是
+混合证明。接手先读
 `HGP_GLOBAL_SCREEN_CONTRACT.md`、`validation/013_q0_hgp_global_screen_20260722/` 与 `status.md`。
-有限 logical/B character catalog 与 16 个 U 初态仍可能漏掉高阶 mode 或“uniform 体积极小但 posterior
-质量显著”的 basin，HP/MAM 也可能共同漏模；B 只是重点 bottleneck，不能替代 full logical/energy/
-weight/transport 门。该剩余风险不阻止 diagnostic，但禁止把全门通过写成混合证明。
-v2 尚未产生服务器 preflight、measurement 或结果；即使将来全过，也不能生成 `READY_FOR_FORMAL`，
-EASY3 仍缺独立方法确认，全部正式 tuning/held-out/production 门禁继续存在。
+
+v1 `exp102_q0_hgp_screen_20260722_2e6ba2a` 的 Linux preflight 虽 PASS，但本地发现 MAM float/IS full
+digest 漂移而终止 `CONFLICT`，从未产生 measurement raw；仍不得续跑或复用。v2 最高权限本就只有
+diagnostic，当前也没有 `READY_FOR_FORMAL`；EASY3 独立确认、fresh T/2T、扩展 panels、正式 tuning、
+held-out 与 production 全部仍缺失。
 
 若要继续正式实验，须另立经审查的新算法/科学契约与 fresh tuning/held-out，不得把重复 T3、延长链、
 删困难 disorder、缩范围或改窗口包装成原 discovery 成功。

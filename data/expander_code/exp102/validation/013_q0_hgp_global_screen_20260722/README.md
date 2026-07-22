@@ -2,48 +2,80 @@
 
 ## Current status
 
-`V1 TERMINAL CONFLICT / V2 PRE-RUN / DIAGNOSTIC TEST AUTHORIZED`
+`V2 TERMINAL UNRESOLVED_MAP_MIXTURE_FAIL / PRE-PILOT`
 
-This directory records the failed v1 preflight boundary and is the evidence
-root for the fresh `exp102.q0_hgp_global.screen.v2` screen. V2 has not been
-launched: no v2 remote preflight, control, measurement raw, report or terminal
-decision exists. Implementation and local tests are not evidence that a server
-job is running or that either sampler has passed.
-
-The terminal v1 run was
-`exp102_q0_hgp_screen_20260722_2e6ba2a`, source
-`2e6ba2a864d7db6ae04e79867d1678dbcfe42580`, archive SHA256
-`6c5aae08c43a196426c27c41d58e6ad5f6a6f94cc8e494519641794ccf99c5e4`
+The fresh immutable run is
+`exp102_q0_hgp_screen_v2_20260722_4d134ee`, source
+`4d134ee7ca25125d341eb11cbfa34d6856514101`, archive SHA256
+`ad72d2c7039192be721b87ce7c96c5da577af05acd37cacd9167e26a773d9027`
 and source-manifest SHA256
-`42ceb8b8619cf5de1d9dc0de16fac31a4f88165d1f6cbeaa038d63accf1046cb`.
-Its nd-1/nd-2/nd-3 preflight workers and aggregate report all reached `PASS`,
-selecting T3. The mandatory macOS audit first exposed a verifier bug that
-treated stored remote solver provenance as a local NumPy/SciPy version
-requirement. After that provenance issue was isolated, continued audit found a
-one-ULP MAM `log_q`/acceptance difference and full-digest drift in both
-50000-draw IS probes. Those drifts, not the solver-provenance verifier bug,
-make v1 terminal `CONFLICT`. It produced no
-measurement control, measurement raw or result and must not be resumed in
-place.
+`5bafae76b06ff46557ae8315bb281a42256e7e4e50ed2e9dae868695114b8ff8`.
+All three Linux preflight workers reached exact consensus and selected
+`T3=(8192 burn,32768 measurement)`. The macmini conda-12 audit returned
+`PORTABLE_PASS`; it exactly reproduced every declared portable field and all
+four MAM acceptance-decision probes. The only full-payload differences were
+the 12 preregistered nonportable floating fields.
 
-Two still earlier attempts remain infrastructure-only history. Source
-`7654bcced23688705f396695370661199b81648a` stopped before a run root because
-`nd-0` has no `screen`. Source
-`df97fb5a7d38543beb515444b5692427dd28cc41` persisted the guarded nd-0
-orchestrator but hit the RHEL Bash 4.2 empty-array rule before a run root.
-Neither produced preflight or sampler raw. The later v1 run above did reach
-preflight PASS; its local `CONFLICT` supersedes the earlier statement that 013
-had no preflight evidence.
+Measurement completed 384/384 frozen sampler tasks and 2/2 IS diagnostics on
+the fixed nd-2/nd-3 ownership without migration, retry, replacement or
+resampling. The nd-3 full analyzer and local terminal audit validated all
+386 raw files. The terminal package status is
+`UNRESOLVED_MAP_MIXTURE_FAIL`: HP64 passed 5/5 cells, HP32 passed 3/5, and
+MAM-IMH8 passed only 1/2 HARD2 cells. Both HP/MAM pairs passed 0/4
+family-cell agreement comparisons, so `selected_pair=null`.
 
-The schedule remains `exp102.q0_hgp_global.screen.schedule.v2`: nd-0 freezes a
-single `CLOCK_BOOTTIME + boot_id` authority because compute-node epochs are
-unsynchronized. Measurement must reuse the preflight anchor. Before every
-stage launch and SUCCESS acceptance, equality with a deadline or a boot-ID
-change fails closed.
+The central scientific discrepancy is not hidden by a runtime or
+infrastructure error. HP32 and HP64 agree on the hard cells, while MAM is
+systematically higher: on m6 HP64/MAM give `q_top=0.14587/0.16241`; on m8
+they give `0.91317/0.99273`. The m6 difference is below the absolute `.04`
+limit but fails the paired uncertainty inequality; the m8 difference also
+exceeds `.04`. MAM's m8 P family has maximum Rhat `1.06088` and minimum ESS
+`379.74`; its B projections fail in both P and U, with maximum Rhat
+`1.08245/1.05662`, minimum ESS `275.33/361.16` and 16 inconsistent B
+characters.
 
-Authority is limited to `DIAGNOSTIC_HARD_PAIR_FOUND`. Even a complete v2 pass
-cannot produce `READY_FOR_FORMAL`, `FROZEN_HELD_OUT_PASS`, publication data or
-any of the 6144 production tasks.
+Ordinary transport counters were misleading on that same m8 cell. Every MAM
+trajectory recorded at least 520 burn and 1947 measurement state changes, yet
+raw replay shows that only 330 of 39899 P-family state changes and 288 of
+40735 U-family changes altered the logical label. A typical chain visited only
+three labels. Both distinct m8 minimum-weight MAP anchors have the same
+all-zero 64-bit logical coordinate. Within each family's 524288 attempts, the
+`theta_logical=.08,.25,.5` components accepted no proposals. The `.02`
+component had 11 accepted proposals per family, but only 4 P and 7 U actual
+same-sector state changes and no logical-label change. The proposal-overlap IS
+estimate and aggregate acceptance therefore mostly measured within-sector
+motion, not the global quantity needed for `q_top`.
+
+HP32's two EASY3 failures have different meanings. The m3 failure is a
+borderline conservative rejection: one column character was `0.0404396`
+against `.04`, while its uncertainty test and every other B gate passed. The
+m5 failure is clear slow-mode evidence: U has maximum B Rhat `1.1552`, minimum
+B ESS `327.0`, and pooled P/U Rhat `1.1172`. HP64 passes both controls, so it is
+a promising candidate, but HP32/HP64 are two settings of one mechanism and
+cannot independently confirm each other.
+
+The complete evidence identities are:
+
+- measurement acceptance manifest:
+  `42e12338dac640b725728f25c46b4d853a23e02392b2c9f2471f519ffcf5bba1`;
+- joint terminal:
+  `7e9bd8d7efb657649c4a0b4f0d146b72063d4584b291479a49c805e6834ab4f1`;
+- terminal package:
+  `233e31e599180153f979a30dc971e8e8128be64505fd0572d68bc1ae87a64041`;
+- report self-SHA:
+  `bb2b8ef99dfbb1ba008bfddf1a64bc0ad9fccabc350bf2e0bd28b48d19dca062`;
+- local terminal attestation:
+  `386e8a0eeadb5c24b376014b522dec36322456abf3b0d636c1ad16cc7681c755`.
+
+The predecessor v1 run
+`exp102_q0_hgp_screen_20260722_2e6ba2a` remains `CONFLICT`: after its Linux
+preflight PASS, local audit found one-ULP MAM floating drift and two IS full
+digest drifts. It produced no measurement control or raw and was not resumed.
+Two earlier attempts stopped before a run root on nd-0 infrastructure issues.
+
+This completed screen has diagnostic authority only. It certifies no `(m,p)`
+point and cannot produce `READY_FOR_FORMAL`, `FROZEN_HELD_OUT_PASS`,
+publication data or any of the 6144 production tasks.
 
 ## Frozen inputs
 
@@ -203,6 +235,5 @@ one sentinel disorder cannot certify or rule out an entire `(m,p)` point.
 
 Any failed marker or failed/duplicate `nd-0` launch guard requires a fresh
 deployment/run ID. The retained guard is not deleted for an in-place retry.
-This directory will be updated with the actual clean source commit, run ID,
-selected tier, evidence hashes and terminal result only after those artifacts
-exist.
+The v2 sequence above is complete and terminal; its raw remains diagnostic
+evidence and cannot be reused by a later sampler contract.
