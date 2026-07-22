@@ -5,6 +5,7 @@ import json
 import os
 from pathlib import Path
 import subprocess
+import sys
 from types import SimpleNamespace
 import time
 
@@ -15,6 +16,10 @@ import pytest
 workflow = importlib.import_module(
     "data.expander_code.exp102.validation."
     "013_q0_hgp_global_screen_20260722.workflow"
+)
+orchestrator = importlib.import_module(
+    "data.expander_code.exp102.validation."
+    "013_q0_hgp_global_screen_20260722.orchestrate_hgp"
 )
 
 
@@ -471,7 +476,7 @@ def test_cli_freezes_provenance_and_analysis_placement():
         ])
 
 
-def test_schedule_is_canonical_deadlined_and_rejects_future_start(
+def test_schedule_is_canonical_deadlined_and_ignores_local_epoch(
     tmp_path, monkeypatch,
 ):
     registry_path = EXP102_ROOT / "registry/registry.json"
@@ -488,7 +493,18 @@ def test_schedule_is_canonical_deadlined_and_rejects_future_start(
     monkeypatch.setattr(
         workflow, "_verify_provenance", lambda *args: source_identity,
     )
-    started = int(time.time())
+    clock_authority = {
+        "clock_authority_version": workflow.CLOCK_AUTHORITY_VERSION,
+        "clock_authority_node": "nd-0",
+        "clock_authority_boot_id": (
+            "01234567-89ab-cdef-0123-456789abcdef"
+        ),
+        "boottime_before_ns": 5_000_000_000_000,
+        "authority_unix_ns": 1_000_000_000_000,
+        "boottime_after_ns": 5_000_000_001_000,
+    }
+    started = 1000
+    started_boottime_ns = clock_authority["boottime_before_ns"]
     identity = {
         "schedule_version": workflow.SCHEDULE_VERSION,
         "contract_version": workflow.CONTRACT_VERSION,
@@ -499,8 +515,12 @@ def test_schedule_is_canonical_deadlined_and_rejects_future_start(
         "source_identity": source_identity,
         "registry_file_sha256": workflow._registry_sha(registry_path),
         "config_file_sha256": workflow._config_sha(config_path),
+        "clock_authority": clock_authority,
         "started_unix": started,
-        **workflow._schedule_deadlines(config, started),
+        "started_boottime_ns": started_boottime_ns,
+        **workflow._schedule_deadlines(
+            config, started, started_boottime_ns,
+        ),
     }
     schedule = {**identity, "schedule_sha256": workflow._sha256_json(identity)}
     path = tmp_path / "schedule.json"
@@ -509,9 +529,14 @@ def test_schedule_is_canonical_deadlined_and_rejects_future_start(
         path, registry_path, config_path, SOURCE_COMMIT, ARCHIVE_SHA256,
         SOURCE_MANIFEST_SHA256, config,
     )[0] == schedule
+    monkeypatch.setattr(workflow.time, "time", lambda: 1e30)
+    assert workflow._validate_schedule(
+        path, registry_path, config_path, SOURCE_COMMIT, ARCHIVE_SHA256,
+        SOURCE_MANIFEST_SHA256, config,
+    )[0] == schedule
 
     future = dict(schedule)
-    future["started_unix"] = int(time.time()) + 3600
+    future["started_unix"] += 3600
     path.write_text(workflow._canonical_json(future) + "\n", encoding="ascii")
     with pytest.raises(ValueError, match="start identity"):
         workflow._validate_schedule(
@@ -561,3 +586,57 @@ def test_wrapper_rejects_action_token_spoof_and_help_marker(tmp_path):
     )
     assert help_result.returncode == 68
     assert not (help_stage / "SUCCESS").exists()
+
+
+def test_wrapper_build_schedule_supports_empty_prerequisites_with_nounset(
+    tmp_path,
+):
+    wrapper = (
+        EXP102_ROOT
+        / "validation/013_q0_hgp_global_screen_20260722/run_hgp_wrapper.sh"
+    )
+    fake_bin = tmp_path / "bin"
+    fake_bin.mkdir()
+    fake_python = fake_bin / "python"
+    fake_python.write_text(
+        "#!/usr/bin/env bash\n"
+        "if [[ ${1:-} == -c ]]; then\n"
+        "  exec \"$REAL_PYTHON\" \"$@\"\n"
+        "fi\n"
+        "exit 0\n",
+        encoding="ascii",
+    )
+    fake_python.chmod(0o755)
+    fake_flock = fake_bin / "flock"
+    fake_flock.write_text("#!/usr/bin/env bash\nexit 0\n", encoding="ascii")
+    fake_flock.chmod(0o755)
+    environment = os.environ.copy()
+    environment["EXP102_SOURCE_COMMIT"] = SOURCE_COMMIT
+    environment["REAL_PYTHON"] = sys.executable
+    environment["PATH"] = f"{fake_bin}{os.pathsep}{environment['PATH']}"
+    stage_dir = tmp_path / "schedule-stage"
+    log_file = tmp_path / "schedule.log"
+
+    completed = subprocess.run(
+        [
+            "bash", str(wrapper), "build-schedule", str(stage_dir),
+            str(log_file), "--", "python", "-m", workflow.__name__,
+            "build-schedule",
+        ],
+        check=False, capture_output=True, text=True, env=environment,
+    )
+
+    assert completed.returncode == 0, completed.stderr
+    success = json.loads(
+        (stage_dir / "SUCCESS").read_text(encoding="ascii")
+    )
+    assert success["stage"] == "build-schedule"
+    assert success["prerequisite_success_sha256"] == []
+    stage = orchestrator._Stage(
+        key="schedule", node="nd-1", stage="build-schedule",
+        workflow_argv=("build-schedule",), stage_dir=stage_dir,
+        log_file=log_file, bootstrap_log=tmp_path / "bootstrap.log",
+        prerequisites=(), session="test",
+    )
+    assert orchestrator._validate_stage_success(stage, SOURCE_COMMIT) == success
+    assert not (stage_dir / "RUNNING").exists()

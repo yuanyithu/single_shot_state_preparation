@@ -9,7 +9,23 @@ exchange on the exact marginal, and draws the eliminated block from its exact
 conditional. The independent MAM-IMH8 mechanism uses a frozen full-support
 multi-anchor independence proposal with the complete Hastings ratio. The
 canonical diagnostic config SHA256 is
-`3c65ef96ce231b4aea4499b5a6030f1cc82475117c5ee5ecc7633d972ef8edc9`.
+`163a5cc87486beabf453f3d4a57bc63f0c4e0b2f54619c60268ee7f0c9b2a341`.
+
+MAM transport gates now count actual state changes, not merely accepted MH
+decisions: an accepted proposal identical to the pre-step state is a self-loop.
+The replayable sampler transcript is v2 and the enclosing screen MAP raw is v3;
+both retain acceptance fields for diagnostics and add burn/measurement
+state-change masks and counts.
+
+Auxiliary preflight/runtime trajectories and IS probes now have namespaces
+disjoint from measurement trajectories and frozen screen IS streams; an
+exhaustive fixture-identity trajectory/IS 63-bit seed regression permits only
+same-case reference/Numba reuse, and the clean deployment identities must be
+rechecked immediately before launch. P/U and
+cross-method `Delta q_top` gates also use a shared-character paired
+finite-population SE plus side-specific delete-one trajectory jackknives,
+rather than adding two marginal character errors and accidentally weakening
+the consistency gate.
 
 The frozen server scope contains 384 trajectories: HP32 and HP64 each run
 `HARD2+EASY3` with 16 planted and 16 exact-uniform starts per cell (320 total),
@@ -52,6 +68,37 @@ not a scientific run. The successor source replaces only the `nd-0` outer
 control persistence with guarded `nohup` + `setsid`; all `nd-1`/`nd-2`/`nd-3`
 scientific stages remain isolated `screen` jobs. A fresh deployment/run is
 required rather than retrying that source in place.
+
+The fresh successor attempt from
+`df97fb5a7d38543beb515444b5692427dd28cc41` proved that the guarded `nd-0`
+orchestrator survives SSH detachment and launches the first `nd-1` screen, but
+the stage bootstrap exited before creating a run root, immutable marker or raw.
+The bootstrap log identified a Bash 4.2 portability bug: under `set -u`, the
+zero-prerequisite `build-schedule` path expanded an empty array. This is also
+infrastructure-only and produced no preflight or sampler evidence. Its guard,
+log and deployment remain audit evidence and are not reused. The successor
+source guards every possibly empty array expansion and adds an executable
+zero-prerequisite wrapper regression; another fresh deployment/run is required.
+
+Read-only follow-up also found that the Linux node epochs are unsynchronized
+(approximately nd-1 `+204 s`, nd-2 `+298 s`, nd-3 `+2 s` relative to nd-0;
+chrony on nd-0/nd-1/nd-2 reported `Not synchronised`). This invalidated the old
+cross-node epoch deadline assumption but produced no preflight or measurement.
+The fresh successor protocol is now
+`exp102.q0_hgp_global.screen.schedule.v2`: only nd-0
+`CLOCK_BOOTTIME + boot_id` authorizes the 6/8/22/24-hour boundaries, every stage
+launch and SUCCESS acceptance is rechecked with `now >= deadline` failing, and
+measurement must reuse the original preflight clock anchor. Compute-node and
+macmini epochs are retained only as finite diagnostics; runtime tier selection
+uses the fixed worst-case hour-8 control origin and cannot read them or any
+physics outcome.
+
+The successor evidence protocol also records each nd-0 SUCCESS acceptance and
+publishes ordered preflight/measurement phase manifests. A terminal package is
+valid only jointly with the measurement acceptance manifest and the exact
+control-derived set of 384 trajectory raw, two IS raw and all matching claims;
+online publication and local pullback both reject missing, extra, symlinked or
+hash-mismatched evidence.
 
 **Q=0 DIAGNOSTIC SCREEN UNRESOLVED / PRE-PILOT — formal pilot blocked, production not started**
 

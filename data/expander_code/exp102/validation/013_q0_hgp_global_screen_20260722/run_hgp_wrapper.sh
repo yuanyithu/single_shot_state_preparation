@@ -86,12 +86,13 @@ case "$stage" in
 esac
 
 prerequisite_sha256=()
-for marker in "${prerequisites[@]}"; do
-  [[ -f $marker && ${marker##*/} == SUCCESS ]] || {
-    echo "missing prerequisite SUCCESS marker: $marker" >&2
-    exit 69
-  }
-  metadata=$(python -c '
+if (( ${#prerequisites[@]} > 0 )); then
+  for marker in "${prerequisites[@]}"; do
+    [[ -f $marker && ${marker##*/} == SUCCESS ]] || {
+      echo "missing prerequisite SUCCESS marker: $marker" >&2
+      exit 69
+    }
+    metadata=$(python -c '
 import json, re, sys
 with open(sys.argv[1], encoding="ascii") as handle:
     value = json.load(handle)
@@ -106,15 +107,22 @@ if not isinstance(fingerprint, str) or re.fullmatch(r"[0-9a-f]{64}", fingerprint
     raise SystemExit(4)
 print(stage)
 ' "$marker" "$EXP102_SOURCE_COMMIT") || {
-    echo "invalid prerequisite SUCCESS marker: $marker" >&2
-    exit 69
-  }
-  [[ $metadata =~ ^($allowed_prerequisite)$ ]] || {
-    echo "invalid prerequisite stage $metadata for $stage" >&2
-    exit 69
-  }
-  prerequisite_sha256+=("$(sha256sum "$marker" | awk '{print $1}')")
-done
+      echo "invalid prerequisite SUCCESS marker: $marker" >&2
+      exit 69
+    }
+    [[ $metadata =~ ^($allowed_prerequisite)$ ]] || {
+      echo "invalid prerequisite stage $metadata for $stage" >&2
+      exit 69
+    }
+    prerequisite_sha256+=("$(sha256sum "$marker" | awk '{print $1}')")
+  done
+fi
+
+fingerprint_arguments=("$stage" "$EXP102_SOURCE_COMMIT" __COMMAND__)
+if (( ${#prerequisite_sha256[@]} > 0 )); then
+  fingerprint_arguments+=("${prerequisite_sha256[@]}")
+fi
+fingerprint_arguments+=(__COMMAND__ "$@")
 
 stage_fingerprint=$(python -c '
 import hashlib, json, sys
@@ -130,8 +138,7 @@ identity = {
 }
 payload = json.dumps(identity, sort_keys=True, separators=(",", ":"), ensure_ascii=True)
 print(hashlib.sha256(payload.encode("ascii")).hexdigest())
-' "$stage" "$EXP102_SOURCE_COMMIT" __COMMAND__ \
-  "${prerequisite_sha256[@]}" __COMMAND__ "$@")
+' "${fingerprint_arguments[@]}")
 
 [[ ! -e $log_file ]] || {
   echo "HGP screen log already exists: $log_file" >&2
@@ -169,10 +176,14 @@ if [[ -e "$stage_dir/FAILED" ]]; then
   exit 77
 fi
 
-prerequisite_json=$(python -c '
+if (( ${#prerequisite_sha256[@]} > 0 )); then
+  prerequisite_json=$(python -c '
 import json, sys
 print(json.dumps(sys.argv[1:], separators=(",", ":")))
 ' "${prerequisite_sha256[@]}")
+else
+  prerequisite_json='[]'
+fi
 printf '{"pid":%d,"stage":"%s","source_commit":"%s","stage_fingerprint":"%s","prerequisite_success_sha256":%s,"started_utc":"%s"}\n' \
   "$$" "$stage" "$EXP102_SOURCE_COMMIT" "$stage_fingerprint" \
   "$prerequisite_json" "$(date -u +%FT%TZ)" >"$stage_dir/RUNNING.tmp.$$"

@@ -17,6 +17,8 @@ from data.expander_code.exp102.exp102_pipeline.global_discovery import (
     HARD_RAW_FIELDS,
     SMALL_PANEL_SHA256,
     _constant_transport_ok,
+    _delta_gate,
+    _paired_qtop_delta_estimate,
     _parallel_validate_measurement_entry,
     bias_binding_from_raw,
     bias_task_identity,
@@ -26,6 +28,7 @@ from data.expander_code.exp102.exp102_pipeline.global_discovery import (
     run_bias_task,
     run_defect_task,
     run_hard_task,
+    validate_serialized_qtop_delta_gate,
     validate_bias_raw,
     validate_defect_raw,
     validate_hard_raw,
@@ -38,6 +41,7 @@ from data.expander_code.exp102.exp102_pipeline.q0_global import (
     CharacterSet,
     DEFECT_GAMMA_SCHEDULE_VERSION,
     DefectTraceConfig,
+    GlobalConflictError,
     GlobalSeedIdentity,
     HardCosetConfig,
     _reference_cluster_move,
@@ -501,6 +505,113 @@ def test_character_trajectory_jackknife_and_finite_population_se_are_conservativ
     d2 = character_d2_estimate(chars, means, means[::-1])
     assert d2["per_character_d2"].shape == masks.shape
     assert d2["delete_one_d2"].shape == (2 * means.shape[0],)
+
+
+def test_qtop_delta_uses_paired_character_se_and_signed_delete_one_contrasts():
+    masks = np.asarray([1, 2, 4, 3, 5], dtype=np.uint64)
+    chars = CharacterSet(
+        masks, np.asarray([0, 1, 2], dtype=np.int32), "sampled", 3, 9, "x",
+    )
+    common = np.asarray([0.10, 0.20, 0.30, 0.15, 0.45])
+    offset = 0.05
+    right_means = np.repeat(np.sqrt(common)[None, :], 4, axis=0)
+    left_means = np.repeat(np.sqrt(common + offset)[None, :], 4, axis=0)
+    left_q = character_qtop_estimate(chars, left_means)
+    right_q = character_qtop_estimate(chars, right_means)
+    left = {
+        "q_top": left_q["q_top"],
+        "q_top_total_se": left_q["q_top_total_se"],
+        "_means": left_means,
+        "_character_set": chars,
+    }
+    right = {
+        "q_top": right_q["q_top"],
+        "q_top_total_se": right_q["q_top_total_se"],
+        "_means": right_means,
+        "_character_set": chars,
+    }
+
+    paired = _paired_qtop_delta_estimate(left, right)
+    assert paired["signed_delta_q_top"] == pytest.approx(offset, abs=1e-14)
+    assert paired["q_top_character_se"] == pytest.approx(0.0, abs=1e-14)
+    assert paired["q_top_trajectory_se"] == pytest.approx(0.0, abs=1e-14)
+    assert np.ptp(paired["delete_one_left_delta"]) == pytest.approx(
+        0.0, abs=1e-14,
+    )
+    assert np.ptp(paired["delete_one_right_delta"]) == pytest.approx(
+        0.0, abs=1e-14,
+    )
+    assert math.hypot(
+        left_q["q_top_character_se"], right_q["q_top_character_se"],
+    ) > 0.0
+
+    gate = _delta_gate(left, right, {"gates": {
+        "max_abs_delta_q_top": 0.10,
+        "delta_sigma_multiplier": 3.0,
+        "delta_sigma_slack": 0.005,
+    }})
+    assert gate["delta_q_top"] == pytest.approx(offset, abs=1e-14)
+    assert gate["se_delta_q_top"] == pytest.approx(0.0, abs=1e-14)
+    assert gate["paired_evidence"]["version"] == (
+        "exp102.qtop_delta.paired_evidence.v1"
+    )
+    assert gate["absolute_pass"]
+    assert not gate["sigma_pass"]
+
+    serialized = json.loads(json.dumps(gate, allow_nan=False))
+    public_left = {key: value for key, value in left.items()
+                   if not key.startswith("_")}
+    public_right = {key: value for key, value in right.items()
+                    if not key.startswith("_")}
+    assert validate_serialized_qtop_delta_gate(
+        serialized, public_left, public_right, {"gates": {
+            "max_abs_delta_q_top": 0.10,
+            "delta_sigma_multiplier": 3.0,
+            "delta_sigma_slack": 0.005,
+        }},
+    ) == serialized
+
+    legacy = _delta_gate(public_left, public_right, {"gates": {
+        "max_abs_delta_q_top": 0.10,
+        "delta_sigma_multiplier": 3.0,
+        "delta_sigma_slack": 0.005,
+    }})
+    assert "paired_evidence" not in legacy
+    assert legacy["se_delta_q_top"] == pytest.approx(math.sqrt(
+        left_q["q_top_total_se"] ** 2 + right_q["q_top_total_se"] ** 2,
+    ))
+    assert validate_serialized_qtop_delta_gate(
+        legacy, public_left, public_right, {"gates": {
+            "max_abs_delta_q_top": 0.10,
+            "delta_sigma_multiplier": 3.0,
+            "delta_sigma_slack": 0.005,
+        }},
+    ) == legacy
+
+    legacy_raw_config = {
+        "contract_version": "exp102.q0_global.screen_diagnostic.v1",
+        "gates": {
+            "max_abs_delta_q_top": 0.10,
+            "delta_sigma_multiplier": 3.0,
+            "delta_sigma_slack": 0.005,
+        },
+    }
+    legacy_from_internal_means = _delta_gate(left, right, legacy_raw_config)
+    assert "paired_evidence" not in legacy_from_internal_means
+    assert legacy_from_internal_means == _delta_gate(
+        public_left, public_right, legacy_raw_config,
+    )
+
+    tampered = json.loads(json.dumps(serialized))
+    tampered["paired_evidence"]["delete_one_left_delta"][0] += 0.01
+    with pytest.raises(GlobalConflictError, match="gate changed"):
+        validate_serialized_qtop_delta_gate(
+            tampered, public_left, public_right, {"gates": {
+                "max_abs_delta_q_top": 0.10,
+                "delta_sigma_multiplier": 3.0,
+                "delta_sigma_slack": 0.005,
+            }},
+        )
 
 
 def test_raw_label_collision_is_diagnostic_and_unsafe_float_bits_fail_closed():

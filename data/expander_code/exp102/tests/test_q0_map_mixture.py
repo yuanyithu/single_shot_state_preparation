@@ -258,6 +258,7 @@ def test_trajectory_raw_retains_replayable_logq_and_acceptance_transcript():
         model, frame, syndrome, config, _seed(), catalog.anchors[-1],
         anchor_catalog=catalog, proposal=proposal,
     )
+    assert MAP_RAW_VERSION == "exp102.q0_map_mixture.raw.v2"
     assert result["raw_version"] == MAP_RAW_VERSION
     assert result["method_id"] == MAP_METHOD_ID
     assert result["proposal_sha256"] == proposal.proposal_sha256
@@ -268,6 +269,12 @@ def test_trajectory_raw_retains_replayable_logq_and_acceptance_transcript():
     assert int(result["measurement_accepts"]) == int(
         result["measurement_accepted"].sum()
     )
+    assert int(result["burn_state_changes"]) == int(
+        result["burn_state_changed"].sum()
+    )
+    assert int(result["measurement_state_changes"]) == int(
+        result["measurement_state_changed"].sum()
+    )
 
     proposed_coordinates = np.unpackbits(
         result["measurement_proposal_coordinates_packed"], axis=1,
@@ -276,6 +283,24 @@ def test_trajectory_raw_retains_replayable_logq_and_acceptance_transcript():
     proposed_states = np.unpackbits(
         result["measurement_proposal_states_packed"], axis=1,
         count=model.num_qubits, bitorder="little",
+    )
+    stored_states = np.unpackbits(
+        result["measurement_states_packed"], axis=1,
+        count=model.num_qubits, bitorder="little",
+    )
+    pre_step_states = np.vstack((
+        np.unpackbits(
+            result["burn_state_packed"], count=model.num_qubits,
+            bitorder="little",
+        ),
+        stored_states[:-1],
+    ))
+    expected_state_changed = (
+        result["measurement_accepted"].astype(np.bool_)
+        & np.any(proposed_states != pre_step_states, axis=1)
+    )
+    assert np.array_equal(
+        result["measurement_state_changed"], expected_state_changed,
     )
     assert np.array_equal(
         proposed_states.sum(axis=1), result["measurement_proposal_weights"],
@@ -301,6 +326,43 @@ def test_trajectory_raw_retains_replayable_logq_and_acceptance_transcript():
         uniform = result["measurement_accept_uniform"][index]
         expected_accept = uniform == 0.0 or math.log(uniform) < expected
         assert bool(result["measurement_accepted"][index]) == expected_accept
+
+
+def test_accepted_self_loop_is_not_counted_as_state_transport():
+    class SelfLoopProposal:
+        @staticmethod
+        def log_probability_coordinates(_coordinate):
+            return 0.0
+
+        @staticmethod
+        def sample(_rng):
+            return {
+                "state": np.asarray([0], dtype=np.uint8),
+                "coordinate": np.asarray([0], dtype=np.uint8),
+                "log_q": 0.0,
+                "anchor_index": 0,
+                "component_index": 0,
+            }
+
+    class ZeroFrame:
+        k = 1
+
+        @staticmethod
+        def label_of(_state):
+            return np.asarray([0], dtype=np.uint8)
+
+    class FixedRng:
+        @staticmethod
+        def random():
+            return 0.5
+
+    _, _, _, transcript = map_mixture._run_imh_stage(
+        SelfLoopProposal(), ZeroFrame(), 0.10,
+        np.asarray([0], dtype=np.uint8),
+        np.asarray([0], dtype=np.uint8), FixedRng(), 4,
+    )
+    assert transcript["accepted"].tolist() == [1, 1, 1, 1]
+    assert transcript["state_changed"].tolist() == [0, 0, 0, 0]
 
 
 def test_invalid_non_full_support_components_are_rejected():

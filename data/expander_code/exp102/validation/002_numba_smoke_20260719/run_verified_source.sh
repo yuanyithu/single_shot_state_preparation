@@ -20,6 +20,7 @@ deployment_root=$(cd "$deployment_root" && pwd -P)
 
 source_dir=$deployment_root/source
 archive=$deployment_root/SOURCE.tar
+archive_marker=$deployment_root/ARCHIVE_SHA256
 manifest=$deployment_root/SOURCE_MANIFEST.json
 commit_marker=$deployment_root/SOURCE_COMMIT
 
@@ -35,12 +36,17 @@ commit_marker=$deployment_root/SOURCE_COMMIT
   echo "expected manifest SHA256 is invalid" >&2
   exit 65
 }
-[[ -d $source_dir && -f $archive && -f $manifest && -f $commit_marker ]] || {
+[[ -d $source_dir && -f $archive && -f $archive_marker \
+  && -f $manifest && -f $commit_marker ]] || {
   echo "deployed source evidence is incomplete" >&2
   exit 66
 }
 [[ $(tr -d '\r\n' <"$commit_marker") == "$expected_commit" ]] || {
   echo "deployed source commit marker mismatch" >&2
+  exit 66
+}
+[[ $(tr -d '\r\n' <"$archive_marker") == "$expected_archive_sha256" ]] || {
+  echo "deployed source archive marker mismatch" >&2
   exit 66
 }
 

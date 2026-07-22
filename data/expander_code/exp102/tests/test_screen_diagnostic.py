@@ -31,6 +31,10 @@ RUNTIME_PACKAGE = (
     "data.expander_code.exp102.validation."
     "011_q0_global_screen_diagnostic_20260721"
 )
+COMPLETED_REPORT_PATH = (
+    EXP102_ROOT / "validation/011_q0_global_screen_diagnostic_20260721"
+    / "completed_run_evidence/independent_replay/screen_report.json"
+)
 
 
 @pytest.fixture
@@ -839,6 +843,21 @@ def test_terminal_decision_rejects_formal_status_or_authorization_tampering(
                 REGISTRY_PATH,
                 diagnostic_protocol[2],
             )
+
+
+def test_historical_011_report_retains_legacy_delta_semantics():
+    registry = sd._registry_with_path(load_registry(REGISTRY_PATH), REGISTRY_PATH)
+    config = sd.load_screen_diagnostic_config(SCREEN_CONFIG_PATH, registry)
+    report = json.loads(COMPLETED_REPORT_PATH.read_text(encoding="ascii"))
+    assert all(
+        "paired_evidence" not in summary["initialization_delta"]
+        for summary in report["cell_summaries"]
+    )
+    assert all(
+        "paired_evidence" not in comparison["q_top"]
+        for comparison in report["comparisons"]
+    )
+    assert sd.validate_screen_report(report, registry, config)
 
 
 def _runtime_modules():

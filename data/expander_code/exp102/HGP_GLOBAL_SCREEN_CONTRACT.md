@@ -11,7 +11,7 @@ resource envelope.
 - Contract: `exp102.q0_hgp_global.screen.v1`.
 - Config: `config/q0_hgp_global.screen.v1.json`.
 - Canonical config SHA256:
-  `3c65ef96ce231b4aea4499b5a6030f1cc82475117c5ee5ecc7633d972ef8edc9`.
+  `163a5cc87486beabf453f3d4a57bc63f0c4e0b2f54619c60268ee7f0c9b2a341`.
 - Maximum success status: `DIAGNOSTIC_HARD_PAIR_FOUND`.
 - Formal tuning, confirmation, resolution, held-out, publication loading and
   production are outside this contract.
@@ -178,11 +178,24 @@ Every task identity binds source commit, archive/manifest SHA, registry SHA,
 config SHA, cell fingerprint, method, resource tier, initialization family,
 trajectory index, stage and the new seed namespace.
 
+Measurement HP trajectories, measurement MAM trajectories and frozen screen IS
+diagnostics use three disjoint namespaces. Preflight digest, runtime warmup,
+runtime timed, preflight IS and runtime IS each use a further dedicated
+namespace. The only
+intentional seed reuse is the reference/Numba execution of the same tiny-oracle
+case, whose complete identities and transcripts must be bit-identical. A
+regression enumerates every frozen trajectory and IS 63-bit stream and rejects
+any other numeric collision, including any auxiliary/measurement overlap. The
+same enumeration is repeated with the eventual clean deployment's actual
+commit/archive/manifest identities before remote launch; the unit-test fixture
+identity alone is not deployment evidence.
+
 Fresh versions are:
 
 - tasks: `exp102.q0_hgp_global.screen.tasks.v1`;
 - HP raw: `exp102.q0_hgp_power.raw.v2`;
-- MAP raw: `exp102.q0_map_mixture.raw.v2`;
+- MAP sampler transcript: `exp102.q0_map_mixture.raw.v2`;
+- MAP screen raw envelope: `exp102.q0_map_mixture.raw.v3`;
 - report: `exp102.q0_hgp_global.screen.report.v1`;
 - decision: `exp102.q0_hgp_global.screen.decision.v1`.
 
@@ -196,8 +209,9 @@ measurement state in packed form, labels/signatures, physical weights, hard
 residual weights, eight time blocks, all seeds/hashes, timing and counters. The
 analyzer independently reconstructs residuals, weights and labels.
 
-The v2 screen envelope also binds a deterministic packed `B`-character
-catalog and its SHA. For a classical matrix with `r` rows, catalog order is all
+The HP-v2/MAP-v3 screen envelopes also bind a deterministic packed
+`B`-character catalog and its SHA. For a classical matrix with `r` rows,
+catalog order is all
 `r^2` row-major single bits, all row parities, all column parities, then 64
 PortablePrng-derived mutually distinct dense masks of weight between one third
 and two thirds of `r^2`. The analyzer extracts `B` from the already packed full
@@ -212,7 +226,10 @@ and cold visits, strict cold-hot-cold round trips, cold likelihood trace and
 final origin permutation. MAM-IMH8 raw binds solver identity, anchor catalog
 and component SHAs, coordinate SHA, proposal SHA and parameters, every proposed
 state/log-q, every acceptance uniform/log-ratio/decision, and stage-separated
-attempt/accept counts.
+attempt/accept counts. It also records, at every burn and measurement clock,
+whether an accepted proposal actually differs from the pre-step state, plus
+stage-separated state-change counts. An accepted proposal equal to the current
+state is an MH self-loop, not transport.
 
 Anchor/proposal artifacts are constructed once per `HARD2` cell, replayed on
 all three nodes and bound by SHA to all 32 MAM-IMH8 trajectories for that cell.
@@ -273,6 +290,37 @@ change applies only to the `nd-0` control process. Every scientific preflight,
 control, sampler and analysis stage on `nd-1`/`nd-2`/`nd-3` still runs in its
 own immutable `screen` through the verified wrapper.
 
+The compute nodes run RHEL Bash 4.2. The verified stage wrapper must therefore
+remain compatible with Bash 4.2 `set -u` semantics: the sole zero-prerequisite
+stage, `build-schedule`, may not expand an empty array. An executable regression
+must reach a `build-schedule` SUCCESS marker with an exactly empty
+`prerequisite_success_sha256` list before a clean source may be deployed.
+
+The frozen schedule schema is `exp102.q0_hgp_global.screen.schedule.v2`.
+Observed node epochs are not synchronized (approximately nd-1 `+204 s`, nd-2
+`+298 s`, and nd-3 `+2 s` relative to nd-0 during the infrastructure audit), so
+no compute-node or macOS epoch grants deadline authority. The preflight
+orchestrator captures one nd-0 `CLOCK_BOOTTIME` interval of at most one second,
+the nd-0 Linux boot ID and a diagnostic Unix timestamp. Exact boottime
+deadlines are start plus 6/8/22/24 hours. Measurement must reconstruct the
+schedule stage from that same frozen anchor; it may not capture a new one.
+The nd-0 orchestrator checks the boot ID and boottime before every stage launch
+and again at the instant every SUCCESS marker is accepted. Equality with a
+deadline is failure, and a reboot invalidates the run. Node-local Unix times
+are finite diagnostic fields only; monotonic elapsed time records local
+duration and cross-node epoch ordering is forbidden.
+
+Each accepted stage has an exclusive, self-hashed nd-0 record that binds the
+exact SUCCESS bytes, stage fingerprint, prerequisite graph, boot ID, observed
+boottime and applicable deadline. Ordered preflight and measurement acceptance
+manifests bind the complete record sets, phase launch metadata and output file
+hashes. A terminal result is the conjunction of the terminal package and the
+measurement acceptance manifest, never either file alone. Before publishing
+that manifest and again after local transfer, validation reconstructs the exact
+384-trajectory plus two-IS raw/claim set from the frozen control and verifies
+every regular non-symlink path, identity and file hash; missing, extra or
+tampered raw is `CONFLICT` even if analysis previously completed.
+
 Cross-node scientific arrays and decision transcripts must be bit identical.
 No ULP whitelist applies to categorical weights, states, labels, anchors,
 proposals or acceptance decisions. A platform `log/exp`, NumPy, SciPy or HiGHS
@@ -298,11 +346,15 @@ methods can run. Runtime projection mirrors the actual sequential stages:
 
 The three wall times are summed and only then multiplied by the independent
 factor-two safety margin; pretending that final replay follows generation
-ownership or dividing aggregate work by aggregate capacity is forbidden. The
-resulting complete 384-task schedule must fit the 79200-second screen window. A
-predicted trajectory above 7200 seconds removes the entire screen with
-`RUNTIME_EXHAUSTED`; candidates may not be silently deleted. If `T1` does not
-fit, the outcome is `RUNTIME_EXHAUSTED`.
+ownership or dividing aggregate work by aggregate capacity is forbidden. Tier
+selection assumes the latest permitted control origin at hour 8: safeguarded
+generation must complete by hour 22 and safeguarded analysis by hour 24. The
+pre-existing 79200-second complete-screen budget remains an additional cap,
+not a replacement for those stricter stage deadlines. Node epochs and observed
+physics outcomes cannot change the projection. A predicted trajectory above
+7200 seconds removes the entire screen with `RUNTIME_EXHAUSTED`; candidates may
+not be silently deleted. If `T1` does not fit, the outcome is
+`RUNTIME_EXHAUSTED`.
 
 Resource selection must not read `q_top`, labels, weights, acceptance outcomes,
 IS estimates or any pass/fail physics statistic. After controls are frozen,
@@ -327,7 +379,12 @@ D2_norm = mean_{u != 0} (m_P(u)-m_U(u))^2
 
 Finite-sample negative U-statistics remain negative. Total MCSE conservatively
 combines trajectory delete-one jackknife and character finite-population/batch
-SE in quadrature.
+SE in quadrature. Every P/U or cross-method `Delta q_top` uses the shared
+frozen character sample as a paired design: character SE is computed directly
+from the per-character squared-mean differences, while independent left/right
+delete-one trajectory contrasts contribute separate jackknife variances. It is
+forbidden to add the two marginal character SEs as though their common masks
+were independently sampled.
 
 Every method/cell must pass all common gates:
 
@@ -393,13 +450,15 @@ MAM-IMH8 also fails unless every one of its 32 independent trajectories for
 the cell has the following stage-specific records:
 
 ```text
-at least one proposal is accepted during burn
-acceptance rate >= .05
-accepted proposals >= 400.
+at least one actual state change during burn
+measurement state-change rate >= .05
+measurement state changes >= 400.
 ```
 
-These are transition gates, not substitutes for Rhat, ESS, P/U agreement or
-the distribution gate.
+Acceptance decisions and acceptance rates remain in raw as MH diagnostics, but
+cannot satisfy these transition gates because an accepted proposal may be an
+exact self-loop. The state-change gates are not substitutes for Rhat, ESS, P/U
+agreement or the distribution gate.
 
 ## 7. Method selection, agreement and terminal states
 

@@ -62,7 +62,7 @@ HGP_SCREEN_VERSION = "exp102.q0_hgp_global.screen.v1"
 HGP_SCREEN_CONFIG_VERSION = "exp102.q0_hgp_global.screen.config.v1"
 HGP_SCREEN_TASK_VERSION = "exp102.q0_hgp_global.screen.tasks.v1"
 HGP_POWER_RAW_VERSION = "exp102.q0_hgp_power.raw.v2"
-HGP_MAP_RAW_VERSION = "exp102.q0_map_mixture.raw.v2"
+HGP_MAP_RAW_VERSION = "exp102.q0_map_mixture.raw.v3"
 HGP_SCREEN_REPORT_VERSION = "exp102.q0_hgp_global.screen.report.v1"
 HGP_SCREEN_MANIFEST_VERSION = "exp102.q0_hgp_global.screen.manifest.v1"
 HGP_SCREEN_SEED_ROOT = "q0_hgp_global_screen_v1"
@@ -72,10 +72,17 @@ HGP_SCREEN_HP_TRAJECTORY_ROOT = "q0_hgp_global_screen_hp_trajectory_v1"
 HGP_SCREEN_MAP_TRAJECTORY_ROOT = "q0_hgp_global_screen_map_trajectory_v1"
 HGP_SCREEN_MAP_ANCHOR_ROOT = "q0_hgp_global_screen_map_anchor_v1"
 HGP_SCREEN_IS_ROOT = "q0_hgp_global_screen_is_diagnostic_v1"
+HGP_SCREEN_PREFLIGHT_DIGEST_ROOT = (
+    "q0_hgp_global_screen_preflight_digest_v1"
+)
+HGP_SCREEN_RUNTIME_WARMUP_ROOT = "q0_hgp_global_screen_runtime_warmup_v1"
+HGP_SCREEN_RUNTIME_TIMED_ROOT = "q0_hgp_global_screen_runtime_timed_v1"
+HGP_SCREEN_PREFLIGHT_IS_ROOT = "q0_hgp_global_screen_is_preflight_v1"
+HGP_SCREEN_RUNTIME_IS_ROOT = "q0_hgp_global_screen_is_runtime_v1"
 HGP_MAP_ARTIFACT_VERSION = "exp102.q0_hgp_global.screen.map_artifact.v1"
 HGP_MAP_IS_RAW_VERSION = "exp102.q0_hgp_global.screen.is_diagnostic.v1"
 HGP_MAP_IS_SAMPLES = 50_000
-HGP_SCREEN_CONFIG_SHA256 = "3c65ef96ce231b4aea4499b5a6030f1cc82475117c5ee5ecc7633d972ef8edc9"
+HGP_SCREEN_CONFIG_SHA256 = "163a5cc87486beabf453f3d4a57bc63f0c4e0b2f54619c60268ee7f0c9b2a341"
 B_CHARACTER_VERSION = "exp102.q0_hgp_b_characters.v1"
 B_DENSE_CHARACTER_COUNT = 64
 B_MIN_NONDEGENERATE_DENSE = 48
@@ -584,12 +591,14 @@ def load_hgp_screen_config(path, registry=None):
         "hp_min_cold_origin_fraction": hp_gates.get(
             "min_cold_origin_fraction",
         ),
-        "map_min_burn_accepts": map_gates.get("min_burn_accepts"),
-        "map_min_measurement_acceptance": map_gates.get(
-            "min_measurement_acceptance_rate",
+        "map_min_burn_state_changes": map_gates.get(
+            "min_burn_state_changes",
         ),
-        "map_min_measurement_accepts": map_gates.get(
-            "min_measurement_accepts",
+        "map_min_measurement_state_change_rate": map_gates.get(
+            "min_measurement_state_change_rate",
+        ),
+        "map_min_measurement_state_changes": map_gates.get(
+            "min_measurement_state_changes",
         ),
     })
     required_gates = {
@@ -599,8 +608,9 @@ def load_hgp_screen_config(path, registry=None):
         "max_rhat", "min_bulk_ess", "hp_min_edge_swap_rate",
         "hp_min_edge_swap_accepts",
         "hp_min_round_trips_per_trajectory", "hp_min_cold_origin_fraction",
-        "map_min_burn_accepts", "map_min_measurement_acceptance",
-        "map_min_measurement_accepts",
+        "map_min_burn_state_changes",
+        "map_min_measurement_state_change_rate",
+        "map_min_measurement_state_changes",
         "max_b_character_d2_upper", "max_b_normalized_weight_delta",
         "max_b_log_likelihood_delta_per_factor",
         "max_abs_b_character_mean_delta", "b_character_delta_sigma_slack",
@@ -610,7 +620,7 @@ def load_hgp_screen_config(path, registry=None):
     if (any(gates[name] is None or not math.isfinite(float(gates[name]))
             for name in required_gates)
             or gates["hp_min_edge_swap_rate"] < 0.0
-            or gates["map_min_measurement_acceptance"] < 0.0):
+            or gates["map_min_measurement_state_change_rate"] < 0.0):
         raise ValueError("HGP screen statistical gate value is invalid")
     namespaces = raw.get("seed_namespaces", {})
     if (namespaces.get("root") != HGP_SCREEN_SEED_ROOT
@@ -622,7 +632,17 @@ def load_hgp_screen_config(path, registry=None):
             or namespaces.get("map_trajectory")
             != HGP_SCREEN_MAP_TRAJECTORY_ROOT
             or namespaces.get("map_anchor") != HGP_SCREEN_MAP_ANCHOR_ROOT
-            or namespaces.get("importance_sampling") != HGP_SCREEN_IS_ROOT):
+            or namespaces.get("importance_sampling") != HGP_SCREEN_IS_ROOT
+            or namespaces.get("preflight_digest")
+            != HGP_SCREEN_PREFLIGHT_DIGEST_ROOT
+            or namespaces.get("runtime_warmup")
+            != HGP_SCREEN_RUNTIME_WARMUP_ROOT
+            or namespaces.get("runtime_timed")
+            != HGP_SCREEN_RUNTIME_TIMED_ROOT
+            or namespaces.get("importance_sampling_preflight")
+            != HGP_SCREEN_PREFLIGHT_IS_ROOT
+            or namespaces.get("importance_sampling_runtime")
+            != HGP_SCREEN_RUNTIME_IS_ROOT):
         raise ValueError("HGP screen seed namespace changed")
     if registry is None:
         registry = load_registry(path.parents[1] / "registry/registry.json")
@@ -680,11 +700,15 @@ class HgpScreenSeedIdentity:
                 or not isinstance(self.trajectory_index, (int, np.integer))
                 or not 0 <= int(self.trajectory_index) < TRAJECTORIES_PER_FAMILY):
             raise ValueError("HGP screen seed trajectory changed")
-        expected_namespace = (
+        formal_namespace = (
             HGP_SCREEN_HP_TRAJECTORY_ROOT if self.method_id in HP_METHODS
             else HGP_SCREEN_MAP_TRAJECTORY_ROOT
         )
-        if self.trajectory_namespace != expected_namespace:
+        allowed_namespaces = {
+            formal_namespace, HGP_SCREEN_PREFLIGHT_DIGEST_ROOT,
+            HGP_SCREEN_RUNTIME_WARMUP_ROOT, HGP_SCREEN_RUNTIME_TIMED_ROOT,
+        }
+        if self.trajectory_namespace not in allowed_namespaces:
             raise ValueError("HGP screen seed namespace changed")
 
     def seed(self, stage, role="stream", index=0):
@@ -728,6 +752,26 @@ def _seed_identity(config, registry, source_commit, archive_sha256,
             HGP_SCREEN_HP_TRAJECTORY_ROOT if method in HP_METHODS
             else HGP_SCREEN_MAP_TRAJECTORY_ROOT
         ),
+    )
+
+
+def _aux_seed_identity(config, registry, source_commit, archive_sha256,
+                       source_manifest_sha256, method, tier, cell, family,
+                       trajectory, namespace):
+    if namespace not in {
+            HGP_SCREEN_PREFLIGHT_DIGEST_ROOT,
+            HGP_SCREEN_RUNTIME_WARMUP_ROOT,
+            HGP_SCREEN_RUNTIME_TIMED_ROOT}:
+        raise ValueError("HGP auxiliary trajectory namespace changed")
+    return HgpScreenSeedIdentity(
+        source_commit=source_commit,
+        archive_sha256=archive_sha256,
+        source_manifest_sha256=source_manifest_sha256,
+        config_sha256=config["hgp_screen_config_sha256"],
+        registry_sha256=registry["registry_sha256"],
+        cell_fingerprint=_cell_fingerprint(cell), method_id=method,
+        resource_tier=tier, init_family=family,
+        trajectory_index=int(trajectory), trajectory_namespace=namespace,
     )
 
 
@@ -1185,9 +1229,14 @@ def load_hgp_map_artifact_descriptors(
 
 
 def _map_is_seed(source_commit, archive_sha256, source_manifest_sha256,
-                 config, registry, cell, artifact_descriptor):
+                 config, registry, cell, artifact_descriptor,
+                 seed_namespace=HGP_SCREEN_IS_ROOT):
+    if seed_namespace not in {
+            HGP_SCREEN_IS_ROOT, HGP_SCREEN_PREFLIGHT_IS_ROOT,
+            HGP_SCREEN_RUNTIME_IS_ROOT}:
+        raise ValueError("HGP screen IS seed namespace changed")
     return derive_seed(
-        HGP_SCREEN_IS_ROOT, source_commit, archive_sha256,
+        seed_namespace, source_commit, archive_sha256,
         source_manifest_sha256, config["hgp_screen_config_sha256"],
         registry["registry_sha256"], _cell_fingerprint(cell), MAP_METHOD_ID,
         artifact_descriptor["artifact_content_sha256"],
@@ -1278,7 +1327,15 @@ def _map_is_transcript(proposal, p, num_samples, seed):
 
 def _map_is_identity(registry, config, source_commit, archive_sha256,
                      source_manifest_sha256, cell, artifact, seed,
-                     diagnostics):
+                     diagnostics, seed_namespace):
+    roles = {
+        HGP_SCREEN_IS_ROOT: "auxiliary_proposal_overlap_diagnostic_only",
+        HGP_SCREEN_PREFLIGHT_IS_ROOT: (
+            "preflight_portability_transcript_only"
+        ),
+    }
+    if seed_namespace not in roles:
+        raise ValueError("HGP screen replayable IS role changed")
     return {
         "raw_version": HGP_MAP_IS_RAW_VERSION,
         "contract_version": HGP_SCREEN_VERSION,
@@ -1290,11 +1347,11 @@ def _map_is_identity(registry, config, source_commit, archive_sha256,
         "cell": _validate_cell(cell),
         "cell_fingerprint": _cell_fingerprint(cell),
         "method_id": MAP_METHOD_ID,
-        "seed_namespace": HGP_SCREEN_IS_ROOT,
+        "seed_namespace": seed_namespace,
         "seed": int(seed),
         "num_samples": HGP_MAP_IS_SAMPLES,
         "artifact_descriptor": artifact.descriptor,
-        "role": "auxiliary_proposal_overlap_diagnostic_only",
+        "role": roles[seed_namespace],
         "used_for_gate_or_selection": False,
         "diagnostics": diagnostics,
     }
@@ -1302,7 +1359,8 @@ def _map_is_identity(registry, config, source_commit, archive_sha256,
 
 def run_hgp_map_is_diagnostic(registry_path, config_path, source_commit,
                               archive_sha256, source_manifest_sha256, cell,
-                              artifact_root, output_path):
+                              artifact_root, output_path,
+                              seed_namespace=HGP_SCREEN_IS_ROOT):
     """Write a replayable 50k-draw auxiliary diagnostic; never a gate input."""
     registry = _registry_with_path(load_registry(registry_path), registry_path)
     config = load_hgp_screen_config(config_path, registry)
@@ -1313,7 +1371,7 @@ def run_hgp_map_is_diagnostic(registry_path, config_path, source_commit,
     )
     seed = _map_is_seed(
         source_commit, archive_sha256, source_manifest_sha256, config,
-        registry, cell, artifact.descriptor,
+        registry, cell, artifact.descriptor, seed_namespace,
     )
     arrays, diagnostics = _map_is_transcript(
         artifact.proposal, cell["p"], HGP_MAP_IS_SAMPLES, seed,
@@ -1321,6 +1379,7 @@ def run_hgp_map_is_diagnostic(registry_path, config_path, source_commit,
     identity = _map_is_identity(
         registry, config, source_commit, archive_sha256,
         source_manifest_sha256, cell, artifact, seed, diagnostics,
+        seed_namespace,
     )
     transcript_sha256 = _artifact_content_sha256(
         identity, arrays, version=HGP_MAP_IS_RAW_VERSION,
@@ -1336,6 +1395,7 @@ def run_hgp_map_is_diagnostic(registry_path, config_path, source_commit,
         "output": str(output_path), "sha256": sha256_file(output_path),
         "transcript_sha256": transcript_sha256,
         "cell_fingerprint": _cell_fingerprint(cell),
+        "seed_namespace": seed_namespace,
         "diagnostics": diagnostics,
         "used_for_gate_or_selection": False,
     }
@@ -1343,7 +1403,8 @@ def run_hgp_map_is_diagnostic(registry_path, config_path, source_commit,
 
 def validate_hgp_map_is_diagnostic(
         path, registry_path, config_path, source_commit, archive_sha256,
-        source_manifest_sha256, cell, artifact_root):
+        source_manifest_sha256, cell, artifact_root,
+        seed_namespace=HGP_SCREEN_IS_ROOT):
     registry = _registry_with_path(load_registry(registry_path), registry_path)
     config = load_hgp_screen_config(config_path, registry)
     cell = _validate_cell(cell)
@@ -1353,7 +1414,7 @@ def validate_hgp_map_is_diagnostic(
     )
     seed = _map_is_seed(
         source_commit, archive_sha256, source_manifest_sha256, config,
-        registry, cell, artifact.descriptor,
+        registry, cell, artifact.descriptor, seed_namespace,
     )
     replay_arrays, diagnostics = _map_is_transcript(
         artifact.proposal, cell["p"], HGP_MAP_IS_SAMPLES, seed,
@@ -1361,6 +1422,7 @@ def validate_hgp_map_is_diagnostic(
     expected_identity = _map_is_identity(
         registry, config, source_commit, archive_sha256,
         source_manifest_sha256, cell, artifact, seed, diagnostics,
+        seed_namespace,
     )
     try:
         with np.load(path, allow_pickle=False) as data:
@@ -1391,6 +1453,7 @@ def validate_hgp_map_is_diagnostic(
     return {
         "path": str(Path(path).resolve()), "sha256": sha256_file(path),
         "cell": cell, "diagnostics": diagnostics,
+        "seed_namespace": seed_namespace,
         "transcript_sha256": expected_sha256,
         "used_for_gate_or_selection": False,
     }
@@ -1714,6 +1777,44 @@ def _compare_result(stored, replay, *, has_map_artifact):
         raise HgpScreenConflictError("HGP screen outer raw schema changed")
 
 
+def _validate_map_transition_counters(data):
+    for stage, start_field in (
+            ("burn", "sampler_initial_state_packed"),
+            ("measurement", "sampler_burn_state_packed")):
+        proposals = np.asarray(
+            data[f"sampler_{stage}_proposal_states_packed"], dtype=np.uint8,
+        )
+        states = np.asarray(
+            data[f"sampler_{stage}_states_packed"], dtype=np.uint8,
+        )
+        accepted = np.asarray(
+            data[f"sampler_{stage}_accepted"], dtype=np.uint8,
+        )
+        changed = np.asarray(
+            data[f"sampler_{stage}_state_changed"], dtype=np.uint8,
+        )
+        start = np.asarray(data[start_field], dtype=np.uint8)
+        if (proposals.ndim != 2 or states.shape != proposals.shape
+                or accepted.shape != (states.shape[0],)
+                or changed.shape != accepted.shape
+                or start.shape != (states.shape[1],)
+                or np.any(accepted > 1) or np.any(changed > 1)):
+            raise HgpScreenConflictError("MAP transition transcript shape changed")
+        before = np.vstack((start[None, :], states[:-1]))
+        accepted_mask = accepted.astype(np.bool_)
+        expected_changed = accepted_mask & np.any(proposals != before, axis=1)
+        if (not np.array_equal(changed.astype(np.bool_), expected_changed)
+                or not np.array_equal(states[accepted_mask], proposals[accepted_mask])
+                or not np.array_equal(states[~accepted_mask], before[~accepted_mask])
+                or int(_scalar(data, f"sampler_{stage}_attempts"))
+                != states.shape[0]
+                or int(_scalar(data, f"sampler_{stage}_accepts"))
+                != int(accepted.sum())
+                or int(_scalar(data, f"sampler_{stage}_state_changes"))
+                != int(expected_changed.sum())):
+            raise HgpScreenConflictError("MAP transition counters changed")
+
+
 def _b_record_from_replay(replay, H, syndrome, p, b_characters, method_id,
                           burn_count):
     r, n = np.asarray(H).shape
@@ -1860,6 +1961,8 @@ def validate_hgp_screen_raw(path, registry, config, source_commit,
         _compare_result(
             data, replay, has_map_artifact=map_artifact is not None,
         )
+        if map_artifact is not None:
+            _validate_map_transition_counters(data)
         if str(_scalar(data, "trajectory_digest")) != _value_digest(replay):
             raise HgpScreenConflictError("HGP screen trajectory digest changed")
         b_record = _b_record_from_replay(
@@ -1901,14 +2004,27 @@ def validate_hgp_screen_raw(path, registry, config, source_commit,
                 ),
             }
         else:
+            measurement_attempts = int(
+                _scalar(data, "sampler_measurement_attempts")
+            )
             record["algorithm_metrics"] = {
                 "burn_accepts": int(_scalar(data, "sampler_burn_accepts")),
+                "burn_state_changes": int(
+                    _scalar(data, "sampler_burn_state_changes")
+                ),
                 "measurement_accepts": int(
                     _scalar(data, "sampler_measurement_accepts")
                 ),
                 "measurement_acceptance": float(
                     _scalar(data, "sampler_measurement_accepts")
-                    / max(int(_scalar(data, "sampler_measurement_attempts")), 1)
+                    / max(measurement_attempts, 1)
+                ),
+                "measurement_state_changes": int(
+                    _scalar(data, "sampler_measurement_state_changes")
+                ),
+                "measurement_state_change_rate": float(
+                    _scalar(data, "sampler_measurement_state_changes")
+                    / max(measurement_attempts, 1)
                 ),
             }
     return record
@@ -1959,15 +2075,17 @@ def _algorithm_failures(records, method, gates):
                < gates["hp_min_cold_origin_fraction"] for value in records):
             failures.append("hp_origin_transport")
     else:
-        if any(value["algorithm_metrics"]["burn_accepts"]
-               < gates["map_min_burn_accepts"] for value in records):
-            failures.append("map_burn_acceptance")
-        if any(value["algorithm_metrics"]["measurement_acceptance"]
-               < gates["map_min_measurement_acceptance"] for value in records):
-            failures.append("map_measurement_acceptance")
-        if any(value["algorithm_metrics"]["measurement_accepts"]
-               < gates["map_min_measurement_accepts"] for value in records):
-            failures.append("map_measurement_accepts")
+        if any(value["algorithm_metrics"]["burn_state_changes"]
+               < gates["map_min_burn_state_changes"] for value in records):
+            failures.append("map_burn_state_changes")
+        if any(value["algorithm_metrics"]["measurement_state_change_rate"]
+               < gates["map_min_measurement_state_change_rate"]
+               for value in records):
+            failures.append("map_measurement_state_change_rate")
+        if any(value["algorithm_metrics"]["measurement_state_changes"]
+               < gates["map_min_measurement_state_changes"]
+               for value in records):
+            failures.append("map_measurement_state_changes")
     return failures
 
 
@@ -2610,22 +2728,27 @@ def hgp_screen_preflight_digest(registry_path, config_path, source_commit,
         "source_manifest_sha256": source_manifest_sha256,
         "registry_sha256": registry["registry_sha256"],
         "config_sha256": config["hgp_screen_config_sha256"],
-        "cells": [], "tiny_oracles": [],
+        "cells": [], "tiny_oracles": [], "auxiliary_seed_catalog": [],
     }
-    for classical in (
+    for oracle_index, classical in enumerate((
         np.asarray([[1, 1, 1]], dtype=np.uint8),
         np.asarray([[1, 1, 0], [0, 1, 1]], dtype=np.uint8),
-    ):
+    )):
         model, frame = build_model(classical)
         syndrome = np.zeros(model.num_checks, dtype=np.uint8)
         initial = np.zeros(model.num_qubits, dtype=np.uint8)
         cell = {"code_id": "tiny", "p": 0.10, "disorder_index": 0,
                 "disorder_source": "preflight"}
-        seed = HgpScreenSeedIdentity(
-            source_commit, archive_sha256, source_manifest_sha256,
-            config["hgp_screen_config_sha256"], registry["registry_sha256"],
-            _cell_fingerprint(cell), "HP32", "T1", "P", 0,
+        seed = _aux_seed_identity(
+            config, registry, source_commit, archive_sha256,
+            source_manifest_sha256, "HP32", "T1", cell, "P",
+            oracle_index, HGP_SCREEN_PREFLIGHT_DIGEST_ROOT,
         )
+        payload["auxiliary_seed_catalog"].append({
+            "purpose": "tiny_oracle_reference_numba",
+            "oracle_index": oracle_index,
+            "seed_identity": seed.as_dict(),
+        })
         sampler = CollapsedPowerPtConfig("HP32", 0.10, 2, 8)
         reference = run_collapsed_power_pt_trajectory(
             model, frame, classical, syndrome, sampler, seed, initial,
@@ -2662,10 +2785,15 @@ def hgp_screen_preflight_digest(registry_path, config_path, source_commit,
         row["b_character_count"] = b_characters.size
         if cell["code_id"] == "m08_c06":
             for method in HP_METHODS:
-                seed = _seed_identity(
+                seed = _aux_seed_identity(
                     config, registry, source_commit, archive_sha256,
                     source_manifest_sha256, method, "T1", cell, "P", 0,
+                    HGP_SCREEN_PREFLIGHT_DIGEST_ROOT,
                 )
+                payload["auxiliary_seed_catalog"].append({
+                    "purpose": "hard_cell_digest",
+                    "seed_identity": seed.as_dict(),
+                })
                 short = CollapsedPowerPtConfig(method, cell["p"], 2, 8)
                 row[f"{method}_transcript_sha256"] = _digest_result(
                     run_collapsed_power_pt_trajectory(
@@ -2690,10 +2818,15 @@ def hgp_screen_preflight_digest(registry_path, config_path, source_commit,
             row["map_proposal_sha256"] = proposal.proposal_sha256
             row["map_solver_identity"] = catalog.solver_identity
         if cell["code_id"] == "m08_c06":
-            seed = _seed_identity(
+            seed = _aux_seed_identity(
                 config, registry, source_commit, archive_sha256,
                 source_manifest_sha256, MAP_METHOD_ID, "T1", cell, "P", 0,
+                HGP_SCREEN_PREFLIGHT_DIGEST_ROOT,
             )
+            payload["auxiliary_seed_catalog"].append({
+                "purpose": "hard_cell_digest",
+                "seed_identity": seed.as_dict(),
+            })
             short = MapMixtureConfig(cell["p"], 8, 8)
             row["map_transcript_sha256"] = _digest_result(
                 run_map_mixture_trajectory(
@@ -2702,6 +2835,9 @@ def hgp_screen_preflight_digest(registry_path, config_path, source_commit,
                 )
             )
         payload["cells"].append(row)
+    payload["auxiliary_seed_catalog_sha256"] = sha256_json(
+        payload["auxiliary_seed_catalog"],
+    )
     return {**payload, "canonical_digest": sha256_json(payload)}
 
 
@@ -3057,11 +3193,22 @@ def benchmark_hgp_screen(registry_path, config_path, source_commit,
         H, syndrome, cell["p"], b_characters, config,
     )
     timings = {}
+    auxiliary_seed_catalog = []
     for method in SCREEN_METHODS:
-        seed = _seed_identity(
+        warm_seed = _aux_seed_identity(
             config, registry, source_commit, archive_sha256,
             source_manifest_sha256, method, "T1", cell, "P", 1,
+            HGP_SCREEN_RUNTIME_WARMUP_ROOT,
         )
+        timed_seed = _aux_seed_identity(
+            config, registry, source_commit, archive_sha256,
+            source_manifest_sha256, method, "T1", cell, "P", 1,
+            HGP_SCREEN_RUNTIME_TIMED_ROOT,
+        )
+        auxiliary_seed_catalog.extend((
+            {"purpose": "runtime_warmup", "seed_identity": warm_seed.as_dict()},
+            {"purpose": "runtime_timed", "seed_identity": timed_seed.as_dict()},
+        ))
         if method in HP_METHODS:
             warm = CollapsedPowerPtConfig(method, cell["p"], 1, 8)
             measured = CollapsedPowerPtConfig(method, cell["p"], 32, 128)
@@ -3072,12 +3219,12 @@ def benchmark_hgp_screen(registry_path, config_path, source_commit,
             benchmark_map_artifact if method == MAP_METHOD_ID else None
         )
         _run_sampler(
-            method, model, frame, H, syndrome, warm, seed, epsilon,
+            method, model, frame, H, syndrome, warm, warm_seed, epsilon,
             map_artifact,
         )
         start = time.monotonic()
         _run_sampler(
-            method, model, frame, H, syndrome, measured, seed, epsilon,
+            method, model, frame, H, syndrome, measured, timed_seed, epsilon,
             map_artifact,
         )
         elapsed = time.monotonic() - start
@@ -3104,8 +3251,14 @@ def benchmark_hgp_screen(registry_path, config_path, source_commit,
         )
         is_seed = _map_is_seed(
             source_commit, archive_sha256, source_manifest_sha256, config,
-            registry, is_cell, artifact.descriptor,
+            registry, is_cell, artifact.descriptor, HGP_SCREEN_RUNTIME_IS_ROOT,
         )
+        auxiliary_seed_catalog.append({
+            "purpose": "importance_sampling_runtime",
+            "cell_fingerprint": _cell_fingerprint(is_cell),
+            "seed_namespace": HGP_SCREEN_RUNTIME_IS_ROOT,
+            "seed": int(is_seed),
+        })
         start = time.monotonic()
         _map_is_transcript(
             artifact.proposal, is_cell["p"], HGP_MAP_IS_SAMPLES, is_seed,
@@ -3118,7 +3271,7 @@ def benchmark_hgp_screen(registry_path, config_path, source_commit,
         b_analysis_timings,
     )
     return {
-        "version": "exp102.q0_hgp_global.screen.runtime_node.v2",
+        "version": "exp102.q0_hgp_global.screen.runtime_node.v3",
         "source_commit": source_commit,
         "archive_sha256": archive_sha256,
         "source_manifest_sha256": source_manifest_sha256,
@@ -3129,6 +3282,8 @@ def benchmark_hgp_screen(registry_path, config_path, source_commit,
         "artifact_generation_wall_seconds": artifact_generation_seconds,
         "b_analysis_timings": b_analysis_timings,
         "is_seconds_by_cell": is_seconds_by_cell,
+        "auxiliary_seed_catalog": auxiliary_seed_catalog,
+        "auxiliary_seed_catalog_sha256": sha256_json(auxiliary_seed_catalog),
         "owner_task_counts": owner_counts,
         "tiers": tiers,
     }

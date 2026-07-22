@@ -24,6 +24,7 @@ SOURCE_COMMIT = "1" * 40
 ARCHIVE_SHA256 = "a" * 64
 SOURCE_MANIFEST_SHA256 = "b" * 64
 CONFIG_SHA256 = "c" * 64
+BOOT_ID = "01234567-89ab-cdef-0123-456789abcdef"
 LAUNCHER_PATH = (
     Path(__file__).resolve().parents[1]
     / "validation/013_q0_hgp_global_screen_20260722"
@@ -44,6 +45,18 @@ def _config():
             "map_measurement": 64,
             "total_measurement": 384,
         },
+        "importance_sampling": {"num_samples_per_cell": 50000},
+    }
+
+
+def _clock_authority():
+    return {
+        "clock_authority_version": orchestrator_module.CLOCK_AUTHORITY_VERSION,
+        "clock_authority_node": "nd-0",
+        "clock_authority_boot_id": BOOT_ID,
+        "boottime_before_ns": 5_000_000_000_000,
+        "authority_unix_ns": 1_000_000_000_000,
+        "boottime_after_ns": 5_000_000_001_000,
     }
 
 
@@ -55,14 +68,18 @@ def _orchestrator(tmp_path):
         deployment_root=tmp_path / "repos/exp102_q0_hgp_test",
         run_root=tmp_path / "runs/exp102_q0_hgp_test",
         config=_config(), config_file_sha256=CONFIG_SHA256,
+        clock_authority=_clock_authority(),
         poll_seconds=0.1,
     )
 
 
-def _schedule():
+def _schedule(*, registry_sha="d" * 64, config_sha=CONFIG_SHA256):
+    clock_authority = _clock_authority()
+    started_unix = 1000
+    started_boottime_ns = clock_authority["boottime_before_ns"]
     identity = {
-        "schedule_version": "schedule.v1",
-        "contract_version": "contract.v1",
+        "schedule_version": orchestrator_module.SCHEDULE_VERSION,
+        "contract_version": orchestrator_module.HGP_CONTRACT_VERSION,
         "run_id": "exp102_q0_hgp_test",
         "source_commit": SOURCE_COMMIT,
         "archive_sha256": ARCHIVE_SHA256,
@@ -72,14 +89,20 @@ def _schedule():
             "archive_sha256": ARCHIVE_SHA256,
             "manifest_sha256": SOURCE_MANIFEST_SHA256,
         },
-        "registry_file_sha256": "d" * 64,
-        "config_file_sha256": CONFIG_SHA256,
-        "started_unix": 1000,
-        "preflight_deadline_unix": 2000,
-        "control_freeze_deadline_unix": 3000,
-        "screen_deadline_unix": 4000,
-        "analysis_deadline_unix": 5000,
+        "registry_file_sha256": registry_sha,
+        "config_file_sha256": config_sha,
+        "clock_authority": clock_authority,
+        "started_unix": started_unix,
+        "started_boottime_ns": started_boottime_ns,
     }
+    for name, hours in (
+            ("preflight", 6), ("control_freeze", 8),
+            ("screen", 22), ("analysis", 24)):
+        identity[f"{name}_deadline_unix"] = started_unix + hours * 3600
+        identity[f"{name}_deadline_boottime_ns"] = (
+            started_boottime_ns
+            + hours * 3600 * orchestrator_module.NANOSECONDS_PER_SECOND
+        )
     return {
         **identity,
         "schedule_sha256": hashlib.sha256(
@@ -105,6 +128,19 @@ def _write_success(path, stage):
     })
 
 
+def _write_stage_success(stage):
+    fingerprint, prerequisite_sha256 = (
+        orchestrator_module._expected_stage_fingerprint(stage, SOURCE_COMMIT)
+    )
+    _write_json(stage.success, {
+        "stage": stage.stage,
+        "source_commit": SOURCE_COMMIT,
+        "stage_fingerprint": fingerprint,
+        "prerequisite_success_sha256": prerequisite_sha256,
+        "completed_utc": "2026-07-22T00:00:00Z",
+    })
+
+
 def _launch_metadata(args, command_sha="9" * 64):
     return {
         "archive_sha256": args.archive_sha256,
@@ -118,6 +154,854 @@ def _launch_metadata(args, command_sha="9" * 64):
         "phase": args.phase,
         "run_id": args.run_id,
         "source_commit": args.source_commit,
+    }
+
+
+def _add_self_hash(identity, field):
+    return {
+        **identity,
+        field: hashlib.sha256(
+            orchestrator_module._canonical_json(identity).encode("ascii")
+        ).hexdigest(),
+    }
+
+
+def _write_phase_launch(runner, phase, attestation_file_sha=None):
+    metadata = {
+        "archive_sha256": ARCHIVE_SHA256,
+        "command_sha256": "9" * 64,
+        "launcher_version": orchestrator_module.ND0_LAUNCHER_VERSION,
+        "local_attestation_sha256": (
+            attestation_file_sha if phase == "measurement" else None
+        ),
+        "manifest_sha256": SOURCE_MANIFEST_SHA256,
+        "phase": phase,
+        "run_id": runner.run_id,
+        "source_commit": SOURCE_COMMIT,
+    }
+    path = (
+        runner.log_root
+        / f".{runner.run_id}_hgp_orchestrator_{runner.token}_{phase}.launch"
+        / "LAUNCH.json"
+    )
+    _write_json(path, metadata)
+    return path
+
+
+def _write_phase_manifest(
+        runner, path, phase, stages, bound_files, bound_identity,
+        published_boottime_ns, prior_manifest=None):
+    identity = runner._phase_acceptance_identity(
+        phase, stages, bound_files, bound_identity,
+        published_boottime_ns, prior_manifest,
+    )
+    value = _add_self_hash(identity, "manifest_sha256")
+    _write_json(path, value)
+    return value
+
+
+def _terminal_evidence(tmp_path):
+    source_root = tmp_path / "source"
+    registry_path = source_root / "registry.json"
+    config_path = source_root / "config.json"
+    config = _config()
+    _write_json(registry_path, {"registry": "test"})
+    _write_json(config_path, config)
+    registry_sha = orchestrator_module._sha256_file(registry_path)
+    config_sha = orchestrator_module._sha256_file(config_path)
+    log_root = tmp_path / "logs"
+    runner = orchestrator_module.HgpOrchestrator(
+        run_id="exp102_q0_hgp_test", source_commit=SOURCE_COMMIT,
+        archive_sha256=ARCHIVE_SHA256,
+        source_manifest_sha256=SOURCE_MANIFEST_SHA256,
+        deployment_root=tmp_path / "repos/exp102_q0_hgp_test",
+        run_root=tmp_path / "runs/exp102_q0_hgp_test",
+        config=config, config_file_sha256=config_sha,
+        clock_authority=_clock_authority(),
+        launch_guard=log_root / "placeholder", poll_seconds=0.1,
+    )
+    runner.registry = registry_path
+    runner.config_path = config_path
+    schedule = _schedule(registry_sha=registry_sha, config_sha=config_sha)
+    _write_json(runner.schedule, schedule)
+
+    artifact = {"artifact_manifest_sha256": "4" * 64}
+    _write_json(runner.artifact_manifest, artifact)
+    is_transcripts = [{
+        "cell_fingerprint": "5" * 64,
+        "transcript_sha256": "6" * 64,
+    }]
+    canonical_digest = {
+        "algebra": {"rank": 7},
+        "importance_sampling_transcript_sha256": is_transcripts,
+    }
+    preflight = {
+        "status": "PASS",
+        "selected_resource_tier": "T3",
+        "source_commit": SOURCE_COMMIT,
+        "archive_sha256": ARCHIVE_SHA256,
+        "source_manifest_sha256": SOURCE_MANIFEST_SHA256,
+        "config_file_sha256": config_sha,
+        "schedule_sha256": schedule["schedule_sha256"],
+        "source_identity": schedule["source_identity"],
+        "selection_basis": (
+            "runtime_only_worst_node_and_frozen_elapsed_deadlines"
+        ),
+        "clock_domain": "unsynchronized_local_diagnostic",
+        "completed_local_unix": 1500,
+        "canonical_digest": canonical_digest,
+        "canonical_digest_sha256": hashlib.sha256(
+            orchestrator_module._canonical_json(canonical_digest).encode(
+                "ascii"
+            )
+        ).hexdigest(),
+    }
+    _write_json(runner.preflight, preflight)
+
+    schedule_stage = runner.schedule_stage()
+    _write_stage_success(schedule_stage)
+    artifact_stage = runner.artifact_stage(schedule_stage.success)
+    _write_stage_success(artifact_stage)
+    preflight_nodes = runner.preflight_node_stages(artifact_stage.success)
+    for stage in preflight_nodes:
+        _write_stage_success(stage)
+    combine_stage = runner.preflight_combine_stage(
+        tuple(stage.success for stage in preflight_nodes)
+    )
+    _write_stage_success(combine_stage)
+    preflight_stages = (
+        schedule_stage, artifact_stage, *preflight_nodes, combine_stage,
+    )
+    _write_phase_launch(runner, "preflight")
+    for stage in preflight_stages:
+        deadline = runner._stage_acceptance_spec(stage)[-1]
+        marker, marker_sha = (
+            orchestrator_module._validate_stage_success_snapshot(
+                stage, SOURCE_COMMIT,
+            )
+        )
+        runner._record_stage_acceptance(
+            stage, marker, marker_sha, deadline - 1, deadline,
+        )
+    preflight_bound_files = {
+        "schedule": runner.schedule,
+        "artifact_manifest": runner.artifact_manifest,
+        "aggregate_preflight": runner.preflight,
+    }
+    preflight_bound_identity = {
+        "schedule_sha256": schedule["schedule_sha256"],
+        "artifact_manifest_sha256": artifact["artifact_manifest_sha256"],
+        "preflight_status": "PASS",
+        "selected_resource_tier": "T3",
+        "registry_file_sha256": registry_sha,
+        "config_file_sha256": config_sha,
+    }
+    preflight_manifest = _write_phase_manifest(
+        runner, runner.preflight_acceptance_manifest, "preflight",
+        preflight_stages, preflight_bound_files, preflight_bound_identity,
+        schedule["preflight_deadline_boottime_ns"] - 1,
+    )
+
+    attestation_identity = {
+        "attestation_version": orchestrator_module.LOCAL_ATTESTATION_VERSION,
+        "status": "PASS",
+        "source_commit": SOURCE_COMMIT,
+        "archive_sha256": ARCHIVE_SHA256,
+        "source_manifest_sha256": SOURCE_MANIFEST_SHA256,
+        "registry_file_sha256": registry_sha,
+        "config_file_sha256": config_sha,
+        "schedule_sha256": schedule["schedule_sha256"],
+        "schedule_file_sha256": orchestrator_module._sha256_file(
+            runner.schedule
+        ),
+        "artifact_manifest_sha256": artifact["artifact_manifest_sha256"],
+        "artifact_manifest_file_sha256": orchestrator_module._sha256_file(
+            runner.artifact_manifest
+        ),
+        "preflight_file_sha256": orchestrator_module._sha256_file(
+            runner.preflight
+        ),
+        "preflight_acceptance_manifest_file_sha256": (
+            orchestrator_module._sha256_file(
+                runner.preflight_acceptance_manifest
+            )
+        ),
+        "preflight_acceptance_manifest_sha256": preflight_manifest[
+            "manifest_sha256"
+        ],
+        "remote_canonical_digest_sha256": preflight[
+            "canonical_digest_sha256"
+        ],
+        "local_canonical_digest_sha256": preflight[
+            "canonical_digest_sha256"
+        ],
+        "exact_canonical_match": True,
+        "mismatch_paths": [],
+        "importance_sampling_transcript_sha256": is_transcripts,
+        "solver_identity_policy": orchestrator_module.LOCAL_SOLVER_POLICY,
+        "local_environment": {
+            "system": "Darwin", "machine": "arm64", "python": "3.12",
+            "numpy": "2.4", "scipy": "1.17",
+            "map_solver_identity_current": "solver-test",
+        },
+        "portability_review": None,
+        "clock_domain": "unsynchronized_local_diagnostic",
+        "completed_local_unix": 1600,
+    }
+    attestation = _add_self_hash(
+        attestation_identity, "attestation_sha256",
+    )
+    attestation_path = (
+        runner.control_root / "HGP_LOCAL_PREFLIGHT_ATTESTATION.json"
+    )
+    _write_json(attestation_path, attestation)
+    attestation_file_sha = orchestrator_module._sha256_file(attestation_path)
+    runner.local_attestation = attestation_path
+    runner.local_attestation_sha256 = attestation_file_sha
+
+    map_cells = (
+        {
+            "code_id": "m06_c00", "p": 0.04, "disorder_index": 0,
+            "disorder_source": "attempt022",
+        },
+        {
+            "code_id": "m08_c06", "p": 0.04, "disorder_index": 0,
+            "disorder_source": "attempt022",
+        },
+    )
+    tasks = []
+    for index in range(384):
+        task = {
+            "fixture_task_index": index,
+            "method_id": "HP32" if index < 160 else "HP64",
+        }
+        if index >= 320:
+            cell = map_cells[(index - 320) // 32]
+            task.update({
+                "method_id": "MAM-IMH8",
+                "cell": cell,
+                "map_artifact": {
+                    "fixture_artifact": cell["code_id"],
+                },
+            })
+        fingerprint = hashlib.sha256(
+            orchestrator_module._canonical_json(task).encode("ascii")
+        ).hexdigest()
+        tasks.append({
+            "task": task,
+            "task_fingerprint": fingerprint,
+            "output_relpath": f"trajectories/{fingerprint}.npz",
+            "owner": orchestrator_module.EXECUTION_NODES[index % 2],
+        })
+    control_identity = {
+        "manifest_version": "fixture.v1",
+        "contract_version": orchestrator_module.HGP_CONTRACT_VERSION,
+        "resource_tier": "T3",
+        "source_commit": SOURCE_COMMIT,
+        "archive_sha256": ARCHIVE_SHA256,
+        "source_manifest_sha256": SOURCE_MANIFEST_SHA256,
+        "importance_sampling": {
+            "raw_version": "fixture.is.v1",
+            "num_samples_per_cell": 50000,
+            "seed_namespace": "fixture_is",
+            "used_for_gate_or_selection": False,
+            "outputs": [
+                "importance_sampling/"
+                + hashlib.sha256(
+                    orchestrator_module._canonical_json(cell).encode("ascii")
+                ).hexdigest()
+                + ".npz"
+                for cell in map_cells
+            ],
+        },
+        "task_count": len(tasks),
+        "tasks": tasks,
+        "execution_nodes": list(orchestrator_module.EXECUTION_NODES),
+    }
+    control = _add_self_hash(control_identity, "manifest_sha256")
+    _write_json(runner.control, control)
+    for node in orchestrator_module.EXECUTION_NODES:
+        _write_json(runner.node_report_root / f"{node}.json", {"node": node})
+
+    report_identity = {
+        "contract_version": orchestrator_module.HGP_CONTRACT_VERSION,
+        "source_commit": SOURCE_COMMIT,
+        "archive_sha256": ARCHIVE_SHA256,
+        "source_manifest_sha256": SOURCE_MANIFEST_SHA256,
+        "manifest_sha256": control["manifest_sha256"],
+        "raw_count": 384,
+        "status": "UNRESOLVED_NO_HP_PASS",
+        "selected_pair": None,
+        "formal_authorization": False,
+        "production_authorization": False,
+    }
+    report = _add_self_hash(report_identity, "report_sha256")
+    _write_json(runner.report, report)
+    decision_identity = {
+        "decision_version": orchestrator_module.TERMINAL_DECISION_VERSION,
+        "contract_version": orchestrator_module.HGP_CONTRACT_VERSION,
+        "source_commit": SOURCE_COMMIT,
+        "archive_sha256": ARCHIVE_SHA256,
+        "source_manifest_sha256": SOURCE_MANIFEST_SHA256,
+        "schedule_sha256": schedule["schedule_sha256"],
+        "schedule_file_sha256": orchestrator_module._sha256_file(
+            runner.schedule
+        ),
+        "artifact_manifest_sha256": artifact["artifact_manifest_sha256"],
+        "artifact_manifest_file_sha256": orchestrator_module._sha256_file(
+            runner.artifact_manifest
+        ),
+        "preflight_file_sha256": orchestrator_module._sha256_file(
+            runner.preflight
+        ),
+        "control_file_sha256": orchestrator_module._sha256_file(runner.control),
+        "manifest_sha256": control["manifest_sha256"],
+        "report_sha256": report["report_sha256"],
+        "report_file_sha256": orchestrator_module._sha256_file(runner.report),
+        "status": report["status"],
+        "selected_pair": None,
+        "formal_authorization": False,
+        "production_authorization": False,
+    }
+    decision = _add_self_hash(decision_identity, "decision_sha256")
+    _write_json(runner.decision, decision)
+    raw_root = runner.raw_root
+    raw_files = []
+    frozen_records = orchestrator_module._terminal_control_records(
+        control, config,
+    )
+    frozen_records.sort(
+        key=lambda value: (value["kind"], value["fingerprint"]),
+    )
+    for record in frozen_records:
+        raw_path = raw_root / record["output_relpath"]
+        raw_path.parent.mkdir(parents=True, exist_ok=True)
+        raw_path.write_bytes(b"raw\n")
+        claim_path = raw_root / record["claim_relpath"]
+        _write_json(claim_path, {
+            "contract_version": orchestrator_module.HGP_CONTRACT_VERSION,
+            "kind": record["kind"],
+            "fingerprint": record["fingerprint"],
+            "manifest_sha256": control["manifest_sha256"],
+            "node": record["owner"],
+            "pid": 4242,
+            "claimed_unix": 1700.0,
+        })
+        raw_files.append({
+            "kind": record["kind"],
+            "fingerprint": record["fingerprint"],
+            "output_relpath": record["output_relpath"],
+            "sha256": orchestrator_module._sha256_file(raw_path),
+            "claim_sha256": orchestrator_module._sha256_file(claim_path),
+        })
+    package_identity = {
+        "package_version": orchestrator_module.TERMINAL_PACKAGE_VERSION,
+        "contract_version": orchestrator_module.HGP_CONTRACT_VERSION,
+        "source_identity": schedule["source_identity"],
+        "schedule_sha256": schedule["schedule_sha256"],
+        "schedule_file_sha256": orchestrator_module._sha256_file(
+            runner.schedule
+        ),
+        "artifact_manifest_file_sha256": orchestrator_module._sha256_file(
+            runner.artifact_manifest
+        ),
+        "preflight_file_sha256": orchestrator_module._sha256_file(
+            runner.preflight
+        ),
+        "control_file_sha256": orchestrator_module._sha256_file(runner.control),
+        "execution_report_file_sha256": {
+            node: orchestrator_module._sha256_file(
+                runner.node_report_root / f"{node}.json"
+            ) for node in orchestrator_module.EXECUTION_NODES
+        },
+        "report_file_sha256": orchestrator_module._sha256_file(runner.report),
+        "decision_file_sha256": orchestrator_module._sha256_file(
+            runner.decision
+        ),
+        "decision_sha256": decision["decision_sha256"],
+        "status": report["status"],
+        "raw_file_count": len(raw_files),
+        "raw_files": raw_files,
+        "formal_authorization": False,
+        "production_authorization": False,
+    }
+    package = _add_self_hash(package_identity, "package_sha256")
+    _write_json(runner.package, package)
+
+    control_stage = runner.control_stage(combine_stage.success)
+    _write_stage_success(control_stage)
+    screen_stages = runner.screen_stages(control_stage.success)
+    for stage in screen_stages:
+        _write_stage_success(stage)
+    analysis_stage = runner.analysis_stage(
+        tuple(stage.success for stage in screen_stages)
+    )
+    _write_stage_success(analysis_stage)
+    measurement_stages = (control_stage, *screen_stages, analysis_stage)
+    _write_phase_launch(runner, "measurement", attestation_file_sha)
+    for stage in measurement_stages:
+        deadline = runner._stage_acceptance_spec(stage)[-1]
+        marker, marker_sha = (
+            orchestrator_module._validate_stage_success_snapshot(
+                stage, SOURCE_COMMIT,
+            )
+        )
+        runner._record_stage_acceptance(
+            stage, marker, marker_sha, deadline - 1, deadline,
+        )
+    measurement_bound_files = {
+        "schedule": runner.schedule,
+        "artifact_manifest": runner.artifact_manifest,
+        "aggregate_preflight": runner.preflight,
+        "local_attestation": attestation_path,
+        "measurement_control": runner.control,
+        "nd2_node_report": runner.node_report_root / "nd-2.json",
+        "nd3_node_report": runner.node_report_root / "nd-3.json",
+        "terminal_report": runner.report,
+        "terminal_decision": runner.decision,
+        "terminal_package": runner.package,
+    }
+    measurement_bound_identity = {
+        "schedule_sha256": schedule["schedule_sha256"],
+        "selected_resource_tier": "T3",
+        "local_attestation_sha256": attestation["attestation_sha256"],
+        "terminal_status": package["status"],
+        "terminal_package_sha256": package["package_sha256"],
+    }
+    measurement_manifest = _write_phase_manifest(
+        runner, runner.measurement_acceptance_manifest, "measurement",
+        measurement_stages, measurement_bound_files,
+        measurement_bound_identity,
+        schedule["analysis_deadline_boottime_ns"] - 1,
+        prior_manifest=runner.preflight_acceptance_manifest,
+    )
+    evidence = {
+        "runner": runner,
+        "registry_path": registry_path,
+        "config_path": config_path,
+        "schedule": schedule,
+        "preflight_manifest": preflight_manifest,
+        "measurement_manifest": measurement_manifest,
+        "preflight_stages": preflight_stages,
+        "measurement_stages": measurement_stages,
+        "attestation_path": attestation_path,
+    }
+    _validate_terminal_evidence(evidence)
+    return evidence
+
+
+def _validate_terminal_evidence(evidence):
+    runner = evidence["runner"]
+    return orchestrator_module.validate_measurement_acceptance_offline(
+        runner.measurement_acceptance_manifest, runner.run_root,
+        evidence["registry_path"], evidence["config_path"], SOURCE_COMMIT,
+        ARCHIVE_SHA256, SOURCE_MANIFEST_SHA256,
+    )
+
+
+def _rehash_json(path, field):
+    value = json.loads(Path(path).read_text(encoding="ascii"))
+    identity = dict(value)
+    identity.pop(field, None)
+    value = _add_self_hash(identity, field)
+    _write_json(path, value)
+    return value
+
+
+def _rehash_acceptance_in_manifest(evidence, phase, key):
+    runner = evidence["runner"]
+    acceptance = runner.acceptance_root / phase / f"{key}.json"
+    acceptance_value = _rehash_json(acceptance, "acceptance_sha256")
+    manifest_path = (
+        runner.preflight_acceptance_manifest if phase == "preflight"
+        else runner.measurement_acceptance_manifest
+    )
+    manifest = json.loads(manifest_path.read_text(encoding="ascii"))
+    for row in manifest["stage_acceptances"]:
+        if row["stage_key"] == key:
+            row["acceptance_sha256"] = acceptance_value["acceptance_sha256"]
+            row["acceptance_file_sha256"] = (
+                orchestrator_module._sha256_file(acceptance)
+            )
+            break
+    identity = dict(manifest)
+    identity.pop("manifest_sha256", None)
+    manifest = _add_self_hash(identity, "manifest_sha256")
+    _write_json(manifest_path, manifest)
+    return manifest
+
+
+def _replace_with_symlink(path):
+    path = Path(path)
+    target = path.with_name(path.name + ".target")
+    path.rename(target)
+    path.symlink_to(target)
+
+
+def test_offline_joint_terminal_requires_package_and_measurement_acceptance(
+    tmp_path,
+):
+    evidence = _terminal_evidence(tmp_path)
+
+    result = _validate_terminal_evidence(evidence)
+
+    assert result["joint_terminal_version"] == (
+        orchestrator_module.JOINT_TERMINAL_VERSION
+    )
+    assert result["status"] == "UNRESOLVED_NO_HP_PASS"
+    assert result["formal_authorization"] is False
+    assert result["production_authorization"] is False
+    identity = dict(result)
+    stored_sha = identity.pop("joint_terminal_sha256")
+    assert stored_sha == hashlib.sha256(
+        orchestrator_module._canonical_json(identity).encode("ascii")
+    ).hexdigest()
+
+
+def test_offline_joint_terminal_rejects_missing_raw(tmp_path):
+    evidence = _terminal_evidence(tmp_path)
+    runner = evidence["runner"]
+    package = json.loads(runner.package.read_text(encoding="ascii"))
+    (runner.raw_root / package["raw_files"][0]["output_relpath"]).unlink()
+
+    with pytest.raises(ValueError, match="raw file"):
+        _validate_terminal_evidence(evidence)
+
+
+@pytest.mark.parametrize(
+    "mutation",
+    (
+        "extra", "duplicate", "path_traversal", "raw_tamper",
+        "claim_tamper", "claim_identity", "symlink",
+    ),
+)
+def test_terminal_raw_evidence_is_exact_and_fail_closed(tmp_path, mutation):
+    evidence = _terminal_evidence(tmp_path)
+    runner = evidence["runner"]
+    control = json.loads(runner.control.read_text(encoding="ascii"))
+    config = json.loads(evidence["config_path"].read_text(encoding="ascii"))
+    package = json.loads(runner.package.read_text(encoding="ascii"))
+    row = package["raw_files"][0]
+    raw_path = runner.raw_root / row["output_relpath"]
+    fingerprint = row["fingerprint"]
+    claim_dir = ".claims" if row["kind"] == "measurement" else ".claims_is"
+    claim_path = runner.raw_root / claim_dir / f"{fingerprint}.json"
+
+    if mutation == "extra":
+        (runner.raw_root / "unexpected.bin").write_bytes(b"extra")
+    elif mutation == "duplicate":
+        package["raw_files"][1] = copy.deepcopy(package["raw_files"][0])
+    elif mutation == "path_traversal":
+        row["output_relpath"] = "../escaped.npz"
+    elif mutation == "raw_tamper":
+        raw_path.write_bytes(raw_path.read_bytes() + b"tampered")
+    elif mutation == "claim_tamper":
+        claim_path.write_bytes(claim_path.read_bytes() + b" ")
+    elif mutation == "claim_identity":
+        claim = json.loads(claim_path.read_text(encoding="ascii"))
+        claim["node"] = "nd-1"
+        _write_json(claim_path, claim)
+        row["claim_sha256"] = orchestrator_module._sha256_file(claim_path)
+    else:
+        _replace_with_symlink(raw_path)
+
+    with pytest.raises(ValueError):
+        orchestrator_module._validate_terminal_raw_evidence(
+            runner.run_root, control, config, package,
+        )
+
+
+def test_online_terminal_checks_raw_before_acceptance_publish(
+    tmp_path, monkeypatch,
+):
+    evidence = _terminal_evidence(tmp_path)
+    runner = evidence["runner"]
+    runner.measurement_acceptance_manifest.unlink()
+    monkeypatch.setattr(orchestrator_module, "_current_boot_id", lambda: BOOT_ID)
+    monkeypatch.setattr(
+        runner, "run_batch",
+        lambda stages, _deadline: tuple(stage.success for stage in stages),
+    )
+    checks = []
+    publishes = []
+
+    def reject_raw(*_args, **_kwargs):
+        checks.append(True)
+        raise ValueError("raw evidence rejected")
+
+    monkeypatch.setattr(
+        orchestrator_module, "_validate_terminal_raw_evidence", reject_raw,
+    )
+    monkeypatch.setattr(
+        runner, "_write_phase_acceptance_manifest",
+        lambda *_args, **_kwargs: publishes.append(True),
+    )
+
+    with pytest.raises(ValueError, match="raw evidence rejected"):
+        runner.run_measurement()
+    assert checks == [True]
+    assert publishes == []
+
+
+def test_offline_stage_deadline_is_strict_at_one_nanosecond(tmp_path):
+    evidence = _terminal_evidence(tmp_path)
+    runner = evidence["runner"]
+    key = "04_control"
+    acceptance_path = runner.acceptance_root / "measurement" / f"{key}.json"
+    acceptance = json.loads(acceptance_path.read_text(encoding="ascii"))
+    deadline = acceptance["deadline_boottime_ns"]
+    assert acceptance["observed_boottime_ns"] == deadline - 1
+    _validate_terminal_evidence(evidence)
+
+    acceptance["observed_boottime_ns"] = deadline
+    _write_json(acceptance_path, acceptance)
+    _rehash_acceptance_in_manifest(evidence, "measurement", key)
+
+    with pytest.raises(ValueError, match="stage identity"):
+        _validate_terminal_evidence(evidence)
+
+
+def test_offline_phase_deadline_is_strict_at_one_nanosecond(tmp_path):
+    evidence = _terminal_evidence(tmp_path)
+    runner = evidence["runner"]
+    path = runner.measurement_acceptance_manifest
+    manifest = json.loads(path.read_text(encoding="ascii"))
+    deadline = manifest["phase_deadline_boottime_ns"]
+    assert manifest["published_boottime_ns"] == deadline - 1
+    _validate_terminal_evidence(evidence)
+
+    manifest["published_boottime_ns"] = deadline
+    _write_json(path, manifest)
+    _rehash_json(path, "manifest_sha256")
+
+    with pytest.raises(ValueError, match="measurement acceptance identity"):
+        _validate_terminal_evidence(evidence)
+
+
+@pytest.mark.parametrize("target", ("success", "acceptance", "manifest"))
+def test_offline_rejects_evidence_byte_tampering(tmp_path, target):
+    evidence = _terminal_evidence(tmp_path)
+    runner = evidence["runner"]
+    paths = {
+        "success": runner.marker_root / "04_control/SUCCESS",
+        "acceptance": (
+            runner.acceptance_root / "measurement/04_control.json"
+        ),
+        "manifest": runner.measurement_acceptance_manifest,
+    }
+    path = paths[target]
+    path.write_bytes(path.read_bytes() + b" ")
+
+    with pytest.raises(ValueError):
+        _validate_terminal_evidence(evidence)
+
+
+def test_offline_rejects_acceptance_self_hash_tamper(tmp_path):
+    evidence = _terminal_evidence(tmp_path)
+    runner = evidence["runner"]
+    key = "04_control"
+    acceptance_path = runner.acceptance_root / "measurement" / f"{key}.json"
+    acceptance = json.loads(acceptance_path.read_text(encoding="ascii"))
+    acceptance["acceptance_sha256"] = "0" * 64
+    _write_json(acceptance_path, acceptance)
+    manifest_path = runner.measurement_acceptance_manifest
+    manifest = json.loads(manifest_path.read_text(encoding="ascii"))
+    for row in manifest["stage_acceptances"]:
+        if row["stage_key"] == key:
+            row["acceptance_sha256"] = "0" * 64
+            row["acceptance_file_sha256"] = (
+                orchestrator_module._sha256_file(acceptance_path)
+            )
+    identity = dict(manifest)
+    identity.pop("manifest_sha256")
+    _write_json(manifest_path, _add_self_hash(identity, "manifest_sha256"))
+
+    with pytest.raises(ValueError, match="stage identity"):
+        _validate_terminal_evidence(evidence)
+
+
+@pytest.mark.parametrize("mutation", ("missing", "extra", "order", "duplicate"))
+def test_offline_rejects_acceptance_set_and_order_changes(tmp_path, mutation):
+    evidence = _terminal_evidence(tmp_path)
+    runner = evidence["runner"]
+    acceptance_dir = runner.acceptance_root / "measurement"
+    manifest_path = runner.measurement_acceptance_manifest
+    if mutation == "missing":
+        (acceptance_dir / "04_control.json").unlink()
+    elif mutation == "extra":
+        _write_json(acceptance_dir / "unexpected.json", {"unexpected": True})
+    else:
+        manifest = json.loads(manifest_path.read_text(encoding="ascii"))
+        if mutation == "order":
+            manifest["stage_acceptances"][0:2] = reversed(
+                manifest["stage_acceptances"][0:2]
+            )
+        else:
+            manifest["stage_acceptances"][1] = copy.deepcopy(
+                manifest["stage_acceptances"][0]
+            )
+        identity = dict(manifest)
+        identity.pop("manifest_sha256")
+        _write_json(
+            manifest_path, _add_self_hash(identity, "manifest_sha256"),
+        )
+
+    with pytest.raises(ValueError):
+        _validate_terminal_evidence(evidence)
+
+
+def test_offline_rejects_stage_boot_id_change(tmp_path):
+    evidence = _terminal_evidence(tmp_path)
+    runner = evidence["runner"]
+    key = "04_control"
+    path = runner.acceptance_root / "measurement" / f"{key}.json"
+    acceptance = json.loads(path.read_text(encoding="ascii"))
+    acceptance["clock_authority_boot_id"] = (
+        "fedcba98-7654-3210-fedc-ba9876543210"
+    )
+    _write_json(path, acceptance)
+    _rehash_acceptance_in_manifest(evidence, "measurement", key)
+
+    with pytest.raises(ValueError, match="stage identity"):
+        _validate_terminal_evidence(evidence)
+
+
+@pytest.mark.parametrize(
+    ("field", "replacement"),
+    (
+        ("phase", "preflight"),
+        ("source_commit", "2" * 40),
+        ("archive_sha256", "2" * 64),
+        ("local_attestation_sha256", "2" * 64),
+    ),
+)
+def test_offline_rejects_measurement_launch_metadata_misbinding(
+        tmp_path, field, replacement):
+    evidence = _terminal_evidence(tmp_path)
+    path = evidence["runner"].measurement_acceptance_manifest
+    manifest = json.loads(path.read_text(encoding="ascii"))
+    manifest["launch_metadata"][field] = replacement
+    manifest["launch_metadata_file_sha256"] = hashlib.sha256(
+        (orchestrator_module._canonical_json(
+            manifest["launch_metadata"]
+        ) + "\n").encode("ascii")
+    ).hexdigest()
+    identity = dict(manifest)
+    identity.pop("manifest_sha256")
+    _write_json(path, _add_self_hash(identity, "manifest_sha256"))
+
+    with pytest.raises(ValueError, match="measurement acceptance identity"):
+        _validate_terminal_evidence(evidence)
+
+
+def test_offline_rejects_attestation_bound_to_wrong_preflight_manifest(
+    tmp_path,
+):
+    evidence = _terminal_evidence(tmp_path)
+    path = evidence["attestation_path"]
+    attestation = json.loads(path.read_text(encoding="ascii"))
+    attestation["preflight_acceptance_manifest_sha256"] = "0" * 64
+    identity = dict(attestation)
+    identity.pop("attestation_sha256")
+    _write_json(path, _add_self_hash(identity, "attestation_sha256"))
+
+    with pytest.raises(ValueError, match="attestation identity"):
+        _validate_terminal_evidence(evidence)
+
+
+def test_offline_rejects_changed_prior_preflight_manifest(tmp_path):
+    evidence = _terminal_evidence(tmp_path)
+    path = evidence["runner"].measurement_acceptance_manifest
+    manifest = json.loads(path.read_text(encoding="ascii"))
+    manifest["prior_manifest"]["manifest_sha256"] = "0" * 64
+    identity = dict(manifest)
+    identity.pop("manifest_sha256")
+    _write_json(path, _add_self_hash(identity, "manifest_sha256"))
+
+    with pytest.raises(ValueError, match="measurement acceptance identity"):
+        _validate_terminal_evidence(evidence)
+
+
+@pytest.mark.parametrize(
+    "target",
+    (
+        "success", "acceptance", "manifest", "bound_terminal",
+        "bound_parent",
+    ),
+)
+def test_offline_rejects_symlinked_evidence(tmp_path, target):
+    evidence = _terminal_evidence(tmp_path)
+    runner = evidence["runner"]
+    if target == "bound_parent":
+        real_control = runner.run_root / "real_control"
+        runner.control_root.rename(real_control)
+        runner.control_root.symlink_to(real_control, target_is_directory=True)
+        with pytest.raises(ValueError, match="symlink"):
+            _validate_terminal_evidence(evidence)
+        return
+    paths = {
+        "success": runner.marker_root / "04_control/SUCCESS",
+        "acceptance": (
+            runner.acceptance_root / "measurement/04_control.json"
+        ),
+        "manifest": runner.measurement_acceptance_manifest,
+        "bound_terminal": runner.report,
+    }
+    _replace_with_symlink(paths[target])
+
+    with pytest.raises(ValueError):
+        _validate_terminal_evidence(evidence)
+
+
+def test_offline_rejects_package_without_measurement_manifest(tmp_path):
+    evidence = _terminal_evidence(tmp_path)
+    evidence["runner"].measurement_acceptance_manifest.unlink()
+
+    with pytest.raises(ValueError):
+        _validate_terminal_evidence(evidence)
+
+
+@pytest.mark.parametrize("mutation", ("missing", "tampered"))
+def test_offline_rejects_measurement_manifest_without_exact_package(
+    tmp_path, mutation,
+):
+    evidence = _terminal_evidence(tmp_path)
+    package = evidence["runner"].package
+    if mutation == "missing":
+        package.unlink()
+    else:
+        package.write_bytes(package.read_bytes() + b" ")
+
+    with pytest.raises(ValueError):
+        _validate_terminal_evidence(evidence)
+
+
+def test_local_audit_environment_uses_map_solver_identity():
+    identity = local_audit_module._environment_identity()
+
+    assert identity["map_solver_identity_current"]
+    assert "numpy=" in identity["map_solver_identity_current"]
+    assert "scipy=" in identity["map_solver_identity_current"]
+    assert "highs=" in identity["map_solver_identity_current"]
+
+
+def test_nd0_clock_authority_capture_is_boottime_bound(monkeypatch):
+    samples = iter((10_000, 10_250))
+    monkeypatch.setattr(orchestrator_module, "_boottime_ns", lambda: next(samples))
+    monkeypatch.setattr(
+        orchestrator_module.time, "time_ns", lambda: 20_000,
+    )
+    monkeypatch.setattr(
+        orchestrator_module, "_current_boot_id", lambda: BOOT_ID,
+    )
+
+    assert orchestrator_module._capture_clock_authority() == {
+        "clock_authority_version": orchestrator_module.CLOCK_AUTHORITY_VERSION,
+        "clock_authority_node": "nd-0",
+        "clock_authority_boot_id": BOOT_ID,
+        "boottime_before_ns": 10_000,
+        "authority_unix_ns": 20_000,
+        "boottime_after_ns": 10_250,
     }
 
 
@@ -190,7 +1074,92 @@ def test_stage_launcher_uses_remote_screen_and_verified_bootstrap(
     assert orchestrator_module.VERIFY_RELATIVE in remote
     assert orchestrator_module.WRAPPER_RELATIVE in remote
     assert " build-schedule " in remote
-    assert kwargs == {"check": True}
+    assert kwargs == {"check": True, "timeout": 180.0}
+
+
+def test_schedule_stage_fingerprint_binds_clock_authority(tmp_path):
+    runner = _orchestrator(tmp_path)
+    stage = runner.schedule_stage()
+    _write_stage_success(stage)
+    orchestrator_module._validate_stage_success(stage, SOURCE_COMMIT)
+
+    changed = copy.deepcopy(runner.clock_authority)
+    changed["authority_unix_ns"] += 1
+    runner.clock_authority = changed
+    with pytest.raises(ValueError, match="command changed"):
+        orchestrator_module._validate_stage_success(
+            runner.schedule_stage(), SOURCE_COMMIT,
+        )
+
+
+def test_run_batch_rejects_success_first_observed_at_deadline(
+    tmp_path, monkeypatch,
+):
+    runner = _orchestrator(tmp_path)
+    stage = runner.schedule_stage()
+    deadline = runner._stage_acceptance_spec(stage)[-1]
+    samples = iter((
+        deadline - 3, deadline - 2, deadline - 1, deadline,
+    ))
+    monkeypatch.setattr(runner, "_authority_now_ns", lambda: next(samples))
+    monkeypatch.setattr(
+        runner, "_launch", lambda launched: _write_stage_success(launched),
+    )
+    monkeypatch.setattr(runner, "_stop", lambda _stage: None)
+
+    with pytest.raises(TimeoutError, match="frozen deadline"):
+        runner.run_batch((stage,), deadline)
+
+
+def test_run_batch_accepts_success_one_nanosecond_before_deadline(
+    tmp_path, monkeypatch,
+):
+    runner = _orchestrator(tmp_path)
+    stage = runner.schedule_stage()
+    deadline = runner._stage_acceptance_spec(stage)[-1]
+    samples = iter((
+        deadline - 4, deadline - 3, deadline - 2, deadline - 1,
+    ))
+    monkeypatch.setattr(runner, "_authority_now_ns", lambda: next(samples))
+    monkeypatch.setattr(
+        runner, "_launch", lambda launched: _write_stage_success(launched),
+    )
+
+    assert runner.run_batch((stage,), deadline) == (stage.success,)
+
+
+def test_run_batch_rechecks_deadline_before_each_launch(tmp_path, monkeypatch):
+    runner = _orchestrator(tmp_path)
+    schedule = runner.schedule_stage()
+    _write_stage_success(schedule)
+    artifact = runner.artifact_stage(schedule.success)
+    _write_stage_success(artifact)
+    first, second = runner.preflight_node_stages(artifact.success)[:2]
+    deadline = runner._stage_acceptance_spec(first)[-1]
+    samples = iter((deadline - 1, deadline))
+    launches = []
+
+    def fake_launch(stage):
+        launches.append(stage.key)
+        _write_stage_success(stage)
+
+    monkeypatch.setattr(runner, "_authority_now_ns", lambda: next(samples))
+    monkeypatch.setattr(runner, "_launch", fake_launch)
+
+    with pytest.raises(TimeoutError, match="expired before launch"):
+        runner.run_batch((first, second), deadline)
+    assert launches == [first.key]
+
+
+def test_authority_clock_rejects_boot_change(tmp_path, monkeypatch):
+    runner = _orchestrator(tmp_path)
+    monkeypatch.setattr(
+        orchestrator_module, "_current_boot_id",
+        lambda: "fedcba98-7654-3210-fedc-ba9876543210",
+    )
+
+    with pytest.raises(RuntimeError, match="reboot invalidated"):
+        runner._authority_now_ns()
 
 
 def test_nd0_outer_launcher_uses_exact_nohup_setsid_shape():
@@ -273,6 +1242,9 @@ def test_nd0_publishes_orchestrator_pid_before_archive_hashing(
     (base / "logs").mkdir(parents=True)
     (deployment / "SOURCE.tar").write_bytes(b"archive\n")
     (deployment / "SOURCE_MANIFEST.json").write_bytes(b"manifest\n")
+    (deployment / "ARCHIVE_SHA256").write_text(
+        ARCHIVE_SHA256 + "\n", encoding="ascii",
+    )
     (deployment / "SOURCE_COMMIT").write_text(
         SOURCE_COMMIT + "\n", encoding="ascii",
     )
@@ -285,8 +1257,11 @@ def test_nd0_publishes_orchestrator_pid_before_archive_hashing(
     )
     events = []
 
+    guard = base / "logs/test-guard"
+
     def record_persistence(_args, _base):
         events.append("pid")
+        return guard
 
     def record_hash(path):
         events.append(Path(path).name)
@@ -304,7 +1279,7 @@ def test_nd0_publishes_orchestrator_pid_before_archive_hashing(
 
     roots = orchestrator_module._require_verified_launch(args, home)
 
-    assert roots == (deployment, base / "runs" / run_id)
+    assert roots == (deployment, base / "runs" / run_id, guard)
     assert events == ["pid", "SOURCE.tar", "SOURCE_MANIFEST.json"]
 
 
@@ -324,6 +1299,9 @@ def test_nd0_launcher_atomic_guard_and_argument_rejection(tmp_path):
     )
     archive_sha = hashlib.sha256(archive.read_bytes()).hexdigest()
     manifest_sha = hashlib.sha256(manifest.read_bytes()).hexdigest()
+    (deployment / "ARCHIVE_SHA256").write_text(
+        archive_sha + "\n", encoding="ascii",
+    )
     env = {**dict(os.environ), "HOME": str(home), "HOSTNAME": "nd-0"}
 
     token = hashlib.sha256(run_id.encode("ascii")).hexdigest()[:8]
@@ -387,6 +1365,7 @@ def test_nd0_launcher_atomic_guard_and_argument_rejection(tmp_path):
 def test_preflight_phase_stops_for_local_audit_without_attestation(
     tmp_path, monkeypatch,
 ):
+    monkeypatch.setattr(orchestrator_module, "_current_boot_id", lambda: BOOT_ID)
     runner = _orchestrator(tmp_path)
     schedule = _schedule()
     _write_json(runner.schedule, schedule)
@@ -406,7 +1385,11 @@ def test_preflight_phase_stops_for_local_audit_without_attestation(
             "archive_sha256": ARCHIVE_SHA256,
             "manifest_sha256": SOURCE_MANIFEST_SHA256,
         },
-        "completed_unix": 1500,
+        "selection_basis": (
+            "runtime_only_worst_node_and_frozen_elapsed_deadlines"
+        ),
+        "clock_domain": "unsynchronized_local_diagnostic",
+        "completed_local_unix": 1500,
     })
     batches = []
 
@@ -415,6 +1398,15 @@ def test_preflight_phase_stops_for_local_audit_without_attestation(
         return tuple(stage.success for stage in stages)
 
     monkeypatch.setattr(runner, "run_batch", fake_run_batch)
+    def fake_acceptance_manifest(path, *_args, **_kwargs):
+        value = {"manifest_sha256": "7" * 64}
+        _write_json(path, value)
+        return value
+
+    monkeypatch.setattr(
+        runner, "_write_phase_acceptance_manifest",
+        fake_acceptance_manifest,
+    )
     result = runner.run_preflight()
 
     assert result["event"] == "preflight_ready_for_local_audit"
@@ -430,6 +1422,7 @@ def test_preflight_phase_stops_for_local_audit_without_attestation(
 def test_measurement_rejects_missing_or_tampered_attestation_before_control(
     tmp_path, monkeypatch,
 ):
+    monkeypatch.setattr(orchestrator_module, "_current_boot_id", lambda: BOOT_ID)
     runner = _orchestrator(tmp_path)
     schedule = _schedule()
     _write_json(runner.schedule, schedule)
@@ -449,7 +1442,11 @@ def test_measurement_rejects_missing_or_tampered_attestation_before_control(
             "archive_sha256": ARCHIVE_SHA256,
             "manifest_sha256": SOURCE_MANIFEST_SHA256,
         },
-        "completed_unix": 1500,
+        "selection_basis": (
+            "runtime_only_worst_node_and_frozen_elapsed_deadlines"
+        ),
+        "clock_domain": "unsynchronized_local_diagnostic",
+        "completed_local_unix": 1500,
     })
     schedule_stage = runner.schedule_stage()
     artifact_stage = runner.artifact_stage(schedule_stage.success)
@@ -457,11 +1454,11 @@ def test_measurement_rejects_missing_or_tampered_attestation_before_control(
     combine_stage = runner.preflight_combine_stage(
         tuple(stage.success for stage in preflight_stages),
     )
-    _write_success(schedule_stage.success, "build-schedule")
-    _write_success(artifact_stage.success, "build-artifacts")
+    _write_stage_success(schedule_stage)
+    _write_stage_success(artifact_stage)
     for stage in preflight_stages:
-        _write_success(stage.success, "preflight")
-    _write_success(combine_stage.success, "preflight")
+        _write_stage_success(stage)
+    _write_stage_success(combine_stage)
 
     control_calls = []
 
@@ -470,15 +1467,16 @@ def test_measurement_rejects_missing_or_tampered_attestation_before_control(
         raise AssertionError("control stage must not be constructed")
 
     monkeypatch.setattr(runner, "control_stage", forbidden_control)
+    monkeypatch.setattr(
+        runner, "_validate_phase_acceptance_manifest",
+        lambda *_args, **_kwargs: {"manifest_sha256": "7" * 64},
+    )
     with pytest.raises(ValueError, match="requires a local attestation"):
         runner.run_measurement()
     assert control_calls == []
 
     attestation = runner.control_root / "HGP_LOCAL_PREFLIGHT_ATTESTATION.json"
     _write_json(attestation, {"tampered": True})
-    registry = tmp_path / "registry.json"
-    _write_json(registry, {"registry": "test"})
-    runner.registry = registry
     runner.local_attestation = attestation
     runner.local_attestation_sha256 = "0" * 64
     with pytest.raises(ValueError, match="file SHA mismatch"):
@@ -501,7 +1499,11 @@ def test_aggregate_preflight_must_be_pass_selected_and_archive_bound(tmp_path):
             "archive_sha256": ARCHIVE_SHA256,
             "manifest_sha256": SOURCE_MANIFEST_SHA256,
         },
-        "completed_unix": 1500,
+        "selection_basis": (
+            "runtime_only_worst_node_and_frozen_elapsed_deadlines"
+        ),
+        "clock_domain": "unsynchronized_local_diagnostic",
+        "completed_local_unix": 1500,
     }
     path = tmp_path / "preflight.json"
     _write_json(path, report)
@@ -514,7 +1516,8 @@ def test_aggregate_preflight_must_be_pass_selected_and_archive_bound(tmp_path):
         ("status", "RUNTIME_EXHAUSTED"),
         ("selected_resource_tier", None),
         ("selected_resource_tier", "T4"),
-        ("completed_unix", 2500),
+        ("completed_local_unix", "invalid"),
+        ("clock_domain", "nd-1_epoch"),
         ("source_commit", "2" * 40),
         ("config_file_sha256", "e" * 64),
     ]
@@ -538,7 +1541,8 @@ def test_aggregate_preflight_must_be_pass_selected_and_archive_bound(tmp_path):
         )
 
 
-def test_schedule_and_control_are_fail_closed(tmp_path):
+def test_schedule_and_control_are_fail_closed(tmp_path, monkeypatch):
+    monkeypatch.setattr(orchestrator_module, "_current_boot_id", lambda: BOOT_ID)
     schedule = _schedule()
     schedule_path = tmp_path / "schedule.json"
     _write_json(schedule_path, schedule)
@@ -546,17 +1550,19 @@ def test_schedule_and_control_are_fail_closed(tmp_path):
         schedule_path, "exp102_q0_hgp_test", SOURCE_COMMIT, ARCHIVE_SHA256,
         SOURCE_MANIFEST_SHA256, CONFIG_SHA256,
     ) == schedule
+    monkeypatch.setattr(orchestrator_module.time, "time", lambda: -1e12)
+    assert orchestrator_module._validate_schedule_output(
+        schedule_path, "exp102_q0_hgp_test", SOURCE_COMMIT, ARCHIVE_SHA256,
+        SOURCE_MANIFEST_SHA256, CONFIG_SHA256,
+    ) == schedule
 
     future_identity = dict(schedule)
     future_identity.pop("schedule_sha256")
-    offset = time.time() + 3600
-    future_identity.update({
-        "started_unix": offset,
-        "preflight_deadline_unix": offset + 1000,
-        "control_freeze_deadline_unix": offset + 2000,
-        "screen_deadline_unix": offset + 3000,
-        "analysis_deadline_unix": offset + 4000,
-    })
+    for name in (
+            "started_unix", "preflight_deadline_unix",
+            "control_freeze_deadline_unix", "screen_deadline_unix",
+            "analysis_deadline_unix"):
+        future_identity[name] += 3600
     future = {
         **future_identity,
         "schedule_sha256": hashlib.sha256(
@@ -621,6 +1627,7 @@ def test_measurement_attestation_is_hash_bound_and_exact(tmp_path):
     schedule_path = control_root / "HGP_GLOBAL_24H_SCHEDULE.json"
     artifact_path = control_root / "hgp_artifacts.json"
     preflight_path = control_root / "hgp_preflight.json"
+    acceptance_path = control_root / "HGP_ND0_PREFLIGHT_ACCEPTANCE.json"
     _write_json(schedule_path, schedule)
     _write_json(artifact_path, {
         "artifact": "bound", "artifact_manifest_sha256": "f" * 64,
@@ -637,6 +1644,7 @@ def test_measurement_attestation_is_hash_bound_and_exact(tmp_path):
         },
     }
     _write_json(preflight_path, preflight)
+    _write_json(acceptance_path, {"manifest_sha256": "7" * 64})
     identity = {
         "attestation_version": orchestrator_module.LOCAL_ATTESTATION_VERSION,
         "status": "PASS",
@@ -652,6 +1660,10 @@ def test_measurement_attestation_is_hash_bound_and_exact(tmp_path):
             artifact_path,
         ),
         "preflight_file_sha256": orchestrator_module._sha256_file(preflight_path),
+        "preflight_acceptance_manifest_file_sha256": (
+            orchestrator_module._sha256_file(acceptance_path)
+        ),
+        "preflight_acceptance_manifest_sha256": "7" * 64,
         "remote_canonical_digest_sha256": remote_digest,
         "local_canonical_digest_sha256": remote_digest,
         "exact_canonical_match": True,
@@ -664,7 +1676,8 @@ def test_measurement_attestation_is_hash_bound_and_exact(tmp_path):
             "map_solver_identity_current": "local-test",
         },
         "portability_review": None,
-        "completed_unix": 1500,
+        "clock_domain": "unsynchronized_local_diagnostic",
+        "completed_local_unix": 1500,
     }
     attestation = {
         **identity,
@@ -677,14 +1690,15 @@ def test_measurement_attestation_is_hash_bound_and_exact(tmp_path):
     file_sha = orchestrator_module._sha256_file(path)
     assert orchestrator_module._validate_local_attestation(
         path, file_sha, schedule, preflight, artifact_path,
-        "e" * 64, CONFIG_SHA256, SOURCE_COMMIT, ARCHIVE_SHA256,
+        acceptance_path, "e" * 64, CONFIG_SHA256, SOURCE_COMMIT, ARCHIVE_SHA256,
         SOURCE_MANIFEST_SHA256,
     ) == attestation
 
     with pytest.raises(ValueError, match="file SHA mismatch"):
         orchestrator_module._validate_local_attestation(
             path, "9" * 64, schedule, preflight, artifact_path,
-            "e" * 64, CONFIG_SHA256, SOURCE_COMMIT, ARCHIVE_SHA256,
+            acceptance_path, "e" * 64, CONFIG_SHA256, SOURCE_COMMIT,
+            ARCHIVE_SHA256,
             SOURCE_MANIFEST_SHA256,
         )
     changed = copy.deepcopy(attestation)
@@ -698,7 +1712,8 @@ def test_measurement_attestation_is_hash_bound_and_exact(tmp_path):
     with pytest.raises(ValueError, match="exact local attestation"):
         orchestrator_module._validate_local_attestation(
             path, orchestrator_module._sha256_file(path), schedule, preflight,
-            artifact_path, "e" * 64, CONFIG_SHA256, SOURCE_COMMIT,
+            artifact_path, acceptance_path, "e" * 64, CONFIG_SHA256,
+            SOURCE_COMMIT,
             ARCHIVE_SHA256,
             SOURCE_MANIFEST_SHA256,
         )
@@ -727,7 +1742,8 @@ def test_measurement_attestation_is_hash_bound_and_exact(tmp_path):
     with pytest.raises(ValueError, match="identity is invalid"):
         orchestrator_module._validate_local_attestation(
             path, orchestrator_module._sha256_file(path), schedule, preflight,
-            artifact_path, "e" * 64, CONFIG_SHA256, SOURCE_COMMIT,
+            artifact_path, acceptance_path, "e" * 64, CONFIG_SHA256,
+            SOURCE_COMMIT,
             ARCHIVE_SHA256, SOURCE_MANIFEST_SHA256,
         )
 
@@ -743,9 +1759,118 @@ def test_measurement_attestation_is_hash_bound_and_exact(tmp_path):
     with pytest.raises(ValueError, match="identity is invalid"):
         orchestrator_module._validate_local_attestation(
             path, orchestrator_module._sha256_file(path), schedule, preflight,
-            artifact_path, "e" * 64, CONFIG_SHA256, SOURCE_COMMIT,
+            artifact_path, acceptance_path, "e" * 64, CONFIG_SHA256,
+            SOURCE_COMMIT,
             ARCHIVE_SHA256, SOURCE_MANIFEST_SHA256,
         )
+
+
+def test_local_audit_complete_exact_success_path(tmp_path, monkeypatch):
+    registry_path = tmp_path / "registry.json"
+    config_path = tmp_path / "config.json"
+    schedule_path = tmp_path / "schedule.json"
+    artifact_root = tmp_path / "artifacts"
+    artifact_manifest_path = tmp_path / "artifact_manifest.json"
+    preflight_path = tmp_path / "preflight.json"
+    preflight_acceptance_path = tmp_path / "preflight_acceptance.json"
+    work_root = tmp_path / "work"
+    output_path = tmp_path / "attestation.json"
+    for path in (
+            registry_path, config_path, schedule_path,
+            artifact_manifest_path, preflight_path,
+            preflight_acceptance_path):
+        _write_json(path, {"placeholder": path.name})
+    artifact_root.mkdir()
+
+    schedule = {"schedule_sha256": "3" * 64}
+    artifact_manifest = {"artifact_manifest_sha256": "4" * 64}
+    is_transcript = [{
+        "cell_fingerprint": "5" * 64,
+        "transcript_sha256": "6" * 64,
+    }]
+    canonical = {
+        "algebra": {"rank": 7},
+        "importance_sampling_transcript_sha256": is_transcript,
+    }
+    preflight = {
+        "status": "PASS",
+        "selected_resource_tier": "T3",
+        "canonical_digest": canonical,
+        "canonical_digest_sha256": local_audit_module.workflow._sha256_json(
+            canonical,
+        ),
+    }
+    monkeypatch.setenv("EXP102_SOURCE_COMMIT", SOURCE_COMMIT)
+    monkeypatch.setattr(
+        local_audit_module.workflow, "_load_registry", lambda _path: {},
+    )
+    monkeypatch.setattr(
+        local_audit_module.workflow, "_load_config", lambda *_args: {},
+    )
+    monkeypatch.setattr(
+        local_audit_module.workflow, "_validate_schedule",
+        lambda *_args: (schedule, schedule_path),
+    )
+    monkeypatch.setattr(
+        local_audit_module.workflow, "_validate_artifact_manifest",
+        lambda *_args: (artifact_manifest, artifact_manifest_path),
+    )
+    monkeypatch.setattr(
+        local_audit_module.workflow, "_validate_preflight",
+        lambda *_args: preflight,
+    )
+    monkeypatch.setattr(
+        local_audit_module.orchestration,
+        "validate_preflight_acceptance_offline",
+        lambda *_args, **_kwargs: {"manifest_sha256": "7" * 64},
+    )
+    monkeypatch.setattr(
+        local_audit_module.pipeline, "hgp_screen_preflight_digest",
+        lambda *_args: {"algebra": {"rank": 7}},
+    )
+    monkeypatch.setattr(
+        local_audit_module.pipeline, "_map_cells", lambda _config: [{"cell": 0}],
+    )
+    monkeypatch.setattr(
+        local_audit_module.pipeline, "_cell_fingerprint", lambda _cell: "5" * 64,
+    )
+
+    def write_is(_registry, _config, _commit, _archive, _manifest, _cell,
+                 _artifact_root, path, **_kwargs):
+        Path(path).write_bytes(b"frozen-is")
+        return {"transcript_sha256": "6" * 64}
+
+    monkeypatch.setattr(
+        local_audit_module.pipeline, "run_hgp_map_is_diagnostic", write_is,
+    )
+    monkeypatch.setattr(
+        local_audit_module.pipeline, "validate_hgp_map_is_diagnostic",
+        lambda *_args, **_kwargs: {"transcript_sha256": "6" * 64},
+    )
+    monkeypatch.setattr(
+        local_audit_module, "_environment_identity",
+        lambda: {
+            "system": "Darwin", "machine": "arm64", "python": "3.12",
+            "numpy": "2.4.1", "scipy": "1.17.0",
+            "map_solver_identity_current": "solver-test",
+        },
+    )
+
+    attestation = local_audit_module.audit_local_preflight(
+        registry_path, config_path, SOURCE_COMMIT, ARCHIVE_SHA256,
+        SOURCE_MANIFEST_SHA256, schedule_path, artifact_root,
+        artifact_manifest_path, preflight_path, preflight_acceptance_path,
+        work_root, output_path,
+    )
+
+    assert attestation["status"] == "PASS"
+    assert attestation["exact_canonical_match"] is True
+    assert attestation["mismatch_paths"] == []
+    assert attestation["importance_sampling_transcript_sha256"] == is_transcript
+    identity = dict(attestation)
+    stored_sha = identity.pop("attestation_sha256")
+    assert stored_sha == local_audit_module.workflow._sha256_json(identity)
+    assert json.loads(output_path.read_text(encoding="ascii")) == attestation
 
 
 def test_local_audit_reports_exact_mismatch_paths_without_float_tolerance():

@@ -27,7 +27,8 @@ import numpy as np
 
 
 CONTRACT_VERSION = "exp102.q0_hgp_global.screen.v1"
-SCHEDULE_VERSION = "exp102.q0_hgp_global.screen.schedule.v1"
+SCHEDULE_VERSION = "exp102.q0_hgp_global.screen.schedule.v2"
+CLOCK_AUTHORITY_VERSION = "exp102.q0_hgp.nd0_boottime.v1"
 PREFLIGHT_NODE_VERSION = "exp102.q0_hgp_global.screen.preflight_node.v1"
 PREFLIGHT_VERSION = "exp102.q0_hgp_global.screen.preflight.v1"
 ARTIFACT_MANIFEST_VERSION = "exp102.q0_hgp_global.screen.artifact_manifest.v1"
@@ -44,6 +45,12 @@ DEFAULT_CONFIG = (
 SHA1_RE = re.compile(r"[0-9a-f]{40}")
 SHA256_RE = re.compile(r"[0-9a-f]{64}")
 RUN_ID_RE = re.compile(r"[A-Za-z0-9._-]+")
+BOOT_ID_RE = re.compile(
+    r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-"
+    r"[0-9a-f]{4}-[0-9a-f]{12}"
+)
+NANOSECONDS_PER_SECOND = 1_000_000_000
+MAX_CLOCK_CAPTURE_SPAN_NS = NANOSECONDS_PER_SECOND
 
 
 # Pipeline adapter. Keep all API name and argument assumptions in this block.
@@ -113,19 +120,26 @@ def _validate_raw(path, registry, config, source_commit, archive_sha256,
 
 
 def _run_is(registry_path, config_path, source_commit, archive_sha256,
-            source_manifest_sha256, cell, artifact_root, output_path):
+            source_manifest_sha256, cell, artifact_root, output_path,
+            seed_namespace=None):
+    if seed_namespace is None:
+        seed_namespace = _pipeline().HGP_SCREEN_IS_ROOT
     return _pipeline().run_hgp_map_is_diagnostic(
         registry_path, config_path, source_commit, archive_sha256,
         source_manifest_sha256, cell, artifact_root, output_path,
+        seed_namespace=seed_namespace,
     )
 
 
 def _validate_is(path, registry_path, config_path, source_commit,
                  archive_sha256, source_manifest_sha256, cell,
-                 artifact_root):
+                 artifact_root, seed_namespace=None):
+    if seed_namespace is None:
+        seed_namespace = _pipeline().HGP_SCREEN_IS_ROOT
     return _pipeline().validate_hgp_map_is_diagnostic(
         path, registry_path, config_path, source_commit, archive_sha256,
         source_manifest_sha256, cell, artifact_root,
+        seed_namespace=seed_namespace,
     )
 
 
@@ -268,7 +282,31 @@ def _registry_sha(path):
     return _sha256_file(path)
 
 
-def _schedule_deadlines(config, started_unix):
+def _validate_clock_authority(value):
+    if not isinstance(value, Mapping) or set(value) != {
+            "clock_authority_version", "clock_authority_node",
+            "clock_authority_boot_id", "boottime_before_ns",
+            "authority_unix_ns", "boottime_after_ns"}:
+        raise ValueError("HGP clock authority schema is invalid")
+    integer_fields = (
+        "boottime_before_ns", "authority_unix_ns", "boottime_after_ns",
+    )
+    if (value.get("clock_authority_version") != CLOCK_AUTHORITY_VERSION
+            or value.get("clock_authority_node") != "nd-0"
+            or BOOT_ID_RE.fullmatch(str(
+                value.get("clock_authority_boot_id", ""),
+            )) is None
+            or any(isinstance(value.get(name), bool)
+                   or not isinstance(value.get(name), int)
+                   or value[name] <= 0 for name in integer_fields)
+            or value["boottime_after_ns"] < value["boottime_before_ns"]
+            or value["boottime_after_ns"] - value["boottime_before_ns"]
+            > MAX_CLOCK_CAPTURE_SPAN_NS):
+        raise ValueError("HGP clock authority identity is invalid")
+    return dict(value)
+
+
+def _schedule_deadlines(config, started_unix, started_boottime_ns):
     frozen = config.get("schedule", {})
     expected = {
         "preflight_deadline_hour": 6,
@@ -279,12 +317,16 @@ def _schedule_deadlines(config, started_unix):
     }
     if frozen != expected:
         raise ValueError("HGP screen schedule protocol changed")
-    return {
-        "preflight_deadline_unix": started_unix + 6 * 3600,
-        "control_freeze_deadline_unix": started_unix + 8 * 3600,
-        "screen_deadline_unix": started_unix + 22 * 3600,
-        "analysis_deadline_unix": started_unix + 24 * 3600,
-    }
+    result = {}
+    for name, hours in (
+            ("preflight", 6), ("control_freeze", 8),
+            ("screen", 22), ("analysis", 24)):
+        seconds = hours * 3600
+        result[f"{name}_deadline_unix"] = started_unix + seconds
+        result[f"{name}_deadline_boottime_ns"] = (
+            started_boottime_ns + seconds * NANOSECONDS_PER_SECOND
+        )
+    return result
 
 
 def _build_schedule(args):
@@ -299,7 +341,16 @@ def _build_schedule(args):
     config_path = Path(args.config).resolve(strict=True)
     registry = _load_registry(registry_path)
     config = _load_config(config_path, registry)
-    started_unix = int(time.time())
+    try:
+        clock_authority = _validate_clock_authority(
+            json.loads(args.clock_authority_json)
+        )
+    except (TypeError, json.JSONDecodeError) as exc:
+        raise ValueError("HGP clock authority JSON is invalid") from exc
+    started_unix = (
+        clock_authority["authority_unix_ns"] // NANOSECONDS_PER_SECOND
+    )
+    started_boottime_ns = clock_authority["boottime_before_ns"]
     identity = {
         "schedule_version": SCHEDULE_VERSION,
         "contract_version": CONTRACT_VERSION,
@@ -310,8 +361,10 @@ def _build_schedule(args):
         "source_identity": source_identity,
         "registry_file_sha256": _registry_sha(registry_path),
         "config_file_sha256": _config_sha(config_path),
+        "clock_authority": clock_authority,
         "started_unix": started_unix,
-        **_schedule_deadlines(config, started_unix),
+        "started_boottime_ns": started_boottime_ns,
+        **_schedule_deadlines(config, started_unix, started_boottime_ns),
     }
     schedule = {**identity, "schedule_sha256": _sha256_json(identity)}
     if _verify_source(args.source_commit) != source_identity:
@@ -329,10 +382,18 @@ def _validate_schedule(
         source_manifest_sha256, config):
     schedule_path = Path(path).resolve(strict=True)
     schedule = _read_json(schedule_path)
+    clock_authority = _validate_clock_authority(
+        schedule.get("clock_authority")
+    )
     started = schedule.get("started_unix")
+    started_boottime_ns = schedule.get("started_boottime_ns")
     if (isinstance(started, bool) or not isinstance(started, int)
             or started <= 0
-            or started > int(time.time()) + 60
+            or started != clock_authority["authority_unix_ns"]
+            // NANOSECONDS_PER_SECOND
+            or isinstance(started_boottime_ns, bool)
+            or not isinstance(started_boottime_ns, int)
+            or started_boottime_ns != clock_authority["boottime_before_ns"]
             or RUN_ID_RE.fullmatch(str(schedule.get("run_id", ""))) is None):
         raise ValueError("HGP schedule start identity is invalid")
     identity = {
@@ -345,8 +406,10 @@ def _validate_schedule(
         "source_identity": schedule.get("source_identity"),
         "registry_file_sha256": _registry_sha(registry_path),
         "config_file_sha256": _config_sha(config_path),
+        "clock_authority": clock_authority,
         "started_unix": started,
-        **_schedule_deadlines(config, started),
+        "started_boottime_ns": started_boottime_ns,
+        **_schedule_deadlines(config, started, started_boottime_ns),
     }
     expected = {**identity, "schedule_sha256": _sha256_json(identity)}
     if schedule != expected:
@@ -361,12 +424,12 @@ def _validate_schedule(
 
 
 def _enforce_deadline(schedule, field):
-    now = time.time()
-    deadline = float(schedule[field])
-    if not math.isfinite(deadline) or now > deadline:
-        raise RuntimeError(
-            f"RUNTIME_EXHAUSTED: HGP stage exceeded {field}"
-        )
+    # Compute-node epochs are unsynchronized and never grant deadline
+    # authority. The nd-0 orchestrator accepts markers against CLOCK_BOOTTIME.
+    boottime_field = field.removesuffix("_unix") + "_boottime_ns"
+    deadline = schedule.get(boottime_field)
+    if isinstance(deadline, bool) or not isinstance(deadline, int):
+        raise ValueError("HGP schedule boottime deadline is invalid")
 
 
 def _forbidden_runtime_outcome(value):
@@ -384,6 +447,55 @@ def _forbidden_runtime_outcome(value):
     if isinstance(value, (list, tuple)):
         return any(_forbidden_runtime_outcome(item) for item in value)
     return False
+
+
+def _validate_auxiliary_seed_catalog(runtime):
+    catalog = runtime.get("auxiliary_seed_catalog")
+    if (not isinstance(catalog, list) or len(catalog) != 8
+            or runtime.get("auxiliary_seed_catalog_sha256")
+            != _sha256_json(catalog)):
+        raise ValueError("runtime auxiliary seed catalog is invalid")
+    purposes = [value.get("purpose") for value in catalog]
+    if purposes.count("runtime_warmup") != 3:
+        raise ValueError("runtime warmup seed catalog changed")
+    if purposes.count("runtime_timed") != 3:
+        raise ValueError("runtime timed seed catalog changed")
+    if purposes.count("importance_sampling_runtime") != 2:
+        raise ValueError("runtime IS seed catalog changed")
+    pipeline = _pipeline()
+    formal_namespaces = {
+        pipeline.HGP_SCREEN_HP_TRAJECTORY_ROOT,
+        pipeline.HGP_SCREEN_MAP_TRAJECTORY_ROOT,
+        pipeline.HGP_SCREEN_IS_ROOT,
+    }
+    rows = set()
+    for value in catalog:
+        if not isinstance(value, Mapping):
+            raise ValueError("runtime auxiliary seed row is invalid")
+        if value["purpose"] in {"runtime_warmup", "runtime_timed"}:
+            identity = value.get("seed_identity")
+            expected_namespace = (
+                pipeline.HGP_SCREEN_RUNTIME_WARMUP_ROOT
+                if value["purpose"] == "runtime_warmup"
+                else pipeline.HGP_SCREEN_RUNTIME_TIMED_ROOT
+            )
+            if (not isinstance(identity, Mapping)
+                    or identity.get("trajectory_namespace")
+                    != expected_namespace):
+                raise ValueError("runtime trajectory seed namespace changed")
+        else:
+            if (value.get("seed_namespace")
+                    != pipeline.HGP_SCREEN_RUNTIME_IS_ROOT
+                    or isinstance(value.get("seed"), bool)
+                    or not isinstance(value.get("seed"), int)):
+                raise ValueError("runtime IS seed namespace changed")
+        if any(namespace in _canonical_json(value)
+               for namespace in formal_namespaces):
+            raise ValueError("runtime seed overlaps a formal namespace")
+        rows.add(_canonical_json(value))
+    if len(rows) != len(catalog):
+        raise ValueError("runtime auxiliary seed catalog contains duplicates")
+    return catalog
 
 
 def _resource_tiers(config):
@@ -1146,7 +1258,8 @@ def _preflight_node(args):
     if node_root.exists():
         raise FileExistsError("preflight node output already exists")
     node_root.mkdir(parents=True)
-    started = time.time()
+    started_local_unix = time.time()
+    started_monotonic = time.monotonic()
 
     environment = os.environ.copy()
     environment["PYTHONDONTWRITEBYTECODE"] = "1"
@@ -1178,11 +1291,13 @@ def _preflight_node(args):
             registry_path, config_path, args.source_commit,
             args.archive_sha256, args.source_manifest_sha256, cell,
             artifact_root, is_path,
+            seed_namespace=_pipeline().HGP_SCREEN_PREFLIGHT_IS_ROOT,
         )
         validated = _validate_is(
             is_path, registry_path, config_path, args.source_commit,
             args.archive_sha256, args.source_manifest_sha256, cell,
             artifact_root,
+            seed_namespace=_pipeline().HGP_SCREEN_PREFLIGHT_IS_ROOT,
         )
         if (generated["transcript_sha256"]
                 != validated["transcript_sha256"]):
@@ -1279,14 +1394,16 @@ def _preflight_node(args):
             "system": platform.system(), "machine": platform.machine(),
             "python": platform.python_version(),
         },
-        "started_unix": started,
-        "completed_unix": time.time(),
+        "clock_domain": "unsynchronized_local_diagnostic",
+        "started_local_unix": started_local_unix,
+        "completed_local_unix": time.time(),
+        "elapsed_monotonic_seconds": time.monotonic() - started_monotonic,
     }
     _enforce_deadline(schedule, "preflight_deadline_unix")
     _write_exclusive_json(node_root / "preflight.json", report)
     print(_canonical_json({
         "node": args.node, "status": "PASS",
-        "wall_seconds": report["completed_unix"] - started,
+        "wall_seconds": report["elapsed_monotonic_seconds"],
     }))
 
 
@@ -1353,10 +1470,19 @@ def _combine_preflight(args):
                 or report.get("config_file_sha256") != _config_sha(config_path)
                 or report.get("pytest_returncode") != 0
                 or report.get("environment", {}).get("system") != "Linux"
-                or float(report.get("started_unix", -1.0))
-                < float(schedule["started_unix"])
-                or float(report.get("completed_unix", math.inf))
-                > float(schedule["preflight_deadline_unix"])):
+                or report.get("clock_domain")
+                != "unsynchronized_local_diagnostic"
+                or not math.isfinite(float(report.get(
+                    "started_local_unix", math.nan,
+                )))
+                or not math.isfinite(float(report.get(
+                    "completed_local_unix", math.nan,
+                )))
+                or not math.isfinite(float(report.get(
+                    "elapsed_monotonic_seconds", math.nan,
+                )))
+                or float(report.get("elapsed_monotonic_seconds", -1.0))
+                < 0.0):
             raise ValueError(f"invalid HGP preflight report for {node}")
         digest_path = path.parent / "digest.json"
         runtime_path = path.parent / "runtime.json"
@@ -1421,21 +1547,26 @@ def _combine_preflight(args):
            != digest_transcript
            for node in EXPECTED_PREFLIGHT_NODES[1:]):
         raise ValueError("HGP canonical digest payload differs across nodes")
+    seed_catalog = runtime_reports[EXPECTED_PREFLIGHT_NODES[0]][
+        "payload"
+    ].get("auxiliary_seed_catalog")
+    if any(runtime_reports[node]["payload"].get("auxiliary_seed_catalog")
+           != seed_catalog for node in EXPECTED_PREFLIGHT_NODES[1:]):
+        raise ValueError("HGP runtime auxiliary seed catalog differs across nodes")
 
-    selection_unix = time.time()
-    control_reserve_seconds = float(
-        schedule["control_freeze_deadline_unix"]
-        - schedule["preflight_deadline_unix"]
-    )
+    control_origin_elapsed_seconds = 8 * 3600.0
+    screen_deadline_elapsed_seconds = 22 * 3600.0
+    analysis_deadline_elapsed_seconds = 24 * 3600.0
     tier_consensus = []
     for tier in RESOURCE_TIER_ORDER:
         node_rows = {}
         for node in EXPECTED_PREFLIGHT_NODES:
             runtime = runtime_reports[node]["payload"]
-            if runtime.get("version") != "exp102.q0_hgp_global.screen.runtime_node.v2":
+            if runtime.get("version") != "exp102.q0_hgp_global.screen.runtime_node.v3":
                 raise ValueError("runtime benchmark schema version changed")
             if _forbidden_runtime_outcome(runtime):
                 raise ValueError("runtime consensus found a physics outcome")
+            _validate_auxiliary_seed_catalog(runtime)
             seconds, local_pass, row = _tier_projection(runtime, tier)
             _validate_projection_accounting(
                 row, accounting, config, runtime, artifact_manifest,
@@ -1444,7 +1575,8 @@ def _combine_preflight(args):
                 key: runtime[key] for key in (
                     "timings", "is_seconds_by_cell",
                     "artifact_generation_wall_seconds", "owner_task_counts",
-                    "b_analysis_timings",
+                    "b_analysis_timings", "auxiliary_seed_catalog",
+                    "auxiliary_seed_catalog_sha256",
                 )
             }
             safe_generation = accounting["safety_factor"] * float(
@@ -1454,26 +1586,26 @@ def _combine_preflight(args):
                 row["analysis_workload"]["projected_analysis_wall_seconds"]
             )
             projected_screen_completion = (
-                selection_unix + control_reserve_seconds + safe_generation
+                control_origin_elapsed_seconds + safe_generation
             )
             projected_analysis_completion = (
                 projected_screen_completion + safe_analysis
             )
             deadline_pass = (
                 projected_screen_completion
-                <= float(schedule["screen_deadline_unix"])
+                <= screen_deadline_elapsed_seconds
                 and projected_analysis_completion
-                <= float(schedule["analysis_deadline_unix"])
+                <= analysis_deadline_elapsed_seconds
             )
             node_rows[node] = {
                 "projected_wall_seconds": seconds,
                 "runtime_gate_pass": local_pass,
                 "projection": row,
                 "runtime_context": runtime_context,
-                "projected_screen_completion_unix": (
+                "projected_screen_completion_elapsed_seconds": (
                     projected_screen_completion
                 ),
-                "projected_analysis_completion_unix": (
+                "projected_analysis_completion_elapsed_seconds": (
                     projected_analysis_completion
                 ),
                 "schedule_deadline_pass": bool(deadline_pass),
@@ -1509,11 +1641,13 @@ def _combine_preflight(args):
         "canonical_digest_sha256": _sha256_json(digest_payload),
         "runtime_consensus": tier_consensus,
         "selected_resource_tier": selected,
-        "selection_basis": "runtime_only_worst_node_and_frozen_deadlines",
-        "runtime_selection_unix": selection_unix,
-        "control_reserve_seconds": control_reserve_seconds,
+        "selection_basis": (
+            "runtime_only_worst_node_and_frozen_elapsed_deadlines"
+        ),
+        "control_origin_elapsed_seconds": control_origin_elapsed_seconds,
         "screen_budget_seconds": budget,
-        "completed_unix": time.time(),
+        "clock_domain": "unsynchronized_local_diagnostic",
+        "completed_local_unix": time.time(),
     }
     _enforce_deadline(schedule, "preflight_deadline_unix")
     if _verify_source(args.source_commit) != local_source_identity:
@@ -1554,15 +1688,18 @@ def _validate_preflight(
             or report.get("config_file_sha256") != _config_sha(config_path)
             or report.get("selected_resource_tier") not in RESOURCE_TIER_ORDER
             or report.get("selection_basis")
-            != "runtime_only_worst_node_and_frozen_deadlines"
+            != "runtime_only_worst_node_and_frozen_elapsed_deadlines"
             or not isinstance(source_identity, Mapping)
             or source_identity.get("mode") != "archive"
             or source_identity.get("source_commit") != source_commit
             or source_identity.get("archive_sha256") != archive_sha256
             or source_identity.get("manifest_sha256")
             != source_manifest_sha256
-            or float(report.get("completed_unix", math.inf))
-            > float(schedule["preflight_deadline_unix"])):
+            or report.get("clock_domain")
+            != "unsynchronized_local_diagnostic"
+            or not math.isfinite(float(report.get(
+                "completed_local_unix", math.nan,
+            )))):
         raise ValueError("HGP screen preflight does not grant run authority")
     rows = report.get("runtime_consensus")
     if (not isinstance(rows, list)
@@ -1572,16 +1709,11 @@ def _validate_preflight(
         raise ValueError("HGP screen preflight runtime consensus is invalid")
     accounting = _runtime_accounting(config)
     budget = _screen_budget_seconds(config)
-    selection_unix = float(report.get("runtime_selection_unix", math.inf))
-    control_reserve_seconds = float(
-        schedule["control_freeze_deadline_unix"]
-        - schedule["preflight_deadline_unix"]
-    )
-    if (not math.isfinite(selection_unix)
-            or selection_unix < float(schedule["started_unix"])
-            or selection_unix > float(schedule["preflight_deadline_unix"])
-            or float(report.get("control_reserve_seconds", -1.0))
-            != control_reserve_seconds):
+    control_origin_elapsed_seconds = 8 * 3600.0
+    screen_deadline_elapsed_seconds = 22 * 3600.0
+    analysis_deadline_elapsed_seconds = 24 * 3600.0
+    if float(report.get("control_origin_elapsed_seconds", -1.0)) != (
+            control_origin_elapsed_seconds):
         raise ValueError("HGP preflight runtime selection clock changed")
     for consensus in rows:
         node_rows = consensus.get("nodes")
@@ -1595,6 +1727,7 @@ def _validate_preflight(
         for node in EXPECTED_PREFLIGHT_NODES:
             value = node_rows[node]
             projection = value.get("projection")
+            _validate_auxiliary_seed_catalog(value.get("runtime_context", {}))
             _validate_projection_accounting(
                 projection, accounting, config,
                 value.get("runtime_context"), artifact_manifest,
@@ -1615,22 +1748,22 @@ def _validate_preflight(
                     "projected_analysis_wall_seconds"
                 ]
             )
-            screen_completion = (
-                selection_unix + control_reserve_seconds + safe_generation
-            )
+            screen_completion = control_origin_elapsed_seconds + safe_generation
             analysis_completion = screen_completion + safe_analysis
             deadline_pass = (
-                screen_completion <= float(schedule["screen_deadline_unix"])
+                screen_completion <= screen_deadline_elapsed_seconds
                 and analysis_completion
-                <= float(schedule["analysis_deadline_unix"])
+                <= analysis_deadline_elapsed_seconds
             )
             if (not math.isclose(
                     float(value.get(
-                        "projected_screen_completion_unix", math.inf,
+                        "projected_screen_completion_elapsed_seconds",
+                        math.inf,
                     )), screen_completion, rel_tol=1e-12, abs_tol=1e-6)
                     or not math.isclose(
                         float(value.get(
-                            "projected_analysis_completion_unix", math.inf,
+                            "projected_analysis_completion_elapsed_seconds",
+                            math.inf,
                         )), analysis_completion,
                         rel_tol=1e-12, abs_tol=1e-6,
                     )
@@ -2229,6 +2362,8 @@ def _run_node(args):
            for record in frozen_is):
         raise FileExistsError("fresh HGP node stage found an existing IS claim")
 
+    started_local_unix = time.time()
+    started_monotonic = time.monotonic()
     results = []
     is_results = []
     if is_work:
@@ -2273,7 +2408,10 @@ def _run_node(args):
         "reused_count": 0,
         "files": results,
         "importance_sampling_files": is_results,
-        "completed_unix": time.time(),
+        "clock_domain": "unsynchronized_local_diagnostic",
+        "started_local_unix": started_local_unix,
+        "completed_local_unix": time.time(),
+        "elapsed_monotonic_seconds": time.monotonic() - started_monotonic,
     }
     _enforce_deadline(schedule, "screen_deadline_unix")
     _write_exclusive_json(output, report)
@@ -2337,8 +2475,19 @@ def _validate_execution_reports(
                 or report.get("expected_is_count") != len(expected_is)
                 or report.get("computed_is_count") != len(expected_is)
                 or report.get("reused_count") != 0
-                or float(report.get("completed_unix", math.inf))
-                > float(schedule["screen_deadline_unix"])):
+                or report.get("clock_domain")
+                != "unsynchronized_local_diagnostic"
+                or not math.isfinite(float(report.get(
+                    "started_local_unix", math.nan,
+                )))
+                or not math.isfinite(float(report.get(
+                    "completed_local_unix", math.nan,
+                )))
+                or not math.isfinite(float(report.get(
+                    "elapsed_monotonic_seconds", math.nan,
+                )))
+                or float(report.get("elapsed_monotonic_seconds", -1.0))
+                < 0.0):
             raise ValueError(f"invalid HGP execution report for {node}")
         expected_files = {
             record["task_fingerprint"]: record for record in expected
@@ -2671,6 +2820,7 @@ def _parser():
         schedule=False,
     )
     schedule.add_argument("--run-id", required=True)
+    schedule.add_argument("--clock-authority-json", required=True)
     schedule.add_argument("--output", required=True)
     schedule.set_defaults(function=_build_schedule)
 

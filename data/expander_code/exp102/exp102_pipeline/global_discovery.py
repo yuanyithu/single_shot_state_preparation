@@ -77,6 +77,10 @@ GLOBAL_READINESS_VERSION = "exp102.q0_global.readiness.v1"
 GLOBAL_SCHEDULE_VERSION = "exp102.q0_global.schedule.v1"
 GLOBAL_POSTSELECTION_VERSION = "exp102.q0_global.postselection_plan.v1"
 GLOBAL_CONTROL_FREEZE_VERSION = "exp102.q0_global.control_freeze.v1"
+PAIRED_QTOP_DELTA_EVIDENCE_VERSION = "exp102.qtop_delta.paired_evidence.v1"
+LEGACY_SCREEN_DIAGNOSTIC_CONTRACT_VERSION = (
+    "exp102.q0_global.screen_diagnostic.v1"
+)
 NODE_CAPACITY = {"nd-1": 75, "nd-2": 75, "nd-3": 91}
 INIT_FAMILIES = ("P", "U")
 TRAJECTORIES_PER_FAMILY = 16
@@ -1661,6 +1665,214 @@ def _family_summary(records, config):
     }
 
 
+def _qtop_delta_character_population(character_set, values):
+    """Average paired character differences and their finite-population SE."""
+    values = np.asarray(values, dtype=np.float64)
+    if values.shape != character_set.masks.shape or not np.all(np.isfinite(values)):
+        raise GlobalConflictError("paired q_top character values are malformed")
+    total = (1 << int(character_set.k)) - 1
+    if character_set.tier == "full":
+        return float(values.mean()), 0.0
+    if character_set.tier != "sampled":
+        raise GlobalConflictError("paired q_top character tier is unknown")
+    basis = np.zeros(values.size, dtype=bool)
+    positions = np.asarray(character_set.basis_positions, dtype=np.int64)
+    if (positions.shape != (int(character_set.k),)
+            or np.unique(positions).size != positions.size
+            or np.any(positions < 0) or np.any(positions >= values.size)):
+        raise GlobalConflictError("paired q_top basis positions are malformed")
+    basis[positions] = True
+    sampled = values[~basis]
+    remaining = total - int(character_set.k)
+    if sampled.size == 0 or sampled.size > remaining:
+        raise GlobalConflictError("paired q_top nonbasis sample is malformed")
+    estimate = (
+        float(values[basis].sum()) + remaining * float(sampled.mean())
+    ) / total
+    if sampled.size <= 1 or remaining <= 1 or sampled.size == remaining:
+        finite_se = 0.0
+    else:
+        fraction = sampled.size / remaining
+        finite_se = (
+            remaining / total
+            * math.sqrt(
+                (1.0 - fraction) * float(sampled.var(ddof=1)) / sampled.size
+            )
+        )
+    return float(estimate), float(finite_se)
+
+
+def _summary_character_means(summary):
+    means = summary.get("_means")
+    if means is None:
+        means = summary.get("_combined_means")
+    return means
+
+
+def _paired_qtop_delta_estimate(left, right):
+    """Estimate signed q_top(left)-q_top(right) on shared character masks."""
+    left_means = np.asarray(_summary_character_means(left), dtype=np.float64)
+    right_means = np.asarray(_summary_character_means(right), dtype=np.float64)
+    left_set = left.get("_character_set")
+    right_set = right.get("_character_set")
+    if left_set is None or right_set is None:
+        raise GlobalConflictError("paired q_top comparison lacks a character set")
+    if (left_set.k != right_set.k or left_set.tier != right_set.tier
+            or not np.array_equal(left_set.masks, right_set.masks)
+            or not np.array_equal(
+                left_set.basis_positions, right_set.basis_positions,
+            )):
+        raise GlobalConflictError("paired q_top character sets differ")
+    character_count = left_set.masks.size
+    if (left_means.ndim != 2 or right_means.ndim != 2
+            or left_means.shape[1:] != (character_count,)
+            or right_means.shape[1:] != (character_count,)
+            or left_means.shape[0] < 3 or right_means.shape[0] < 3
+            or not np.all(np.isfinite(left_means))
+            or not np.all(np.isfinite(right_means))):
+        raise GlobalConflictError("paired q_top trajectory means are malformed")
+
+    left_q = character_qtop_estimate(left_set, left_means)
+    right_q = character_qtop_estimate(right_set, right_means)
+    per_character_delta = (
+        left_q["per_character_m2"] - right_q["per_character_m2"]
+    )
+    signed_delta, character_se = _qtop_delta_character_population(
+        left_set, per_character_delta,
+    )
+
+    # Recompute the same signed contrast while deleting one independent
+    # trajectory on each side.  The two side-specific jackknife variances add;
+    # the shared frozen-character fluctuation is handled only once above.
+    delete_left = np.asarray(left_q["delete_one_q_top"], dtype=np.float64)
+    delete_right = np.asarray(right_q["delete_one_q_top"], dtype=np.float64)
+    left_contrasts = delete_left - float(right_q["q_top"])
+    right_contrasts = float(left_q["q_top"]) - delete_right
+    trajectory_variance = 0.0
+    for contrasts in (left_contrasts, right_contrasts):
+        trajectory_variance += (
+            (contrasts.size - 1) / contrasts.size
+            * float(np.square(contrasts - contrasts.mean()).sum())
+        )
+    trajectory_se = math.sqrt(trajectory_variance)
+    return {
+        "signed_delta_q_top": float(signed_delta),
+        "q_top_trajectory_se": float(trajectory_se),
+        "q_top_character_se": float(character_se),
+        "q_top_total_se": float(math.hypot(trajectory_se, character_se)),
+        "per_character_delta_m2": per_character_delta,
+        "delete_one_left_delta": left_contrasts,
+        "delete_one_right_delta": right_contrasts,
+    }
+
+
+def _paired_qtop_delta_evidence(character_set, paired):
+    return {
+        "version": PAIRED_QTOP_DELTA_EVIDENCE_VERSION,
+        "k": int(character_set.k),
+        "tier": str(character_set.tier),
+        "basis_positions": np.asarray(
+            character_set.basis_positions, dtype=np.int64,
+        ).tolist(),
+        "per_character_delta_m2": np.asarray(
+            paired["per_character_delta_m2"], dtype=np.float64,
+        ).tolist(),
+        "delete_one_left_delta": np.asarray(
+            paired["delete_one_left_delta"], dtype=np.float64,
+        ).tolist(),
+        "delete_one_right_delta": np.asarray(
+            paired["delete_one_right_delta"], dtype=np.float64,
+        ).tolist(),
+    }
+
+
+def _paired_qtop_delta_from_evidence(evidence):
+    if not isinstance(evidence, dict) or set(evidence) != {
+            "version", "k", "tier", "basis_positions",
+            "per_character_delta_m2", "delete_one_left_delta",
+            "delete_one_right_delta"}:
+        raise GlobalConflictError("paired q_top delta evidence is malformed")
+    k = evidence.get("k")
+    if (isinstance(k, bool) or not isinstance(k, int) or not 0 < k <= 64
+            or evidence.get("version") != PAIRED_QTOP_DELTA_EVIDENCE_VERSION):
+        raise GlobalConflictError("paired q_top delta evidence identity is invalid")
+    tier = evidence.get("tier")
+    if tier not in {"full", "sampled"}:
+        raise GlobalConflictError("paired q_top delta evidence tier is invalid")
+    try:
+        values = np.asarray(
+            evidence.get("per_character_delta_m2"), dtype=np.float64,
+        )
+        positions = np.asarray(evidence.get("basis_positions"), dtype=np.int64)
+    except (TypeError, ValueError, OverflowError) as exc:
+        raise GlobalConflictError(
+            "paired q_top delta evidence values are malformed",
+        ) from exc
+    total = (1 << k) - 1
+    if (values.ndim != 1 or positions.shape != (k,)
+            or np.unique(positions).size != positions.size
+            or np.any(positions < 0) or np.any(positions >= values.size)
+            or (tier == "full" and values.size != total)
+            or (tier == "sampled" and (values.size <= k
+                                        or values.size > total))):
+        raise GlobalConflictError("paired q_top delta evidence values are malformed")
+    character_set = CharacterSet(
+        masks=np.zeros(values.size, dtype=np.uint64),
+        basis_positions=positions,
+        tier=tier,
+        k=k,
+        random_seed=None,
+        character_sha256="serialized-paired-delta-evidence",
+    )
+    signed_delta, character_se = _qtop_delta_character_population(
+        character_set, values,
+    )
+    trajectory_variance = 0.0
+    delete_arrays = []
+    for name in ("delete_one_left_delta", "delete_one_right_delta"):
+        try:
+            contrasts = np.asarray(evidence.get(name), dtype=np.float64)
+        except (TypeError, ValueError, OverflowError) as exc:
+            raise GlobalConflictError(
+                "paired q_top delta delete-one evidence is malformed",
+            ) from exc
+        if (contrasts.ndim != 1 or contrasts.size < 3
+                or not np.all(np.isfinite(contrasts))):
+            raise GlobalConflictError(
+                "paired q_top delta delete-one evidence is malformed",
+            )
+        trajectory_variance += (
+            (contrasts.size - 1) / contrasts.size
+            * float(np.square(contrasts - contrasts.mean()).sum())
+        )
+        delete_arrays.append(contrasts)
+    trajectory_se = math.sqrt(trajectory_variance)
+    return {
+        "signed_delta_q_top": float(signed_delta),
+        "q_top_trajectory_se": float(trajectory_se),
+        "q_top_character_se": float(character_se),
+        "q_top_total_se": float(math.hypot(trajectory_se, character_se)),
+        "delete_one_left_delta": delete_arrays[0],
+        "delete_one_right_delta": delete_arrays[1],
+    }
+
+
+def _delta_gate_payload(delta, se, config, *, paired_evidence=None):
+    gates = config["gates"]
+    result = {
+        "delta_q_top": float(delta),
+        "se_delta_q_top": float(se),
+        "absolute_pass": bool(delta <= gates["max_abs_delta_q_top"]),
+        "sigma_pass": bool(
+            delta <= gates["delta_sigma_multiplier"] * se
+                     + gates["delta_sigma_slack"]
+        ),
+    }
+    if paired_evidence is not None:
+        result["paired_evidence"] = paired_evidence
+    return result
+
+
 def _delta_gate(left, right, config):
     if (left.get("q_top") is None or right.get("q_top") is None
             or left.get("q_top_total_se") is None
@@ -1671,15 +1883,67 @@ def _delta_gate(left, right, config):
             "absolute_pass": False,
             "sigma_pass": False,
         }
-    delta = abs(float(left["q_top"]) - float(right["q_top"]))
-    se = math.sqrt(left["q_top_total_se"] ** 2 + right["q_top_total_se"] ** 2)
-    gates = config["gates"]
-    return {
-        "delta_q_top": delta,
-        "se_delta_q_top": se,
-        "absolute_pass": delta <= gates["max_abs_delta_q_top"],
-        "sigma_pass": delta <= gates["delta_sigma_multiplier"] * se + gates["delta_sigma_slack"],
-    }
+    left_means = _summary_character_means(left)
+    right_means = _summary_character_means(right)
+    if (left_means is None) != (right_means is None):
+        raise GlobalConflictError("q_top comparison has one missing trajectory ensemble")
+    use_legacy = (
+        config.get("contract_version")
+        == LEGACY_SCREEN_DIAGNOSTIC_CONTRACT_VERSION
+    )
+    if left_means is not None and not use_legacy:
+        paired = _paired_qtop_delta_estimate(left, right)
+        delta = abs(paired["signed_delta_q_top"])
+        se = paired["q_top_total_se"]
+        evidence = _paired_qtop_delta_evidence(left["_character_set"], paired)
+    else:
+        # Serialized legacy reports do not retain trajectory-by-character
+        # means.  Keep their historical read-only validation path; every new
+        # raw analysis above carries means and therefore uses paired errors.
+        delta = abs(float(left["q_top"]) - float(right["q_top"]))
+        # Keep the exact operation order used by serialized v1 reports.  Even
+        # changing this to hypot can alter the last bit and invalidate history.
+        se = math.sqrt(
+            float(left["q_top_total_se"]) ** 2
+            + float(right["q_top_total_se"]) ** 2
+        )
+        evidence = None
+    return _delta_gate_payload(delta, se, config, paired_evidence=evidence)
+
+
+def validate_serialized_qtop_delta_gate(stored, left, right, config):
+    """Validate new paired evidence without reinterpreting legacy reports."""
+    if not isinstance(stored, dict):
+        raise GlobalConflictError("serialized q_top delta gate is malformed")
+    evidence = stored.get("paired_evidence")
+    if evidence is None:
+        # Historical reports contain only public q_top/SE values.  Their
+        # original independent-total-SE quadrature remains their exact meaning.
+        expected = _delta_gate(left, right, config)
+    else:
+        if (config.get("contract_version")
+                == LEGACY_SCREEN_DIAGNOSTIC_CONTRACT_VERSION
+                or left.get("q_top") is None or right.get("q_top") is None
+                or _summary_character_means(left) is not None
+                or _summary_character_means(right) is not None):
+            raise GlobalConflictError(
+                "serialized paired q_top delta has invalid public summaries",
+            )
+        paired = _paired_qtop_delta_from_evidence(evidence)
+        public_signed_delta = float(left["q_top"]) - float(right["q_top"])
+        if not math.isclose(
+                paired["signed_delta_q_top"], public_signed_delta,
+                rel_tol=0.0, abs_tol=16.0 * np.finfo(np.float64).eps):
+            raise GlobalConflictError(
+                "serialized paired q_top delta disagrees with public q_top",
+            )
+        expected = _delta_gate_payload(
+            abs(paired["signed_delta_q_top"]), paired["q_top_total_se"],
+            config, paired_evidence=evidence,
+        )
+    if stored != expected:
+        raise GlobalConflictError("serialized q_top delta gate changed")
+    return expected
 
 
 def _cell_method_summary(records, config):

@@ -35,17 +35,20 @@ server_root=$HOME/.single_shot
 deployment_root=$server_root/repos/$run_id
 run_root=$server_root/runs/$run_id
 archive=$deployment_root/SOURCE.tar
+archive_marker=$deployment_root/ARCHIVE_SHA256
 manifest=$deployment_root/SOURCE_MANIFEST.json
 commit_marker=$deployment_root/SOURCE_COMMIT
 verify_relative=data/expander_code/exp102/validation/002_numba_smoke_20260719/run_verified_source.sh
 module=data.expander_code.exp102.validation.013_q0_hgp_global_screen_20260722.orchestrate_hgp
 
 [[ -d $deployment_root && -d $deployment_root/source ]] || exit 67
-[[ -f $archive && -f $manifest && -f $commit_marker ]] || exit 67
+[[ -f $archive && -f $archive_marker && -f $manifest && -f $commit_marker ]] \
+  || exit 67
 [[ -d $server_root/logs ]] || exit 67
 printf '%s  %s\n' "$archive_sha256" "$archive" | sha256sum -c - >/dev/null
 printf '%s  %s\n' "$manifest_sha256" "$manifest" | sha256sum -c - >/dev/null
 [[ $(tr -d '\r\n' < "$commit_marker") == "$source_commit" ]] || exit 67
+[[ $(tr -d '\r\n' < "$archive_marker") == "$archive_sha256" ]] || exit 67
 if [[ $phase == preflight ]]; then
   [[ ! -e $run_root ]] || {
     echo "HGP preflight requires a fresh run root" >&2

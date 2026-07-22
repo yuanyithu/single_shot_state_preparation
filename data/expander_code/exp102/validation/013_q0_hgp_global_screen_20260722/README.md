@@ -18,6 +18,26 @@ stage marker or raw and launched no preflight/sampler. That source is not
 retried in place; the guarded `nohup` + `setsid` launcher below requires a
 fresh deployment/run.
 
+The fresh successor source
+`df97fb5a7d38543beb515444b5692427dd28cc41` successfully persisted the `nd-0`
+orchestrator and launched the first `nd-1` screen. That screen then exited
+before creating a run root, immutable marker or raw because RHEL Bash 4.2
+treats an empty-array expansion as unbound under `set -u`; `build-schedule`
+is intentionally the only stage with zero prerequisites. This was likewise an
+infrastructure-only attempt, not a preflight or sampler result. Its deployment,
+phase guard and logs are not reused. The successor wrapper explicitly guards
+all possibly empty arrays and has an executable zero-prerequisite regression.
+
+The same infrastructure audit found that node epochs are materially
+unsynchronized: nd-1/nd-2/nd-3 were approximately `+204/+298/+2` seconds from
+nd-0, and nd-0/nd-1/nd-2 chrony reported `Not synchronised`. The successor uses
+`exp102.q0_hgp_global.screen.schedule.v2`: nd-0 freezes one
+`CLOCK_BOOTTIME + boot_id` authority, while all compute-node and macOS epochs
+are diagnostic only. Measurement must reuse the preflight anchor. Before each
+stage launch and at each SUCCESS acceptance, nd-0 rechecks boottime; equality
+with a deadline or a boot-ID change fails closed. No 013 preflight or
+measurement was produced while finding or fixing this issue.
+
 Authority is limited to `DIAGNOSTIC_HARD_PAIR_FOUND`. This run cannot produce
 `READY_FOR_FORMAL`, `FROZEN_HELD_OUT_PASS`, publication data or any of the 6144
 production tasks.
@@ -28,7 +48,7 @@ production tasks.
 - Contract document: `../../HGP_GLOBAL_SCREEN_CONTRACT.md`.
 - Config: `../../config/q0_hgp_global.screen.v1.json`.
 - Canonical config SHA256:
-  `3c65ef96ce231b4aea4499b5a6030f1cc82475117c5ee5ecc7633d972ef8edc9`.
+  `163a5cc87486beabf453f3d4a57bc63f0c4e0b2f54619c60268ee7f0c9b2a341`.
 - Registry SHA256:
   `883730e0ba548f6b358187d8f123fdd4d8aeb116f4bacda363c35c16d01ae40b`.
 - Candidates: `HP32`, `HP64`, `MAM-IMH8`.
@@ -47,18 +67,31 @@ production tasks.
 The five disorder-uniform seeds are intentionally the earlier frozen values so
 the physical cells are unchanged. All sampler, anchor, character and auxiliary
 IS streams use new `q0_hgp_global_screen_*_v1` namespaces. No raw or seed from
-005--012 is reusable.
+005--012 is reusable. Preflight digest, runtime warmup/timed and preflight/
+runtime IS use namespaces disjoint from all 384 measurement tasks and the two
+frozen screen IS streams; the complete trajectory/IS 63-bit seed enumeration
+allows only the intentional reference/Numba reuse of one identical tiny-oracle
+stream. The fixture-identity regression is repeated with the final clean
+commit/archive/manifest identities before launch.
 
 ## What counts as a pass
 
 One HP method must pass all five cells from both initial families, with every
 individual trajectory satisfying its swap and cold-hot-cold transport gate.
 `MAM-IMH8` must independently pass both `HARD2` cells, with every individual
-trajectory accepting during burn and satisfying its measurement acceptance
-gate. The selected HP and MAM-IMH8 distributions must then agree on `HARD2`
+trajectory changing state during burn and satisfying its measurement
+state-change count/rate gates. Accepted self-proposals remain recorded as MH
+diagnostics but do not count as transport. The selected HP and MAM-IMH8
+distributions must then agree on `HARD2`
 under the frozen character `q_top`, `D2_norm` and normalized-weight gates.
 `EASY3` is an HP runtime/false-negative control and has no independent-method
 certification claim.
+
+All `Delta q_top` uncertainty calculations are paired on the common frozen
+character masks. The character finite-population SE is taken from the
+per-character contrast itself, and the two independent trajectory ensembles
+contribute side-specific delete-one jackknife variances. Marginal character
+SEs are not added as if the masks had been sampled twice.
 
 Both mechanisms also face the same collapsed-`B` slow-variable gate. Raw binds
 all `r^2` B-bit characters, row/column parities and 64 deterministic dense
@@ -105,8 +138,13 @@ one sentinel disorder cannot certify or rule out an entire `(m,p)` point.
    with an atomic phase guard and PID metadata. It still launches every
    schedule/artifact/preflight job on `nd-1`/`nd-2`/`nd-3` in an independent
    `screen` through the verified archive and immutable stage wrapper.
+   The 6/8/22/24-hour deadlines derive only from the schedule-v2 nd-0
+   `CLOCK_BOOTTIME` anchor; node-local epoch values cannot grant extra time or
+   cause a false expiry.
 3. Fail closed on any source, digest, solver, transcript or reference/Numba
-   difference; otherwise select the largest common resource tier that fits.
+   difference; otherwise select the largest common resource tier that fits
+   safeguarded generation from the worst-case hour-8 control origin by hour 22
+   and safeguarded analysis by hour 24.
 4. Stop at the aggregate preflight boundary, pull the frozen artifacts and
    preflight evidence to the macmini, and replay them under conda `12`. The
    stored remote solver identity is provenance; local replay checks exact
@@ -124,7 +162,11 @@ one sentinel disorder cannot certify or rule out an entire `(m,p)` point.
    retry, then perform the frozen 91-worker full replay on nd-3.
 7. Pull all raw and terminal evidence locally, verify file/canonical hashes and
    independently replay state, label, weight, residual, proposal and transition
-   records before accepting the terminal package.
+   records before accepting the terminal package. The terminal package and
+   measurement acceptance manifest are a joint terminal: validation must also
+   reconstruct the exact 384-trajectory plus two-IS raw/claim set from the
+   frozen control and reject any missing, extra, symlinked or hash-mismatched
+   file.
 
 Any failed marker or failed/duplicate `nd-0` launch guard requires a fresh
 deployment/run ID. The retained guard is not deleted for an in-place retry.

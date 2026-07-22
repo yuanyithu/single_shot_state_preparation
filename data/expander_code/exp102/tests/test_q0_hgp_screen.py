@@ -115,6 +115,10 @@ def test_config_is_canonical_and_all_mutations_fail_closed(tmp_path, protocol):
     assert config["screen_panel_sha256"] == sha256_json(
         hs._method_schedule_identity(config),
     )
+    assert config["raw_versions"]["map"] == "exp102.q0_map_mixture.raw.v3"
+    assert config["gates"]["map_min_burn_state_changes"] == 1
+    assert config["gates"]["map_min_measurement_state_change_rate"] == 0.05
+    assert config["gates"]["map_min_measurement_state_changes"] == 400
 
     original = json.loads(CONFIG_PATH.read_text(encoding="ascii"))
     noncanonical = tmp_path / "noncanonical_config.json"
@@ -151,6 +155,69 @@ def test_config_is_canonical_and_all_mutations_fail_closed(tmp_path, protocol):
     wrong_registry["registry_sha256"] = "0" * 64
     with pytest.raises(ValueError, match="registry SHA"):
         hs.load_hgp_screen_config(CONFIG_PATH, wrong_registry)
+
+
+def test_map_transport_gate_uses_state_changes_not_accepted_self_loops(protocol):
+    _, config = protocol
+    record = {
+        "algorithm_metrics": {
+            "burn_accepts": 8192,
+            "burn_state_changes": 0,
+            "measurement_accepts": 32768,
+            "measurement_acceptance": 1.0,
+            "measurement_state_changes": 0,
+            "measurement_state_change_rate": 0.0,
+        },
+    }
+    assert hs._algorithm_failures(
+        [record], MAP_METHOD_ID, config["gates"],
+    ) == [
+        "map_burn_state_changes",
+        "map_measurement_state_change_rate",
+        "map_measurement_state_changes",
+    ]
+
+    record["algorithm_metrics"].update({
+        "burn_state_changes": 1,
+        "measurement_state_changes": 400,
+        "measurement_state_change_rate": 0.05,
+    })
+    assert not hs._algorithm_failures(
+        [record], MAP_METHOD_ID, config["gates"],
+    )
+
+
+def test_map_transition_replay_distinguishes_accepted_self_loop():
+    data = {
+        "sampler_initial_state_packed": np.asarray([0], dtype=np.uint8),
+        "sampler_burn_state_packed": np.asarray([0], dtype=np.uint8),
+        "sampler_burn_proposal_states_packed": np.asarray(
+            [[0], [1]], dtype=np.uint8,
+        ),
+        "sampler_burn_states_packed": np.asarray(
+            [[0], [0]], dtype=np.uint8,
+        ),
+        "sampler_burn_accepted": np.asarray([1, 0], dtype=np.uint8),
+        "sampler_burn_state_changed": np.asarray([0, 0], dtype=np.uint8),
+        "sampler_burn_attempts": np.asarray(2, dtype=np.int64),
+        "sampler_burn_accepts": np.asarray(1, dtype=np.int64),
+        "sampler_burn_state_changes": np.asarray(0, dtype=np.int64),
+        "sampler_measurement_proposal_states_packed": np.asarray(
+            [[1]], dtype=np.uint8,
+        ),
+        "sampler_measurement_states_packed": np.asarray(
+            [[1]], dtype=np.uint8,
+        ),
+        "sampler_measurement_accepted": np.asarray([1], dtype=np.uint8),
+        "sampler_measurement_state_changed": np.asarray([1], dtype=np.uint8),
+        "sampler_measurement_attempts": np.asarray(1, dtype=np.int64),
+        "sampler_measurement_accepts": np.asarray(1, dtype=np.int64),
+        "sampler_measurement_state_changes": np.asarray(1, dtype=np.int64),
+    }
+    hs._validate_map_transition_counters(data)
+    data["sampler_burn_state_changed"][0] = np.uint8(1)
+    with pytest.raises(hs.HgpScreenConflictError, match="transition counters"):
+        hs._validate_map_transition_counters(data)
 
 
 def test_frozen_b_character_catalog_is_complete_unique_and_dense():
@@ -425,6 +492,16 @@ def test_hp_and_map_short_raw_are_pickle_free_replayable_and_tamper_closed(
         assert record["labels"].shape == (8,)
         assert record["weights"].shape == (8,)
         assert record["valid_mask"].all()
+        if method == MAP_METHOD_ID:
+            metrics = record["algorithm_metrics"]
+            assert metrics["burn_accepts"] >= metrics["burn_state_changes"]
+            assert (
+                metrics["measurement_accepts"]
+                >= metrics["measurement_state_changes"]
+            )
+            assert metrics["measurement_state_change_rate"] == pytest.approx(
+                metrics["measurement_state_changes"] / 8.0,
+            )
 
         with np.load(path, allow_pickle=False) as data:
             arrays = {name: data[name].copy() for name in data.files}
@@ -510,8 +587,11 @@ def test_manifest_tamper_is_rejected_and_report_cannot_authorize_formal_work(
         else:
             metrics = {
                 "burn_accepts": 8,
+                "burn_state_changes": 8,
                 "measurement_accepts": 1000,
                 "measurement_acceptance": 1.0,
+                "measurement_state_changes": 1000,
+                "measurement_state_change_rate": 1.0,
             }
         return {
             "cell": task["cell"],

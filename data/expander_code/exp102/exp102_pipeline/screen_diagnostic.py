@@ -2053,9 +2053,10 @@ def _validate_report_summary(summary, expected_cell, method, tier, config):
     if not _report_close(core, family_core):
         raise GlobalConflictError("diagnostic report cell core time is inconsistent")
     families = summary["families"]
-    delta = _global._delta_gate(families["P"], families["U"], config)
-    if summary.get("initialization_delta") != delta:
-        raise GlobalConflictError("diagnostic report initialization delta changed")
+    delta = _global.validate_serialized_qtop_delta_gate(
+        summary.get("initialization_delta"), families["P"], families["U"],
+        config,
+    )
     missing = any(families[name]["q_top"] is None for name in INIT_FAMILIES)
     failures = []
     if missing:
@@ -2291,9 +2292,9 @@ def validate_screen_report(report, registry, config):
         right = summary_index.get((cell_key, defect_method, defect_tier))
         if left is None or right is None:
             raise GlobalConflictError("diagnostic comparison refers to unknown summary")
-        expected_q = _global._delta_gate(left, right, config)
-        if comparison["q_top"] != expected_q:
-            raise GlobalConflictError("diagnostic comparison q_top gate changed")
+        expected_q = _global.validate_serialized_qtop_delta_gate(
+            comparison["q_top"], left, right, config,
+        )
         missing = left["q_top"] is None or right["q_top"] is None
         if missing:
             expected_values = (None, None, False, None, None, False, False)

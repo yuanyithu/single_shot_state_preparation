@@ -62,7 +62,7 @@ from .seeds import derive_seed
 MAP_MIXTURE_VERSION = "exp102.q0_map_mixture.discovery.v1"
 MAP_ANCHOR_VERSION = "exp102.q0_map_mixture.anchors.v2"
 MAP_PROPOSAL_VERSION = "exp102.q0_map_mixture.proposal.v1"
-MAP_RAW_VERSION = "exp102.q0_map_mixture.raw.v1"
+MAP_RAW_VERSION = "exp102.q0_map_mixture.raw.v2"
 MAP_METHOD_ID = "MAM-IMH8"
 MAP_ANCHOR_SEED_NAMESPACE = "q0_hgp_global_screen_map_anchor_v1"
 MAP_PRIMARY_ANCHOR_SEED_SENTINEL = 0
@@ -239,6 +239,11 @@ def _solver_identity():
         f"numpy={np.__version__};scipy={scipy.__version__};"
         f"highs={highs_version}"
     )
+
+
+def map_solver_identity():
+    """Return the exact MILP solver identity recorded in MAP artifacts."""
+    return _solver_identity()
 
 
 def _validated_milp_primal(H, syndrome, objective, result, *, expected_weight=None):
@@ -905,6 +910,7 @@ def _run_imh_stage(proposal, frame, p, state, coordinate, rng, steps):
         "log_acceptance": np.empty(steps, dtype=np.float64),
         "accept_uniform": np.empty(steps, dtype=np.float64),
         "accepted": np.empty(steps, dtype=np.uint8),
+        "state_changed": np.empty(steps, dtype=np.uint8),
         "proposal_anchor_index": np.empty(steps, dtype=np.int16),
         "proposal_component_index": np.empty(steps, dtype=np.int8),
         "states_packed": np.empty((steps, physical_width), dtype=np.uint8),
@@ -922,6 +928,7 @@ def _run_imh_stage(proposal, frame, p, state, coordinate, rng, steps):
         )
         uniform = rng.random()
         accepted = uniform == 0.0 or math.log(uniform) < log_acceptance
+        state_changed = accepted and not np.array_equal(proposed_state, state)
         transcript["proposal_coordinates_packed"][step] = np.packbits(
             proposed_coordinate, bitorder="little",
         )
@@ -934,6 +941,7 @@ def _run_imh_stage(proposal, frame, p, state, coordinate, rng, steps):
         transcript["log_acceptance"][step] = log_acceptance
         transcript["accept_uniform"][step] = uniform
         transcript["accepted"][step] = np.uint8(accepted)
+        transcript["state_changed"][step] = np.uint8(state_changed)
         transcript["proposal_anchor_index"][step] = draw["anchor_index"]
         transcript["proposal_component_index"][step] = draw["component_index"]
         if accepted:
@@ -1081,6 +1089,7 @@ def run_map_mixture_trajectory(model, frame, syndrome, config, seed_identity,
         "burn_log_acceptance": burn["log_acceptance"],
         "burn_accept_uniform": burn["accept_uniform"],
         "burn_accepted": burn["accepted"],
+        "burn_state_changed": burn["state_changed"],
         "burn_proposal_anchor_index": burn["proposal_anchor_index"],
         "burn_proposal_component_index": burn["proposal_component_index"],
         "burn_states_packed": burn["states_packed"],
@@ -1094,6 +1103,7 @@ def run_map_mixture_trajectory(model, frame, syndrome, config, seed_identity,
         "measurement_log_acceptance": measurement["log_acceptance"],
         "measurement_accept_uniform": measurement["accept_uniform"],
         "measurement_accepted": measurement["accepted"],
+        "measurement_state_changed": measurement["state_changed"],
         "measurement_proposal_anchor_index": measurement["proposal_anchor_index"],
         "measurement_proposal_component_index": measurement["proposal_component_index"],
         "measurement_states_packed": measurement["states_packed"],
@@ -1105,8 +1115,12 @@ def run_map_mixture_trajectory(model, frame, syndrome, config, seed_identity,
         ),
         "burn_attempts": np.int64(config.burn_steps),
         "burn_accepts": np.int64(burn["accepted"].sum()),
+        "burn_state_changes": np.int64(burn["state_changed"].sum()),
         "measurement_attempts": np.int64(config.measurement_steps),
         "measurement_accepts": np.int64(measurement["accepted"].sum()),
+        "measurement_state_changes": np.int64(
+            measurement["state_changed"].sum()
+        ),
         "initial_label": _label_uint64(frame, initial),
         "burn_label": _label_uint64(frame, burn_state),
         "final_label": _label_uint64(frame, state),

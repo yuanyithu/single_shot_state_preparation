@@ -25,11 +25,15 @@ VALIDATION_ROOT = (
     "013_q0_hgp_global_screen_20260722"
 )
 workflow = importlib.import_module(VALIDATION_ROOT + ".workflow")
+orchestration = importlib.import_module(VALIDATION_ROOT + ".orchestrate_hgp")
 pipeline = importlib.import_module(
     "data.expander_code.exp102.exp102_pipeline.q0_hgp_screen"
 )
+map_pipeline = importlib.import_module(
+    "data.expander_code.exp102.exp102_pipeline.q0_map_mixture"
+)
 
-ATTESTATION_VERSION = "exp102.q0_hgp_global.screen.local_attestation.v1"
+ATTESTATION_VERSION = "exp102.q0_hgp_global.screen.local_attestation.v3"
 SOLVER_POLICY = "stored_generation_identity_exact_artifact_replay_no_local_milp"
 
 
@@ -73,20 +77,24 @@ def _environment_identity():
         "python": platform.python_version(),
         "numpy": np.__version__,
         "scipy": scipy.__version__,
-        "map_solver_identity_current": pipeline._solver_identity(),
+        "map_solver_identity_current": map_pipeline.map_solver_identity(),
     }
 
 
 def audit_local_preflight(
         registry_path, config_path, source_commit, archive_sha256,
         source_manifest_sha256, schedule_path, artifact_root,
-        artifact_manifest_path, preflight_path, work_root, output_path):
+        artifact_manifest_path, preflight_path, preflight_acceptance_path,
+        work_root, output_path):
     registry_path = Path(registry_path).resolve(strict=True)
     config_path = Path(config_path).resolve(strict=True)
     schedule_path = Path(schedule_path).resolve(strict=True)
     artifact_root = Path(artifact_root).resolve(strict=True)
     artifact_manifest_path = Path(artifact_manifest_path).resolve(strict=True)
     preflight_path = Path(preflight_path).resolve(strict=True)
+    preflight_acceptance_path = Path(
+        preflight_acceptance_path,
+    ).resolve(strict=True)
     work_root = Path(work_root).resolve()
     output_path = Path(output_path).resolve()
     if work_root.exists() or output_path.exists():
@@ -112,6 +120,27 @@ def audit_local_preflight(
     )
     if remote_preflight.get("status") != "PASS":
         raise RuntimeError("remote aggregate preflight is not PASS")
+    preflight_acceptance = orchestration.validate_preflight_acceptance_offline(
+        preflight_acceptance_path, schedule_path.parent.parent, schedule,
+        source_commit, archive_sha256, source_manifest_sha256,
+        {
+            "schedule": schedule_path,
+            "artifact_manifest": artifact_manifest_path,
+            "aggregate_preflight": preflight_path,
+        },
+        {
+            "schedule_sha256": schedule["schedule_sha256"],
+            "artifact_manifest_sha256": artifact_manifest[
+                "artifact_manifest_sha256"
+            ],
+            "preflight_status": remote_preflight["status"],
+            "selected_resource_tier": remote_preflight[
+                "selected_resource_tier"
+            ],
+            "registry_file_sha256": workflow._sha256_file(registry_path),
+            "config_file_sha256": workflow._sha256_file(config_path),
+        },
+    )
 
     work_root.mkdir(parents=True)
     local_payload = pipeline.hgp_screen_preflight_digest(
@@ -127,10 +156,12 @@ def audit_local_preflight(
         generated = pipeline.run_hgp_map_is_diagnostic(
             registry_path, config_path, source_commit, archive_sha256,
             source_manifest_sha256, cell, artifact_root, path,
+            seed_namespace=pipeline.HGP_SCREEN_PREFLIGHT_IS_ROOT,
         )
         validated = pipeline.validate_hgp_map_is_diagnostic(
             path, registry_path, config_path, source_commit, archive_sha256,
             source_manifest_sha256, cell, artifact_root,
+            seed_namespace=pipeline.HGP_SCREEN_PREFLIGHT_IS_ROOT,
         )
         if generated["transcript_sha256"] != validated["transcript_sha256"]:
             raise RuntimeError("local HGP IS generation/replay digest changed")
@@ -156,7 +187,7 @@ def audit_local_preflight(
     }
     comparison_path = work_root / "canonical_comparison.json"
     workflow._write_exclusive_json(comparison_path, comparison)
-    completed_unix = time.time()
+    completed_local_unix = time.time()
     identity = {
         "attestation_version": ATTESTATION_VERSION,
         "status": "PASS" if exact else "MISMATCH_REQUIRES_PORTABILITY_REVIEW",
@@ -174,6 +205,12 @@ def audit_local_preflight(
             artifact_manifest_path,
         ),
         "preflight_file_sha256": workflow._sha256_file(preflight_path),
+        "preflight_acceptance_manifest_file_sha256": workflow._sha256_file(
+            preflight_acceptance_path,
+        ),
+        "preflight_acceptance_manifest_sha256": preflight_acceptance[
+            "manifest_sha256"
+        ],
         "remote_canonical_digest_sha256": remote_digest,
         "local_canonical_digest_sha256": local_digest,
         "exact_canonical_match": bool(exact),
@@ -182,7 +219,8 @@ def audit_local_preflight(
         "solver_identity_policy": SOLVER_POLICY,
         "local_environment": _environment_identity(),
         "portability_review": None,
-        "completed_unix": completed_unix,
+        "clock_domain": "unsynchronized_local_diagnostic",
+        "completed_local_unix": completed_local_unix,
     }
     attestation = {
         **identity, "attestation_sha256": workflow._sha256_json(identity),
@@ -202,6 +240,7 @@ def _parser():
     parser.add_argument("--artifact-root", required=True)
     parser.add_argument("--artifact-manifest", required=True)
     parser.add_argument("--preflight", required=True)
+    parser.add_argument("--preflight-acceptance", required=True)
     parser.add_argument("--work-root", required=True)
     parser.add_argument("--output", required=True)
     return parser
@@ -212,7 +251,8 @@ def main(argv=None):
     attestation = audit_local_preflight(
         args.registry, args.config, args.source_commit, args.archive_sha256,
         args.source_manifest_sha256, args.schedule, args.artifact_root,
-        args.artifact_manifest, args.preflight, args.work_root, args.output,
+        args.artifact_manifest, args.preflight, args.preflight_acceptance,
+        args.work_root, args.output,
     )
     print(workflow._canonical_json({
         "status": attestation["status"],

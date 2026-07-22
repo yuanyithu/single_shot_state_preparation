@@ -6,6 +6,7 @@
 
 - 优先**就地改写**已有条目，而不是在底部不断追加新条目；同一个坑有了新认识就改原条目，避免各节无限增长、前后矛盾。
 - 清理判据是「这条坑是否还会再次绊到 agent」：只要某个坑在后续 run 里仍可能复现、需要主动规避，就保留在本文档——无论它是通用规律还是带具体参数实例的个案（如 `exp35 p=0.05,q_hot=0.44 可行`）。只有已被代码或流程修掉、不可能再触发的历史记录，才删除或下沉到 `笔记/实验报告.md`。
+- 冻结或启动复杂实验前必须做一次**科学 red-team**：逐项核对目标分布与支持集、坐标含义和合法且有对抗性的初态、真正的慢变量与“接受但未移动”的自环、估计量是否就是用户要交付的量、门禁的假阳性/假阴性与共同失效模式、exact/独立确认以及结果权限边界。上述问题没有说清前，不得先围绕 wall time、acceptance、ESS 或实现细节做局部优化。
 
 ## 当前主线：expander code（exp101 起，2026-07-07~）
 
@@ -63,7 +64,9 @@ HP 的 HARD2+EASY3 320 条加 MAM HARD2 64 条，共 384 条；MAP artifact/5000
 HARD2，最高状态仅 `DIAGNOSTIC_HARD_PAIR_FOUND`。m3 near-MAP shells 仍使 planted chain
 `0/8192` accepted，且 m3/m5 MILP 出现 180s 级风险，因此不得把 MAM 扩回 EASY3 或加入结果驱动
 near-MAP。canonical config SHA 为
-`3c65ef96ce231b4aea4499b5a6030f1cc82475117c5ee5ecc7633d972ef8edc9`；接手先读
+`163a5cc87486beabf453f3d4a57bc63f0c4e0b2f54619c60268ee7f0c9b2a341`；MAM transport 门只认
+accepted 且 proposal 不同于当前 state 的真实 state change，accepted self-loop 仅作 MH 诊断；
+接手先读
 `HGP_GLOBAL_SCREEN_CONTRACT.md`、`validation/013_q0_hgp_global_screen_20260722/` 与 `status.md`。
 HP 每轮精确重抽 `A|B` 会制造新鲜条件噪声，不能用 full-state ESS 掩盖 collapsed `B` 卡住；013 raw
 必须独立重建并门禁全部 B-bit、行列 parity、64 个 dense characters、`|B|`、`L(B)`，且逐 character
