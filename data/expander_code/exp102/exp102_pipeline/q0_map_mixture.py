@@ -60,7 +60,7 @@ from .seeds import derive_seed
 
 
 MAP_MIXTURE_VERSION = "exp102.q0_map_mixture.discovery.v1"
-MAP_ANCHOR_VERSION = "exp102.q0_map_mixture.anchors.v2"
+MAP_ANCHOR_VERSION = "exp102.q0_map_mixture.anchors.v3"
 MAP_PROPOSAL_VERSION = "exp102.q0_map_mixture.proposal.v1"
 MAP_RAW_VERSION = "exp102.q0_map_mixture.raw.v2"
 MAP_METHOD_ID = "MAM-IMH8"
@@ -368,8 +368,9 @@ def build_milp_map_anchors(H_check, syndrome, p, *, max_anchors=8,
     solver_identity = _solver_identity()
     if "highs=unknown" in solver_identity:
         raise MapMixtureConflictError("anchor MILP solver identity is unknown")
-    # Solver identity is audited separately; the scientific catalog digest is
-    # portable when two environments return identical ordered anchors.
+    # The stored solver provenance is part of the immutable catalog identity.
+    # Frozen cross-platform replay may waive equality with the *current*
+    # solver, but it must never permit provenance to be rewritten in place.
     digest = _sha256_arrays(
         MAP_ANCHOR_VERSION,
         (np.packbits(H, axis=1, bitorder="little"),
@@ -378,7 +379,8 @@ def build_milp_map_anchors(H_check, syndrome, p, *, max_anchors=8,
          np.asarray(used_seeds, dtype=">u8")),
         (MAP_ANCHOR_SEED_NAMESPACE, H.shape, y.shape, anchor_array.shape,
          format(p, ".17g"),
-         optimum_weight, max_anchors, repr(MILP_OPTIONS), *state_hashes,
+         optimum_weight, max_anchors, repr(MILP_OPTIONS), solver_identity,
+         *state_hashes,
          *objective_hashes),
     )
     return MapAnchorCatalog(
@@ -464,7 +466,8 @@ def validate_map_anchor_catalog(H_check, syndrome, p, catalog, *,
         (MAP_ANCHOR_SEED_NAMESPACE, H.shape, y.shape, anchors.shape,
          format(p, ".17g"),
          int(catalog.optimum_weight), int(requested_max_anchors),
-         repr(MILP_OPTIONS), *state_hashes, *objective_hashes),
+         repr(MILP_OPTIONS), solver_identity, *state_hashes,
+         *objective_hashes),
     )
     if digest != catalog.anchor_sha256:
         raise MapMixtureConflictError("anchor catalog SHA failed replay")
@@ -955,12 +958,11 @@ def _run_imh_stage(proposal, frame, p, state, coordinate, rng, steps):
     return state, coordinate, current_log_q, transcript
 
 
-def run_map_mixture_trajectory(model, frame, syndrome, config, seed_identity,
-                               initial_state, *, anchor_catalog=None,
-                               proposal=None, frozen_artifact_replay=False):
-    """Run a fixed-clock IMH trajectory and retain a replayable proposal log."""
-    if not isinstance(frozen_artifact_replay, (bool, np.bool_)):
-        raise ValueError("frozen MAP replay mode must be boolean")
+def _run_map_mixture_trajectory_impl(
+        model, frame, syndrome, config, seed_identity, initial_state, *,
+        anchor_catalog, proposal, require_current_solver_identity):
+    if not isinstance(require_current_solver_identity, (bool, np.bool_)):
+        raise ValueError("solver-identity replay mode must be boolean")
     if config.method_id != seed_identity.method_id:
         raise MapMixtureConflictError("map-mixture config/seed method mismatch")
     y = _as_bits(syndrome, ndim=1, name="syndrome")
@@ -975,10 +977,6 @@ def run_map_mixture_trajectory(model, frame, syndrome, config, seed_identity,
         raise MapMixtureConflictError("map-mixture observable frame mismatch") from exc
     if _parity_residual(model.H_check, state, y).any():
         raise MapMixtureConflictError("initial state is outside the requested hard coset")
-    if frozen_artifact_replay and (anchor_catalog is None or proposal is None):
-        raise MapMixtureConflictError(
-            "frozen MAP replay requires both bound artifact objects",
-        )
     if anchor_catalog is None:
         anchor_catalog = build_milp_map_anchors(
             model.H_check, y, config.p, max_anchors=config.max_anchors,
@@ -988,7 +986,7 @@ def run_map_mixture_trajectory(model, frame, syndrome, config, seed_identity,
     validate_map_mixture_proposal(
         model, y, config.p, anchor_catalog, proposal,
         requested_max_anchors=config.max_anchors,
-        require_current_solver_identity=not bool(frozen_artifact_replay),
+        require_current_solver_identity=bool(require_current_solver_identity),
     )
     coordinate = proposal.coordinates.coordinates_of_state(state)
     load_exp101()
@@ -1126,6 +1124,63 @@ def run_map_mixture_trajectory(model, frame, syndrome, config, seed_identity,
         "final_label": _label_uint64(frame, state),
         "engine": "reference",
     }
+
+
+def run_map_mixture_trajectory(model, frame, syndrome, config, seed_identity,
+                               initial_state, *, anchor_catalog=None,
+                               proposal=None):
+    """Run IMH while requiring any supplied catalog's current solver identity.
+
+    Portable replay of an immutable artifact is intentionally unavailable on
+    this public low-level entry point.  The owning artifact loader must use the
+    private high-level entry point below after authenticating the outer file.
+    """
+    return _run_map_mixture_trajectory_impl(
+        model, frame, syndrome, config, seed_identity, initial_state,
+        anchor_catalog=anchor_catalog, proposal=proposal,
+        require_current_solver_identity=True,
+    )
+
+
+def _run_map_mixture_trajectory_from_verified_artifact(
+        model, frame, syndrome, config, seed_identity, initial_state, *,
+        artifact):
+    """Replay an artifact already authenticated by its high-level loader.
+
+    This private boundary deliberately accepts the complete artifact rather
+    than a catalog/proposal pair.  It rechecks the descriptor-to-component
+    bindings and all inner scientific digests, while allowing the immutable
+    stored solver identity to differ from the current platform.
+    """
+    descriptor = getattr(artifact, "descriptor", None)
+    catalog = getattr(artifact, "catalog", None)
+    proposal = getattr(artifact, "proposal", None)
+    if (not isinstance(descriptor, dict)
+            or not isinstance(catalog, MapAnchorCatalog)
+            or not isinstance(proposal, MapMixtureProposal)):
+        raise MapMixtureConflictError(
+            "frozen MAP replay requires one verified artifact object",
+        )
+    expected_bindings = {
+        "anchor_sha256": catalog.anchor_sha256,
+        "anchor_solver_identity": catalog.solver_identity,
+        "requested_max_anchors": int(catalog.requested_max_anchors),
+        "anchor_count": catalog.size,
+        "coordinate_sha256": proposal.coordinates.coordinate_sha256,
+        "proposal_sha256": proposal.proposal_sha256,
+    }
+    if (any(name not in descriptor for name in expected_bindings)
+            or any(descriptor[name] != value
+                   for name, value in expected_bindings.items())
+            or int(config.max_anchors) != int(catalog.requested_max_anchors)):
+        raise MapMixtureConflictError(
+            "frozen MAP artifact descriptor/component binding changed",
+        )
+    return _run_map_mixture_trajectory_impl(
+        model, frame, syndrome, config, seed_identity, initial_state,
+        anchor_catalog=catalog, proposal=proposal,
+        require_current_solver_identity=False,
+    )
 
 
 def enumerate_affine_states(coordinates, *, max_dimension=20):

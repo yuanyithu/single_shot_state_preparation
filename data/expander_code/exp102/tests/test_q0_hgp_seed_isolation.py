@@ -25,7 +25,7 @@ from data.expander_code.exp102.exp102_pipeline.registry import load_registry
 
 EXP102_ROOT = Path(__file__).resolve().parents[1]
 REGISTRY_PATH = EXP102_ROOT / "registry/registry.json"
-CONFIG_PATH = EXP102_ROOT / "config/q0_hgp_global.screen.v1.json"
+CONFIG_PATH = EXP102_ROOT / "config/q0_hgp_global.screen.v2.json"
 SOURCE_COMMIT = "c" * 40
 ARCHIVE_SHA256 = "a" * 64
 SOURCE_MANIFEST_SHA256 = "b" * 64

@@ -40,24 +40,43 @@ WRAPPER_RELATIVE = (
     "013_q0_hgp_global_screen_20260722/run_hgp_wrapper.sh"
 )
 CONFIG_RELATIVE = (
-    "data/expander_code/exp102/config/q0_hgp_global.screen.v1.json"
+    "data/expander_code/exp102/config/q0_hgp_global.screen.v2.json"
 )
 REGISTRY_RELATIVE = "data/expander_code/exp102/registry/registry.json"
 
 PREFLIGHT_NODES = ("nd-1", "nd-2", "nd-3")
 EXECUTION_NODES = ("nd-2", "nd-3")
-LOCAL_ATTESTATION_VERSION = "exp102.q0_hgp_global.screen.local_attestation.v3"
+LOCAL_ATTESTATION_VERSION = "exp102.q0_hgp_global.screen.local_attestation.v4"
 LOCAL_SOLVER_POLICY = (
     "stored_generation_identity_exact_artifact_replay_no_local_milp"
 )
+LOCAL_FULL_MISMATCH_POLICY = (
+    "diagnostic_only_after_remote_full_consensus_and_exact_portable_decisions"
+)
+LOCAL_ATTESTATION_STATUSES = {"PASS_EXACT", "PORTABLE_PASS"}
+LOCAL_FULL_CONSENSUS_NODES = ("nd-1", "nd-2", "nd-3")
+LOCAL_IS_SUMMARY_KEY = "importance_sampling_transcript_summary"
+LOCAL_IS_FULL_FIELDS = {
+    "cell_fingerprint", "full_transcript_sha256",
+    "portable_transcript_sha256", "nonportable_float_sha256",
+    "field_manifest_sha256",
+}
+LOCAL_IS_PORTABLE_FIELDS = {
+    "cell_fingerprint", "portable_transcript_sha256",
+    "field_manifest_sha256",
+}
+LOCAL_DECISION_FIELDS = {
+    "cell_fingerprint", "method_id", "init_family",
+    "acceptance_decision_sha256",
+}
 CLOCK_AUTHORITY_VERSION = "exp102.q0_hgp.nd0_boottime.v1"
 SCHEDULE_VERSION = "exp102.q0_hgp_global.screen.schedule.v2"
 STAGE_ACCEPTANCE_VERSION = "exp102.q0_hgp.nd0_stage_acceptance.v1"
 ACCEPTANCE_MANIFEST_VERSION = "exp102.q0_hgp.nd0_acceptance_manifest.v1"
 JOINT_TERMINAL_VERSION = "exp102.q0_hgp.offline_joint_terminal.v1"
-HGP_CONTRACT_VERSION = "exp102.q0_hgp_global.screen.v1"
-TERMINAL_DECISION_VERSION = "exp102.q0_hgp_global.screen.decision.v1"
-TERMINAL_PACKAGE_VERSION = "exp102.q0_hgp_global.screen.terminal_package.v1"
+HGP_CONTRACT_VERSION = "exp102.q0_hgp_global.screen.v2"
+TERMINAL_DECISION_VERSION = "exp102.q0_hgp_global.screen.decision.v2"
+TERMINAL_PACKAGE_VERSION = "exp102.q0_hgp_global.screen.terminal_package.v2"
 ND0_PERSISTENCE_TOKEN = "exp102_q0_hgp_nd0_nohup_setsid_v1"
 ND0_LAUNCHER_VERSION = "exp102.q0_hgp.nd0_nohup_setsid.v1"
 SHA1_RE = re.compile(r"[0-9a-f]{40}")
@@ -149,8 +168,8 @@ TERMINAL_PACKAGE_FIELDS = {
     "artifact_manifest_file_sha256", "preflight_file_sha256",
     "control_file_sha256", "execution_report_file_sha256",
     "report_file_sha256", "decision_file_sha256", "decision_sha256",
-    "status", "raw_file_count", "raw_files", "formal_authorization",
-    "production_authorization", "package_sha256",
+    "raw_evidence_summary", "status", "raw_file_count", "raw_files",
+    "formal_authorization", "production_authorization", "package_sha256",
 }
 TERMINAL_DECISION_FIELDS = {
     "decision_version", "contract_version", "source_commit",
@@ -159,7 +178,25 @@ TERMINAL_DECISION_FIELDS = {
     "artifact_manifest_file_sha256", "preflight_file_sha256",
     "control_file_sha256", "manifest_sha256", "report_sha256",
     "report_file_sha256", "status", "selected_pair",
+    "raw_evidence_summary",
     "formal_authorization", "production_authorization", "decision_sha256",
+}
+TERMINAL_TRANSCRIPT_SUMMARY_FIELDS = (
+    "full_transcript_sha256", "portable_transcript_sha256",
+    "nonportable_float_sha256", "field_manifest_sha256",
+)
+TERMINAL_MEASUREMENT_SUMMARY_FIELDS = (
+    *TERMINAL_TRANSCRIPT_SUMMARY_FIELDS, "acceptance_decision_sha256",
+)
+TERMINAL_RAW_BASE_FIELDS = {
+    "kind", "fingerprint", "output_relpath", "sha256", "claim_sha256",
+}
+TERMINAL_RAW_EVIDENCE_SUMMARY_FIELDS = {
+    "measurement_full_evidence_sha256",
+    "measurement_portable_evidence_sha256",
+    "acceptance_decision_catalog_sha256",
+    "importance_sampling_full_evidence_sha256",
+    "importance_sampling_portable_evidence_sha256",
 }
 TERMINAL_STATUSES = {
     "DIAGNOSTIC_HARD_PAIR_FOUND", "UNRESOLVED_NO_HP_PASS",
@@ -181,6 +218,10 @@ def _canonical_json(value):
         value, sort_keys=True, separators=(",", ":"), ensure_ascii=True,
         allow_nan=False,
     )
+
+
+def _sha256_json(value):
+    return hashlib.sha256(_canonical_json(value).encode("ascii")).hexdigest()
 
 
 def _read_json(path):
@@ -354,6 +395,84 @@ def _terminal_control_records(control, config):
     return measurement + importance_sampling
 
 
+def _terminal_raw_evidence_summary(rows):
+    """Rebuild the exact workflow-v2 transcript catalogs from package rows."""
+    if not isinstance(rows, list):
+        raise ValueError("HGP terminal raw evidence rows are invalid")
+    measurement = []
+    importance = []
+    for row in rows:
+        if not isinstance(row, dict):
+            raise ValueError("HGP terminal raw evidence row is invalid")
+        kind = row.get("kind")
+        if kind == "measurement":
+            evidence_fields = TERMINAL_MEASUREMENT_SUMMARY_FIELDS
+        elif kind == "importance_sampling":
+            evidence_fields = TERMINAL_TRANSCRIPT_SUMMARY_FIELDS
+        else:
+            raise ValueError("HGP terminal raw evidence kind changed")
+        if (set(row) != TERMINAL_RAW_BASE_FIELDS | set(evidence_fields)
+                or SHA256_RE.fullmatch(str(
+                    row.get("fingerprint", ""),
+                )) is None
+                or not isinstance(row.get("output_relpath"), str)
+                or not row["output_relpath"]
+                or any(SHA256_RE.fullmatch(str(row.get(name, ""))) is None
+                       for name in (
+                           "sha256", "claim_sha256", *evidence_fields,
+                       ))):
+            raise ValueError("HGP terminal raw evidence row schema changed")
+        if kind == "measurement":
+            measurement.append({
+                "task_fingerprint": row["fingerprint"],
+                **{name: row[name] for name in evidence_fields},
+            })
+        else:
+            importance.append({
+                "is_fingerprint": row["fingerprint"],
+                **{name: row[name] for name in evidence_fields},
+            })
+
+    measurement.sort(key=lambda value: value["task_fingerprint"])
+    importance.sort(key=lambda value: value["is_fingerprint"])
+    measurement_portable = [{
+        "task_fingerprint": value["task_fingerprint"],
+        "portable_transcript_sha256": value[
+            "portable_transcript_sha256"
+        ],
+        "field_manifest_sha256": value["field_manifest_sha256"],
+        "acceptance_decision_sha256": value[
+            "acceptance_decision_sha256"
+        ],
+    } for value in measurement]
+    decisions = [{
+        "task_fingerprint": value["task_fingerprint"],
+        "acceptance_decision_sha256": value[
+            "acceptance_decision_sha256"
+        ],
+    } for value in measurement]
+    importance_portable = [{
+        "is_fingerprint": value["is_fingerprint"],
+        "portable_transcript_sha256": value[
+            "portable_transcript_sha256"
+        ],
+        "field_manifest_sha256": value["field_manifest_sha256"],
+    } for value in importance]
+    return {
+        "measurement_full_evidence_sha256": _sha256_json(measurement),
+        "measurement_portable_evidence_sha256": _sha256_json(
+            measurement_portable,
+        ),
+        "acceptance_decision_catalog_sha256": _sha256_json(decisions),
+        "importance_sampling_full_evidence_sha256": _sha256_json(
+            importance,
+        ),
+        "importance_sampling_portable_evidence_sha256": _sha256_json(
+            importance_portable,
+        ),
+    }
+
+
 def _validate_terminal_raw_evidence(run_root, control, config, package):
     """Bind the terminal package to every frozen raw and claim byte."""
     run_root = Path(run_root).resolve(strict=True)
@@ -368,6 +487,9 @@ def _validate_terminal_raw_evidence(run_root, control, config, package):
             or package.get("raw_file_count") != len(expected)
             or len(rows) != len(expected)):
         raise ValueError("HGP terminal package raw set changed")
+    raw_evidence_summary = _terminal_raw_evidence_summary(rows)
+    if package.get("raw_evidence_summary") != raw_evidence_summary:
+        raise ValueError("HGP terminal package raw evidence summary changed")
     row_identities = [
         (row.get("kind"), row.get("fingerprint"), row.get("output_relpath"))
         if isinstance(row, dict) else None
@@ -429,6 +551,7 @@ def _validate_terminal_raw_evidence(run_root, control, config, package):
         "measurement_count": 384,
         "importance_sampling_count": 2,
         "raw_file_count": len(expected),
+        "raw_evidence_summary": raw_evidence_summary,
     }
 
 
@@ -1934,6 +2057,8 @@ def validate_measurement_acceptance_offline(
             or decision.get("report_file_sha256")
             != _sha256_file(fixed_paths["terminal_report"])
             or decision.get("status") != package.get("status")
+            or decision.get("raw_evidence_summary")
+            != package.get("raw_evidence_summary")
             or decision.get("formal_authorization") is not False
             or decision.get("production_authorization") is not False
             or package.get("decision_sha256") != decision_sha):
@@ -2267,6 +2392,61 @@ def _validate_control_output(path, preflight, schedule, config, source_commit,
     return control
 
 
+def _validate_attestation_decisions(payload, context):
+    if not isinstance(payload, dict):
+        raise ValueError(f"{context} portable payload is invalid")
+    catalog = payload.get("acceptance_decision_catalog")
+    digest = payload.get("acceptance_decision_catalog_sha256")
+    if (not isinstance(catalog, list) or not catalog
+            or SHA256_RE.fullmatch(str(digest)) is None):
+        raise ValueError(f"{context} acceptance decisions are invalid")
+    seen = set()
+    for entry in catalog:
+        if (not isinstance(entry, dict)
+                or set(entry) != LOCAL_DECISION_FIELDS
+                or SHA256_RE.fullmatch(str(entry.get(
+                    "cell_fingerprint",
+                ))) is None
+                or entry.get("method_id") != "MAM-IMH8"
+                or entry.get("init_family") not in {"P", "U"}
+                or SHA256_RE.fullmatch(str(entry.get(
+                    "acceptance_decision_sha256",
+                ))) is None):
+            raise ValueError(f"{context} acceptance catalog is invalid")
+        identity = (
+            entry["cell_fingerprint"], entry["method_id"],
+            entry["init_family"],
+        )
+        if identity in seen:
+            raise ValueError(f"{context} acceptance catalog is duplicated")
+        seen.add(identity)
+    if _sha256_json(catalog) != digest:
+        raise ValueError(f"{context} acceptance decision SHA is invalid")
+    return catalog, digest
+
+
+def _validate_attestation_is_summary(summary, fields, context):
+    if not isinstance(summary, list) or not summary:
+        raise ValueError(f"{context} IS summary is invalid")
+    seen = set()
+    for entry in summary:
+        if (not isinstance(entry, dict) or set(entry) != fields
+                or any(SHA256_RE.fullmatch(str(entry[name])) is None
+                       for name in fields)):
+            raise ValueError(f"{context} IS summary schema is invalid")
+        fingerprint = entry["cell_fingerprint"]
+        if fingerprint in seen:
+            raise ValueError(f"{context} IS summary is duplicated")
+        seen.add(fingerprint)
+    return summary
+
+
+def _attestation_portable_is_projection(summary):
+    return [{
+        name: entry[name] for name in sorted(LOCAL_IS_PORTABLE_FIELDS)
+    } for entry in summary]
+
+
 def _validate_local_attestation(
         path, expected_file_sha256, schedule, preflight,
         artifact_manifest_path, preflight_acceptance_manifest_path,
@@ -2286,13 +2466,19 @@ def _validate_local_attestation(
         "source_manifest_sha256", "registry_file_sha256",
         "config_file_sha256", "schedule_sha256", "schedule_file_sha256",
         "artifact_manifest_sha256", "artifact_manifest_file_sha256",
-        "preflight_file_sha256", "remote_canonical_digest_sha256",
+        "preflight_file_sha256",
         "preflight_acceptance_manifest_file_sha256",
         "preflight_acceptance_manifest_sha256",
-        "local_canonical_digest_sha256", "exact_canonical_match",
-        "mismatch_paths", "importance_sampling_transcript_sha256",
-        "solver_identity_policy", "local_environment",
-        "portability_review", "clock_domain", "completed_local_unix",
+        "remote_full_payload_sha256", "local_full_payload_sha256",
+        "remote_portable_payload_sha256", "local_portable_payload_sha256",
+        "exact_canonical_match", "portable_canonical_match",
+        "acceptance_decisions_exact", "acceptance_decision_catalog_sha256",
+        "remote_full_consensus", "remote_full_consensus_nodes",
+        "mismatch_paths", "importance_sampling_portable_summary",
+        "remote_importance_sampling_full_summary",
+        "local_importance_sampling_full_summary",
+        "solver_identity_policy", "full_mismatch_policy",
+        "local_environment", "clock_domain", "completed_local_unix",
         "attestation_sha256",
     }
     if set(value) != expected_fields:
@@ -2301,14 +2487,46 @@ def _validate_local_attestation(
     stored_sha = identity.pop("attestation_sha256", None)
     status = value.get("status")
     exact = value.get("exact_canonical_match")
-    remote_digest = preflight.get("canonical_digest_sha256")
-    expected_is = preflight.get("canonical_digest", {}).get(
-        "importance_sampling_transcript_sha256",
+    remote_full = preflight.get("canonical_full_payload")
+    remote_portable = preflight.get("canonical_portable_payload")
+    remote_full_sha = preflight.get("canonical_full_payload_sha256")
+    remote_portable_sha = preflight.get("canonical_portable_payload_sha256")
+    if (not isinstance(remote_full, dict)
+            or not isinstance(remote_portable, dict)
+            or SHA256_RE.fullmatch(str(remote_full_sha)) is None
+            or SHA256_RE.fullmatch(str(remote_portable_sha)) is None
+            or _sha256_json(remote_full) != remote_full_sha
+            or _sha256_json(remote_portable) != remote_portable_sha):
+        raise ValueError("HGP preflight canonical evidence is invalid")
+    full_decisions, full_decision_sha = _validate_attestation_decisions(
+        remote_full, "remote full",
+    )
+    portable_decisions, portable_decision_sha = (
+        _validate_attestation_decisions(remote_portable, "remote portable")
+    )
+    if (full_decisions != portable_decisions
+            or full_decision_sha != portable_decision_sha):
+        raise ValueError("HGP preflight full/portable decisions disagree")
+    expected_remote_is = _validate_attestation_is_summary(
+        remote_full.get(LOCAL_IS_SUMMARY_KEY), LOCAL_IS_FULL_FIELDS,
+        "remote full",
+    )
+    expected_portable_is = _validate_attestation_is_summary(
+        remote_portable.get(LOCAL_IS_SUMMARY_KEY), LOCAL_IS_PORTABLE_FIELDS,
+        "remote portable",
+    )
+    if _attestation_portable_is_projection(
+            expected_remote_is) != expected_portable_is:
+        raise ValueError("HGP preflight full/portable IS summaries disagree")
+    local_full_is = _validate_attestation_is_summary(
+        value.get("local_importance_sampling_full_summary"),
+        LOCAL_IS_FULL_FIELDS, "local full",
     )
     environment = value.get("local_environment")
+    mismatch_paths = value.get("mismatch_paths")
     common_valid = (
         value.get("attestation_version") == LOCAL_ATTESTATION_VERSION
-        and status == "PASS"
+        and status in LOCAL_ATTESTATION_STATUSES
         and value.get("source_commit") == source_commit
         and value.get("archive_sha256") == archive_sha256
         and value.get("source_manifest_sha256") == source_manifest_sha256
@@ -2329,10 +2547,33 @@ def _validate_local_attestation(
         == _read_json(preflight_acceptance_manifest_path).get(
             "manifest_sha256"
         )
-        and value.get("remote_canonical_digest_sha256") == remote_digest
-        and isinstance(expected_is, list)
-        and value.get("importance_sampling_transcript_sha256") == expected_is
+        and value.get("remote_full_payload_sha256") == remote_full_sha
+        and SHA256_RE.fullmatch(str(value.get(
+            "local_full_payload_sha256",
+        ))) is not None
+        and value.get("remote_portable_payload_sha256") == remote_portable_sha
+        and value.get("local_portable_payload_sha256") == remote_portable_sha
+        and value.get("portable_canonical_match") is True
+        and value.get("acceptance_decisions_exact") is True
+        and value.get("acceptance_decision_catalog_sha256")
+        == portable_decision_sha
+        and preflight.get("remote_full_consensus") is True
+        and tuple(preflight.get("nodes", ()))
+        == LOCAL_FULL_CONSENSUS_NODES
+        and value.get("remote_full_consensus") is True
+        and tuple(value.get("remote_full_consensus_nodes", ()))
+        == LOCAL_FULL_CONSENSUS_NODES
+        and isinstance(mismatch_paths, list)
+        and all(isinstance(item, str) and item for item in mismatch_paths)
+        and value.get("importance_sampling_portable_summary")
+        == expected_portable_is
+        and value.get("remote_importance_sampling_full_summary")
+        == expected_remote_is
+        and _attestation_portable_is_projection(local_full_is)
+        == expected_portable_is
         and value.get("solver_identity_policy") == LOCAL_SOLVER_POLICY
+        and value.get("full_mismatch_policy")
+        == LOCAL_FULL_MISMATCH_POLICY
         and isinstance(environment, dict)
         and set(environment) == {
             "system", "machine", "python", "numpy", "scipy",
@@ -2350,11 +2591,19 @@ def _validate_local_attestation(
     )
     if not common_valid:
         raise ValueError("HGP local attestation identity is invalid")
-    if (exact is not True
-            or value.get("local_canonical_digest_sha256") != remote_digest
-            or value.get("portability_review") is not None
-            or value.get("mismatch_paths") != []):
-        raise ValueError("HGP exact local attestation is inconsistent")
+    local_full_sha = value["local_full_payload_sha256"]
+    if status == "PASS_EXACT":
+        consistent = (
+            exact is True and local_full_sha == remote_full_sha
+            and mismatch_paths == []
+        )
+    else:
+        consistent = (
+            exact is False and local_full_sha != remote_full_sha
+            and bool(mismatch_paths)
+        )
+    if not consistent:
+        raise ValueError("HGP local attestation status is inconsistent")
     return value
 
 
@@ -2365,6 +2614,10 @@ def _validate_terminal_output(path, source_commit, schedule):
     source_identity = package.get("source_identity")
     raw_files = package.get("raw_files")
     raw_count = package.get("raw_file_count")
+    try:
+        raw_evidence_summary = _terminal_raw_evidence_summary(raw_files)
+    except ValueError as exc:
+        raise ValueError("HGP terminal package is invalid") from exc
     file_hash_fields = (
         "schedule_file_sha256", "artifact_manifest_file_sha256",
         "preflight_file_sha256", "control_file_sha256",
@@ -2395,19 +2648,12 @@ def _validate_terminal_output(path, source_commit, schedule):
             or isinstance(raw_count, bool) or not isinstance(raw_count, int)
             or raw_count < 0 or not isinstance(raw_files, list)
             or raw_count != len(raw_files)
-            or any(not isinstance(row, dict) or set(row) != {
-                "kind", "fingerprint", "output_relpath", "sha256",
-                "claim_sha256",
-            } for row in raw_files)
-            or any(row.get("kind") not in {
-                "measurement", "importance_sampling",
-            } or SHA256_RE.fullmatch(str(row.get("fingerprint", ""))) is None
-                   or not isinstance(row.get("output_relpath"), str)
-                   or not row["output_relpath"]
-                   or SHA256_RE.fullmatch(str(row.get("sha256", ""))) is None
-                   or SHA256_RE.fullmatch(str(
-                       row.get("claim_sha256", ""),
-                   )) is None for row in raw_files)
+            or not isinstance(package.get("raw_evidence_summary"), dict)
+            or set(package["raw_evidence_summary"])
+            != TERMINAL_RAW_EVIDENCE_SUMMARY_FIELDS
+            or any(SHA256_RE.fullmatch(str(value)) is None for value in
+                   package["raw_evidence_summary"].values())
+            or package["raw_evidence_summary"] != raw_evidence_summary
             or package.get("formal_authorization") is not False
             or package.get("production_authorization") is not False
             or stored_sha != hashlib.sha256(

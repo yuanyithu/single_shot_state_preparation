@@ -26,21 +26,21 @@ from typing import Mapping
 import numpy as np
 
 
-CONTRACT_VERSION = "exp102.q0_hgp_global.screen.v1"
+CONTRACT_VERSION = "exp102.q0_hgp_global.screen.v2"
 SCHEDULE_VERSION = "exp102.q0_hgp_global.screen.schedule.v2"
 CLOCK_AUTHORITY_VERSION = "exp102.q0_hgp.nd0_boottime.v1"
-PREFLIGHT_NODE_VERSION = "exp102.q0_hgp_global.screen.preflight_node.v1"
-PREFLIGHT_VERSION = "exp102.q0_hgp_global.screen.preflight.v1"
+PREFLIGHT_NODE_VERSION = "exp102.q0_hgp_global.screen.preflight_node.v2"
+PREFLIGHT_VERSION = "exp102.q0_hgp_global.screen.preflight.v2"
 ARTIFACT_MANIFEST_VERSION = "exp102.q0_hgp_global.screen.artifact_manifest.v1"
-NODE_RAW_VERSION = "exp102.q0_hgp_global.screen.node_raw.v1"
-DECISION_VERSION = "exp102.q0_hgp_global.screen.decision.v1"
-TERMINAL_PACKAGE_VERSION = "exp102.q0_hgp_global.screen.terminal_package.v1"
+NODE_RAW_VERSION = "exp102.q0_hgp_global.screen.node_raw.v2"
+DECISION_VERSION = "exp102.q0_hgp_global.screen.decision.v2"
+TERMINAL_PACKAGE_VERSION = "exp102.q0_hgp_global.screen.terminal_package.v2"
 EXPECTED_PREFLIGHT_NODES = ("nd-1", "nd-2", "nd-3")
 ARTIFACT_BUILDER_NODE = "nd-1"
 RESOURCE_TIER_ORDER = ("T1", "T2", "T3")
 DEFAULT_REGISTRY = "data/expander_code/exp102/registry/registry.json"
 DEFAULT_CONFIG = (
-    "data/expander_code/exp102/config/q0_hgp_global.screen.v1.json"
+    "data/expander_code/exp102/config/q0_hgp_global.screen.v2.json"
 )
 SHA1_RE = re.compile(r"[0-9a-f]{40}")
 SHA256_RE = re.compile(r"[0-9a-f]{64}")
@@ -119,6 +119,14 @@ def _validate_raw(path, registry, config, source_commit, archive_sha256,
     )
 
 
+def _validate_stored_measurement_evidence(path):
+    return _pipeline().validate_hgp_screen_stored_evidence(path)
+
+
+def _validate_stored_is_evidence(path):
+    return _pipeline().validate_hgp_map_is_stored_evidence(path)
+
+
 def _run_is(registry_path, config_path, source_commit, archive_sha256,
             source_manifest_sha256, cell, artifact_root, output_path,
             seed_namespace=None):
@@ -157,6 +165,139 @@ def _preflight_digest(registry_path, config_path, source_commit,
         registry_path, config_path, source_commit, archive_sha256,
         source_manifest_sha256, artifact_root,
     )
+
+
+def _build_preflight_evidence_bundle(full_payload, portable_payload):
+    return _pipeline().build_hgp_preflight_evidence_bundle(
+        full_payload, portable_payload,
+    )
+
+
+_PREFLIGHT_DIGEST_FIELDS = {
+    "canonical_full_payload", "canonical_full_payload_sha256",
+    "canonical_portable_payload", "canonical_portable_payload_sha256",
+}
+_TRANSCRIPT_SUMMARY_FIELDS = (
+    "full_transcript_sha256", "portable_transcript_sha256",
+    "nonportable_float_sha256", "field_manifest_sha256",
+)
+_MEASUREMENT_SUMMARY_FIELDS = (
+    *_TRANSCRIPT_SUMMARY_FIELDS, "acceptance_decision_sha256",
+)
+
+
+def _require_sha256(name, value):
+    if SHA256_RE.fullmatch(str(value)) is None:
+        raise ValueError(f"{name} must be a full lowercase SHA256")
+    return str(value)
+
+
+def _validate_preflight_digest_bundle(bundle):
+    if not isinstance(bundle, Mapping) or set(bundle) != _PREFLIGHT_DIGEST_FIELDS:
+        raise ValueError("HGP preflight digest bundle schema changed")
+    full = bundle["canonical_full_payload"]
+    portable = bundle["canonical_portable_payload"]
+    if not isinstance(full, Mapping) or not isinstance(portable, Mapping):
+        raise ValueError("HGP preflight canonical payload is not an object")
+    if (bundle["canonical_full_payload_sha256"] != _sha256_json(full)
+            or bundle["canonical_portable_payload_sha256"]
+            != _sha256_json(portable)):
+        raise ValueError("HGP preflight canonical payload SHA changed")
+    catalogs = []
+    for name, payload in (("full", full), ("portable", portable)):
+        catalog = payload.get("acceptance_decision_catalog")
+        digest = payload.get("acceptance_decision_catalog_sha256")
+        if (not isinstance(catalog, list) or not catalog
+                or digest != _sha256_json(catalog)):
+            raise ValueError(
+                f"HGP preflight {name} acceptance-decision summary changed",
+            )
+        identities = set()
+        for row in catalog:
+            if (not isinstance(row, Mapping) or set(row) != {
+                    "cell_fingerprint", "method_id", "init_family",
+                    "acceptance_decision_sha256"}
+                    or not isinstance(row["method_id"], str)
+                    or not row["method_id"]
+                    or row["init_family"] not in {"P", "U"}
+                    or SHA256_RE.fullmatch(str(
+                        row["cell_fingerprint"],
+                    )) is None
+                    or SHA256_RE.fullmatch(str(
+                        row["acceptance_decision_sha256"],
+                    )) is None):
+                raise ValueError(
+                    f"HGP preflight {name} acceptance row changed",
+                )
+            identities.add((
+                row["cell_fingerprint"], row["method_id"],
+                row["init_family"],
+            ))
+        if len(identities) != len(catalog):
+            raise ValueError(
+                f"HGP preflight {name} acceptance rows are duplicated",
+            )
+        catalogs.append(catalog)
+    if catalogs[0] != catalogs[1]:
+        raise ValueError("HGP full/portable acceptance decisions disagree")
+    return _jsonable(bundle)
+
+
+def _add_preflight_is_summaries(bundle, summaries):
+    bundle = _validate_preflight_digest_bundle(bundle)
+    full_payload = dict(bundle["canonical_full_payload"])
+    portable_payload = dict(bundle["canonical_portable_payload"])
+    key = "importance_sampling_transcript_summary"
+    if key in full_payload or key in portable_payload:
+        raise ValueError("pipeline preflight payload already contains workflow IS evidence")
+    full_rows = []
+    portable_rows = []
+    for value in summaries:
+        fingerprint = _require_sha256(
+            "preflight IS cell fingerprint", value.get("cell_fingerprint"),
+        )
+        full_row = {"cell_fingerprint": fingerprint}
+        for name in _TRANSCRIPT_SUMMARY_FIELDS:
+            full_row[name] = _require_sha256(
+                f"preflight IS {name}", value.get(name),
+            )
+        full_rows.append(full_row)
+        portable_rows.append({
+            "cell_fingerprint": fingerprint,
+            "portable_transcript_sha256": full_row[
+                "portable_transcript_sha256"
+            ],
+            "field_manifest_sha256": full_row["field_manifest_sha256"],
+        })
+    if len({row["cell_fingerprint"] for row in full_rows}) != len(full_rows):
+        raise ValueError("preflight IS summaries contain duplicate cells")
+    full_payload[key] = full_rows
+    portable_payload[key] = portable_rows
+    result = _build_preflight_evidence_bundle(
+        full_payload, portable_payload,
+    )
+    return _validate_preflight_digest_bundle(result)
+
+
+def _linux_preflight_digest_consensus(bundles):
+    if not isinstance(bundles, Mapping) or set(bundles) != set(
+            EXPECTED_PREFLIGHT_NODES):
+        raise ValueError("HGP preflight digest consensus node set changed")
+    validated = {
+        node: _validate_preflight_digest_bundle(bundles[node])
+        for node in EXPECTED_PREFLIGHT_NODES
+    }
+    first = validated[EXPECTED_PREFLIGHT_NODES[0]]
+    for field, label in (
+            ("canonical_full_payload", "full"),
+            ("canonical_portable_payload", "portable")):
+        transcript = _canonical_json(first[field])
+        if any(_canonical_json(validated[node][field]) != transcript
+               for node in EXPECTED_PREFLIGHT_NODES[1:]):
+            raise ValueError(
+                f"HGP canonical {label} payload differs across Linux nodes",
+            )
+    return first
 
 
 def _benchmark(registry_path, config_path, source_commit, archive_sha256,
@@ -1299,26 +1440,29 @@ def _preflight_node(args):
             artifact_root,
             seed_namespace=_pipeline().HGP_SCREEN_PREFLIGHT_IS_ROOT,
         )
-        if (generated["transcript_sha256"]
-                != validated["transcript_sha256"]):
-            raise RuntimeError("preflight IS generation/replay digest changed")
+        for name in _TRANSCRIPT_SUMMARY_FIELDS:
+            if generated.get(name) != validated.get(name):
+                raise RuntimeError(
+                    f"preflight IS generation/replay {name} changed",
+                )
         is_digests.append({
             "cell_fingerprint": fingerprint,
-            "transcript_sha256": validated["transcript_sha256"],
             "file_sha256": _sha256_file(is_path),
+            **{
+                name: _require_sha256(
+                    f"preflight IS {name}", validated.get(name),
+                )
+                for name in _TRANSCRIPT_SUMMARY_FIELDS
+            },
         })
 
-    digest_payload = _jsonable(_preflight_digest(
-        registry_path, config_path, args.source_commit,
-        args.archive_sha256, args.source_manifest_sha256, artifact_root,
-    ))
-    digest_payload["importance_sampling_transcript_sha256"] = [
-        {
-            "cell_fingerprint": value["cell_fingerprint"],
-            "transcript_sha256": value["transcript_sha256"],
-        }
-        for value in is_digests
-    ]
+    digest_payload = _add_preflight_is_summaries(
+        _preflight_digest(
+            registry_path, config_path, args.source_commit,
+            args.archive_sha256, args.source_manifest_sha256, artifact_root,
+        ),
+        is_digests,
+    )
     runtime_payload = _jsonable(_benchmark(
         registry_path, config_path, args.source_commit,
         args.archive_sha256, args.source_manifest_sha256, artifact_root,
@@ -1541,12 +1685,10 @@ def _combine_preflight(args):
         for report in (digest_reports[node], runtime_reports[node]):
             if {key: report.get(key) for key in identity} != identity:
                 raise ValueError(f"preflight identity mismatch on {node}")
-    digest_payload = digest_reports[EXPECTED_PREFLIGHT_NODES[0]]["payload"]
-    digest_transcript = _canonical_json(digest_payload)
-    if any(_canonical_json(digest_reports[node]["payload"])
-           != digest_transcript
-           for node in EXPECTED_PREFLIGHT_NODES[1:]):
-        raise ValueError("HGP canonical digest payload differs across nodes")
+    first_bundle = _linux_preflight_digest_consensus({
+        node: digest_reports[node]["payload"]
+        for node in EXPECTED_PREFLIGHT_NODES
+    })
     seed_catalog = runtime_reports[EXPECTED_PREFLIGHT_NODES[0]][
         "payload"
     ].get("auxiliary_seed_catalog")
@@ -1637,8 +1779,8 @@ def _combine_preflight(args):
             node: _sha256_file(node_paths[node])
             for node in EXPECTED_PREFLIGHT_NODES
         },
-        "canonical_digest": digest_payload,
-        "canonical_digest_sha256": _sha256_json(digest_payload),
+        **first_bundle,
+        "remote_full_consensus": True,
         "runtime_consensus": tier_consensus,
         "selected_resource_tier": selected,
         "selection_basis": (
@@ -1687,6 +1829,8 @@ def _validate_preflight(
             or report.get("registry_file_sha256") != _registry_sha(registry_path)
             or report.get("config_file_sha256") != _config_sha(config_path)
             or report.get("selected_resource_tier") not in RESOURCE_TIER_ORDER
+            or report.get("nodes") != list(EXPECTED_PREFLIGHT_NODES)
+            or report.get("remote_full_consensus") is not True
             or report.get("selection_basis")
             != "runtime_only_worst_node_and_frozen_elapsed_deadlines"
             or not isinstance(source_identity, Mapping)
@@ -1785,9 +1929,9 @@ def _validate_preflight(
             or not passing
             or report["selected_resource_tier"] != passing[-1]):
         raise ValueError("HGP screen preflight did not select the largest tier")
-    digest = report.get("canonical_digest")
-    if report.get("canonical_digest_sha256") != _sha256_json(digest):
-        raise ValueError("HGP screen preflight canonical digest SHA is invalid")
+    _validate_preflight_digest_bundle({
+        name: report.get(name) for name in _PREFLIGHT_DIGEST_FIELDS
+    })
     return report
 
 
@@ -1873,25 +2017,6 @@ def _npz_scalar(data, name):
     return value.item()
 
 
-def _stored_sampler_digest(data):
-    values = {
-        name.removeprefix("sampler_"): np.asarray(data[name])
-        for name in data.files if name.startswith("sampler_")
-    }
-    if not values:
-        raise ValueError("staging raw contains no sampler payload")
-    digest = hashlib.sha256(
-        b"exp102.q0_hgp_global.screen.trajectory.v1\0"
-    )
-    for name in sorted(values):
-        value = np.ascontiguousarray(values[name])
-        digest.update(name.encode("ascii") + b"\0")
-        digest.update(value.dtype.str.encode("ascii") + b"\0")
-        digest.update(np.asarray(value.shape, dtype=">u8").tobytes())
-        digest.update(value.tobytes(order="C"))
-    return digest.hexdigest()
-
-
 def _unpack_state_rows(packed, num_qubits, *, name):
     packed = np.asarray(packed)
     if packed.dtype != np.uint8 or packed.ndim not in (1, 2):
@@ -1952,6 +2077,137 @@ def _check_state_field(data, field, model, syndrome):
     return states
 
 
+def _validate_map_staging_algebra(data, artifact_path, model):
+    """Rebuild every stored MAP coordinate/state link without consuming RNG."""
+    with np.load(artifact_path, allow_pickle=False) as artifact:
+        reference = np.asarray(
+            artifact["coordinate_packed_reference"], dtype=np.uint8,
+        ).copy()
+        basis = np.asarray(
+            artifact["coordinate_packed_basis"], dtype=np.uint8,
+        ).copy()
+        anchor_count = int(np.asarray(artifact["anchors"]).shape[0])
+        component_count = int(np.asarray(
+            artifact["proposal_component_weights"],
+        ).size)
+    physical_width = (int(model.num_qubits) + 7) // 8
+    if (reference.shape != (physical_width,) or basis.ndim != 2
+            or basis.shape[1] != physical_width
+            or anchor_count <= 0 or component_count <= 0):
+        raise ValueError("staging MAP artifact coordinate dimensions changed")
+    _unpack_state_rows(reference, model.num_qubits, name="MAP reference")
+    _unpack_state_rows(basis, model.num_qubits, name="MAP basis")
+    dimension = int(basis.shape[0])
+    coordinate_width = (dimension + 7) // 8
+
+    # Decode packed GF(2) coordinates with one 256-entry XOR table per byte.
+    lookup = np.zeros(
+        (coordinate_width, 256, physical_width), dtype=np.uint8,
+    )
+    for byte in range(coordinate_width):
+        for value in range(1, 256):
+            low_bit = value & -value
+            bit = low_bit.bit_length() - 1
+            row = byte * 8 + bit
+            lookup[byte, value] = lookup[byte, value ^ low_bit]
+            if row < dimension:
+                lookup[byte, value] ^= basis[row]
+
+    def decode(packed, *, name):
+        packed = np.asarray(packed)
+        if packed.dtype != np.uint8 or packed.ndim not in (1, 2):
+            raise ValueError(f"{name} is not packed uint8 coordinates")
+        rows = packed[None, :] if packed.ndim == 1 else packed
+        if rows.shape[1] != coordinate_width:
+            raise ValueError(f"{name} coordinate width changed")
+        _unpack_state_rows(rows, dimension, name=name)
+        states = np.repeat(reference[None, :], rows.shape[0], axis=0)
+        for byte in range(coordinate_width):
+            states ^= lookup[byte, rows[:, byte]]
+        return states
+
+    coordinate_state_pairs = (
+        ("sampler_initial_coordinate_packed", "sampler_initial_state_packed"),
+        ("sampler_burn_coordinate_packed", "sampler_burn_state_packed"),
+        ("sampler_final_coordinate_packed", "sampler_final_state_packed"),
+        ("sampler_burn_proposal_coordinates_packed",
+         "sampler_burn_proposal_states_packed"),
+        ("sampler_measurement_proposal_coordinates_packed",
+         "sampler_measurement_proposal_states_packed"),
+    )
+    for coordinate_name, state_name in coordinate_state_pairs:
+        expected = decode(data[coordinate_name], name=coordinate_name)
+        stored = np.asarray(data[state_name], dtype=np.uint8)
+        stored = stored[None, :] if stored.ndim == 1 else stored
+        if stored.shape != expected.shape or not np.array_equal(stored, expected):
+            raise ValueError(
+                f"staging MAP coordinate/state mismatch: {coordinate_name}",
+            )
+
+    for stage in ("burn", "measurement"):
+        proposals = np.asarray(
+            data[f"sampler_{stage}_proposal_states_packed"], dtype=np.uint8,
+        )
+        states = np.asarray(
+            data[f"sampler_{stage}_states_packed"], dtype=np.uint8,
+        )
+        accepted = np.asarray(data[f"sampler_{stage}_accepted"])
+        changed = np.asarray(data[f"sampler_{stage}_state_changed"])
+        uniforms = np.asarray(
+            data[f"sampler_{stage}_accept_uniform"], dtype=np.float64,
+        )
+        anchors = np.asarray(data[f"sampler_{stage}_proposal_anchor_index"])
+        components = np.asarray(
+            data[f"sampler_{stage}_proposal_component_index"],
+        )
+        start_name = (
+            "sampler_initial_state_packed" if stage == "burn"
+            else "sampler_burn_state_packed"
+        )
+        start = np.asarray(data[start_name], dtype=np.uint8)
+        count = int(states.shape[0]) if states.ndim == 2 else -1
+        if (count <= 0 or proposals.shape != states.shape or states.ndim != 2
+                or accepted.shape != (count,) or changed.shape != (count,)
+                or uniforms.shape != (count,) or anchors.shape != (count,)
+                or components.shape != (count,)
+                or start.shape != (states.shape[1],)
+                or not np.issubdtype(accepted.dtype, np.integer)
+                or not np.issubdtype(changed.dtype, np.integer)
+                or not np.issubdtype(anchors.dtype, np.integer)
+                or not np.issubdtype(components.dtype, np.integer)
+                or np.any((accepted < 0) | (accepted > 1))
+                or np.any((changed < 0) | (changed > 1))
+                or not np.isfinite(uniforms).all()
+                or np.any((uniforms < 0.0) | (uniforms >= 1.0))
+                or np.any((anchors < 0) | (anchors >= anchor_count))
+                or np.any((components < 0) | (components >= component_count))):
+            raise ValueError(f"staging MAP {stage} transition shape/range changed")
+        before = np.vstack((start[None, :], states[:-1]))
+        accepted_mask = accepted.astype(np.bool_)
+        expected_changed = accepted_mask & np.any(proposals != before, axis=1)
+        if (not np.array_equal(changed.astype(np.bool_), expected_changed)
+                or not np.array_equal(
+                    states[accepted_mask], proposals[accepted_mask],
+                )
+                or not np.array_equal(
+                    states[~accepted_mask], before[~accepted_mask],
+                )
+                or int(_npz_scalar(data, f"sampler_{stage}_attempts"))
+                != count
+                or int(_npz_scalar(data, f"sampler_{stage}_accepts"))
+                != int(accepted.sum())
+                or int(_npz_scalar(data, f"sampler_{stage}_state_changes"))
+                != int(expected_changed.sum())):
+            raise ValueError(f"staging MAP {stage} transition counters changed")
+        endpoint_name = (
+            "sampler_burn_state_packed" if stage == "burn"
+            else "sampler_final_state_packed"
+        )
+        if not np.array_equal(
+                states[-1], np.asarray(data[endpoint_name], dtype=np.uint8)):
+            raise ValueError(f"staging MAP {stage} endpoint changed")
+
+
 def _validate_staging_measurement(
         path, registry_path, config, expected_task, source_commit,
         archive_sha256, source_manifest_sha256, artifact_root):
@@ -1969,7 +2225,10 @@ def _validate_staging_measurement(
         "character_masks", "character_sha256", "num_qubits", "k",
         "b_character_masks_packed", "b_character_sha256",
         "b_character_count", "b_dimension", "b_dense_character_count",
-        "trajectory_digest", "core_seconds", "wall_seconds",
+        "field_manifest_json", "field_manifest_sha256",
+        "full_transcript_sha256", "portable_transcript_sha256",
+        "nonportable_float_sha256", "acceptance_decision_sha256",
+        "core_seconds", "wall_seconds",
     }
     map_outer = {
         "map_artifact_descriptor_json", "map_artifact_file_sha256",
@@ -2017,8 +2276,11 @@ def _validate_staging_measurement(
             value = np.asarray(data[name])
             if np.issubdtype(value.dtype, np.floating) and not np.isfinite(value).all():
                 raise ValueError(f"staging raw contains nonfinite values: {name}")
-        if str(_npz_scalar(data, "trajectory_digest")) != _stored_sampler_digest(data):
-            raise ValueError("staging sampler payload digest changed")
+        stored_evidence = _validate_stored_measurement_evidence(path)
+        for name in _MEASUREMENT_SUMMARY_FIELDS:
+            _require_sha256(
+                f"staging measurement {name}", stored_evidence.get(name),
+            )
         model, frame = _load_model_for_cell(registry_path, expected_task["cell"])
         if (int(_npz_scalar(data, "num_qubits")) != model.num_qubits
                 or int(_npz_scalar(data, "k")) != model.k):
@@ -2101,19 +2363,13 @@ def _validate_staging_measurement(
             artifact_path = Path(artifact_root) / descriptor["artifact_relpath"]
             if _sha256_file(artifact_path) != descriptor["artifact_file_sha256"]:
                 raise ValueError("staging MAP artifact file changed")
-    return True
-
-
-def _content_sha256(metadata, arrays, version):
-    digest = hashlib.sha256(str(version).encode("ascii") + b"\0")
-    digest.update(_canonical_json(metadata).encode("ascii") + b"\0")
-    for name in sorted(arrays):
-        value = np.ascontiguousarray(np.asarray(arrays[name]))
-        digest.update(name.encode("ascii") + b"\0")
-        digest.update(value.dtype.str.encode("ascii") + b"\0")
-        digest.update(np.asarray(value.shape, dtype=">u8").tobytes())
-        digest.update(value.tobytes(order="C"))
-    return digest.hexdigest()
+            _validate_map_staging_algebra(
+                data, artifact_path, model,
+            )
+    return {
+        name: stored_evidence[name]
+        for name in _MEASUREMENT_SUMMARY_FIELDS
+    }
 
 
 def _validate_staging_is(
@@ -2127,14 +2383,26 @@ def _validate_staging_is(
         "sample_component_index",
     }
     with np.load(path, allow_pickle=False) as data:
-        if set(data.files) != {"identity_json", "transcript_sha256", *array_names}:
+        evidence_fields = {
+            "field_manifest_sha256", "full_transcript_sha256",
+            "portable_transcript_sha256", "nonportable_float_sha256",
+        }
+        if set(data.files) != {
+                "identity_json", "diagnostics_json", "field_manifest_json",
+                *evidence_fields, *array_names}:
             raise ValueError("staging IS schema changed")
         if any(np.asarray(data[name]).dtype.hasobject for name in data.files):
             raise ValueError("staging IS contains an object array")
         identity_json = str(_npz_scalar(data, "identity_json"))
+        diagnostics_json = str(_npz_scalar(data, "diagnostics_json"))
+        field_manifest_json = str(_npz_scalar(data, "field_manifest_json"))
         identity = json.loads(identity_json)
-        if identity_json != _canonical_json(identity):
-            raise ValueError("staging IS identity is noncanonical")
+        diagnostics = json.loads(diagnostics_json)
+        field_manifest = json.loads(field_manifest_json)
+        if (identity_json != _canonical_json(identity)
+                or diagnostics_json != _canonical_json(diagnostics)
+                or field_manifest_json != _canonical_json(field_manifest)):
+            raise ValueError("staging IS metadata is noncanonical")
         expected_scalars = {
             "contract_version": CONTRACT_VERSION,
             "source_commit": source_commit,
@@ -2147,6 +2415,7 @@ def _validate_staging_is(
                 "num_samples_per_cell"
             ],
             "used_for_gate_or_selection": False,
+            "raw_version": config["raw_versions"]["importance_sampling"],
         }
         for name, expected in expected_scalars.items():
             if identity.get(name) != expected:
@@ -2158,6 +2427,12 @@ def _validate_staging_is(
         for name in ("sample_log_q", "sample_log_importance_weight"):
             if not np.isfinite(arrays[name]).all():
                 raise ValueError(f"staging IS contains nonfinite {name}")
+        if (not isinstance(diagnostics, Mapping)
+                or any(not isinstance(value, (int, float))
+                       or isinstance(value, bool)
+                       or not math.isfinite(float(value))
+                       for value in diagnostics.values())):
+            raise ValueError("staging IS diagnostics contain nonfinite values")
         model, _ = _load_model_for_cell(registry_path, record["cell"])
         states = _unpack_state_rows(
             arrays["sample_states_packed"], model.num_qubits,
@@ -2179,12 +2454,15 @@ def _validate_staging_is(
         if not np.array_equal(
                 arrays["sample_physical_weights"], states.sum(axis=1)):
             raise ValueError("staging IS cached physical weights changed")
-        expected_sha = _content_sha256(
-            identity, arrays, config["raw_versions"]["importance_sampling"],
-        )
-        if str(_npz_scalar(data, "transcript_sha256")) != expected_sha:
-            raise ValueError("staging IS transcript SHA changed")
-    return True
+        stored_evidence = _validate_stored_is_evidence(path)
+        for name in _TRANSCRIPT_SUMMARY_FIELDS:
+            _require_sha256(
+                f"staging IS {name}", stored_evidence.get(name),
+            )
+    return {
+        name: stored_evidence[name]
+        for name in _TRANSCRIPT_SUMMARY_FIELDS
+    }
 
 
 def _execute_task(argument):
@@ -2216,10 +2494,13 @@ def _execute_task(argument):
         raise RuntimeError("HGP screen task did not create its raw output")
     registry = _load_registry(registry_path)
     config = _load_config(config_path, registry)
-    _validate_staging_measurement(
+    evidence = _validate_staging_measurement(
         staging_path, registry_path, config, task, source_commit,
         archive_sha256, source_manifest_sha256, artifact_root,
     )
+    if any(result.get(name) != evidence[name]
+           for name in _MEASUREMENT_SUMMARY_FIELDS):
+        raise RuntimeError("pipeline/staging measurement evidence changed")
     staging_sha256 = _sha256_file(staging_path)
     # link(2) provides an atomic no-overwrite installation of the final raw.
     os.link(staging_path, raw_path)
@@ -2233,6 +2514,7 @@ def _execute_task(argument):
         "size_bytes": raw_path.stat().st_size,
         "pipeline_result_sha256": _sha256_json(_jsonable(result)),
         "claim_sha256": _sha256_file(claim_path),
+        **evidence,
     }
 
 
@@ -2266,10 +2548,13 @@ def _execute_is(argument):
         raise RuntimeError("HGP screen IS task did not create its raw output")
     registry = _load_registry(registry_path)
     config = _load_config(config_path, registry)
-    _validate_staging_is(
+    evidence = _validate_staging_is(
         staging_path, registry_path, config, record, source_commit,
         archive_sha256, source_manifest_sha256, artifact_root,
     )
+    if any(result.get(name) != evidence[name]
+           for name in _TRANSCRIPT_SUMMARY_FIELDS):
+        raise RuntimeError("pipeline/staging IS evidence changed")
     staging_sha256 = _sha256_file(staging_path)
     os.link(staging_path, raw_path)
     staging_path.unlink()
@@ -2282,6 +2567,7 @@ def _execute_is(argument):
         "size_bytes": raw_path.stat().st_size,
         "pipeline_result_sha256": _sha256_json(_jsonable(result)),
         "claim_sha256": _sha256_file(claim_path),
+        **evidence,
     }
 
 
@@ -2511,6 +2797,14 @@ def _validate_execution_reports(
                         value.get("pipeline_result_sha256", ""),
                     )) is None):
                 raise ValueError(f"HGP execution raw evidence changed for {node}")
+            stored_evidence = _validate_stored_measurement_evidence(raw_path)
+            if any(
+                    value.get(name) != stored_evidence.get(name)
+                    or SHA256_RE.fullmatch(str(value.get(name, ""))) is None
+                    for name in _MEASUREMENT_SUMMARY_FIELDS):
+                raise ValueError(
+                    f"HGP execution transcript evidence changed for {node}",
+                )
         expected_is_files = {
             record["is_fingerprint"]: record for record in expected_is
         }
@@ -2534,6 +2828,14 @@ def _validate_execution_reports(
                         value.get("pipeline_result_sha256", ""),
                     )) is None):
                 raise ValueError(f"HGP execution IS evidence changed for {node}")
+            stored_evidence = _validate_stored_is_evidence(raw_path)
+            if any(
+                    value.get(name) != stored_evidence.get(name)
+                    or SHA256_RE.fullmatch(str(value.get(name, ""))) is None
+                    for name in _TRANSCRIPT_SUMMARY_FIELDS):
+                raise ValueError(
+                    f"HGP execution IS transcript evidence changed for {node}",
+                )
         reports[node] = report
     return reports
 
@@ -2691,6 +2993,77 @@ def _analyze_command(args):
         raise ValueError("HGP analysis produced an unauthorized terminal status")
     _enforce_deadline(schedule, "analysis_deadline_unix")
     report_file_sha256 = _sha256_file(staging_output)
+    measurement_evidence = sorted((
+        {
+            "task_fingerprint": value["task_fingerprint"],
+            **{
+                name: value[name]
+                for name in _MEASUREMENT_SUMMARY_FIELDS
+            },
+        }
+        for node in manifest["execution_nodes"]
+        for value in execution_reports[node]["files"]
+    ), key=lambda value: value["task_fingerprint"])
+    measurement_portable_evidence = [
+        {
+            "task_fingerprint": value["task_fingerprint"],
+            "portable_transcript_sha256": value[
+                "portable_transcript_sha256"
+            ],
+            "field_manifest_sha256": value["field_manifest_sha256"],
+            "acceptance_decision_sha256": value[
+                "acceptance_decision_sha256"
+            ],
+        }
+        for value in measurement_evidence
+    ]
+    acceptance_decision_catalog = [
+        {
+            "task_fingerprint": value["task_fingerprint"],
+            "acceptance_decision_sha256": value[
+                "acceptance_decision_sha256"
+            ],
+        }
+        for value in measurement_evidence
+    ]
+    is_evidence = sorted((
+        {
+            "is_fingerprint": value["is_fingerprint"],
+            **{
+                name: value[name]
+                for name in _TRANSCRIPT_SUMMARY_FIELDS
+            },
+        }
+        for node in manifest["execution_nodes"]
+        for value in execution_reports[node]["importance_sampling_files"]
+    ), key=lambda value: value["is_fingerprint"])
+    is_portable_evidence = [
+        {
+            "is_fingerprint": value["is_fingerprint"],
+            "portable_transcript_sha256": value[
+                "portable_transcript_sha256"
+            ],
+            "field_manifest_sha256": value["field_manifest_sha256"],
+        }
+        for value in is_evidence
+    ]
+    raw_evidence_summary = {
+        "measurement_full_evidence_sha256": _sha256_json(
+            measurement_evidence,
+        ),
+        "measurement_portable_evidence_sha256": _sha256_json(
+            measurement_portable_evidence,
+        ),
+        "acceptance_decision_catalog_sha256": _sha256_json(
+            acceptance_decision_catalog,
+        ),
+        "importance_sampling_full_evidence_sha256": _sha256_json(
+            is_evidence,
+        ),
+        "importance_sampling_portable_evidence_sha256": _sha256_json(
+            is_portable_evidence,
+        ),
+    }
     decision_identity = {
         "decision_version": DECISION_VERSION,
         "contract_version": CONTRACT_VERSION,
@@ -2712,6 +3085,7 @@ def _analyze_command(args):
         "report_file_sha256": report_file_sha256,
         "status": report["status"],
         "selected_pair": report["selected_pair"],
+        "raw_evidence_summary": raw_evidence_summary,
         "formal_authorization": False,
         "production_authorization": False,
     }
@@ -2728,6 +3102,10 @@ def _analyze_command(args):
                 "output_relpath": value["output_relpath"],
                 "sha256": value["sha256"],
                 "claim_sha256": value["claim_sha256"],
+                **{
+                    name: value[name]
+                    for name in _MEASUREMENT_SUMMARY_FIELDS
+                },
             }
             for node in manifest["execution_nodes"]
             for value in execution_reports[node]["files"]
@@ -2738,6 +3116,10 @@ def _analyze_command(args):
                 "output_relpath": value["output_relpath"],
                 "sha256": value["sha256"],
                 "claim_sha256": value["claim_sha256"],
+                **{
+                    name: value[name]
+                    for name in _TRANSCRIPT_SUMMARY_FIELDS
+                },
             }
             for node in manifest["execution_nodes"]
             for value in execution_reports[node]["importance_sampling_files"]
@@ -2762,6 +3144,7 @@ def _analyze_command(args):
         "report_file_sha256": report_file_sha256,
         "decision_file_sha256": _sha256_file(staging_decision),
         "decision_sha256": decision["decision_sha256"],
+        "raw_evidence_summary": raw_evidence_summary,
         "status": report["status"],
         "raw_file_count": len(raw_files),
         "raw_files": raw_files,

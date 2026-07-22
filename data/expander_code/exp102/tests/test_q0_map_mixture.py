@@ -1,6 +1,7 @@
 import inspect
 import math
 from dataclasses import replace
+from types import SimpleNamespace
 
 import numpy as np
 import pytest
@@ -87,7 +88,7 @@ def test_map_label_uint64_preserves_k64_bit63():
     )
 
 
-def test_frozen_artifact_replay_is_solver_portable_but_not_a_bypass(monkeypatch):
+def test_only_verified_artifact_entry_can_replay_a_foreign_solver(monkeypatch):
     model, frame = _model([[1, 1, 1]])
     syndrome = _syndrome(model, True)
     catalog, proposal = _catalog_and_proposal(
@@ -104,23 +105,47 @@ def test_frozen_artifact_replay_is_solver_portable_but_not_a_bypass(monkeypatch)
             model, frame, syndrome, config, _seed(), initial,
             anchor_catalog=catalog, proposal=proposal,
         )
-    result = run_map_mixture_trajectory(
+    assert "frozen_artifact_replay" not in inspect.signature(
+        run_map_mixture_trajectory,
+    ).parameters
+    artifact = SimpleNamespace(
+        descriptor={
+            "anchor_sha256": catalog.anchor_sha256,
+            "anchor_solver_identity": catalog.solver_identity,
+            "requested_max_anchors": catalog.requested_max_anchors,
+            "anchor_count": catalog.size,
+            "coordinate_sha256": proposal.coordinates.coordinate_sha256,
+            "proposal_sha256": proposal.proposal_sha256,
+        },
+        catalog=catalog,
+        proposal=proposal,
+    )
+    result = map_mixture._run_map_mixture_trajectory_from_verified_artifact(
         model, frame, syndrome, config, _seed(), initial,
-        anchor_catalog=catalog, proposal=proposal,
-        frozen_artifact_replay=True,
+        artifact=artifact,
     )
     assert not result["measurement_residual_weights"].any()
-    with pytest.raises(MapMixtureConflictError, match="requires both"):
-        run_map_mixture_trajectory(
+    with pytest.raises(MapMixtureConflictError, match="verified artifact"):
+        map_mixture._run_map_mixture_trajectory_from_verified_artifact(
             model, frame, syndrome, config, _seed(), initial,
-            anchor_catalog=catalog, frozen_artifact_replay=True,
+            artifact=SimpleNamespace(catalog=catalog, proposal=proposal),
         )
-    unknown = replace(catalog, solver_identity="numpy=9.9;scipy=9.9;highs=unknown")
-    with pytest.raises(MapMixtureConflictError, match="solver identity"):
-        run_map_mixture_trajectory(
+
+    rewritten = replace(
+        catalog, solver_identity="numpy=8.8;scipy=8.8;highs=8.8.8",
+    )
+    rewritten_artifact = SimpleNamespace(
+        descriptor={
+            **artifact.descriptor,
+            "anchor_solver_identity": rewritten.solver_identity,
+        },
+        catalog=rewritten,
+        proposal=proposal,
+    )
+    with pytest.raises(MapMixtureConflictError, match="SHA"):
+        map_mixture._run_map_mixture_trajectory_from_verified_artifact(
             model, frame, syndrome, config, _seed(), initial,
-            anchor_catalog=unknown, proposal=proposal,
-            frozen_artifact_replay=True,
+            artifact=rewritten_artifact,
         )
 
 

@@ -2,58 +2,62 @@
 
 ## Current status
 
-`PRE-RUN / DIAGNOSTIC TEST AUTHORIZED`
+`V1 TERMINAL CONFLICT / V2 PRE-RUN / DIAGNOSTIC TEST AUTHORIZED`
 
-This directory is the evidence root for the fresh
-`exp102.q0_hgp_global.screen.v1` server screen. At creation time no 013 remote
-raw, control, preflight consensus, report or terminal decision exists. The
-source must first be completed, tested, committed and packaged from a clean Git
-archive; this README must not be read as evidence that a server job is already
-running or that a sampler has passed.
+This directory records the failed v1 preflight boundary and is the evidence
+root for the fresh `exp102.q0_hgp_global.screen.v2` screen. V2 has not been
+launched: no v2 remote preflight, control, measurement raw, report or terminal
+decision exists. Implementation and local tests are not evidence that a server
+job is running or that either sampler has passed.
 
-One infrastructure-only launch from source
-`7654bcced23688705f396695370661199b81648a` stopped in the outer launcher
-because `nd-0` has no `screen`. It created no run root, orchestrator log,
-stage marker or raw and launched no preflight/sampler. That source is not
-retried in place; the guarded `nohup` + `setsid` launcher below requires a
-fresh deployment/run.
+The terminal v1 run was
+`exp102_q0_hgp_screen_20260722_2e6ba2a`, source
+`2e6ba2a864d7db6ae04e79867d1678dbcfe42580`, archive SHA256
+`6c5aae08c43a196426c27c41d58e6ad5f6a6f94cc8e494519641794ccf99c5e4`
+and source-manifest SHA256
+`42ceb8b8619cf5de1d9dc0de16fac31a4f88165d1f6cbeaa038d63accf1046cb`.
+Its nd-1/nd-2/nd-3 preflight workers and aggregate report all reached `PASS`,
+selecting T3. The mandatory macOS audit first exposed a verifier bug that
+treated stored remote solver provenance as a local NumPy/SciPy version
+requirement. After that provenance issue was isolated, continued audit found a
+one-ULP MAM `log_q`/acceptance difference and full-digest drift in both
+50000-draw IS probes. Those drifts, not the solver-provenance verifier bug,
+make v1 terminal `CONFLICT`. It produced no
+measurement control, measurement raw or result and must not be resumed in
+place.
 
-The fresh successor source
-`df97fb5a7d38543beb515444b5692427dd28cc41` successfully persisted the `nd-0`
-orchestrator and launched the first `nd-1` screen. That screen then exited
-before creating a run root, immutable marker or raw because RHEL Bash 4.2
-treats an empty-array expansion as unbound under `set -u`; `build-schedule`
-is intentionally the only stage with zero prerequisites. This was likewise an
-infrastructure-only attempt, not a preflight or sampler result. Its deployment,
-phase guard and logs are not reused. The successor wrapper explicitly guards
-all possibly empty arrays and has an executable zero-prerequisite regression.
+Two still earlier attempts remain infrastructure-only history. Source
+`7654bcced23688705f396695370661199b81648a` stopped before a run root because
+`nd-0` has no `screen`. Source
+`df97fb5a7d38543beb515444b5692427dd28cc41` persisted the guarded nd-0
+orchestrator but hit the RHEL Bash 4.2 empty-array rule before a run root.
+Neither produced preflight or sampler raw. The later v1 run above did reach
+preflight PASS; its local `CONFLICT` supersedes the earlier statement that 013
+had no preflight evidence.
 
-The same infrastructure audit found that node epochs are materially
-unsynchronized: nd-1/nd-2/nd-3 were approximately `+204/+298/+2` seconds from
-nd-0, and nd-0/nd-1/nd-2 chrony reported `Not synchronised`. The successor uses
-`exp102.q0_hgp_global.screen.schedule.v2`: nd-0 freezes one
-`CLOCK_BOOTTIME + boot_id` authority, while all compute-node and macOS epochs
-are diagnostic only. Measurement must reuse the preflight anchor. Before each
-stage launch and at each SUCCESS acceptance, nd-0 rechecks boottime; equality
-with a deadline or a boot-ID change fails closed. No 013 preflight or
-measurement was produced while finding or fixing this issue.
+The schedule remains `exp102.q0_hgp_global.screen.schedule.v2`: nd-0 freezes a
+single `CLOCK_BOOTTIME + boot_id` authority because compute-node epochs are
+unsynchronized. Measurement must reuse the preflight anchor. Before every
+stage launch and SUCCESS acceptance, equality with a deadline or a boot-ID
+change fails closed.
 
-Authority is limited to `DIAGNOSTIC_HARD_PAIR_FOUND`. This run cannot produce
-`READY_FOR_FORMAL`, `FROZEN_HELD_OUT_PASS`, publication data or any of the 6144
-production tasks.
+Authority is limited to `DIAGNOSTIC_HARD_PAIR_FOUND`. Even a complete v2 pass
+cannot produce `READY_FOR_FORMAL`, `FROZEN_HELD_OUT_PASS`, publication data or
+any of the 6144 production tasks.
 
 ## Frozen inputs
 
-- Contract: `exp102.q0_hgp_global.screen.v1`.
+- Contract: `exp102.q0_hgp_global.screen.v2`.
 - Contract document: `../../HGP_GLOBAL_SCREEN_CONTRACT.md`.
-- Config: `../../config/q0_hgp_global.screen.v1.json`.
+- Config: `../../config/q0_hgp_global.screen.v2.json`.
 - Canonical config SHA256:
-  `163a5cc87486beabf453f3d4a57bc63f0c4e0b2f54619c60268ee7f0c9b2a341`.
+  `38092ec030f6c283f163c0ddb3eed612aa850c76ce34f130520522646fa883dc`.
 - Registry SHA256:
   `883730e0ba548f6b358187d8f123fdd4d8aeb116f4bacda363c35c16d01ae40b`.
 - Candidates: `HP32`, `HP64`, `MAM-IMH8`.
 - HP panel: frozen `HARD2+EASY3`, five cells in contract order.
 - MAP/IS panel: frozen `HARD2` only.
+- MAP anchor catalog: `exp102.q0_map_mixture.anchors.v3`.
 - Replication: `P/U` each 16 trajectories per scheduled method/cell.
 - Measurement control size: 384 fresh tasks (320 HP, 64 MAP).
 - Resource choices: only `T1/T2/T3`; one common tier selected from runtime and
@@ -65,14 +69,28 @@ production tasks.
 - Final full replay: frozen on `nd-3` with 91 workers.
 
 The five disorder-uniform seeds are intentionally the earlier frozen values so
-the physical cells are unchanged. All sampler, anchor, character and auxiliary
-IS streams use new `q0_hgp_global_screen_*_v1` namespaces. No raw or seed from
-005--012 is reusable. Preflight digest, runtime warmup/timed and preflight/
-runtime IS use namespaces disjoint from all 384 measurement tasks and the two
-frozen screen IS streams; the complete trajectory/IS 63-bit seed enumeration
-allows only the intentional reference/Numba reuse of one identical tiny-oracle
-stream. The fixture-identity regression is repeated with the final clean
-commit/archive/manifest identities before launch.
+the physical cells are unchanged. All v2 sampler and auxiliary draws use fresh
+`q0_hgp_global_screen_*_v2` namespaces; no v1 trajectory, preflight probe, IS
+draw or sampler seed stream is reusable. Unchanged character catalogs and
+deterministic anchor tie-breaks identify frozen mathematical objects, not
+reused sampler draws, and are rebound through the v2 config and anchor-v3
+hashes. Preflight digest, runtime warmup/timed and preflight/runtime IS streams
+remain disjoint from all 384 measurement tasks and the two frozen screen IS
+streams. The complete trajectory/IS 63-bit seed enumeration allows only the
+intentional reference/Numba reuse of one identical tiny-oracle stream and is
+repeated with the final clean commit/archive/manifest identities before launch.
+
+V2 preflight additionally freezes four MAM portability probes: both `HARD2`
+cells from both `P` and `U`, each with `burn=256` and `measurement=2048`.
+Across Linux they belong to the complete full transcript. The local portable
+projection exactly checks their proposal identities, uniforms, acceptance and
+state-change decisions, and resulting states. No ULP, absolute, relative or
+rounding tolerance is permitted.
+
+HP does not expose every internal categorical uniform and decision. Its
+portable claim is therefore limited to exact fixed-clock discrete outputs and
+transport counters. Neither this README nor a future report may upgrade that
+claim to bitwise replay of every hidden HP decision.
 
 ## What counts as a pass
 
@@ -108,6 +126,14 @@ The 50000-draw importance-sampling calculation is proposal-overlap diagnostics
 only. It cannot pass a method, select HP32 versus HP64, replace MCMC samples or
 enter a physical estimate.
 
+These gates do not make finite diagnostics into a proof. The frozen logical/B
+characters may miss a higher-order mode, 16 `U` starts may miss a basin with
+tiny K=0 volume but material posterior mass, and HP/MAM may share that failure
+mode. B is a targeted collapsed bottleneck, not an assumption that no other
+slow variable exists; the full logical, energy, weight, transport and
+cross-method gates remain mandatory. This residual risk is one reason the
+maximum authority stays diagnostic-only.
+
 ## Prior feasibility evidence (not reusable)
 
 The local 012 HP32 probe was the first result to remove the planted/uniform
@@ -141,16 +167,23 @@ one sentinel disorder cannot certify or rule out an entire `(m,p)` point.
    The 6/8/22/24-hour deadlines derive only from the schedule-v2 nd-0
    `CLOCK_BOOTTIME` anchor; node-local epoch values cannot grant extra time or
    cause a false expiry.
-3. Fail closed on any source, digest, solver, transcript or reference/Numba
-   difference; otherwise select the largest common resource tier that fits
-   safeguarded generation from the worst-case hour-8 control origin by hour 22
-   and safeguarded analysis by hour 24.
+3. Require full-Linux exact consensus: all three nodes must agree byte-for-byte
+   on the complete full and portable payloads, including the frozen floating
+   transcript. Fail closed on any source, artifact, field-manifest, digest,
+   discrete transcript or reference/Numba difference. Only then select the
+   largest common resource tier that fits safeguarded generation from the
+   worst-case hour-8 control origin by hour 22 and safeguarded analysis by
+   hour 24.
 4. Stop at the aggregate preflight boundary, pull the frozen artifacts and
    preflight evidence to the macmini, and replay them under conda `12`. The
    stored remote solver identity is provenance; local replay checks exact
    GF(2)/hash/proposal content without rerunning MILP under the local version.
-   `local_preflight_audit.py` writes a self-hashed attestation; an exact
-   mismatch is fail-closed and does not invent a float tolerance.
+   `local_preflight_audit.py` rebuilds both projections and the four MAM
+   acceptance-decision digests. It may attest `PASS_EXACT` if the full payload
+   also agrees, or `PORTABLE_PASS` if every declared portable field and MAM
+   decision agrees after remote full consensus. A full mismatch remains
+   recorded only at paths exhaustively declared nonportable. There is no ULP
+   or other numerical tolerance, and a portable mismatch is `CONFLICT`.
 5. Only after that audit, run `launch_hgp_orchestrator.sh ... measurement`
    from the same verified source before the control-freeze deadline, passing
    the canonical, regular (non-symlink) server copy of
@@ -160,13 +193,13 @@ one sentinel disorder cannot certify or rule out an entire `(m,p)` point.
    deadlines before materializing the immutable 384-task control.
 6. Run fresh nd-2/nd-3 screen tasks without migration, resampling or in-place
    retry, then perform the frozen 91-worker full replay on nd-3.
-7. Pull all raw and terminal evidence locally, verify file/canonical hashes and
-   independently replay state, label, weight, residual, proposal and transition
-   records before accepting the terminal package. The terminal package and
-   measurement acceptance manifest are a joint terminal: validation must also
-   reconstruct the exact 384-trajectory plus two-IS raw/claim set from the
-   frozen control and reject any missing, extra, symlinked or hash-mismatched
-   file.
+7. Pull all raw and terminal evidence locally. Run the independent analyzer and
+   `local_terminal_audit.py` to verify the joint nd-0 terminal, file/canonical
+   hashes, algebra and stored full/portable/decision evidence for every raw.
+   The terminal package and measurement acceptance manifest are a joint
+   terminal: validation must reconstruct the exact 384-trajectory plus two-IS
+   raw/claim set from the frozen control and reject any missing, extra,
+   symlinked or hash-mismatched file.
 
 Any failed marker or failed/duplicate `nd-0` launch guard requires a fresh
 deployment/run ID. The retained guard is not deleted for an in-place retry.

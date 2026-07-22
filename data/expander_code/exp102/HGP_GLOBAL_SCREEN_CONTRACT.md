@@ -1,4 +1,4 @@
-# exp102 q=0 HGP global sampler screen contract v1
+# exp102 q=0 HGP global sampler screen contract v2
 
 ## 1. Purpose and authority boundary
 
@@ -8,10 +8,10 @@ on all five frozen controls and whether the independent multi-anchor
 independence-MH sampler confirms it on the two known hard cells within a fixed
 resource envelope.
 
-- Contract: `exp102.q0_hgp_global.screen.v1`.
-- Config: `config/q0_hgp_global.screen.v1.json`.
+- Contract: `exp102.q0_hgp_global.screen.v2`.
+- Config: `config/q0_hgp_global.screen.v2.json`.
 - Canonical config SHA256:
-  `163a5cc87486beabf453f3d4a57bc63f0c4e0b2f54619c60268ee7f0c9b2a341`.
+  `38092ec030f6c283f163c0ddb3eed612aa850c76ce34f130520522646fa883dc`.
 - Maximum success status: `DIAGNOSTIC_HARD_PAIR_FOUND`.
 - Formal tuning, confirmation, resolution, held-out, publication loading and
   production are outside this contract.
@@ -20,6 +20,27 @@ The screen cannot create `READY_FOR_FORMAL` or `FROZEN_HELD_OUT_PASS` and
 cannot launch any of the 6144 production disorder tasks. In particular, MAP
 agreement on `HARD2` does not independently certify `EASY3`. A successful
 screen only permits a separately reviewed discovery/formal-sampler contract.
+
+This v2 contract is `PRE-RUN`: no v2 server preflight, measurement control,
+measurement raw, report or result exists. It must not be described as launched
+or passed merely because its implementation or local tests exist.
+
+The predecessor v1 run
+`exp102_q0_hgp_screen_20260722_2e6ba2a` used source
+`2e6ba2a864d7db6ae04e79867d1678dbcfe42580`, archive SHA256
+`6c5aae08c43a196426c27c41d58e6ad5f6a6f94cc8e494519641794ccf99c5e4`
+and source-manifest SHA256
+`42ceb8b8619cf5de1d9dc0de16fac31a4f88165d1f6cbeaa038d63accf1046cb`.
+Its nd-1/nd-2/nd-3 Linux preflight reached aggregate `PASS` and selected T3.
+The required macOS conda-12 replay first exposed a verifier defect: stored
+remote solver provenance was incorrectly treated as a requirement on the
+local NumPy/SciPy versions. Continuing the audit after isolating that defect
+then found one-ULP MAM `log_q`/acceptance drift and full-digest drift in both
+50000-draw IS probes. Those transcript/digest drifts, not the solver-provenance
+verifier defect, make v1 terminal `CONFLICT`. It created no
+measurement control, measurement raw or result and grants no authority to
+resume in place. No v1 sampler/preflight raw, auxiliary draws or sampler seed
+streams may enter v2.
 
 The local evidence in `validation/012_hgp_collapsed_power_pt_20260722/` is
 feasibility evidence only. Its source identity predates the final clean source,
@@ -68,7 +89,9 @@ block may be changed after observing a result.
 solver identity, exact GF(2) primal replay, anchor states and anchor SHA are
 bound before trajectories start. Planted errors are not an allowed input.
 This method, its anchor artifacts and its IS diagnostics are scheduled only on
-`HARD2`.
+`HARD2`. V2 uses `exp102.q0_map_mixture.anchors.v3`; the catalog digest now
+binds the recorded solver identity as generation provenance, so changing that
+identity cannot leave the catalog SHA unchanged.
 
 The solver identity is generation provenance, not a requirement that every
 later verifier install the same NumPy/SciPy/HiGHS versions. All three Linux
@@ -78,7 +101,9 @@ conda-12 replay validates that stored identity is present and known, then
 replays the file/content hashes, ordered anchors, exact GF(2) constraints,
 weights, tie-break/objective hashes, affine coordinates and proposal SHA. It
 does not rerun MILP or replace the stored identity with the verifier's local
-solver identity. Raw continues to record the stored generation identity.
+solver identity. Portable execution is private to this verified-artifact path;
+a generated or unbound in-memory catalog cannot opt into it with a boolean
+flag. Raw continues to record the stored generation identity.
 
 The proposal is the normalized mixture of the frozen product-Bernoulli
 components in the config. Every component probability lies strictly inside
@@ -96,6 +121,11 @@ The frozen 50000-draw self-normalized importance-sampling calculation is an
 auxiliary proposal-overlap diagnostic. Its ESS, maximum weight, estimated
 normalization and stationary acceptance estimate cannot pass or fail a sampler,
 select a method or resource tier, replace IMH samples, or enter `q_top`.
+Its field manifest separates portable proposal identities, coordinates, packed
+states, weights and component indices from nonportable `log_q`, log-importance
+and derived floating diagnostics. Linux full evidence freezes both partitions;
+local portable evidence compares only the declared portable partition exactly.
+This is an evidence projection, not a numerical tolerance.
 
 ### 2.3 Initialization and scientific red-team boundary
 
@@ -125,6 +155,16 @@ than a mathematical proof of mixing. One disorder per sentinel cannot certify
 an `(m,p)` point, interpolate neighboring p values, or replace fresh formal
 tuning and held-out disorders.
 
+Residual common-mode risk remains explicit. A finite logical/B-character
+catalog cannot mathematically exclude an unsampled higher-order Fourier mode,
+and 16 exact-uniform `U` starts can miss a basin with tiny K=0 volume but
+material target-posterior mass. HP and MAM could then agree inside the same
+missed decomposition. The B projections specifically target HP's collapsed
+bottleneck; B is not assumed to be the only slow variable of either method,
+so the full logical-character, energy, weight, transport and cross-mechanism
+gates cannot be replaced by B diagnostics. These limitations are why a pass
+retains diagnostic-only authority.
+
 ## 3. Frozen cells and independent trajectories
 
 The ordered panel is unchanged from the previous frozen global screen.
@@ -142,8 +182,11 @@ The ordered panel is unchanged from the previous frozen global screen.
 
 The panel SHA, five cell fingerprints and five disorder-uniform seeds remain
 the already frozen values recorded in the config. This preserves the physical
-instances, not any sampler stream. All sampler, character, anchor and IS seed
-namespaces are new `q0_hgp_global_screen_*_v1` namespaces.
+instances, not any sampler stream. The v2 root, HP/MAM measurement, preflight,
+runtime and IS namespaces are fresh `q0_hgp_global_screen_*_v2` streams and may
+not reuse v1 draws. The unchanged character catalogs and deterministic anchor
+tie-break namespace identify unchanged mathematical objects rather than sampler
+trajectories; their bytes are rebound by the v2 config and anchor-v3 hashes.
 
 Every scheduled method/cell has two adversarial initialization families:
 
@@ -192,12 +235,15 @@ identity alone is not deployment evidence.
 
 Fresh versions are:
 
-- tasks: `exp102.q0_hgp_global.screen.tasks.v1`;
-- HP raw: `exp102.q0_hgp_power.raw.v2`;
+- tasks: `exp102.q0_hgp_global.screen.tasks.v2`;
+- HP raw: `exp102.q0_hgp_power.raw.v3`;
 - MAP sampler transcript: `exp102.q0_map_mixture.raw.v2`;
-- MAP screen raw envelope: `exp102.q0_map_mixture.raw.v3`;
-- report: `exp102.q0_hgp_global.screen.report.v1`;
-- decision: `exp102.q0_hgp_global.screen.decision.v1`.
+- MAP screen raw envelope: `exp102.q0_map_mixture.raw.v4`;
+- MAP artifact: `exp102.q0_hgp_global.screen.map_artifact.v2` with anchor
+  catalog `exp102.q0_map_mixture.anchors.v3`;
+- IS raw: `exp102.q0_hgp_global.screen.is_diagnostic.v2`;
+- report: `exp102.q0_hgp_global.screen.report.v2`;
+- decision: `exp102.q0_hgp_global.screen.decision.v2`.
 
 NPZ loading always uses `allow_pickle=False`. Raw numerical estimates are not
 clipped. A missing/extra field, nonfinite value, algebra failure, SHA/identity
@@ -209,7 +255,16 @@ measurement state in packed form, labels/signatures, physical weights, hard
 residual weights, eight time blocks, all seeds/hashes, timing and counters. The
 analyzer independently reconstructs residuals, weights and labels.
 
-The HP-v2/MAP-v3 screen envelopes also bind a deterministic packed
+Each sampler raw also binds an exhaustive field manifest and separate full,
+portable and nonportable-float digests. The full projection is byte-exact
+Linux evidence. The portable projection contains only explicitly declared
+cross-platform discrete fields and remains byte-exact; no field is rounded and
+no ULP allowance exists. For MAM, proposal states, uniforms, acceptance flags,
+state-change flags and fixed-clock states form an additional exact acceptance-
+decision digest. Nonportable log-q/log-acceptance arrays remain preserved and
+full-replayed on Linux but cannot silently enter the local portable claim.
+
+The HP-v3/MAP-v4 screen envelopes also bind a deterministic packed
 `B`-character catalog and its SHA. For a classical matrix with `r` rows,
 catalog order is all
 `r^2` row-major single bits, all row parities, all column parities, then 64
@@ -229,7 +284,11 @@ state/log-q, every acceptance uniform/log-ratio/decision, and stage-separated
 attempt/accept counts. It also records, at every burn and measurement clock,
 whether an accepted proposal actually differs from the pre-step state, plus
 stage-separated state-change counts. An accepted proposal equal to the current
-state is an MH self-loop, not transport.
+state is an MH self-loop, not transport. HP does not expose the internal
+uniform and individual decision transcript needed to claim per-decision
+cross-platform replay. Its portable claim is deliberately limited to exact
+agreement of fixed-clock discrete outputs and transport counters; it must never
+be summarized as bit identity of every hidden HP decision.
 
 Anchor/proposal artifacts are constructed once per `HARD2` cell, replayed on
 all three nodes and bound by SHA to all 32 MAM-IMH8 trajectories for that cell.
@@ -246,8 +305,11 @@ must pass before controls are materialized. It includes:
 - exact K0 initializer and hard-residual replay;
 - reference/Numba bit identity, including `k=64` and bit 63;
 - canonical H, mass, lambda, character, anchor, coordinate and proposal SHAs;
-- exact transcript digests for HP categorical/swap decisions and MAP proposals/
-  acceptances;
+- exact full-Linux transcript digests and separately sealed portable
+  projections;
+- four fixed MAM portability probes: both `HARD2` cells, each from `P` and `U`,
+  with `burn=256` and `measurement=2048`, including exact proposal draws,
+  uniforms, acceptance decisions and resulting states;
 - source/archive/config/registry/seed tamper rejection;
 - per-method runtime measurement.
 
@@ -264,19 +326,30 @@ combined and exposes the immutable schedule, artifact manifest/files and
 aggregate preflight hashes. Before the control-freeze deadline, those files are
 pulled to the macmini and replayed under conda `12`; only an explicit second
 verified orchestrator invocation carrying the exact local-attestation file SHA
-may freeze the 384-task control. The normal attestation status is `PASS` and
-requires byte-identical complete canonical digests. If an actual mismatch is
-observed, the automatic audit emits
-`MISMATCH_REQUIRES_PORTABILITY_REVIEW`, which grants no launch authority. This
-contract and source accept only an exact `PASS`; `PORTABLE_PASS` is not a
-status in this contract and cannot be introduced by continuing the same run.
-Any future portability exception requires a different reviewed contract,
-source commit and fresh run. No ULP whitelist is preregistered speculatively.
-A local solver-version mismatch alone is not a conflict under the stored-provenance
-rule above, while any discrete state/anchor/proposal/transcript/hash mismatch
-is `CONFLICT`. No measurement node may be launched merely because three remote
-worker processes exited successfully; the aggregate report must be `PASS` and
-name one frozen common tier.
+may freeze the 384-task control.
+
+All three Linux nodes must agree byte-for-byte on the complete full payload,
+including declared nonportable floats, and on the portable payload. This is
+the full-Linux exact consensus. The local audit then independently rebuilds
+both projections from the same verified artifact bytes; its authorization
+claim is the portable-local exact projection. It emits `PASS_EXACT`
+when the full payload also matches, or `PORTABLE_PASS` only when the portable
+payload and the four MAM acceptance-decision digests match exactly after remote
+full consensus. A local full-payload mismatch is diagnostic and may occur only
+in fields excluded by the frozen exhaustive field manifest; no runtime field
+can be moved between partitions. There is no ULP, absolute, relative or
+rounding tolerance. Any portable state, coordinate, proposal identity,
+uniform, acceptance decision, counter, hash or IS discrete-transcript mismatch
+is `CONFLICT`. A local solver-version mismatch alone is not a conflict under
+the stored-provenance rule above.
+
+For HP, `acceptance_decision_sha256` is explicitly the portable fixed-clock
+output/transit-counter digest because the kernel does not expose every internal
+uniform and decision. This field name does not authorize a stronger scientific
+claim. No measurement node may be launched merely because three remote worker
+processes exited successfully; the aggregate report must be `PASS`, name one
+frozen common tier, and the local attestation must be a fully validated
+`PASS_EXACT` or `PORTABLE_PASS`.
 
 The storage node `nd-0` has no `screen` executable. Its verified outer
 orchestrator therefore runs under fixed `/usr/bin/nohup` plus
@@ -321,10 +394,12 @@ that manifest and again after local transfer, validation reconstructs the exact
 every regular non-symlink path, identity and file hash; missing, extra or
 tampered raw is `CONFLICT` even if analysis previously completed.
 
-Cross-node scientific arrays and decision transcripts must be bit identical.
-No ULP whitelist applies to categorical weights, states, labels, anchors,
-proposals or acceptance decisions. A platform `log/exp`, NumPy, SciPy or HiGHS
-difference that changes a frozen digest is `CONFLICT`.
+Cross-node Linux full scientific arrays and transcripts must be bit identical.
+Across Linux and macOS, the declared portable projection must be bit identical.
+No ULP whitelist applies to either projection. A platform `log/exp`, NumPy,
+SciPy or HiGHS difference in a declared nonportable float remains visible in
+the full evidence and local mismatch paths; a difference in any portable digest
+or MAM acceptance decision is `CONFLICT`.
 
 Only these common resource tiers exist:
 

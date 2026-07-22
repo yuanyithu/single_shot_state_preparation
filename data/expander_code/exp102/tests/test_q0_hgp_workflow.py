@@ -1,5 +1,4 @@
 import copy
-import hashlib
 import importlib
 import json
 import os
@@ -27,19 +26,6 @@ SOURCE_COMMIT = "1" * 40
 ARCHIVE_SHA256 = "a" * 64
 SOURCE_MANIFEST_SHA256 = "b" * 64
 EXP102_ROOT = Path(__file__).resolve().parents[1]
-
-
-def _sampler_digest(values):
-    digest = hashlib.sha256(
-        b"exp102.q0_hgp_global.screen.trajectory.v1\0"
-    )
-    for name in sorted(values):
-        value = np.ascontiguousarray(np.asarray(values[name]))
-        digest.update(name.encode("ascii") + b"\0")
-        digest.update(value.dtype.str.encode("ascii") + b"\0")
-        digest.update(np.asarray(value.shape, dtype=">u8").tobytes())
-        digest.update(value.tobytes(order="C"))
-    return digest.hexdigest()
 
 
 def _fake_model_and_frame():
@@ -180,6 +166,76 @@ def test_importance_records_follow_manifest_scope_without_fixed_counts():
     assert [record["owner"] for record in records] == ["nd-2", "nd-3"]
 
 
+def _preflight_digest_bundle(*, full_probe=1.0):
+    pipeline = workflow._pipeline()
+    catalog = [{
+        "cell_fingerprint": "1" * 64,
+        "method_id": "MAM-IMH8",
+        "init_family": "P",
+        "acceptance_decision_sha256": "2" * 64,
+    }]
+    common = {
+        "evidence_schema_version": pipeline.HGP_PREFLIGHT_EVIDENCE_VERSION,
+        "acceptance_decision_catalog": catalog,
+        "acceptance_decision_catalog_sha256": workflow._sha256_json(catalog),
+    }
+    return workflow._build_preflight_evidence_bundle(
+        {**common, "evidence_projection": "full", "probe": full_probe},
+        {**common, "evidence_projection": "portable", "probe": 1},
+    )
+
+
+def test_preflight_full_and_portable_evidence_are_sealed_and_exact():
+    summaries = [{
+        "cell_fingerprint": "3" * 64,
+        "full_transcript_sha256": "4" * 64,
+        "portable_transcript_sha256": "5" * 64,
+        "nonportable_float_sha256": "6" * 64,
+        "field_manifest_sha256": "7" * 64,
+    }]
+    bundled = workflow._add_preflight_is_summaries(
+        _preflight_digest_bundle(), summaries,
+    )
+    assert set(bundled) == workflow._PREFLIGHT_DIGEST_FIELDS
+    assert bundled["canonical_full_payload"][
+        "importance_sampling_transcript_summary"
+    ] == summaries
+    assert bundled["canonical_portable_payload"][
+        "importance_sampling_transcript_summary"
+    ] == [{
+        "cell_fingerprint": "3" * 64,
+        "portable_transcript_sha256": "5" * 64,
+        "field_manifest_sha256": "7" * 64,
+    }]
+    consensus = {
+        node: copy.deepcopy(bundled)
+        for node in workflow.EXPECTED_PREFLIGHT_NODES
+    }
+    assert workflow._linux_preflight_digest_consensus(consensus) == bundled
+
+    # One representable-float step is still a byte-level Linux conflict.
+    changed = _preflight_digest_bundle(full_probe=np.nextafter(1.0, 2.0))
+    changed = workflow._add_preflight_is_summaries(changed, summaries)
+    consensus["nd-3"] = changed
+    with pytest.raises(ValueError, match="full payload differs"):
+        workflow._linux_preflight_digest_consensus(consensus)
+
+    tampered = copy.deepcopy(bundled)
+    tampered["canonical_full_payload"][
+        "acceptance_decision_catalog"
+    ][0]["decision_transcript_sha256"] = "8" * 64
+    tampered["canonical_full_payload"][
+        "acceptance_decision_catalog_sha256"
+    ] = workflow._sha256_json(tampered["canonical_full_payload"][
+        "acceptance_decision_catalog"
+    ])
+    tampered["canonical_full_payload_sha256"] = workflow._sha256_json(
+        tampered["canonical_full_payload"],
+    )
+    with pytest.raises(ValueError, match="acceptance row"):
+        workflow._validate_preflight_digest_bundle(tampered)
+
+
 def test_staging_measurement_checks_structure_without_full_sampler_replay(
     tmp_path, monkeypatch,
 ):
@@ -202,6 +258,14 @@ def test_staging_measurement_checks_structure_without_full_sampler_replay(
         lambda *args: (_ for _ in ()).throw(
             AssertionError("staging invoked the full sampler replay")
         ),
+    )
+    evidence = {
+        name: str(index + 1) * 64
+        for index, name in enumerate(workflow._MEASUREMENT_SUMMARY_FIELDS)
+    }
+    monkeypatch.setattr(
+        workflow, "_validate_stored_measurement_evidence",
+        lambda path: dict(evidence),
     )
     task = {
         "method_id": "HP32",
@@ -250,7 +314,22 @@ def test_staging_measurement_checks_structure_without_full_sampler_replay(
         "b_dense_character_count": np.array(64, dtype=np.int16),
         "num_qubits": np.array(3, dtype=np.int32),
         "k": np.array(1, dtype=np.int16),
-        "trajectory_digest": np.array(_sampler_digest(sampler)),
+        "field_manifest_json": np.array("{}"),
+        "field_manifest_sha256": np.array(
+            evidence["field_manifest_sha256"],
+        ),
+        "full_transcript_sha256": np.array(
+            evidence["full_transcript_sha256"],
+        ),
+        "portable_transcript_sha256": np.array(
+            evidence["portable_transcript_sha256"],
+        ),
+        "nonportable_float_sha256": np.array(
+            evidence["nonportable_float_sha256"],
+        ),
+        "acceptance_decision_sha256": np.array(
+            evidence["acceptance_decision_sha256"],
+        ),
         "core_seconds": np.array(1.0),
         "wall_seconds": np.array(1.0),
     }
@@ -260,7 +339,72 @@ def test_staging_measurement_checks_structure_without_full_sampler_replay(
     assert workflow._validate_staging_measurement(
         path, tmp_path / "registry.json", config, task, SOURCE_COMMIT,
         ARCHIVE_SHA256, SOURCE_MANIFEST_SHA256, tmp_path,
+    ) == evidence
+
+
+def test_staging_map_rebuilds_coordinates_and_transition_counters(tmp_path):
+    artifact_path = tmp_path / "map.npz"
+    np.savez(
+        artifact_path,
+        coordinate_packed_reference=np.array([0], dtype=np.uint8),
+        coordinate_packed_basis=np.array([[1], [2]], dtype=np.uint8),
+        anchors=np.zeros((2, 3), dtype=np.uint8),
+        proposal_component_weights=np.array([0.5, 0.5]),
     )
+    payload = {
+        "sampler_initial_coordinate_packed": np.array([0], dtype=np.uint8),
+        "sampler_burn_coordinate_packed": np.array([1], dtype=np.uint8),
+        "sampler_final_coordinate_packed": np.array([3], dtype=np.uint8),
+        "sampler_initial_state_packed": np.array([0], dtype=np.uint8),
+        "sampler_burn_state_packed": np.array([1], dtype=np.uint8),
+        "sampler_final_state_packed": np.array([3], dtype=np.uint8),
+    }
+    for stage, proposal, state in (
+            ("burn", 1, 1), ("measurement", 3, 3)):
+        payload.update({
+            f"sampler_{stage}_proposal_coordinates_packed": np.array(
+                [[proposal]], dtype=np.uint8,
+            ),
+            f"sampler_{stage}_proposal_states_packed": np.array(
+                [[state]], dtype=np.uint8,
+            ),
+            f"sampler_{stage}_states_packed": np.array(
+                [[state]], dtype=np.uint8,
+            ),
+            f"sampler_{stage}_accepted": np.array([1], dtype=np.uint8),
+            f"sampler_{stage}_state_changed": np.array([1], dtype=np.uint8),
+            f"sampler_{stage}_accept_uniform": np.array([0.25]),
+            f"sampler_{stage}_proposal_anchor_index": np.array(
+                [1], dtype=np.int16,
+            ),
+            f"sampler_{stage}_proposal_component_index": np.array(
+                [1], dtype=np.int8,
+            ),
+            f"sampler_{stage}_attempts": np.array(1, dtype=np.int64),
+            f"sampler_{stage}_accepts": np.array(1, dtype=np.int64),
+            f"sampler_{stage}_state_changes": np.array(1, dtype=np.int64),
+        })
+    raw_path = tmp_path / "map_raw.npz"
+    np.savez(raw_path, **payload)
+    model = SimpleNamespace(num_qubits=3)
+    with np.load(raw_path, allow_pickle=False) as data:
+        workflow._validate_map_staging_algebra(data, artifact_path, model)
+
+    changed = dict(payload)
+    changed["sampler_measurement_proposal_coordinates_packed"] = np.array(
+        [[2]], dtype=np.uint8,
+    )
+    np.savez(raw_path, **changed)
+    with np.load(raw_path, allow_pickle=False) as data:
+        with pytest.raises(ValueError, match="coordinate/state mismatch"):
+            workflow._validate_map_staging_algebra(data, artifact_path, model)
+
+    changed = dict(payload)
+    changed["sampler_measurement_accept_uniform"] = np.array([1.0])
+    np.savez(raw_path, **changed)
+    with np.load(raw_path, allow_pickle=False) as data:
+        with pytest.raises(ValueError, match="shape/range"):
+            workflow._validate_map_staging_algebra(data, artifact_path, model)
 
 
 def test_staging_is_checks_structure_without_redrawing_samples(
@@ -275,6 +419,14 @@ def test_staging_is_checks_structure_without_redrawing_samples(
         lambda *args: (_ for _ in ()).throw(
             AssertionError("staging redrew the importance samples")
         ),
+    )
+    evidence = {
+        name: format(index + 10, "x") * 64
+        for index, name in enumerate(workflow._TRANSCRIPT_SUMMARY_FIELDS)
+    }
+    monkeypatch.setattr(
+        workflow, "_validate_stored_is_evidence",
+        lambda path: dict(evidence),
     )
     artifact_root = tmp_path / "artifacts"
     artifact_path = artifact_root / "map_artifacts/a.npz"
@@ -295,7 +447,7 @@ def test_staging_is_checks_structure_without_redrawing_samples(
     config = {
         "hgp_screen_config_sha256": "c",
         "importance_sampling": {"num_samples_per_cell": 2},
-        "raw_versions": {"importance_sampling": "is.v1"},
+        "raw_versions": {"importance_sampling": "is.v2"},
     }
     identity = {
         "contract_version": workflow.CONTRACT_VERSION,
@@ -307,6 +459,7 @@ def test_staging_is_checks_structure_without_redrawing_samples(
         "artifact_descriptor": descriptor,
         "num_samples": 2,
         "used_for_gate_or_selection": False,
+        "raw_version": "is.v2",
     }
     arrays = {
         "sample_states_packed": np.zeros((2, 1), dtype=np.uint8),
@@ -318,14 +471,27 @@ def test_staging_is_checks_structure_without_redrawing_samples(
         "sample_component_index": np.zeros(2, dtype=np.int16),
     }
     path = tmp_path / "is.npz"
+    diagnostics = {"num_samples": 2}
+    field_manifest = {"manifest_version": "test.v1"}
     np.savez(
         path,
         identity_json=np.array(workflow._canonical_json(identity)),
-        transcript_sha256=np.array(workflow._content_sha256(
-            identity, arrays, "is.v1",
-        )),
+        diagnostics_json=np.array(workflow._canonical_json(diagnostics)),
+        field_manifest_json=np.array(
+            workflow._canonical_json(field_manifest),
+        ),
+        field_manifest_sha256=np.array(evidence["field_manifest_sha256"]),
+        full_transcript_sha256=np.array(
+            evidence["full_transcript_sha256"],
+        ),
+        portable_transcript_sha256=np.array(
+            evidence["portable_transcript_sha256"],
+        ),
+        nonportable_float_sha256=np.array(
+            evidence["nonportable_float_sha256"],
+        ),
         **arrays,
-    )
+    ) == evidence
     assert workflow._validate_staging_is(
         path, tmp_path / "registry.json", config, record, SOURCE_COMMIT,
         ARCHIVE_SHA256, SOURCE_MANIFEST_SHA256, artifact_root,
@@ -342,7 +508,7 @@ def test_claim_is_exclusive(tmp_path):
 def test_runtime_accounting_accepts_exact_placement_and_rejects_double_count():
     pipeline = workflow._pipeline()
     registry_path = EXP102_ROOT / "registry/registry.json"
-    config_path = EXP102_ROOT / "config/q0_hgp_global.screen.v1.json"
+    config_path = EXP102_ROOT / "config/q0_hgp_global.screen.v2.json"
     registry = workflow._load_registry(registry_path)
     config = workflow._load_config(config_path, registry)
     timings = {
@@ -480,7 +646,7 @@ def test_schedule_is_canonical_deadlined_and_ignores_local_epoch(
     tmp_path, monkeypatch,
 ):
     registry_path = EXP102_ROOT / "registry/registry.json"
-    config_path = EXP102_ROOT / "config/q0_hgp_global.screen.v1.json"
+    config_path = EXP102_ROOT / "config/q0_hgp_global.screen.v2.json"
     registry = workflow._load_registry(registry_path)
     config = workflow._load_config(config_path, registry)
     source_identity = {

@@ -166,6 +166,74 @@ def _add_self_hash(identity, field):
     }
 
 
+def _canonical_evidence(*, full_marker="6", is_full_marker="7"):
+    decision_catalog = [{
+        "cell_fingerprint": "5" * 64,
+        "method_id": "MAM-IMH8",
+        "init_family": "P",
+        "acceptance_decision_sha256": "4" * 64,
+    }]
+    decision_sha = hashlib.sha256(
+        orchestrator_module._canonical_json(decision_catalog).encode("ascii")
+    ).hexdigest()
+    full_is = [{
+        "cell_fingerprint": "5" * 64,
+        "full_transcript_sha256": is_full_marker * 64,
+        "portable_transcript_sha256": "8" * 64,
+        "nonportable_float_sha256": full_marker * 64,
+        "field_manifest_sha256": "9" * 64,
+    }]
+    portable_is = [{
+        "cell_fingerprint": "5" * 64,
+        "portable_transcript_sha256": "8" * 64,
+        "field_manifest_sha256": "9" * 64,
+    }]
+    full_payload = {
+        "schema_version": "full.v1",
+        "platform_float_marker": full_marker,
+        "acceptance_decision_catalog": decision_catalog,
+        "acceptance_decision_catalog_sha256": decision_sha,
+        "importance_sampling_transcript_summary": full_is,
+    }
+    portable_payload = {
+        "schema_version": "portable.v1",
+        "discrete_marker": "exact",
+        "acceptance_decision_catalog": decision_catalog,
+        "acceptance_decision_catalog_sha256": decision_sha,
+        "importance_sampling_transcript_summary": portable_is,
+    }
+    return {
+        "canonical_full_payload": full_payload,
+        "canonical_full_payload_sha256": hashlib.sha256(
+            orchestrator_module._canonical_json(full_payload).encode("ascii")
+        ).hexdigest(),
+        "canonical_portable_payload": portable_payload,
+        "canonical_portable_payload_sha256": hashlib.sha256(
+            orchestrator_module._canonical_json(portable_payload).encode(
+                "ascii"
+            )
+        ).hexdigest(),
+    }
+
+
+def _base_canonical_evidence(*, full_marker="6"):
+    evidence = _canonical_evidence(full_marker=full_marker)
+    full_payload = dict(evidence["canonical_full_payload"])
+    portable_payload = dict(evidence["canonical_portable_payload"])
+    full_payload.pop("importance_sampling_transcript_summary")
+    portable_payload.pop("importance_sampling_transcript_summary")
+    return {
+        "canonical_full_payload": full_payload,
+        "canonical_full_payload_sha256": orchestrator_module._sha256_json(
+            full_payload,
+        ),
+        "canonical_portable_payload": portable_payload,
+        "canonical_portable_payload_sha256": (
+            orchestrator_module._sha256_json(portable_payload)
+        ),
+    }
+
+
 def _write_phase_launch(runner, phase, attestation_file_sha=None):
     metadata = {
         "archive_sha256": ARCHIVE_SHA256,
@@ -227,16 +295,11 @@ def _terminal_evidence(tmp_path):
 
     artifact = {"artifact_manifest_sha256": "4" * 64}
     _write_json(runner.artifact_manifest, artifact)
-    is_transcripts = [{
-        "cell_fingerprint": "5" * 64,
-        "transcript_sha256": "6" * 64,
-    }]
-    canonical_digest = {
-        "algebra": {"rank": 7},
-        "importance_sampling_transcript_sha256": is_transcripts,
-    }
+    evidence = _canonical_evidence()
     preflight = {
         "status": "PASS",
+        "remote_full_consensus": True,
+        "nodes": ["nd-1", "nd-2", "nd-3"],
         "selected_resource_tier": "T3",
         "source_commit": SOURCE_COMMIT,
         "archive_sha256": ARCHIVE_SHA256,
@@ -249,12 +312,7 @@ def _terminal_evidence(tmp_path):
         ),
         "clock_domain": "unsynchronized_local_diagnostic",
         "completed_local_unix": 1500,
-        "canonical_digest": canonical_digest,
-        "canonical_digest_sha256": hashlib.sha256(
-            orchestrator_module._canonical_json(canonical_digest).encode(
-                "ascii"
-            )
-        ).hexdigest(),
+        **evidence,
     }
     _write_json(runner.preflight, preflight)
 
@@ -304,7 +362,7 @@ def _terminal_evidence(tmp_path):
 
     attestation_identity = {
         "attestation_version": orchestrator_module.LOCAL_ATTESTATION_VERSION,
-        "status": "PASS",
+        "status": "PASS_EXACT",
         "source_commit": SOURCE_COMMIT,
         "archive_sha256": ARCHIVE_SHA256,
         "source_manifest_sha256": SOURCE_MANIFEST_SHA256,
@@ -329,22 +387,45 @@ def _terminal_evidence(tmp_path):
         "preflight_acceptance_manifest_sha256": preflight_manifest[
             "manifest_sha256"
         ],
-        "remote_canonical_digest_sha256": preflight[
-            "canonical_digest_sha256"
+        "remote_full_payload_sha256": evidence[
+            "canonical_full_payload_sha256"
         ],
-        "local_canonical_digest_sha256": preflight[
-            "canonical_digest_sha256"
+        "local_full_payload_sha256": evidence[
+            "canonical_full_payload_sha256"
+        ],
+        "remote_portable_payload_sha256": evidence[
+            "canonical_portable_payload_sha256"
+        ],
+        "local_portable_payload_sha256": evidence[
+            "canonical_portable_payload_sha256"
         ],
         "exact_canonical_match": True,
+        "portable_canonical_match": True,
+        "acceptance_decisions_exact": True,
+        "acceptance_decision_catalog_sha256": evidence[
+            "canonical_portable_payload"
+        ]["acceptance_decision_catalog_sha256"],
+        "remote_full_consensus": True,
+        "remote_full_consensus_nodes": ["nd-1", "nd-2", "nd-3"],
         "mismatch_paths": [],
-        "importance_sampling_transcript_sha256": is_transcripts,
+        "importance_sampling_portable_summary": evidence[
+            "canonical_portable_payload"
+        ]["importance_sampling_transcript_summary"],
+        "remote_importance_sampling_full_summary": evidence[
+            "canonical_full_payload"
+        ]["importance_sampling_transcript_summary"],
+        "local_importance_sampling_full_summary": evidence[
+            "canonical_full_payload"
+        ]["importance_sampling_transcript_summary"],
         "solver_identity_policy": orchestrator_module.LOCAL_SOLVER_POLICY,
+        "full_mismatch_policy": (
+            orchestrator_module.LOCAL_FULL_MISMATCH_POLICY
+        ),
         "local_environment": {
             "system": "Darwin", "machine": "arm64", "python": "3.12",
             "numpy": "2.4", "scipy": "1.17",
             "map_solver_identity_current": "solver-test",
         },
-        "portability_review": None,
         "clock_domain": "unsynchronized_local_diagnostic",
         "completed_local_unix": 1600,
     }
@@ -437,6 +518,42 @@ def _terminal_evidence(tmp_path):
     }
     report = _add_self_hash(report_identity, "report_sha256")
     _write_json(runner.report, report)
+    frozen_records = orchestrator_module._terminal_control_records(
+        control, config,
+    )
+    frozen_records.sort(
+        key=lambda value: (value["kind"], value["fingerprint"]),
+    )
+    evidence_by_identity = {}
+    evidence_rows = []
+    for record in frozen_records:
+        evidence_fields = (
+            orchestrator_module.TERMINAL_MEASUREMENT_SUMMARY_FIELDS
+            if record["kind"] == "measurement"
+            else orchestrator_module.TERMINAL_TRANSCRIPT_SUMMARY_FIELDS
+        )
+        raw_evidence = {
+            name: hashlib.sha256(
+                f"{record['kind']}:{record['fingerprint']}:{name}".encode(
+                    "ascii"
+                )
+            ).hexdigest()
+            for name in evidence_fields
+        }
+        evidence_by_identity[(record["kind"], record["fingerprint"])] = (
+            raw_evidence
+        )
+        evidence_rows.append({
+            "kind": record["kind"],
+            "fingerprint": record["fingerprint"],
+            "output_relpath": record["output_relpath"],
+            "sha256": "0" * 64,
+            "claim_sha256": "1" * 64,
+            **raw_evidence,
+        })
+    raw_evidence_summary = (
+        orchestrator_module._terminal_raw_evidence_summary(evidence_rows)
+    )
     decision_identity = {
         "decision_version": orchestrator_module.TERMINAL_DECISION_VERSION,
         "contract_version": orchestrator_module.HGP_CONTRACT_VERSION,
@@ -460,6 +577,7 @@ def _terminal_evidence(tmp_path):
         "report_file_sha256": orchestrator_module._sha256_file(runner.report),
         "status": report["status"],
         "selected_pair": None,
+        "raw_evidence_summary": raw_evidence_summary,
         "formal_authorization": False,
         "production_authorization": False,
     }
@@ -467,12 +585,6 @@ def _terminal_evidence(tmp_path):
     _write_json(runner.decision, decision)
     raw_root = runner.raw_root
     raw_files = []
-    frozen_records = orchestrator_module._terminal_control_records(
-        control, config,
-    )
-    frozen_records.sort(
-        key=lambda value: (value["kind"], value["fingerprint"]),
-    )
     for record in frozen_records:
         raw_path = raw_root / record["output_relpath"]
         raw_path.parent.mkdir(parents=True, exist_ok=True)
@@ -493,6 +605,9 @@ def _terminal_evidence(tmp_path):
             "output_relpath": record["output_relpath"],
             "sha256": orchestrator_module._sha256_file(raw_path),
             "claim_sha256": orchestrator_module._sha256_file(claim_path),
+            **evidence_by_identity[
+                (record["kind"], record["fingerprint"])
+            ],
         })
     package_identity = {
         "package_version": orchestrator_module.TERMINAL_PACKAGE_VERSION,
@@ -519,6 +634,7 @@ def _terminal_evidence(tmp_path):
             runner.decision
         ),
         "decision_sha256": decision["decision_sha256"],
+        "raw_evidence_summary": raw_evidence_summary,
         "status": report["status"],
         "raw_file_count": len(raw_files),
         "raw_files": raw_files,
@@ -709,6 +825,81 @@ def test_terminal_raw_evidence_is_exact_and_fail_closed(tmp_path, mutation):
         orchestrator_module._validate_terminal_raw_evidence(
             runner.run_root, control, config, package,
         )
+
+
+@pytest.mark.parametrize(
+    ("kind", "mutation"),
+    (
+        ("measurement", "missing_evidence"),
+        ("importance_sampling", "extra_evidence"),
+        ("measurement", "changed_evidence"),
+        ("importance_sampling", "changed_evidence"),
+    ),
+)
+def test_terminal_package_requires_exact_v2_raw_evidence_schema(
+    tmp_path, kind, mutation,
+):
+    evidence = _terminal_evidence(tmp_path)
+    runner = evidence["runner"]
+    package = json.loads(runner.package.read_text(encoding="ascii"))
+    row = next(value for value in package["raw_files"] if value["kind"] == kind)
+    if mutation == "missing_evidence":
+        row.pop("acceptance_decision_sha256")
+    elif mutation == "extra_evidence":
+        row["acceptance_decision_sha256"] = "e" * 64
+    else:
+        row["portable_transcript_sha256"] = "e" * 64
+    identity = dict(package)
+    identity.pop("package_sha256")
+    _write_json(
+        runner.package, _add_self_hash(identity, "package_sha256"),
+    )
+
+    with pytest.raises(ValueError, match="terminal package is invalid"):
+        orchestrator_module._validate_terminal_output(
+            runner.package, SOURCE_COMMIT, evidence["schedule"],
+        )
+
+
+def test_offline_terminal_cross_binds_decision_and_raw_evidence_summary(
+    tmp_path,
+):
+    evidence = _terminal_evidence(tmp_path)
+    runner = evidence["runner"]
+    package = json.loads(runner.package.read_text(encoding="ascii"))
+    measurement = next(
+        row for row in package["raw_files"]
+        if row["kind"] == "measurement"
+    )
+    measurement["portable_transcript_sha256"] = "e" * 64
+    package["raw_evidence_summary"] = (
+        orchestrator_module._terminal_raw_evidence_summary(
+            package["raw_files"],
+        )
+    )
+    package_identity = dict(package)
+    package_identity.pop("package_sha256")
+    package = _add_self_hash(package_identity, "package_sha256")
+    _write_json(runner.package, package)
+
+    manifest = json.loads(
+        runner.measurement_acceptance_manifest.read_text(encoding="ascii")
+    )
+    manifest["bound_file_sha256"]["terminal_package"] = (
+        orchestrator_module._sha256_file(runner.package)
+    )
+    manifest["bound_identity"]["terminal_package_sha256"] = package[
+        "package_sha256"
+    ]
+    manifest_identity = dict(manifest)
+    manifest_identity.pop("manifest_sha256")
+    _write_json(
+        runner.measurement_acceptance_manifest,
+        _add_self_hash(manifest_identity, "manifest_sha256"),
+    )
+
+    with pytest.raises(ValueError, match="report/decision identity"):
+        _validate_terminal_evidence(evidence)
 
 
 def test_online_terminal_checks_raw_before_acceptance_publish(
@@ -1632,22 +1823,17 @@ def test_measurement_attestation_is_hash_bound_and_exact(tmp_path):
     _write_json(artifact_path, {
         "artifact": "bound", "artifact_manifest_sha256": "f" * 64,
     })
-    remote_digest = "d" * 64
-    expected_is = [{
-        "cell_fingerprint": "1" * 64,
-        "transcript_sha256": "2" * 64,
-    }]
+    evidence = _canonical_evidence()
     preflight = {
-        "canonical_digest_sha256": remote_digest,
-        "canonical_digest": {
-            "importance_sampling_transcript_sha256": expected_is,
-        },
+        **evidence,
+        "remote_full_consensus": True,
+        "nodes": ["nd-1", "nd-2", "nd-3"],
     }
     _write_json(preflight_path, preflight)
     _write_json(acceptance_path, {"manifest_sha256": "7" * 64})
     identity = {
         "attestation_version": orchestrator_module.LOCAL_ATTESTATION_VERSION,
-        "status": "PASS",
+        "status": "PASS_EXACT",
         "source_commit": SOURCE_COMMIT,
         "archive_sha256": ARCHIVE_SHA256,
         "source_manifest_sha256": SOURCE_MANIFEST_SHA256,
@@ -1664,18 +1850,45 @@ def test_measurement_attestation_is_hash_bound_and_exact(tmp_path):
             orchestrator_module._sha256_file(acceptance_path)
         ),
         "preflight_acceptance_manifest_sha256": "7" * 64,
-        "remote_canonical_digest_sha256": remote_digest,
-        "local_canonical_digest_sha256": remote_digest,
+        "remote_full_payload_sha256": evidence[
+            "canonical_full_payload_sha256"
+        ],
+        "local_full_payload_sha256": evidence[
+            "canonical_full_payload_sha256"
+        ],
+        "remote_portable_payload_sha256": evidence[
+            "canonical_portable_payload_sha256"
+        ],
+        "local_portable_payload_sha256": evidence[
+            "canonical_portable_payload_sha256"
+        ],
         "exact_canonical_match": True,
+        "portable_canonical_match": True,
+        "acceptance_decisions_exact": True,
+        "acceptance_decision_catalog_sha256": evidence[
+            "canonical_portable_payload"
+        ]["acceptance_decision_catalog_sha256"],
+        "remote_full_consensus": True,
+        "remote_full_consensus_nodes": ["nd-1", "nd-2", "nd-3"],
         "mismatch_paths": [],
-        "importance_sampling_transcript_sha256": expected_is,
+        "importance_sampling_portable_summary": evidence[
+            "canonical_portable_payload"
+        ]["importance_sampling_transcript_summary"],
+        "remote_importance_sampling_full_summary": evidence[
+            "canonical_full_payload"
+        ]["importance_sampling_transcript_summary"],
+        "local_importance_sampling_full_summary": evidence[
+            "canonical_full_payload"
+        ]["importance_sampling_transcript_summary"],
         "solver_identity_policy": orchestrator_module.LOCAL_SOLVER_POLICY,
+        "full_mismatch_policy": (
+            orchestrator_module.LOCAL_FULL_MISMATCH_POLICY
+        ),
         "local_environment": {
             "system": "Darwin", "machine": "arm64", "python": "3.12",
             "numpy": "2.4.1", "scipy": "1.17.0",
             "map_solver_identity_current": "local-test",
         },
-        "portability_review": None,
         "clock_domain": "unsynchronized_local_diagnostic",
         "completed_local_unix": 1500,
     }
@@ -1701,71 +1914,85 @@ def test_measurement_attestation_is_hash_bound_and_exact(tmp_path):
             ARCHIVE_SHA256,
             SOURCE_MANIFEST_SHA256,
         )
-    changed = copy.deepcopy(attestation)
-    changed["exact_canonical_match"] = False
-    changed_identity = dict(changed)
-    changed_identity.pop("attestation_sha256")
-    changed["attestation_sha256"] = hashlib.sha256(
-        orchestrator_module._canonical_json(changed_identity).encode("ascii")
-    ).hexdigest()
-    _write_json(path, changed)
-    with pytest.raises(ValueError, match="exact local attestation"):
+    portable = copy.deepcopy(attestation)
+    portable["status"] = "PORTABLE_PASS"
+    portable["exact_canonical_match"] = False
+    portable["local_full_payload_sha256"] = "e" * 64
+    portable["mismatch_paths"] = ["$.cells[0].nonportable_float_sha256"]
+    portable["local_importance_sampling_full_summary"] = copy.deepcopy(
+        portable["local_importance_sampling_full_summary"],
+    )
+    portable["local_importance_sampling_full_summary"][0][
+        "full_transcript_sha256"
+    ] = "a" * 64
+    portable["local_importance_sampling_full_summary"][0][
+        "nonportable_float_sha256"
+    ] = "b" * 64
+    portable_identity = dict(portable)
+    portable_identity.pop("attestation_sha256")
+    portable["attestation_sha256"] = orchestrator_module._sha256_json(
+        portable_identity,
+    )
+    _write_json(path, portable)
+    assert orchestrator_module._validate_local_attestation(
+        path, orchestrator_module._sha256_file(path), schedule, preflight,
+        artifact_path, acceptance_path, "e" * 64, CONFIG_SHA256,
+        SOURCE_COMMIT, ARCHIVE_SHA256, SOURCE_MANIFEST_SHA256,
+    ) == portable
+
+    for field, value in (
+            ("acceptance_decisions_exact", False),
+            ("portable_canonical_match", False),
+            ("local_portable_payload_sha256", "9" * 64)):
+        forged = copy.deepcopy(portable)
+        forged[field] = value
+        forged_identity = dict(forged)
+        forged_identity.pop("attestation_sha256")
+        forged["attestation_sha256"] = orchestrator_module._sha256_json(
+            forged_identity,
+        )
+        _write_json(path, forged)
+        with pytest.raises(ValueError, match="identity is invalid"):
+            orchestrator_module._validate_local_attestation(
+                path, orchestrator_module._sha256_file(path), schedule,
+                preflight, artifact_path, acceptance_path, "e" * 64,
+                CONFIG_SHA256, SOURCE_COMMIT, ARCHIVE_SHA256,
+                SOURCE_MANIFEST_SHA256,
+            )
+
+    old = copy.deepcopy(portable)
+    old["attestation_version"] = (
+        "exp102.q0_hgp_global.screen.local_attestation.v3"
+    )
+    old_identity = dict(old)
+    old_identity.pop("attestation_sha256")
+    old["attestation_sha256"] = orchestrator_module._sha256_json(old_identity)
+    _write_json(path, old)
+    with pytest.raises(ValueError, match="identity is invalid"):
         orchestrator_module._validate_local_attestation(
             path, orchestrator_module._sha256_file(path), schedule, preflight,
             artifact_path, acceptance_path, "e" * 64, CONFIG_SHA256,
-            SOURCE_COMMIT,
-            ARCHIVE_SHA256,
+            SOURCE_COMMIT, ARCHIVE_SHA256, SOURCE_MANIFEST_SHA256,
+        )
+
+    no_consensus = dict(preflight)
+    no_consensus["remote_full_consensus"] = False
+    _write_json(path, portable)
+    with pytest.raises(ValueError, match="identity is invalid"):
+        orchestrator_module._validate_local_attestation(
+            path, orchestrator_module._sha256_file(path), schedule,
+            no_consensus, artifact_path, acceptance_path, "e" * 64,
+            CONFIG_SHA256, SOURCE_COMMIT, ARCHIVE_SHA256,
             SOURCE_MANIFEST_SHA256,
         )
 
-    # A hand-written PORTABLE_PASS remains forbidden even when its self-hash
-    # and externally supplied file SHA are recomputed.
-    forged = copy.deepcopy(attestation)
-    forged["status"] = "PORTABLE_PASS"
-    forged["exact_canonical_match"] = False
-    forged["mismatch_paths"] = ["$.cells[0].mass"]
-    forged["portability_review"] = {
-        "review_version": "exp102.q0_hgp_global.screen.portability_review.v1",
-        "discrete_transcripts_exact": True,
-        "review_contract_sha256": "3" * 64,
-        "comparator_source_sha256": "4" * 64,
-        "approved_float_differences": [{
-            "field": "$.cells[0].mass", "observed_ulp": 1, "max_ulp": 999,
-        }],
-    }
-    forged_identity = dict(forged)
-    forged_identity.pop("attestation_sha256")
-    forged["attestation_sha256"] = hashlib.sha256(
-        orchestrator_module._canonical_json(forged_identity).encode("ascii")
-    ).hexdigest()
-    _write_json(path, forged)
-    with pytest.raises(ValueError, match="identity is invalid"):
-        orchestrator_module._validate_local_attestation(
-            path, orchestrator_module._sha256_file(path), schedule, preflight,
-            artifact_path, acceptance_path, "e" * 64, CONFIG_SHA256,
-            SOURCE_COMMIT,
-            ARCHIVE_SHA256, SOURCE_MANIFEST_SHA256,
-        )
 
-    forged = copy.deepcopy(attestation)
-    forged["registry_file_sha256"] = "9" * 64
-    forged["importance_sampling_transcript_sha256"] = []
-    forged_identity = dict(forged)
-    forged_identity.pop("attestation_sha256")
-    forged["attestation_sha256"] = hashlib.sha256(
-        orchestrator_module._canonical_json(forged_identity).encode("ascii")
-    ).hexdigest()
-    _write_json(path, forged)
-    with pytest.raises(ValueError, match="identity is invalid"):
-        orchestrator_module._validate_local_attestation(
-            path, orchestrator_module._sha256_file(path), schedule, preflight,
-            artifact_path, acceptance_path, "e" * 64, CONFIG_SHA256,
-            SOURCE_COMMIT,
-            ARCHIVE_SHA256, SOURCE_MANIFEST_SHA256,
-        )
-
-
-def test_local_audit_complete_exact_success_path(tmp_path, monkeypatch):
+@pytest.mark.parametrize(("remote_full_marker", "expected_status"), (
+    ("6", "PASS_EXACT"),
+    ("a", "PORTABLE_PASS"),
+))
+def test_local_audit_complete_exact_or_portable_success_path(
+        tmp_path, monkeypatch, remote_full_marker, expected_status):
     registry_path = tmp_path / "registry.json"
     config_path = tmp_path / "config.json"
     schedule_path = tmp_path / "schedule.json"
@@ -1784,21 +2011,14 @@ def test_local_audit_complete_exact_success_path(tmp_path, monkeypatch):
 
     schedule = {"schedule_sha256": "3" * 64}
     artifact_manifest = {"artifact_manifest_sha256": "4" * 64}
-    is_transcript = [{
-        "cell_fingerprint": "5" * 64,
-        "transcript_sha256": "6" * 64,
-    }]
-    canonical = {
-        "algebra": {"rank": 7},
-        "importance_sampling_transcript_sha256": is_transcript,
-    }
+    evidence = _canonical_evidence(full_marker=remote_full_marker)
+    base_evidence = _base_canonical_evidence()
     preflight = {
         "status": "PASS",
+        "remote_full_consensus": True,
+        "nodes": ["nd-1", "nd-2", "nd-3"],
         "selected_resource_tier": "T3",
-        "canonical_digest": canonical,
-        "canonical_digest_sha256": local_audit_module.workflow._sha256_json(
-            canonical,
-        ),
+        **evidence,
     }
     monkeypatch.setenv("EXP102_SOURCE_COMMIT", SOURCE_COMMIT)
     monkeypatch.setattr(
@@ -1824,9 +2044,15 @@ def test_local_audit_complete_exact_success_path(tmp_path, monkeypatch):
         "validate_preflight_acceptance_offline",
         lambda *_args, **_kwargs: {"manifest_sha256": "7" * 64},
     )
+    digest_calls = []
+
+    def replay_digest(*_args, **kwargs):
+        digest_calls.append(kwargs)
+        return copy.deepcopy(base_evidence)
+
     monkeypatch.setattr(
         local_audit_module.pipeline, "hgp_screen_preflight_digest",
-        lambda *_args: {"algebra": {"rank": 7}},
+        replay_digest,
     )
     monkeypatch.setattr(
         local_audit_module.pipeline, "_map_cells", lambda _config: [{"cell": 0}],
@@ -1838,14 +2064,24 @@ def test_local_audit_complete_exact_success_path(tmp_path, monkeypatch):
     def write_is(_registry, _config, _commit, _archive, _manifest, _cell,
                  _artifact_root, path, **_kwargs):
         Path(path).write_bytes(b"frozen-is")
-        return {"transcript_sha256": "6" * 64}
+        return {
+            "full_transcript_sha256": "7" * 64,
+            "portable_transcript_sha256": "8" * 64,
+            "nonportable_float_sha256": "6" * 64,
+            "field_manifest_sha256": "9" * 64,
+        }
 
     monkeypatch.setattr(
         local_audit_module.pipeline, "run_hgp_map_is_diagnostic", write_is,
     )
     monkeypatch.setattr(
         local_audit_module.pipeline, "validate_hgp_map_is_diagnostic",
-        lambda *_args, **_kwargs: {"transcript_sha256": "6" * 64},
+        lambda *_args, **_kwargs: {
+            "full_transcript_sha256": "7" * 64,
+            "portable_transcript_sha256": "8" * 64,
+            "nonportable_float_sha256": "6" * 64,
+            "field_manifest_sha256": "9" * 64,
+        },
     )
     monkeypatch.setattr(
         local_audit_module, "_environment_identity",
@@ -1863,10 +2099,17 @@ def test_local_audit_complete_exact_success_path(tmp_path, monkeypatch):
         work_root, output_path,
     )
 
-    assert attestation["status"] == "PASS"
-    assert attestation["exact_canonical_match"] is True
-    assert attestation["mismatch_paths"] == []
-    assert attestation["importance_sampling_transcript_sha256"] == is_transcript
+    assert attestation["status"] == expected_status
+    assert digest_calls == [{}]
+    assert attestation["exact_canonical_match"] is (
+        expected_status == "PASS_EXACT"
+    )
+    assert bool(attestation["mismatch_paths"]) is (
+        expected_status == "PORTABLE_PASS"
+    )
+    assert attestation["importance_sampling_portable_summary"] == evidence[
+        "canonical_portable_payload"
+    ]["importance_sampling_transcript_summary"]
     identity = dict(attestation)
     stored_sha = identity.pop("attestation_sha256")
     assert stored_sha == local_audit_module.workflow._sha256_json(identity)

@@ -5,6 +5,7 @@ import numpy as np
 import pytest
 
 from data.expander_code.exp102.exp102_pipeline import q0_hgp_screen as hs
+from data.expander_code.exp102.exp102_pipeline import q0_map_mixture as mm
 from data.expander_code.exp102.exp102_pipeline.io import atomic_json, atomic_npz
 from data.expander_code.exp102.exp102_pipeline.q0_map_mixture import (
     MAP_METHOD_ID,
@@ -15,7 +16,7 @@ from data.expander_code.exp102.exp102_pipeline.registry import load_registry
 
 EXP102_ROOT = Path(__file__).resolve().parents[1]
 REGISTRY_PATH = EXP102_ROOT / "registry/registry.json"
-CONFIG_PATH = EXP102_ROOT / "config/q0_hgp_global.screen.v1.json"
+CONFIG_PATH = EXP102_ROOT / "config/q0_hgp_global.screen.v2.json"
 SOURCE_COMMIT = "1" * 40
 ARCHIVE_SHA256 = "a" * 64
 SOURCE_MANIFEST_SHA256 = "b" * 64
@@ -84,6 +85,23 @@ def test_artifact_is_complete_pickle_free_readonly_and_tamper_closed(
             REGISTRY_PATH, CONFIG_PATH, SOURCE_COMMIT, ARCHIVE_SHA256,
             SOURCE_MANIFEST_SHA256, cell, tampered_root,
         )
+
+
+def test_bound_artifact_load_is_independent_of_current_solver_version(
+        frozen_artifact, monkeypatch):
+    root, cell, descriptor = frozen_artifact
+    monkeypatch.setattr(
+        mm, "_solver_identity",
+        lambda: "numpy=9.9;scipy=9.9;highs=9.9.9",
+    )
+    loaded = hs.load_hgp_map_artifact(
+        REGISTRY_PATH, CONFIG_PATH, SOURCE_COMMIT, ARCHIVE_SHA256,
+        SOURCE_MANIFEST_SHA256, cell, root, descriptor,
+    )
+    assert loaded.descriptor == descriptor
+    assert loaded.catalog.solver_identity == descriptor[
+        "anchor_solver_identity"
+    ]
 
 
 def test_manifest_and_all_map_trajectories_bind_one_descriptor_per_cell(
@@ -216,7 +234,10 @@ def test_frozen_50000_draw_is_is_replayable_and_auxiliary_only(
         output, REGISTRY_PATH, CONFIG_PATH, SOURCE_COMMIT, ARCHIVE_SHA256,
         SOURCE_MANIFEST_SHA256, cell, root,
     )
-    assert replay["transcript_sha256"] == result["transcript_sha256"]
+    for name in (
+            "full_transcript_sha256", "portable_transcript_sha256",
+            "nonportable_float_sha256", "field_manifest_sha256"):
+        assert replay[name] == result[name]
     assert replay["used_for_gate_or_selection"] is False
 
     with np.load(output, allow_pickle=False) as data:
@@ -225,6 +246,7 @@ def test_frozen_50000_draw_is_is_replayable_and_auxiliary_only(
         assert payload["sample_coordinates_packed"].shape[0] == 50_000
         assert all(not value.dtype.hasobject for value in payload.values())
         identity = json.loads(str(payload["identity_json"].item()))
+        diagnostics = json.loads(str(payload["diagnostics_json"].item()))
         assert identity["artifact_descriptor"] == descriptor
         assert identity["used_for_gate_or_selection"] is False
         replay_arrays = {
@@ -232,7 +254,6 @@ def test_frozen_50000_draw_is_is_replayable_and_auxiliary_only(
             if name.startswith("sample_")
         }
 
-    diagnostics = identity["diagnostics"]
     monkeypatch.setattr(
         hs, "_map_is_transcript",
         lambda proposal, p, num_samples, seed: (replay_arrays, diagnostics),
@@ -240,7 +261,7 @@ def test_frozen_50000_draw_is_is_replayable_and_auxiliary_only(
     payload["sample_physical_weights"][0] += 1
     tampered = tmp_path / "is_tampered.npz"
     atomic_npz(tampered, **payload)
-    with pytest.raises(hs.HgpScreenConflictError, match="replay mismatch"):
+    with pytest.raises(hs.HgpScreenConflictError, match="stored evidence"):
         hs.validate_hgp_map_is_diagnostic(
             tampered, REGISTRY_PATH, CONFIG_PATH, SOURCE_COMMIT, ARCHIVE_SHA256,
             SOURCE_MANIFEST_SHA256, cell, root,
@@ -359,7 +380,10 @@ def test_is_diagnostics_are_reported_but_cannot_change_pair_selection(
         return {
             "sha256": "d" * 64, "cell": cell,
             "diagnostics": {"arbitrary_auxiliary_value": diagnostic["value"]},
-            "transcript_sha256": "e" * 64,
+            "full_transcript_sha256": "e" * 64,
+            "portable_transcript_sha256": "f" * 64,
+            "nonportable_float_sha256": "a" * 64,
+            "field_manifest_sha256": "b" * 64,
             "used_for_gate_or_selection": False,
         }
 

@@ -1,104 +1,97 @@
 # exp102 status
 
-**Q=0 HGP HARD-PAIR DIAGNOSTIC IMPLEMENTED / PRE-RUN -- formal work remains blocked**
+**Q=0 HGP HARD-PAIR DIAGNOSTIC V2 / PRE-RUN -- formal work remains blocked**
 
-On 2026-07-22 the user authorized fresh server testing of the isolated
-`exp102.q0_hgp_global.screen.v1` diagnostic. The candidate HP32/HP64 sampler
-analytically collapses one HGP block, performs likelihood-power replica
-exchange on the exact marginal, and draws the eliminated block from its exact
-conditional. The independent MAM-IMH8 mechanism uses a frozen full-support
-multi-anchor independence proposal with the complete Hastings ratio. The
-canonical diagnostic config SHA256 is
-`163a5cc87486beabf453f3d4a57bc63f0c4e0b2f54619c60268ee7f0c9b2a341`.
+The currently authorized contract is `exp102.q0_hgp_global.screen.v2`, with
+config `q0_hgp_global.screen.v2.json` and canonical config SHA256
+`38092ec030f6c283f163c0ddb3eed612aa850c76ce34f130520522646fa883dc`.
+V2 has not been launched: no v2 server preflight, measurement control,
+measurement raw, report or result exists.
 
-MAM transport gates now count actual state changes, not merely accepted MH
-decisions: an accepted proposal identical to the pre-step state is a self-loop.
-The replayable sampler transcript is v2 and the enclosing screen MAP raw is v3;
-both retain acceptance fields for diagnostics and add burn/measurement
-state-change masks and counts.
+Its predecessor v1 run, `exp102_q0_hgp_screen_20260722_2e6ba2a`, used source
+`2e6ba2a864d7db6ae04e79867d1678dbcfe42580`, archive SHA256
+`6c5aae08c43a196426c27c41d58e6ad5f6a6f94cc8e494519641794ccf99c5e4`
+and source-manifest SHA256
+`42ceb8b8619cf5de1d9dc0de16fac31a4f88165d1f6cbeaa038d63accf1046cb`.
+All three Linux preflight workers passed, aggregate status was `PASS`, and T3
+was selected. The required macOS conda-12 audit first found that the verifier
+incorrectly treated stored remote solver provenance as a local-version
+requirement. Continuing the audit after isolating that verifier error found a
+one-ULP difference in MAM `log_q`/acceptance fields and full-digest drift in
+both 50000-draw IS probes. Those drifts, not the solver-provenance verifier
+error, make v1 terminal `CONFLICT`. It produced no
+measurement control, measurement raw or result and cannot be resumed in place.
 
-Auxiliary preflight/runtime trajectories and IS probes now have namespaces
-disjoint from measurement trajectories and frozen screen IS streams; an
-exhaustive fixture-identity trajectory/IS 63-bit seed regression permits only
-same-case reference/Numba reuse, and the clean deployment identities must be
-rechecked immediately before launch. P/U and
-cross-method `Delta q_top` gates also use a shared-character paired
-finite-population SE plus side-specific delete-one trajectory jackknives,
-rather than adding two marginal character errors and accidentally weakening
-the consistency gate.
+V2 replaces the old cross-platform full-payload equality claim with two exact,
+explicit evidence layers. The three Linux nodes must first reach full-Linux
+exact consensus, including the frozen floating transcript. Only after that may
+macmini perform a portable-local exact projection over the exhaustive declared
+discrete fields. There is no ULP, absolute, relative or rounding tolerance.
+Any mismatch in a portable field or MAM acceptance decision is `CONFLICT`;
+nonportable floats stay present in the Linux full evidence and local mismatch
+diagnostics rather than being silently rounded away.
 
-The frozen server scope contains 384 trajectories: HP32 and HP64 each run
-`HARD2+EASY3` with 16 planted and 16 exact-uniform starts per cell (320 total),
-while MAM-IMH8 runs only the two `HARD2` cells (64 total). MAP artifacts and
-50000-draw IS diagnostics are also limited to HARD2. Local probes showed that
-adding deterministic m3 near-MAP shells did not address the relevant basin:
-the planted start still accepted 0/8192 measurement proposals, the uniform
-start accepted only 1.5%, both weight-24 solves hit 180 seconds, and the m5
-primary solve also exceeded 180 seconds. Those known-failing EASY3 MAP tasks
-and near-MAP shells are excluded rather than optimized further.
+V2 uses anchor catalog `exp102.q0_map_mixture.anchors.v3` and fresh v2 sampler
+and auxiliary namespaces. Preflight includes four fixed MAM portability probes:
+the two `HARD2` cells from both `P` and `U`, each with `burn=256` and
+`measurement=2048`. MAM binds proposal states, uniforms, acceptance decisions,
+actual state changes and resulting fixed-clock states. HP does not expose each
+internal categorical uniform/decision, so its portable claim is intentionally
+limited to exact fixed-clock discrete outputs and transport counters; it may
+not be reported as per-hidden-decision bit identity.
 
-Small-code production-bound enumeration now directly exercises the reference
-B categorical and conditional A reconstruction paths on the n=10,k=4 and
-n=13,k=1 HGPs for zero/nonzero syndrome and p=.04,.10,.25. Complete fixed-order
-sweeps satisfy row normalization and stationarity, while each individual B
-heatbath block satisfies detailed balance, all within `1e-13`. Both public
-samplers independently bind the observable frame to the model before using RNG.
-Raw replay also reconstructs the collapsed B trace and gates every B bit,
-row/column parity, 64 frozen dense characters, `|B|` and `L(B)`; both catalog-
-average and per-character P/U and cross-method differences must pass. The
-workflow binds one immutable MAP artifact per hard cell, exact task/IS sets,
-source/archive/config/registry identity, structure-only staging validation,
-final bit-exact replay, and the real execution topology: distributed nd-2/nd-3
-generation followed by a frozen 91-worker nd-3 analyzer. Runtime projection
-counts those stages separately before applying the independent factor-two
-safety margin.
+The frozen measurement scope remains 384 fresh trajectories: HP32 and HP64
+each run `HARD2+EASY3` with 16 `P` and 16 `U` starts per cell (320 total), while
+MAM-IMH8 runs only `HARD2` (64 total). MAP artifacts and 50000-draw IS
+diagnostics are also HARD2-only. HP analytically collapses one HGP block,
+samples its exact likelihood-power marginal and reconstructs the eliminated
+block conditionally; MAM uses a frozen full-support multi-anchor independence
+proposal with the complete Hastings ratio. MAM transport counts accepted
+proposals only when the state actually changes; an accepted self-proposal is
+an MH self-loop, not transport.
 
-No 013 server preflight, measurement raw, terminal report or sampler pass
-exists yet. The maximum possible outcome is only
-`DIAGNOSTIC_HARD_PAIR_FOUND`; EASY3 has no independent-method confirmation,
-and one sentinel disorder cannot certify any `(m,p)` parameter point. This
-contract cannot create `READY_FOR_FORMAL`, `FROZEN_HELD_OUT_PASS`, a
-publication result or any of the 6144 production tasks.
+The initialization question is constrained by the target support, not by a
+generic preference for simple starts. All five sentinel syndromes are nonzero,
+so the physical all-zero bit string is outside their q=0 hard cosets. Starting
+all chains from zero would test the wrong support. `P` (planted hard-coset
+state) and `U` (exact K=0 uniform hard-coset state) are two legal, deliberately
+opposed families; their purpose is to expose retained initialization memory,
+not to optimize apparent convergence. The planted error never enters energy,
+proposal, acceptance or anchor construction.
 
-The first outer launch attempt from clean source
-`7654bcced23688705f396695370661199b81648a` exited before creating a run root,
-orchestrator log, stage marker or raw because `nd-0` has no `screen`
-executable. It launched no preflight or sampler and is infrastructure-only,
-not a scientific run. The successor source replaces only the `nd-0` outer
-control persistence with guarded `nohup` + `setsid`; all `nd-1`/`nd-2`/`nd-3`
-scientific stages remain isolated `screen` jobs. A fresh deployment/run is
-required rather than retrying that source in place.
+Scientific correctness and finite-budget mixing remain separate gates. Exact
+small-code stationarity/detailed-balance tests establish the target kernel;
+P/U agreement, transport, Rhat, ESS, characters and weights test whether it
+mixes within the selected tier. Raw replay reconstructs HP's collapsed B
+bottleneck and gates every B bit, row/column parity, 64 dense characters,
+`|B|` and `L(B)`, including per-character differences so a frozen component
+cannot be hidden by aggregate `q_top` or D2. B is not assumed to be the only
+slow variable, so full logical/energy/weight gates remain mandatory. A finite
+character catalog and 16 `U` starts still cannot rule out an unsampled
+higher-order mode or a tiny-volume, high-posterior-mass basin shared by both
+methods; this residual common-mode risk is why any pass remains diagnostic.
+A failure is unresolved within this algorithm and budget, not mathematical
+impossibility.
 
-The fresh successor attempt from
-`df97fb5a7d38543beb515444b5692427dd28cc41` proved that the guarded `nd-0`
-orchestrator survives SSH detachment and launches the first `nd-1` screen, but
-the stage bootstrap exited before creating a run root, immutable marker or raw.
-The bootstrap log identified a Bash 4.2 portability bug: under `set -u`, the
-zero-prerequisite `build-schedule` path expanded an empty array. This is also
-infrastructure-only and produced no preflight or sampler evidence. Its guard,
-log and deployment remain audit evidence and are not reused. The successor
-source guards every possibly empty array expansion and adds an executable
-zero-prerequisite wrapper regression; another fresh deployment/run is required.
+The first two 013 launch attempts remain infrastructure-only history. Source
+`7654bcced23688705f396695370661199b81648a` stopped before a run root because
+`nd-0` lacks `screen`; source
+`df97fb5a7d38543beb515444b5692427dd28cc41` persisted the guarded nd-0
+orchestrator but hit Bash 4.2 empty-array expansion before a run root. Neither
+produced preflight or sampler raw. The later v1 run above did reach aggregate
+preflight PASS before the independent local audit correctly stopped it.
 
-Read-only follow-up also found that the Linux node epochs are unsynchronized
-(approximately nd-1 `+204 s`, nd-2 `+298 s`, nd-3 `+2 s` relative to nd-0;
-chrony on nd-0/nd-1/nd-2 reported `Not synchronised`). This invalidated the old
-cross-node epoch deadline assumption but produced no preflight or measurement.
-The fresh successor protocol is now
-`exp102.q0_hgp_global.screen.schedule.v2`: only nd-0
-`CLOCK_BOOTTIME + boot_id` authorizes the 6/8/22/24-hour boundaries, every stage
-launch and SUCCESS acceptance is rechecked with `now >= deadline` failing, and
-measurement must reuse the original preflight clock anchor. Compute-node and
-macmini epochs are retained only as finite diagnostics; runtime tier selection
-uses the fixed worst-case hour-8 control origin and cannot read them or any
-physics outcome.
+The schedule remains `exp102.q0_hgp_global.screen.schedule.v2`: only nd-0
+`CLOCK_BOOTTIME + boot_id` authorizes the 6/8/22/24-hour boundaries because the
+node epochs are unsynchronized. A terminal package is valid only together with
+the measurement acceptance manifest and the exact control-derived set of 384
+trajectory raw plus two IS raw. Missing, extra, symlinked or hash-mismatched
+evidence fails closed.
 
-The successor evidence protocol also records each nd-0 SUCCESS acceptance and
-publishes ordered preflight/measurement phase manifests. A terminal package is
-valid only jointly with the measurement acceptance manifest and the exact
-control-derived set of 384 trajectory raw, two IS raw and all matching claims;
-online publication and local pullback both reject missing, extra, symlinked or
-hash-mismatched evidence.
+The maximum possible outcome remains only `DIAGNOSTIC_HARD_PAIR_FOUND`.
+`EASY3` lacks independent-method confirmation, and one sentinel disorder
+cannot certify any `(m,p)` point. V2 cannot create `READY_FOR_FORMAL`,
+`FROZEN_HELD_OUT_PASS`, publication data or any of the 6144 production tasks.
 
 **Q=0 DIAGNOSTIC SCREEN UNRESOLVED / PRE-PILOT — formal pilot blocked, production not started**
 

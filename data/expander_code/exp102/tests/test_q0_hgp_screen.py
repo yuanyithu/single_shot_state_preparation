@@ -30,7 +30,7 @@ from data.expander_code.exp102.exp102_pipeline.seeds import derive_seed
 
 EXP102_ROOT = Path(__file__).resolve().parents[1]
 REGISTRY_PATH = EXP102_ROOT / "registry/registry.json"
-CONFIG_PATH = EXP102_ROOT / "config/q0_hgp_global.screen.v1.json"
+CONFIG_PATH = EXP102_ROOT / "config/q0_hgp_global.screen.v2.json"
 SOURCE_COMMIT = "1" * 40
 ARCHIVE_SHA256 = "a" * 64
 SOURCE_MANIFEST_SHA256 = "b" * 64
@@ -115,7 +115,17 @@ def test_config_is_canonical_and_all_mutations_fail_closed(tmp_path, protocol):
     assert config["screen_panel_sha256"] == sha256_json(
         hs._method_schedule_identity(config),
     )
-    assert config["raw_versions"]["map"] == "exp102.q0_map_mixture.raw.v3"
+    assert config["raw_versions"]["map"] == "exp102.q0_map_mixture.raw.v4"
+    assert config["portable_evidence"] == {
+        "version": "exp102.q0_hgp_global.screen.portable_evidence.v1",
+        "remote_linux_policy": "full_transcript_bit_exact_three_node_consensus",
+        "local_policy": "portable_transcript_and_acceptance_decision_bit_exact",
+        "float_tolerance": None,
+        "map_preflight_burn": 256,
+        "map_preflight_measurement": 2048,
+        "map_preflight_init_families": ["P", "U"],
+        "map_preflight_panels": ["HARD2"],
+    }
     assert config["gates"]["map_min_burn_state_changes"] == 1
     assert config["gates"]["map_min_measurement_state_change_rate"] == 0.05
     assert config["gates"]["map_min_measurement_state_changes"] == 400
@@ -155,6 +165,193 @@ def test_config_is_canonical_and_all_mutations_fail_closed(tmp_path, protocol):
     wrong_registry["registry_sha256"] = "0" * 64
     with pytest.raises(ValueError, match="registry SHA"):
         hs.load_hgp_screen_config(CONFIG_PATH, wrong_registry)
+
+
+def _synthetic_sampler_result(method):
+    fields = hs._HP_RESULT_FIELDS if method in hs.HP_METHODS else hs._MAP_RESULT_FIELDS
+    result = {
+        name: np.asarray([0], dtype=np.uint8) for name in fields
+    }
+    result["method_id"] = method
+    result["engine"] = "reference"
+    for name in hs._HP_NONPORTABLE_RESULT_FIELDS | hs._MAP_NONPORTABLE_RESULT_FIELDS:
+        if name in result and name not in {"engine", "lambda_sha256", "mass_sha256"}:
+            result[name] = np.asarray([0.25], dtype=np.float64)
+    if method == MAP_METHOD_ID:
+        result["burn_accept_uniform"] = np.asarray([0.125], dtype=np.float64)
+        result["measurement_accept_uniform"] = np.asarray(
+            [0.75], dtype=np.float64,
+        )
+    return result
+
+
+def test_sampler_evidence_has_explicit_exact_portable_partitions():
+    mam = _synthetic_sampler_result(MAP_METHOD_ID)
+    baseline = hs._sampler_evidence(mam, MAP_METHOD_ID)
+    manifest = baseline["field_manifest"]
+    assert set(manifest["nonportable_fields"]) == hs._MAP_NONPORTABLE_RESULT_FIELDS
+    assert "burn_accept_uniform" in manifest["portable_fields"]
+    assert "measurement_accept_uniform" in manifest["portable_fields"]
+    assert manifest["float_tolerance"] is None
+
+    derived_float_changed = dict(mam)
+    derived_float_changed["burn_log_acceptance"] = np.asarray(
+        [1.0e100], dtype=np.float64,
+    )
+    changed = hs._sampler_evidence(derived_float_changed, MAP_METHOD_ID)
+    assert changed["full_transcript_sha256"] != baseline["full_transcript_sha256"]
+    assert changed["nonportable_float_sha256"] != baseline[
+        "nonportable_float_sha256"
+    ]
+    assert changed["portable_transcript_sha256"] == baseline[
+        "portable_transcript_sha256"
+    ]
+    assert changed["acceptance_decision_sha256"] == baseline[
+        "acceptance_decision_sha256"
+    ]
+
+    uniform_changed = dict(mam)
+    uniform_changed["burn_accept_uniform"] = np.asarray(
+        [0.5], dtype=np.float64,
+    )
+    changed = hs._sampler_evidence(uniform_changed, MAP_METHOD_ID)
+    assert changed["portable_transcript_sha256"] != baseline[
+        "portable_transcript_sha256"
+    ]
+    assert changed["acceptance_decision_sha256"] != baseline[
+        "acceptance_decision_sha256"
+    ]
+
+    hp = _synthetic_sampler_result("HP32")
+    baseline = hs._sampler_evidence(hp, "HP32")
+    assert set(baseline["field_manifest"]["nonportable_fields"]) == (
+        hs._HP_NONPORTABLE_RESULT_FIELDS
+    )
+    likelihood_changed = dict(hp)
+    likelihood_changed["cold_log_likelihood"] = np.asarray(
+        [-1234.5], dtype=np.float64,
+    )
+    changed = hs._sampler_evidence(likelihood_changed, "HP32")
+    assert changed["full_transcript_sha256"] != baseline["full_transcript_sha256"]
+    assert changed["portable_transcript_sha256"] == baseline[
+        "portable_transcript_sha256"
+    ]
+    counter_changed = dict(hp)
+    counter_changed["swap_accepts"] = np.asarray([1], dtype=np.int64)
+    changed = hs._sampler_evidence(counter_changed, "HP32")
+    assert changed["portable_transcript_sha256"] != baseline[
+        "portable_transcript_sha256"
+    ]
+
+
+def test_is_evidence_splits_identity_diagnostics_and_float_arrays():
+    identity = {
+        "raw_version": hs.HGP_MAP_IS_RAW_VERSION, "seed": 7,
+        "num_samples": hs.HGP_MAP_IS_SAMPLES,
+        "num_qubits": 10, "coordinate_dimension": 7,
+        "artifact_descriptor": {"anchor_count": 2},
+    }
+    diagnostics = {name: 1.0 for name in hs._MAP_IS_DIAGNOSTIC_FIELDS}
+    diagnostics["num_samples"] = hs.HGP_MAP_IS_SAMPLES
+    diagnostics["minimum_sampled_physical_weight"] = 1
+    count = hs.HGP_MAP_IS_SAMPLES
+    arrays = {
+        "sample_states_packed": np.zeros((count, 2), dtype=np.uint8),
+        "sample_coordinates_packed": np.zeros((count, 1), dtype=np.uint8),
+        "sample_physical_weights": np.zeros(count, dtype=np.int32),
+        "sample_anchor_index": np.zeros(count, dtype=np.int16),
+        "sample_component_index": np.zeros(count, dtype=np.int8),
+    }
+    arrays.update({
+        name: np.full(count, 0.25, dtype=np.float64)
+        for name in hs._MAP_IS_NONPORTABLE_ARRAY_FIELDS
+    })
+    baseline = hs._map_is_evidence(identity, diagnostics, arrays)
+    assert set(baseline["field_manifest"]["portable_array_fields"]) == (
+        hs._MAP_IS_PORTABLE_ARRAY_FIELDS
+    )
+    changed_arrays = dict(arrays)
+    changed_arrays["sample_log_q"] = np.full(count, 9.0, dtype=np.float64)
+    changed = hs._map_is_evidence(identity, diagnostics, changed_arrays)
+    assert changed["full_transcript_sha256"] != baseline["full_transcript_sha256"]
+    assert changed["nonportable_float_sha256"] != baseline[
+        "nonportable_float_sha256"
+    ]
+    assert changed["portable_transcript_sha256"] == baseline[
+        "portable_transcript_sha256"
+    ]
+
+
+def test_preflight_bundle_exposes_only_two_independent_canonical_projections():
+    full = {
+        "evidence_schema_version": hs.HGP_PREFLIGHT_EVIDENCE_VERSION,
+        "evidence_projection": "full",
+        "acceptance_decision_catalog": [],
+        "acceptance_decision_catalog_sha256": sha256_json([]),
+    }
+    portable = {
+        "evidence_schema_version": hs.HGP_PREFLIGHT_EVIDENCE_VERSION,
+        "evidence_projection": "portable",
+        "acceptance_decision_catalog": [],
+        "acceptance_decision_catalog_sha256": sha256_json([]),
+    }
+    bundle = hs.build_hgp_preflight_evidence_bundle(full, portable)
+    assert set(bundle) == {
+        "canonical_full_payload", "canonical_full_payload_sha256",
+        "canonical_portable_payload", "canonical_portable_payload_sha256",
+    }
+    assert bundle["canonical_full_payload_sha256"] == sha256_json(full)
+    assert bundle["canonical_portable_payload_sha256"] == sha256_json(portable)
+
+
+def test_preflight_digest_freezes_hard2_p_u_decision_catalog(artifact_root):
+    bundle = hs.hgp_screen_preflight_digest(
+        REGISTRY_PATH, CONFIG_PATH, SOURCE_COMMIT, ARCHIVE_SHA256,
+        SOURCE_MANIFEST_SHA256, artifact_root,
+    )
+    assert set(bundle) == {
+        "canonical_full_payload", "canonical_full_payload_sha256",
+        "canonical_portable_payload", "canonical_portable_payload_sha256",
+    }
+    full = bundle["canonical_full_payload"]
+    portable = bundle["canonical_portable_payload"]
+    assert bundle["canonical_full_payload_sha256"] == sha256_json(full)
+    assert bundle["canonical_portable_payload_sha256"] == sha256_json(portable)
+    assert len(full["cells"]) == len(portable["cells"]) == 5
+    expected_catalog = [
+        (cell["code_id"], family)
+        for cell in hs.HARD_CELLS for family in hs.INIT_FAMILIES
+    ]
+    assert [
+        (
+            next(
+                cell["code_id"] for cell in hs.HARD_CELLS
+                if hs._cell_fingerprint(cell) == row["cell_fingerprint"]
+            ),
+            row["init_family"],
+        )
+        for row in portable["acceptance_decision_catalog"]
+    ] == expected_catalog
+    assert portable["acceptance_decision_catalog_sha256"] == sha256_json(
+        portable["acceptance_decision_catalog"],
+    )
+    assert full["acceptance_decision_catalog"] == portable[
+        "acceptance_decision_catalog"
+    ]
+    for full_row, portable_row in zip(full["cells"], portable["cells"]):
+        assert "mass_sha256" in full_row
+        assert "mass_sha256" not in portable_row
+        if full_row["cell"] in hs.HARD_CELLS:
+            assert [
+                row["init_family"] for row in full_row["map_portability_probes"]
+            ] == list(hs.INIT_FAMILIES)
+            for row in portable_row["map_portability_probes"]:
+                evidence = row["transcript_evidence"]
+                assert "full_transcript_sha256" not in evidence
+                assert "nonportable_float_sha256" not in evidence
+                assert "burn_accept_uniform" in evidence[
+                    "field_manifest"
+                ]["portable_fields"]
 
 
 def test_map_transport_gate_uses_state_changes_not_accepted_self_loops(protocol):
@@ -492,6 +689,13 @@ def test_hp_and_map_short_raw_are_pickle_free_replayable_and_tamper_closed(
         assert record["labels"].shape == (8,)
         assert record["weights"].shape == (8,)
         assert record["valid_mask"].all()
+        stored_evidence = hs.validate_hgp_screen_stored_evidence(path)
+        assert stored_evidence["task"] == entry["task"]
+        for name in (
+                "full_transcript_sha256", "portable_transcript_sha256",
+                "nonportable_float_sha256", "field_manifest_sha256",
+                "acceptance_decision_sha256"):
+            assert stored_evidence[name] == record[name]
         if method == MAP_METHOD_ID:
             metrics = record["algorithm_metrics"]
             assert metrics["burn_accepts"] >= metrics["burn_state_changes"]
@@ -502,6 +706,50 @@ def test_hp_and_map_short_raw_are_pickle_free_replayable_and_tamper_closed(
             assert metrics["measurement_state_change_rate"] == pytest.approx(
                 metrics["measurement_state_changes"] / 8.0,
             )
+            original_run_sampler = hs._run_sampler
+
+            def replay_with_changed_derived_logs(*args, **kwargs):
+                replay = original_run_sampler(*args, **kwargs)
+                replay = dict(replay)
+                for name in hs._MAP_NONPORTABLE_RESULT_FIELDS:
+                    replay[name] = np.asarray(replay[name]).copy() + 1000.0
+                return replay
+
+            monkeypatch.setattr(
+                hs, "_run_sampler", replay_with_changed_derived_logs,
+            )
+            with pytest.raises(
+                    hs.HgpScreenConflictError, match="sampler replay mismatch"):
+                hs.validate_hgp_screen_raw(
+                    path, registry, config, SOURCE_COMMIT, ARCHIVE_SHA256,
+                    SOURCE_MANIFEST_SHA256, artifact_root,
+                    replay_evidence="full",
+                )
+            portable = hs.validate_hgp_screen_raw(
+                path, registry, config, SOURCE_COMMIT, ARCHIVE_SHA256,
+                SOURCE_MANIFEST_SHA256, artifact_root,
+                replay_evidence="portable",
+            )
+            assert portable["replay_evidence"] == "portable"
+
+            def replay_with_changed_uniform(*args, **kwargs):
+                replay = original_run_sampler(*args, **kwargs)
+                replay = dict(replay)
+                replay["burn_accept_uniform"] = np.asarray(
+                    replay["burn_accept_uniform"],
+                ).copy()
+                replay["burn_accept_uniform"].flat[0] += 0.25
+                return replay
+
+            monkeypatch.setattr(hs, "_run_sampler", replay_with_changed_uniform)
+            with pytest.raises(
+                    hs.HgpScreenConflictError, match="sampler replay mismatch"):
+                hs.validate_hgp_screen_raw(
+                    path, registry, config, SOURCE_COMMIT, ARCHIVE_SHA256,
+                    SOURCE_MANIFEST_SHA256, artifact_root,
+                    replay_evidence="portable",
+                )
+            monkeypatch.setattr(hs, "_run_sampler", original_run_sampler)
 
         with np.load(path, allow_pickle=False) as data:
             arrays = {name: data[name].copy() for name in data.files}
@@ -529,7 +777,7 @@ def test_hp_and_map_short_raw_are_pickle_free_replayable_and_tamper_closed(
         changed["sampler_measurement_weights"].flat[0] += 1
         tamper_cases["trajectory"] = changed
         changed = {name: value.copy() for name, value in arrays.items()}
-        changed["trajectory_digest"] = np.array("0" * 64)
+        changed["full_transcript_sha256"] = np.array("0" * 64)
         tamper_cases["digest"] = changed
 
         for kind, changed in tamper_cases.items():
@@ -540,6 +788,64 @@ def test_hp_and_map_short_raw_are_pickle_free_replayable_and_tamper_closed(
                     tampered, registry, config, SOURCE_COMMIT,
                     ARCHIVE_SHA256, SOURCE_MANIFEST_SHA256, artifact_root,
                 )
+
+
+def test_is_v2_stored_full_and_portable_replay_are_separate(
+        tmp_path, monkeypatch, artifact_root):
+    cell = dict(hs.HARD_CELLS[0])
+    path = tmp_path / "is_v2.npz"
+    generated = hs.run_hgp_map_is_diagnostic(
+        REGISTRY_PATH, CONFIG_PATH, SOURCE_COMMIT, ARCHIVE_SHA256,
+        SOURCE_MANIFEST_SHA256, cell, artifact_root, path,
+        seed_namespace=hs.HGP_SCREEN_PREFLIGHT_IS_ROOT,
+    )
+    stored = hs.validate_hgp_map_is_stored_evidence(path)
+    full = hs.validate_hgp_map_is_diagnostic(
+        path, REGISTRY_PATH, CONFIG_PATH, SOURCE_COMMIT, ARCHIVE_SHA256,
+        SOURCE_MANIFEST_SHA256, cell, artifact_root,
+        seed_namespace=hs.HGP_SCREEN_PREFLIGHT_IS_ROOT,
+    )
+    for name in (
+            "full_transcript_sha256", "portable_transcript_sha256",
+            "nonportable_float_sha256", "field_manifest_sha256"):
+        assert generated[name] == stored[name] == full[name]
+
+    original_transcript = hs._map_is_transcript
+
+    def changed_float_transcript(*args, **kwargs):
+        arrays, diagnostics = original_transcript(*args, **kwargs)
+        arrays = dict(arrays)
+        arrays["sample_log_q"] = arrays["sample_log_q"].copy() + 1000.0
+        arrays["sample_log_importance_weight"] = (
+            arrays["sample_log_importance_weight"].copy() - 1000.0
+        )
+        return arrays, diagnostics
+
+    monkeypatch.setattr(hs, "_map_is_transcript", changed_float_transcript)
+    with pytest.raises(hs.HgpScreenConflictError, match="replay mismatch"):
+        hs.validate_hgp_map_is_diagnostic(
+            path, REGISTRY_PATH, CONFIG_PATH, SOURCE_COMMIT, ARCHIVE_SHA256,
+            SOURCE_MANIFEST_SHA256, cell, artifact_root,
+            seed_namespace=hs.HGP_SCREEN_PREFLIGHT_IS_ROOT,
+            replay_evidence="full",
+        )
+    portable = hs.validate_hgp_map_is_diagnostic(
+        path, REGISTRY_PATH, CONFIG_PATH, SOURCE_COMMIT, ARCHIVE_SHA256,
+        SOURCE_MANIFEST_SHA256, cell, artifact_root,
+        seed_namespace=hs.HGP_SCREEN_PREFLIGHT_IS_ROOT,
+        replay_evidence="portable",
+    )
+    assert portable["replay_evidence"] == "portable"
+
+    monkeypatch.setattr(hs, "_map_is_transcript", original_transcript)
+    with np.load(path, allow_pickle=False) as data:
+        arrays = {name: data[name].copy() for name in data.files}
+    arrays["sample_log_q"].flat[0] += 1.0
+    tampered = tmp_path / "is_v2_tampered.npz"
+    atomic_npz(tampered, **arrays)
+    with pytest.raises(
+            hs.HgpScreenConflictError, match="stored evidence mismatch"):
+        hs.validate_hgp_map_is_stored_evidence(tampered)
 
 
 def test_manifest_tamper_is_rejected_and_report_cannot_authorize_formal_work(
@@ -641,7 +947,10 @@ def test_manifest_tamper_is_rejected_and_report_cannot_authorize_formal_work(
         source_manifest_sha, cell, artifacts: {
             "sha256": "d" * 64, "cell": cell,
             "diagnostics": {"importance_ess": 1.0},
-            "transcript_sha256": "e" * 64,
+            "full_transcript_sha256": "e" * 64,
+            "portable_transcript_sha256": "f" * 64,
+            "nonportable_float_sha256": "a" * 64,
+            "field_manifest_sha256": "b" * 64,
             "used_for_gate_or_selection": False,
         },
     )

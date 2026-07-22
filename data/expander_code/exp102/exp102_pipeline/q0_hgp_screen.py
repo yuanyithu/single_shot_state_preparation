@@ -50,7 +50,7 @@ from .q0_map_mixture import (
     MapMixtureProposal,
     build_map_mixture_proposal,
     build_milp_map_anchors,
-    run_map_mixture_trajectory,
+    _run_map_mixture_trajectory_from_verified_artifact,
     validate_map_mixture_proposal,
 )
 from .registry import load_frozen_code, load_registry
@@ -58,34 +58,144 @@ from .seeds import derive_seed
 from .worker import build_model
 
 
-HGP_SCREEN_VERSION = "exp102.q0_hgp_global.screen.v1"
-HGP_SCREEN_CONFIG_VERSION = "exp102.q0_hgp_global.screen.config.v1"
-HGP_SCREEN_TASK_VERSION = "exp102.q0_hgp_global.screen.tasks.v1"
-HGP_POWER_RAW_VERSION = "exp102.q0_hgp_power.raw.v2"
-HGP_MAP_RAW_VERSION = "exp102.q0_map_mixture.raw.v3"
-HGP_SCREEN_REPORT_VERSION = "exp102.q0_hgp_global.screen.report.v1"
-HGP_SCREEN_MANIFEST_VERSION = "exp102.q0_hgp_global.screen.manifest.v1"
-HGP_SCREEN_SEED_ROOT = "q0_hgp_global_screen_v1"
+HGP_SCREEN_VERSION = "exp102.q0_hgp_global.screen.v2"
+HGP_SCREEN_CONFIG_VERSION = "exp102.q0_hgp_global.screen.config.v2"
+HGP_SCREEN_TASK_VERSION = "exp102.q0_hgp_global.screen.tasks.v2"
+HGP_POWER_RAW_VERSION = "exp102.q0_hgp_power.raw.v3"
+HGP_MAP_RAW_VERSION = "exp102.q0_map_mixture.raw.v4"
+HGP_SCREEN_REPORT_VERSION = "exp102.q0_hgp_global.screen.report.v2"
+HGP_SCREEN_MANIFEST_VERSION = "exp102.q0_hgp_global.screen.manifest.v2"
+HGP_SCREEN_SEED_ROOT = "q0_hgp_global_screen_v2"
 HGP_SCREEN_CHARACTER_ROOT = "q0_hgp_global_screen_characters_v1"
 HGP_SCREEN_B_CHARACTER_ROOT = "q0_hgp_global_screen_b_characters_v1"
-HGP_SCREEN_HP_TRAJECTORY_ROOT = "q0_hgp_global_screen_hp_trajectory_v1"
-HGP_SCREEN_MAP_TRAJECTORY_ROOT = "q0_hgp_global_screen_map_trajectory_v1"
+HGP_SCREEN_HP_TRAJECTORY_ROOT = "q0_hgp_global_screen_hp_trajectory_v2"
+HGP_SCREEN_MAP_TRAJECTORY_ROOT = "q0_hgp_global_screen_map_trajectory_v2"
 HGP_SCREEN_MAP_ANCHOR_ROOT = "q0_hgp_global_screen_map_anchor_v1"
-HGP_SCREEN_IS_ROOT = "q0_hgp_global_screen_is_diagnostic_v1"
+HGP_SCREEN_IS_ROOT = "q0_hgp_global_screen_is_diagnostic_v2"
 HGP_SCREEN_PREFLIGHT_DIGEST_ROOT = (
-    "q0_hgp_global_screen_preflight_digest_v1"
+    "q0_hgp_global_screen_preflight_digest_v2"
 )
-HGP_SCREEN_RUNTIME_WARMUP_ROOT = "q0_hgp_global_screen_runtime_warmup_v1"
-HGP_SCREEN_RUNTIME_TIMED_ROOT = "q0_hgp_global_screen_runtime_timed_v1"
-HGP_SCREEN_PREFLIGHT_IS_ROOT = "q0_hgp_global_screen_is_preflight_v1"
-HGP_SCREEN_RUNTIME_IS_ROOT = "q0_hgp_global_screen_is_runtime_v1"
-HGP_MAP_ARTIFACT_VERSION = "exp102.q0_hgp_global.screen.map_artifact.v1"
-HGP_MAP_IS_RAW_VERSION = "exp102.q0_hgp_global.screen.is_diagnostic.v1"
+HGP_SCREEN_RUNTIME_WARMUP_ROOT = "q0_hgp_global_screen_runtime_warmup_v2"
+HGP_SCREEN_RUNTIME_TIMED_ROOT = "q0_hgp_global_screen_runtime_timed_v2"
+HGP_SCREEN_PREFLIGHT_IS_ROOT = "q0_hgp_global_screen_is_preflight_v2"
+HGP_SCREEN_RUNTIME_IS_ROOT = "q0_hgp_global_screen_is_runtime_v2"
+HGP_MAP_ARTIFACT_VERSION = "exp102.q0_hgp_global.screen.map_artifact.v2"
+HGP_MAP_IS_RAW_VERSION = "exp102.q0_hgp_global.screen.is_diagnostic.v2"
 HGP_MAP_IS_SAMPLES = 50_000
-HGP_SCREEN_CONFIG_SHA256 = "163a5cc87486beabf453f3d4a57bc63f0c4e0b2f54619c60268ee7f0c9b2a341"
+HGP_SCREEN_CONFIG_SHA256 = "38092ec030f6c283f163c0ddb3eed612aa850c76ce34f130520522646fa883dc"
 B_CHARACTER_VERSION = "exp102.q0_hgp_b_characters.v1"
 B_DENSE_CHARACTER_COUNT = 64
 B_MIN_NONDEGENERATE_DENSE = 48
+
+HGP_SAMPLER_EVIDENCE_VERSION = (
+    "exp102.q0_hgp_global.screen.sampler_evidence.v2"
+)
+HGP_SAMPLER_FIELD_MANIFEST_VERSION = (
+    "exp102.q0_hgp_global.screen.sampler_field_manifest.v1"
+)
+HGP_PREFLIGHT_EVIDENCE_VERSION = (
+    "exp102.q0_hgp_global.screen.preflight_evidence.v2"
+)
+HGP_MAP_IS_FIELD_MANIFEST_VERSION = (
+    "exp102.q0_hgp_global.screen.is_field_manifest.v1"
+)
+
+_MAP_NONPORTABLE_RESULT_FIELDS = frozenset({
+    "burn_proposal_log_q",
+    "burn_current_log_q_before",
+    "burn_log_acceptance",
+    "measurement_proposal_log_q",
+    "measurement_current_log_q_before",
+    "measurement_log_acceptance",
+})
+_MAP_DECISION_RESULT_FIELDS = frozenset({
+    "initial_state_packed",
+    "burn_state_packed",
+    "final_state_packed",
+    "burn_proposal_states_packed",
+    "burn_accept_uniform",
+    "burn_accepted",
+    "burn_state_changed",
+    "burn_states_packed",
+    "measurement_proposal_states_packed",
+    "measurement_accept_uniform",
+    "measurement_accepted",
+    "measurement_state_changed",
+    "measurement_states_packed",
+})
+_HP_NONPORTABLE_RESULT_FIELDS = frozenset({
+    "sampler_config_json",
+    "sampler_config_sha256",
+    "cold_log_likelihood",
+    "lambda_values",
+    "lambda_sha256",
+    "mass_sha256",
+    "engine",
+})
+_HP_RESULT_FIELDS = frozenset({
+    "raw_version", "method_id", "sampler_config_json",
+    "sampler_config_sha256", "seed_identity_json", "initial_state_packed",
+    "burn_state_packed", "final_state_packed", "measurement_states_packed",
+    "burn_labels", "measurement_labels", "measurement_weights",
+    "measurement_residual_weights", "measurement_block", "burn_basis_seen",
+    "initial_label", "burn_label", "final_label", "local_attempts_by_rung",
+    "local_changes_by_rung", "swap_attempts", "swap_accepts",
+    "hot_visits_by_origin", "cold_visits_by_origin",
+    "round_trips_by_origin", "cold_burn_weights", "cold_log_likelihood",
+    "final_origins_by_rung", "lambda_values", "lambda_sha256",
+    "mass_sha256", "round_trip_definition", "engine",
+})
+_MAP_RESULT_FIELDS = frozenset({
+    "raw_version", "method_id", "sampler_config_json",
+    "sampler_config_sha256", "seed_identity_json", "model_fingerprint",
+    "frame_fingerprint", "matrix_syndrome_sha256", "proposal_sha256",
+    "anchor_sha256", "anchor_state_sha256", "anchor_objective_sha256",
+    "anchor_tie_break_seeds", "anchor_solver_identity",
+    "anchor_seed_namespace", "anchor_optimum_weight", "anchor_count",
+    "coordinate_sha256", "burn_seed", "measurement_seed",
+    "initial_state_packed", "initial_coordinate_packed",
+    "burn_state_packed", "burn_coordinate_packed", "final_state_packed",
+    "final_coordinate_packed", "burn_proposal_coordinates_packed",
+    "burn_proposal_states_packed", "burn_proposal_weights",
+    "burn_proposal_log_q", "burn_current_log_q_before",
+    "burn_log_acceptance", "burn_accept_uniform", "burn_accepted",
+    "burn_state_changed", "burn_proposal_anchor_index",
+    "burn_proposal_component_index", "burn_states_packed", "burn_weights",
+    "burn_labels", "measurement_proposal_coordinates_packed",
+    "measurement_proposal_states_packed", "measurement_proposal_weights",
+    "measurement_proposal_log_q", "measurement_current_log_q_before",
+    "measurement_log_acceptance", "measurement_accept_uniform",
+    "measurement_accepted", "measurement_state_changed",
+    "measurement_proposal_anchor_index",
+    "measurement_proposal_component_index", "measurement_states_packed",
+    "measurement_labels", "measurement_weights",
+    "measurement_residual_weights", "measurement_block", "burn_attempts",
+    "burn_accepts", "burn_state_changes", "measurement_attempts",
+    "measurement_accepts", "measurement_state_changes", "initial_label",
+    "burn_label", "final_label", "engine",
+})
+_MAP_IS_PORTABLE_ARRAY_FIELDS = frozenset({
+    "sample_states_packed",
+    "sample_coordinates_packed",
+    "sample_physical_weights",
+    "sample_anchor_index",
+    "sample_component_index",
+})
+_MAP_IS_NONPORTABLE_ARRAY_FIELDS = frozenset({
+    "sample_log_q",
+    "sample_log_importance_weight",
+})
+_MAP_IS_DIAGNOSTIC_FIELDS = frozenset({
+    "num_samples",
+    "importance_ess",
+    "importance_ess_fraction",
+    "max_normalized_weight",
+    "top10_normalized_weight",
+    "weighted_mean_physical_weight",
+    "stationary_imh_acceptance",
+    "minimum_sampled_physical_weight",
+    "log_unnormalized_normalization_estimate",
+})
 
 HP_METHODS = ("HP32", "HP64")
 SCREEN_METHODS = (*HP_METHODS, MAP_METHOD_ID)
@@ -133,9 +243,12 @@ _COMMON_RAW_FIELDS = {
     "hgp_screen_config_sha256", "cell_json", "uniform_seed",
     "syndrome_packed", "syndrome_sha256", "model_fingerprint",
     "section_fingerprint", "logical_frame_fingerprint", "character_masks",
-    "character_sha256", "num_qubits", "k", "trajectory_digest",
+    "character_sha256", "num_qubits", "k",
     "b_character_masks_packed", "b_character_sha256", "b_character_count",
     "b_dimension", "b_dense_character_count",
+    "field_manifest_json", "field_manifest_sha256",
+    "full_transcript_sha256", "portable_transcript_sha256",
+    "nonportable_float_sha256", "acceptance_decision_sha256",
     "core_seconds", "wall_seconds",
 }
 
@@ -527,6 +640,21 @@ def load_hgp_screen_config(path, registry=None):
             or importance.get("role")
             != "auxiliary_proposal_overlap_diagnostic_only"):
         raise ValueError("HGP screen importance-sampling protocol changed")
+    if raw.get("portable_evidence") != {
+            "version": "exp102.q0_hgp_global.screen.portable_evidence.v1",
+            "remote_linux_policy": (
+                "full_transcript_bit_exact_three_node_consensus"
+            ),
+            "local_policy": (
+                "portable_transcript_and_acceptance_decision_bit_exact"
+            ),
+            "float_tolerance": None,
+            "map_preflight_burn": 256,
+            "map_preflight_measurement": 2048,
+            "map_preflight_init_families": ["P", "U"],
+            "map_preflight_panels": ["HARD2"],
+    }:
+        raise ValueError("HGP screen portable-evidence protocol changed")
     if raw.get("b_character_spec") != {
             "version": B_CHARACTER_VERSION,
             "dense_count": B_DENSE_CHARACTER_COUNT,
@@ -1325,9 +1453,127 @@ def _map_is_transcript(proposal, p, num_samples, seed):
     return arrays, diagnostics
 
 
+def _map_is_field_manifest(identity, diagnostics, arrays):
+    array_fields = frozenset(str(name) for name in arrays)
+    expected_fields = (
+        _MAP_IS_PORTABLE_ARRAY_FIELDS | _MAP_IS_NONPORTABLE_ARRAY_FIELDS
+    )
+    if array_fields != expected_fields:
+        raise HgpScreenConflictError("HGP screen IS array fields changed")
+    manifest = {
+        "manifest_version": HGP_MAP_IS_FIELD_MANIFEST_VERSION,
+        "identity_fields": sorted(identity),
+        "diagnostic_fields": sorted(diagnostics),
+        "full_array_fields": sorted(array_fields),
+        "portable_array_fields": sorted(_MAP_IS_PORTABLE_ARRAY_FIELDS),
+        "nonportable_float_array_fields": sorted(
+            _MAP_IS_NONPORTABLE_ARRAY_FIELDS,
+        ),
+        "diagnostics_portability": "nonportable_auxiliary_only",
+        "float_tolerance": None,
+    }
+    if (set(manifest["portable_array_fields"])
+            | set(manifest["nonportable_float_array_fields"])
+            != array_fields
+            or set(manifest["portable_array_fields"])
+            & set(manifest["nonportable_float_array_fields"])):
+        raise HgpScreenConflictError("HGP screen IS field partition changed")
+    return manifest
+
+
+def _validate_map_is_array_schema(identity, arrays):
+    num_samples = int(identity.get("num_samples", -1))
+    num_qubits = int(identity.get("num_qubits", -1))
+    coordinate_dimension = int(identity.get("coordinate_dimension", -1))
+    expected = {
+        "sample_states_packed": (
+            np.dtype(np.uint8), (num_samples, (num_qubits + 7) // 8),
+        ),
+        "sample_coordinates_packed": (
+            np.dtype(np.uint8),
+            (num_samples, (coordinate_dimension + 7) // 8),
+        ),
+        "sample_physical_weights": (
+            np.dtype(np.int32), (num_samples,),
+        ),
+        "sample_log_q": (np.dtype(np.float64), (num_samples,)),
+        "sample_log_importance_weight": (
+            np.dtype(np.float64), (num_samples,),
+        ),
+        "sample_anchor_index": (np.dtype(np.int16), (num_samples,)),
+        "sample_component_index": (np.dtype(np.int8), (num_samples,)),
+    }
+    if (num_samples != HGP_MAP_IS_SAMPLES or num_qubits <= 0
+            or coordinate_dimension <= 0 or set(arrays) != set(expected)):
+        raise HgpScreenConflictError("HGP screen IS identity/array schema changed")
+    for name, (dtype, shape) in expected.items():
+        value = np.asarray(arrays[name])
+        if value.dtype != dtype or value.shape != shape:
+            raise HgpScreenConflictError(
+                f"HGP screen IS array schema changed: {name}",
+            )
+    if (np.any(arrays["sample_physical_weights"] < 0)
+            or np.any(arrays["sample_physical_weights"] > num_qubits)
+            or np.any(arrays["sample_anchor_index"] < 0)
+            or np.any(arrays["sample_anchor_index"]
+                      >= int(identity["artifact_descriptor"]["anchor_count"]))
+            or np.any(arrays["sample_component_index"] < 0)
+            or np.any(arrays["sample_component_index"]
+                      >= len(DEFAULT_COMPONENT_WEIGHTS))
+            or not np.all(np.isfinite(arrays["sample_log_q"]))
+            or not np.all(np.isfinite(
+                arrays["sample_log_importance_weight"],
+            ))):
+        raise HgpScreenConflictError("HGP screen IS array values are invalid")
+
+
+def _map_is_evidence(identity, diagnostics, arrays):
+    _validate_map_is_array_schema(identity, arrays)
+    manifest = _map_is_field_manifest(identity, diagnostics, arrays)
+    manifest_sha256 = sha256_json(manifest)
+    portable_arrays = {
+        name: arrays[name] for name in manifest["portable_array_fields"]
+    }
+    nonportable_arrays = {
+        name: arrays[name]
+        for name in manifest["nonportable_float_array_fields"]
+    }
+    full_sha256 = _artifact_content_sha256(
+        {
+            "identity": identity,
+            "diagnostics": diagnostics,
+            "field_manifest": manifest,
+        },
+        arrays,
+        version=f"{HGP_MAP_IS_RAW_VERSION}.full_transcript",
+    )
+    portable_sha256 = _artifact_content_sha256(
+        {"identity": identity, "field_manifest": manifest},
+        portable_arrays,
+        version=f"{HGP_MAP_IS_RAW_VERSION}.portable_transcript",
+    )
+    nonportable_sha256 = _artifact_content_sha256(
+        {
+            "identity_sha256": sha256_json(identity),
+            "diagnostics": diagnostics,
+            "field_manifest_sha256": manifest_sha256,
+            "portable_transcript_sha256": portable_sha256,
+        },
+        nonportable_arrays,
+        version=f"{HGP_MAP_IS_RAW_VERSION}.nonportable_float",
+    )
+    return {
+        "field_manifest": manifest,
+        "field_manifest_sha256": manifest_sha256,
+        "full_transcript_sha256": full_sha256,
+        "portable_transcript_sha256": portable_sha256,
+        "nonportable_float_sha256": nonportable_sha256,
+    }
+
+
 def _map_is_identity(registry, config, source_commit, archive_sha256,
                      source_manifest_sha256, cell, artifact, seed,
-                     diagnostics, seed_namespace):
+                     seed_namespace):
     roles = {
         HGP_SCREEN_IS_ROOT: "auxiliary_proposal_overlap_diagnostic_only",
         HGP_SCREEN_PREFLIGHT_IS_ROOT: (
@@ -1350,10 +1596,13 @@ def _map_is_identity(registry, config, source_commit, archive_sha256,
         "seed_namespace": seed_namespace,
         "seed": int(seed),
         "num_samples": HGP_MAP_IS_SAMPLES,
+        "num_qubits": int(artifact.proposal.coordinates.num_qubits),
+        "coordinate_dimension": int(
+            artifact.proposal.coordinates.dimension,
+        ),
         "artifact_descriptor": artifact.descriptor,
         "role": roles[seed_namespace],
         "used_for_gate_or_selection": False,
-        "diagnostics": diagnostics,
     }
 
 
@@ -1378,22 +1627,38 @@ def run_hgp_map_is_diagnostic(registry_path, config_path, source_commit,
     )
     identity = _map_is_identity(
         registry, config, source_commit, archive_sha256,
-        source_manifest_sha256, cell, artifact, seed, diagnostics,
-        seed_namespace,
+        source_manifest_sha256, cell, artifact, seed, seed_namespace,
     )
-    transcript_sha256 = _artifact_content_sha256(
-        identity, arrays, version=HGP_MAP_IS_RAW_VERSION,
-    )
+    evidence = _map_is_evidence(identity, diagnostics, arrays)
     output_path = Path(output_path)
     if output_path.exists():
         raise FileExistsError(f"HGP screen IS raw already exists: {output_path}")
     atomic_npz(
         output_path, identity_json=np.array(canonical_json(identity)),
-        transcript_sha256=np.array(transcript_sha256), **arrays,
+        diagnostics_json=np.array(canonical_json(diagnostics)),
+        field_manifest_json=np.array(canonical_json(
+            evidence["field_manifest"],
+        )),
+        field_manifest_sha256=np.array(evidence["field_manifest_sha256"]),
+        full_transcript_sha256=np.array(evidence["full_transcript_sha256"]),
+        portable_transcript_sha256=np.array(
+            evidence["portable_transcript_sha256"],
+        ),
+        nonportable_float_sha256=np.array(
+            evidence["nonportable_float_sha256"],
+        ),
+        **arrays,
     )
     return {
         "output": str(output_path), "sha256": sha256_file(output_path),
-        "transcript_sha256": transcript_sha256,
+        "full_transcript_sha256": evidence["full_transcript_sha256"],
+        "portable_transcript_sha256": evidence[
+            "portable_transcript_sha256"
+        ],
+        "nonportable_float_sha256": evidence[
+            "nonportable_float_sha256"
+        ],
+        "field_manifest_sha256": evidence["field_manifest_sha256"],
         "cell_fingerprint": _cell_fingerprint(cell),
         "seed_namespace": seed_namespace,
         "diagnostics": diagnostics,
@@ -1401,10 +1666,94 @@ def run_hgp_map_is_diagnostic(registry_path, config_path, source_commit,
     }
 
 
+def _validate_replay_evidence(replay_evidence):
+    if replay_evidence not in {"full", "portable"}:
+        raise ValueError("replay_evidence must be 'full' or 'portable'")
+    return replay_evidence
+
+
+def _validate_map_is_diagnostics(diagnostics):
+    if set(diagnostics) != _MAP_IS_DIAGNOSTIC_FIELDS:
+        raise HgpScreenConflictError("HGP screen IS diagnostic schema changed")
+    if (diagnostics["num_samples"] != HGP_MAP_IS_SAMPLES
+            or isinstance(diagnostics["num_samples"], bool)
+            or any(not math.isfinite(float(value))
+                   for value in diagnostics.values())):
+        raise HgpScreenConflictError("HGP screen IS diagnostics are invalid")
+
+
+def validate_hgp_map_is_stored_evidence(path):
+    """Rehash an IS NPZ without rerunning its 50k proposal draws."""
+    try:
+        with np.load(path, allow_pickle=False) as data:
+            expected_fields = {
+                "identity_json", "diagnostics_json", "field_manifest_json",
+                "field_manifest_sha256", "full_transcript_sha256",
+                "portable_transcript_sha256", "nonportable_float_sha256",
+                *_MAP_IS_PORTABLE_ARRAY_FIELDS,
+                *_MAP_IS_NONPORTABLE_ARRAY_FIELDS,
+            }
+            if set(data.files) != expected_fields:
+                raise HgpScreenConflictError("HGP screen IS raw schema changed")
+            identity_json = str(_scalar(data, "identity_json"))
+            diagnostics_json = str(_scalar(data, "diagnostics_json"))
+            manifest_json = str(_scalar(data, "field_manifest_json"))
+            identity = json.loads(identity_json)
+            diagnostics = json.loads(diagnostics_json)
+            manifest = json.loads(manifest_json)
+            if (canonical_json(identity) != identity_json
+                    or canonical_json(diagnostics) != diagnostics_json
+                    or canonical_json(manifest) != manifest_json):
+                raise HgpScreenConflictError(
+                    "HGP screen IS metadata is not canonical",
+                )
+            _validate_map_is_diagnostics(diagnostics)
+            arrays = {
+                name: np.asarray(data[name]).copy()
+                for name in (
+                    _MAP_IS_PORTABLE_ARRAY_FIELDS
+                    | _MAP_IS_NONPORTABLE_ARRAY_FIELDS
+                )
+            }
+            evidence = _map_is_evidence(identity, diagnostics, arrays)
+            if manifest != evidence["field_manifest"]:
+                raise HgpScreenConflictError(
+                    "HGP screen IS field manifest changed",
+                )
+            for name in (
+                    "field_manifest_sha256", "full_transcript_sha256",
+                    "portable_transcript_sha256",
+                    "nonportable_float_sha256"):
+                if str(_scalar(data, name)) != evidence[name]:
+                    raise HgpScreenConflictError(
+                        f"HGP screen IS stored evidence mismatch: {name}",
+                    )
+    except HgpScreenConflictError:
+        raise
+    except Exception as exc:
+        raise HgpScreenConflictError(
+            f"HGP screen IS cannot be loaded: {exc}",
+        ) from exc
+    return {
+        "path": str(Path(path).resolve()),
+        "sha256": sha256_file(path),
+        "identity": identity,
+        "diagnostics": diagnostics,
+        **{
+            name: evidence[name]
+            for name in (
+                "field_manifest_sha256", "full_transcript_sha256",
+                "portable_transcript_sha256", "nonportable_float_sha256"
+            )
+        },
+    }
+
+
 def validate_hgp_map_is_diagnostic(
         path, registry_path, config_path, source_commit, archive_sha256,
         source_manifest_sha256, cell, artifact_root,
-        seed_namespace=HGP_SCREEN_IS_ROOT):
+        seed_namespace=HGP_SCREEN_IS_ROOT, *, replay_evidence="full"):
+    replay_evidence = _validate_replay_evidence(replay_evidence)
     registry = _registry_with_path(load_registry(registry_path), registry_path)
     config = load_hgp_screen_config(config_path, registry)
     cell = _validate_cell(cell)
@@ -1421,40 +1770,47 @@ def validate_hgp_map_is_diagnostic(
     )
     expected_identity = _map_is_identity(
         registry, config, source_commit, archive_sha256,
-        source_manifest_sha256, cell, artifact, seed, diagnostics,
-        seed_namespace,
+        source_manifest_sha256, cell, artifact, seed, seed_namespace,
     )
-    try:
-        with np.load(path, allow_pickle=False) as data:
-            expected_fields = {
-                "identity_json", "transcript_sha256", *replay_arrays,
-            }
-            if set(data.files) != expected_fields:
-                raise HgpScreenConflictError("HGP screen IS raw schema changed")
-            identity_json = str(_scalar(data, "identity_json"))
-            if (identity_json != canonical_json(expected_identity)
-                    or json.loads(identity_json) != expected_identity):
-                raise HgpScreenConflictError("HGP screen IS identity changed")
-            for name, expected in replay_arrays.items():
-                if not np.array_equal(data[name], expected):
-                    raise HgpScreenConflictError(
-                        f"HGP screen IS replay mismatch: {name}",
-                    )
-            transcript_sha256 = str(_scalar(data, "transcript_sha256"))
-    except HgpScreenConflictError:
-        raise
-    except Exception as exc:
-        raise HgpScreenConflictError(f"HGP screen IS cannot be loaded: {exc}") from exc
-    expected_sha256 = _artifact_content_sha256(
-        expected_identity, replay_arrays, version=HGP_MAP_IS_RAW_VERSION,
+    stored = validate_hgp_map_is_stored_evidence(path)
+    if stored["identity"] != expected_identity:
+        raise HgpScreenConflictError("HGP screen IS identity changed")
+    expected_evidence = _map_is_evidence(
+        expected_identity, diagnostics, replay_arrays,
     )
-    if transcript_sha256 != expected_sha256:
-        raise HgpScreenConflictError("HGP screen IS transcript SHA changed")
+    replay_fields = (
+        set(replay_arrays) if replay_evidence == "full"
+        else set(_MAP_IS_PORTABLE_ARRAY_FIELDS)
+    )
+    with np.load(path, allow_pickle=False) as data:
+        for name in sorted(replay_fields):
+            if not np.array_equal(data[name], replay_arrays[name]):
+                raise HgpScreenConflictError(
+                    f"HGP screen IS replay mismatch: {name}",
+                )
+    digest_names = ["field_manifest_sha256", "portable_transcript_sha256"]
+    if replay_evidence == "full":
+        digest_names.extend((
+            "full_transcript_sha256", "nonportable_float_sha256",
+        ))
+        if stored["diagnostics"] != diagnostics:
+            raise HgpScreenConflictError(
+                "HGP screen IS diagnostic replay changed",
+            )
+    for name in digest_names:
+        if stored[name] != expected_evidence[name]:
+            raise HgpScreenConflictError(
+                f"HGP screen IS replay evidence mismatch: {name}",
+            )
     return {
-        "path": str(Path(path).resolve()), "sha256": sha256_file(path),
-        "cell": cell, "diagnostics": diagnostics,
+        "path": stored["path"], "sha256": stored["sha256"],
+        "cell": cell, "diagnostics": stored["diagnostics"],
         "seed_namespace": seed_namespace,
-        "transcript_sha256": expected_sha256,
+        "full_transcript_sha256": stored["full_transcript_sha256"],
+        "portable_transcript_sha256": stored["portable_transcript_sha256"],
+        "nonportable_float_sha256": stored["nonportable_float_sha256"],
+        "field_manifest_sha256": stored["field_manifest_sha256"],
+        "replay_evidence": replay_evidence,
         "used_for_gate_or_selection": False,
     }
 
@@ -1641,15 +1997,18 @@ def _run_sampler(method, model, frame, H, syndrome, sampler, seed, initial,
         raise HgpScreenConflictError(
             "MAP task requires a loaded frozen artifact",
         )
-    return run_map_mixture_trajectory(
+    return _run_map_mixture_trajectory_from_verified_artifact(
         model, frame, syndrome, sampler, seed, initial,
-        anchor_catalog=map_artifact.catalog, proposal=map_artifact.proposal,
-        frozen_artifact_replay=True,
+        artifact=map_artifact,
     )
 
 
-def _value_digest(values):
-    digest = hashlib.sha256(b"exp102.q0_hgp_global.screen.trajectory.v1\0")
+def _value_digest(values, *, domain=HGP_SAMPLER_EVIDENCE_VERSION,
+                  metadata=None):
+    if not isinstance(domain, str) or not domain:
+        raise ValueError("evidence digest domain must be a nonempty string")
+    digest = hashlib.sha256(domain.encode("ascii") + b"\0")
+    digest.update(canonical_json(metadata or {}).encode("ascii") + b"\0")
     for name in sorted(values):
         array = np.ascontiguousarray(np.asarray(values[name]))
         digest.update(name.encode("ascii") + b"\0")
@@ -1657,6 +2016,113 @@ def _value_digest(values):
         digest.update(np.asarray(array.shape, dtype=">u8").tobytes())
         digest.update(array.tobytes(order="C"))
     return digest.hexdigest()
+
+
+def _sampler_field_manifest(method, fields):
+    fields = frozenset(str(name) for name in fields)
+    if method in HP_METHODS:
+        expected_fields = _HP_RESULT_FIELDS
+        declared_nonportable = _HP_NONPORTABLE_RESULT_FIELDS
+        decision_fields = frozenset()
+        portable_claim = (
+            "fixed_clock_discrete_outputs_and_transport_counters_only"
+        )
+    elif method == MAP_METHOD_ID:
+        expected_fields = _MAP_RESULT_FIELDS
+        declared_nonportable = _MAP_NONPORTABLE_RESULT_FIELDS
+        decision_fields = _MAP_DECISION_RESULT_FIELDS
+        portable_claim = (
+            "proposal_draws_uniforms_acceptance_decisions_and_states_exact"
+        )
+    else:
+        raise ValueError("unknown HGP sampler method for evidence manifest")
+    if fields != expected_fields:
+        raise HgpScreenConflictError(
+            "sampler result schema changed: "
+            f"missing={sorted(expected_fields - fields)}, "
+            f"extra={sorted(fields - expected_fields)}",
+        )
+    missing_nonportable = declared_nonportable - fields
+    missing_decisions = decision_fields - fields
+    if missing_nonportable or missing_decisions:
+        missing = sorted(missing_nonportable | missing_decisions)
+        raise HgpScreenConflictError(
+            f"sampler evidence fields missing: {missing}",
+        )
+    portable_fields = fields - declared_nonportable
+    manifest = {
+        "manifest_version": HGP_SAMPLER_FIELD_MANIFEST_VERSION,
+        "method_id": method,
+        "full_fields": sorted(fields),
+        "portable_fields": sorted(portable_fields),
+        "nonportable_fields": sorted(declared_nonportable),
+        "acceptance_decision_fields": sorted(decision_fields),
+        "portable_claim": portable_claim,
+        "float_tolerance": None,
+    }
+    if (set(manifest["portable_fields"])
+            | set(manifest["nonportable_fields"]) != fields
+            or set(manifest["portable_fields"])
+            & set(manifest["nonportable_fields"])
+            or not decision_fields <= portable_fields):
+        raise HgpScreenConflictError("sampler evidence field partition changed")
+    return manifest
+
+
+def _sampler_evidence(result, method):
+    values = {str(name): np.asarray(value) for name, value in result.items()}
+    manifest = _sampler_field_manifest(method, values)
+    manifest_sha256 = sha256_json(manifest)
+    metadata = {
+        "field_manifest_sha256": manifest_sha256,
+        "method_id": method,
+    }
+    portable_values = {
+        name: values[name] for name in manifest["portable_fields"]
+    }
+    nonportable_values = {
+        name: values[name] for name in manifest["nonportable_fields"]
+    }
+    full_sha256 = _value_digest(
+        values,
+        domain=f"{HGP_SAMPLER_EVIDENCE_VERSION}.full",
+        metadata=metadata,
+    )
+    portable_sha256 = _value_digest(
+        portable_values,
+        domain=f"{HGP_SAMPLER_EVIDENCE_VERSION}.portable",
+        metadata=metadata,
+    )
+    nonportable_sha256 = _value_digest(
+        nonportable_values,
+        domain=f"{HGP_SAMPLER_EVIDENCE_VERSION}.nonportable_float",
+        metadata={
+            **metadata,
+            "portable_transcript_sha256": portable_sha256,
+        },
+    )
+    if manifest["acceptance_decision_fields"]:
+        decision_values = {
+            name: values[name]
+            for name in manifest["acceptance_decision_fields"]
+        }
+        decision_sha256 = _value_digest(
+            decision_values,
+            domain=f"{HGP_SAMPLER_EVIDENCE_VERSION}.acceptance_decision",
+            metadata=metadata,
+        )
+    else:
+        # HP does not expose the internal uniforms/decisions required for a
+        # stronger claim; bind its exact portable output transcript instead.
+        decision_sha256 = portable_sha256
+    return {
+        "field_manifest": manifest,
+        "field_manifest_sha256": manifest_sha256,
+        "full_transcript_sha256": full_sha256,
+        "portable_transcript_sha256": portable_sha256,
+        "nonportable_float_sha256": nonportable_sha256,
+        "acceptance_decision_sha256": decision_sha256,
+    }
 
 
 def _syndrome_sha256(syndrome):
@@ -1688,6 +2154,7 @@ def run_hgp_screen_task(registry_path, config_path, source_commit,
     )
     if sampler_raw_version != expected_sampler_raw:
         raise HgpScreenConflictError("sampler raw version changed")
+    evidence = _sampler_evidence(result, task["method_id"])
     payload = {
         "raw_version": np.array(
             HGP_POWER_RAW_VERSION if task["method_id"] in HP_METHODS
@@ -1724,7 +2191,24 @@ def run_hgp_screen_task(registry_path, config_path, source_commit,
         ),
         "num_qubits": np.array(model.num_qubits, dtype=np.int32),
         "k": np.array(model.k, dtype=np.int16),
-        "trajectory_digest": np.array(_value_digest(result)),
+        "field_manifest_json": np.array(canonical_json(
+            evidence["field_manifest"],
+        )),
+        "field_manifest_sha256": np.array(
+            evidence["field_manifest_sha256"],
+        ),
+        "full_transcript_sha256": np.array(
+            evidence["full_transcript_sha256"],
+        ),
+        "portable_transcript_sha256": np.array(
+            evidence["portable_transcript_sha256"],
+        ),
+        "nonportable_float_sha256": np.array(
+            evidence["nonportable_float_sha256"],
+        ),
+        "acceptance_decision_sha256": np.array(
+            evidence["acceptance_decision_sha256"],
+        ),
         "core_seconds": np.array(core_seconds, dtype=np.float64),
         "wall_seconds": np.array(wall_seconds, dtype=np.float64),
     }
@@ -1749,6 +2233,17 @@ def run_hgp_screen_task(registry_path, config_path, source_commit,
     return {
         "output": str(output_path), "sha256": sha256_file(output_path),
         "task_fingerprint": sha256_json(task),
+        "full_transcript_sha256": evidence["full_transcript_sha256"],
+        "portable_transcript_sha256": evidence[
+            "portable_transcript_sha256"
+        ],
+        "nonportable_float_sha256": evidence[
+            "nonportable_float_sha256"
+        ],
+        "field_manifest_sha256": evidence["field_manifest_sha256"],
+        "acceptance_decision_sha256": evidence[
+            "acceptance_decision_sha256"
+        ],
         "wall_seconds": wall_seconds, "core_seconds": core_seconds,
     }
 
@@ -1760,12 +2255,122 @@ def _scalar(data, name):
     return value.item()
 
 
-def _compare_result(stored, replay, *, has_map_artifact):
+def validate_hgp_screen_stored_evidence(path):
+    """Rehash one sampler NPZ without consuming another trajectory stream."""
+    try:
+        with np.load(path, allow_pickle=False) as data:
+            task_json = str(_scalar(data, "task_json"))
+            task = json.loads(task_json)
+            if canonical_json(task) != task_json:
+                raise HgpScreenConflictError(
+                    "HGP screen raw task is not canonical",
+                )
+            method = task.get("method_id")
+            if method not in SCREEN_METHODS:
+                raise HgpScreenConflictError(
+                    "HGP screen raw method changed",
+                )
+            if str(_scalar(data, "task_fingerprint")) != sha256_json(task):
+                raise HgpScreenConflictError(
+                    "HGP screen raw task fingerprint changed",
+                )
+            sampler_fields = {
+                name.removeprefix("sampler_")
+                for name in data.files if name.startswith("sampler_")
+            }
+            expected_sampler_fields = (
+                _HP_RESULT_FIELDS if method in HP_METHODS
+                else _MAP_RESULT_FIELDS
+            )
+            if sampler_fields != expected_sampler_fields:
+                raise HgpScreenConflictError(
+                    "HGP screen sampler raw schema changed",
+                )
+            expected_outer_fields = _COMMON_RAW_FIELDS | (
+                _MAP_ARTIFACT_RAW_FIELDS if method == MAP_METHOD_ID else set()
+            )
+            expected_files = expected_outer_fields | {
+                f"sampler_{name}" for name in expected_sampler_fields
+            }
+            if set(data.files) != expected_files:
+                raise HgpScreenConflictError(
+                    "HGP screen outer raw schema changed",
+                )
+            expected_outer_raw = (
+                HGP_POWER_RAW_VERSION if method in HP_METHODS
+                else HGP_MAP_RAW_VERSION
+            )
+            expected_sampler_raw = (
+                COLLAPSED_RAW_VERSION if method in HP_METHODS
+                else MAP_RAW_VERSION
+            )
+            if (str(_scalar(data, "raw_version")) != expected_outer_raw
+                    or str(_scalar(data, "sampler_raw_version"))
+                    != expected_sampler_raw):
+                raise HgpScreenConflictError(
+                    "HGP screen raw version changed",
+                )
+            values = {
+                name: np.asarray(data[f"sampler_{name}"]).copy()
+                for name in expected_sampler_fields
+            }
+            evidence = _sampler_evidence(values, method)
+            manifest_json = str(_scalar(data, "field_manifest_json"))
+            manifest = json.loads(manifest_json)
+            if (canonical_json(manifest) != manifest_json
+                    or manifest != evidence["field_manifest"]):
+                raise HgpScreenConflictError(
+                    "HGP screen sampler field manifest changed",
+                )
+            for name in (
+                    "field_manifest_sha256",
+                    "full_transcript_sha256", "portable_transcript_sha256",
+                    "nonportable_float_sha256",
+                    "acceptance_decision_sha256"):
+                if str(_scalar(data, name)) != evidence[name]:
+                    raise HgpScreenConflictError(
+                        f"HGP screen stored evidence mismatch: {name}",
+                    )
+            if method == MAP_METHOD_ID:
+                _validate_map_transition_counters(data)
+    except HgpScreenConflictError:
+        raise
+    except Exception as exc:
+        raise HgpScreenConflictError(
+            f"HGP screen raw evidence cannot be loaded: {exc}",
+        ) from exc
+    return {
+        "path": str(Path(path).resolve()),
+        "sha256": sha256_file(path),
+        "task": task,
+        "task_fingerprint": sha256_json(task),
+        "field_manifest": evidence["field_manifest"],
+        **{
+            name: evidence[name]
+            for name in (
+                "field_manifest_sha256", "full_transcript_sha256",
+                "portable_transcript_sha256", "nonportable_float_sha256",
+                "acceptance_decision_sha256",
+            )
+        },
+    }
+
+
+def _compare_result(stored, replay, *, has_map_artifact,
+                    replay_evidence="full"):
+    replay_evidence = _validate_replay_evidence(replay_evidence)
     expected_fields = {f"sampler_{name}" for name in replay}
     actual_fields = {name for name in stored.files if name.startswith("sampler_")}
     if actual_fields != expected_fields:
         raise HgpScreenConflictError("HGP screen sampler raw schema changed")
-    for name, expected in replay.items():
+    method = str(replay["method_id"])
+    manifest = _sampler_field_manifest(method, replay)
+    compare_fields = (
+        manifest["full_fields"] if replay_evidence == "full"
+        else manifest["portable_fields"]
+    )
+    for name in compare_fields:
+        expected = replay[name]
         if not np.array_equal(stored[f"sampler_{name}"], np.asarray(expected)):
             raise HgpScreenConflictError(
                 f"HGP screen sampler replay mismatch: {name}",
@@ -1862,10 +2467,14 @@ def _b_record_from_replay(replay, H, syndrome, p, b_characters, method_id,
 
 def validate_hgp_screen_raw(path, registry, config, source_commit,
                             archive_sha256, source_manifest_sha256,
-                            artifact_root):
+                            artifact_root, *, replay_evidence="full"):
+    replay_evidence = _validate_replay_evidence(replay_evidence)
     path = Path(path)
+    stored_evidence = validate_hgp_screen_stored_evidence(path)
     with np.load(path, allow_pickle=False) as data:
         task = json.loads(str(_scalar(data, "task_json")))
+        if task != stored_evidence["task"]:
+            raise HgpScreenConflictError("HGP screen stored task changed")
         expected_task = _task_identity(
             config, registry, source_commit, archive_sha256,
             source_manifest_sha256, task["method_id"], task["resource_tier"],
@@ -1960,11 +2569,24 @@ def validate_hgp_screen_raw(path, registry, config, source_commit,
                     )
         _compare_result(
             data, replay, has_map_artifact=map_artifact is not None,
+            replay_evidence=replay_evidence,
         )
         if map_artifact is not None:
             _validate_map_transition_counters(data)
-        if str(_scalar(data, "trajectory_digest")) != _value_digest(replay):
-            raise HgpScreenConflictError("HGP screen trajectory digest changed")
+        replay_digest = _sampler_evidence(replay, task["method_id"])
+        digest_names = [
+            "field_manifest_sha256", "portable_transcript_sha256",
+            "acceptance_decision_sha256",
+        ]
+        if replay_evidence == "full":
+            digest_names.extend((
+                "full_transcript_sha256", "nonportable_float_sha256",
+            ))
+        for name in digest_names:
+            if stored_evidence[name] != replay_digest[name]:
+                raise HgpScreenConflictError(
+                    f"HGP screen replay evidence mismatch: {name}",
+                )
         b_record = _b_record_from_replay(
             replay, H, syndrome, task["cell"]["p"], b_characters,
             task["method_id"],
@@ -1988,6 +2610,22 @@ def validate_hgp_screen_raw(path, registry, config, source_commit,
             "num_qubits": model.num_qubits, "k": model.k,
             "character_masks": characters.masks,
             "core_seconds": float(_scalar(data, "core_seconds")),
+            "full_transcript_sha256": stored_evidence[
+                "full_transcript_sha256"
+            ],
+            "portable_transcript_sha256": stored_evidence[
+                "portable_transcript_sha256"
+            ],
+            "nonportable_float_sha256": stored_evidence[
+                "nonportable_float_sha256"
+            ],
+            "field_manifest_sha256": stored_evidence[
+                "field_manifest_sha256"
+            ],
+            "acceptance_decision_sha256": stored_evidence[
+                "acceptance_decision_sha256"
+            ],
+            "replay_evidence": replay_evidence,
             **b_record,
         }
         if task["method_id"] in HP_METHODS:
@@ -2552,7 +3190,18 @@ def analyze_hgp_screen(raw_root, manifest_path, registry_path, config_path,
             "sha256": validated_is["sha256"],
             "cell": validated_is["cell"],
             "diagnostics": validated_is["diagnostics"],
-            "transcript_sha256": validated_is["transcript_sha256"],
+            "full_transcript_sha256": validated_is[
+                "full_transcript_sha256"
+            ],
+            "portable_transcript_sha256": validated_is[
+                "portable_transcript_sha256"
+            ],
+            "nonportable_float_sha256": validated_is[
+                "nonportable_float_sha256"
+            ],
+            "field_manifest_sha256": validated_is[
+                "field_manifest_sha256"
+            ],
             "used_for_gate_or_selection": False,
         })
     paths = [str(raw_root / entry["output_relpath"]) for entry in manifest["tasks"]]
@@ -2706,10 +3355,50 @@ def analyze_hgp_screen(raw_root, manifest_path, registry_path, config_path,
 
 
 def _digest_result(result):
-    return _value_digest({
-        name: value for name, value in result.items()
-        if name not in {"engine"}
-    })
+    return _sampler_evidence(result, str(result["method_id"]))
+
+
+def _project_transcript_evidence(evidence, projection):
+    common = {
+        "field_manifest": evidence["field_manifest"],
+        "field_manifest_sha256": evidence["field_manifest_sha256"],
+        "portable_transcript_sha256": evidence[
+            "portable_transcript_sha256"
+        ],
+        "acceptance_decision_sha256": evidence[
+            "acceptance_decision_sha256"
+        ],
+    }
+    if projection == "portable":
+        return common
+    if projection != "full":
+        raise ValueError("unknown transcript evidence projection")
+    return {
+        **common,
+        "full_transcript_sha256": evidence["full_transcript_sha256"],
+        "nonportable_float_sha256": evidence[
+            "nonportable_float_sha256"
+        ],
+    }
+
+
+def build_hgp_preflight_evidence_bundle(full_payload, portable_payload):
+    """Seal exact full and portable preflight projections independently."""
+    if (not isinstance(full_payload, dict)
+            or not isinstance(portable_payload, dict)
+            or full_payload.get("evidence_projection") != "full"
+            or portable_payload.get("evidence_projection") != "portable"
+            or full_payload.get("evidence_schema_version")
+            != HGP_PREFLIGHT_EVIDENCE_VERSION
+            or portable_payload.get("evidence_schema_version")
+            != HGP_PREFLIGHT_EVIDENCE_VERSION):
+        raise HgpScreenConflictError("invalid HGP preflight evidence payload")
+    return {
+        "canonical_full_payload": full_payload,
+        "canonical_full_payload_sha256": sha256_json(full_payload),
+        "canonical_portable_payload": portable_payload,
+        "canonical_portable_payload_sha256": sha256_json(portable_payload),
+    }
 
 
 def hgp_screen_preflight_digest(registry_path, config_path, source_commit,
@@ -2721,15 +3410,37 @@ def hgp_screen_preflight_digest(registry_path, config_path, source_commit,
     _require_source_commit(source_commit)
     _require_sha256("archive_sha256", archive_sha256)
     _require_sha256("source_manifest_sha256", source_manifest_sha256)
-    payload = {
+    projection_manifest = {
+        "manifest_version": HGP_SAMPLER_FIELD_MANIFEST_VERSION,
+        "hp_nonportable_fields": sorted(_HP_NONPORTABLE_RESULT_FIELDS),
+        "map_nonportable_fields": sorted(_MAP_NONPORTABLE_RESULT_FIELDS),
+        "map_acceptance_decision_fields": sorted(
+            _MAP_DECISION_RESULT_FIELDS,
+        ),
+        "preflight_full_only_cell_fields": ["mass_sha256"],
+        "float_tolerance": None,
+    }
+    portable_spec = config["portable_evidence"]
+    common_payload = {
+        "evidence_schema_version": HGP_PREFLIGHT_EVIDENCE_VERSION,
         "contract_version": HGP_SCREEN_VERSION,
         "source_commit": source_commit,
         "archive_sha256": archive_sha256,
         "source_manifest_sha256": source_manifest_sha256,
         "registry_sha256": registry["registry_sha256"],
         "config_sha256": config["hgp_screen_config_sha256"],
-        "cells": [], "tiny_oracles": [], "auxiliary_seed_catalog": [],
+        "projection_manifest": projection_manifest,
     }
+    full_payload = {
+        **common_payload, "evidence_projection": "full",
+        "cells": [], "tiny_oracles": [],
+    }
+    portable_payload = {
+        **common_payload, "evidence_projection": "portable",
+        "cells": [], "tiny_oracles": [],
+    }
+    auxiliary_seed_catalog = []
+    acceptance_decision_catalog = []
     for oracle_index, classical in enumerate((
         np.asarray([[1, 1, 1]], dtype=np.uint8),
         np.asarray([[1, 1, 0], [0, 1, 1]], dtype=np.uint8),
@@ -2744,7 +3455,7 @@ def hgp_screen_preflight_digest(registry_path, config_path, source_commit,
             source_manifest_sha256, "HP32", "T1", cell, "P",
             oracle_index, HGP_SCREEN_PREFLIGHT_DIGEST_ROOT,
         )
-        payload["auxiliary_seed_catalog"].append({
+        auxiliary_seed_catalog.append({
             "purpose": "tiny_oracle_reference_numba",
             "oracle_index": oracle_index,
             "seed_identity": seed.as_dict(),
@@ -2764,25 +3475,42 @@ def hgp_screen_preflight_digest(registry_path, config_path, source_commit,
                 raise HgpScreenConflictError(
                     f"preflight reference/Numba mismatch: {name}",
                 )
-        payload["tiny_oracles"].append(_digest_result(reference))
+        evidence = _digest_result(reference)
+        full_payload["tiny_oracles"].append({
+            "oracle_index": oracle_index,
+            "transcript_evidence": _project_transcript_evidence(
+                evidence, "full",
+            ),
+        })
+        portable_payload["tiny_oracles"].append({
+            "oracle_index": oracle_index,
+            "transcript_evidence": _project_transcript_evidence(
+                evidence, "portable",
+            ),
+        })
     for cell in _screen_cells(config):
         _, code, H = load_frozen_code(registry_path, cell["code_id"])
         model, frame = build_model(H)
         uniform_seed, epsilon, syndrome = _disorder(registry, code, model, cell)
-        row = {
+        common_row = {
             "cell": cell, "uniform_seed": uniform_seed,
             "syndrome_sha256": _syndrome_sha256(syndrome),
+        }
+        full_row = {
+            **common_row,
             "mass_sha256": hashlib.sha256(
                 build_classical_coset_mass(H, cell["p"]).astype(">f8").tobytes()
             ).hexdigest(),
         }
+        portable_row = dict(common_row)
         b_characters = frozen_b_character_set(
             H.shape[0],
             _b_character_seed(registry["registry_sha256"], code["code_id"]),
             config["b_character_spec"]["dense_count"],
         )
-        row["b_character_sha256"] = b_characters.character_sha256
-        row["b_character_count"] = b_characters.size
+        for row in (full_row, portable_row):
+            row["b_character_sha256"] = b_characters.character_sha256
+            row["b_character_count"] = b_characters.size
         if cell["code_id"] == "m08_c06":
             for method in HP_METHODS:
                 seed = _aux_seed_identity(
@@ -2790,16 +3518,23 @@ def hgp_screen_preflight_digest(registry_path, config_path, source_commit,
                     source_manifest_sha256, method, "T1", cell, "P", 0,
                     HGP_SCREEN_PREFLIGHT_DIGEST_ROOT,
                 )
-                payload["auxiliary_seed_catalog"].append({
+                auxiliary_seed_catalog.append({
                     "purpose": "hard_cell_digest",
+                    "init_family": "P",
                     "seed_identity": seed.as_dict(),
                 })
                 short = CollapsedPowerPtConfig(method, cell["p"], 2, 8)
-                row[f"{method}_transcript_sha256"] = _digest_result(
+                evidence = _digest_result(
                     run_collapsed_power_pt_trajectory(
                         model, frame, H, syndrome, short, seed, epsilon,
                         engine="numba",
                     )
+                )
+                full_row[f"{method}_transcript_evidence"] = (
+                    _project_transcript_evidence(evidence, "full")
+                )
+                portable_row[f"{method}_transcript_evidence"] = (
+                    _project_transcript_evidence(evidence, "portable")
                 )
         if cell in _map_cells(config):
             map_artifact = load_hgp_map_artifact(
@@ -2808,37 +3543,85 @@ def hgp_screen_preflight_digest(registry_path, config_path, source_commit,
             )
             catalog = map_artifact.catalog
             proposal = map_artifact.proposal
-            row["map_artifact_file_sha256"] = map_artifact.descriptor[
-                "artifact_file_sha256"
-            ]
-            row["map_artifact_content_sha256"] = map_artifact.descriptor[
-                "artifact_content_sha256"
-            ]
-            row["map_anchor_sha256"] = catalog.anchor_sha256
-            row["map_proposal_sha256"] = proposal.proposal_sha256
-            row["map_solver_identity"] = catalog.solver_identity
-        if cell["code_id"] == "m08_c06":
-            seed = _aux_seed_identity(
-                config, registry, source_commit, archive_sha256,
-                source_manifest_sha256, MAP_METHOD_ID, "T1", cell, "P", 0,
-                HGP_SCREEN_PREFLIGHT_DIGEST_ROOT,
-            )
-            payload["auxiliary_seed_catalog"].append({
-                "purpose": "hard_cell_digest",
-                "seed_identity": seed.as_dict(),
-            })
-            short = MapMixtureConfig(cell["p"], 8, 8)
-            row["map_transcript_sha256"] = _digest_result(
-                run_map_mixture_trajectory(
-                    model, frame, syndrome, short, seed, epsilon,
-                    anchor_catalog=catalog, proposal=proposal,
+            artifact_fields = {
+                "map_artifact_file_sha256": map_artifact.descriptor[
+                    "artifact_file_sha256"
+                ],
+                "map_artifact_content_sha256": map_artifact.descriptor[
+                    "artifact_content_sha256"
+                ],
+                "map_anchor_sha256": catalog.anchor_sha256,
+                "map_proposal_sha256": proposal.proposal_sha256,
+                "map_solver_identity": catalog.solver_identity,
+            }
+            full_row.update(artifact_fields)
+            portable_row.update(artifact_fields)
+            full_row["map_portability_probes"] = []
+            portable_row["map_portability_probes"] = []
+            for family in portable_spec["map_preflight_init_families"]:
+                seed = _aux_seed_identity(
+                    config, registry, source_commit, archive_sha256,
+                    source_manifest_sha256, MAP_METHOD_ID, "T1", cell,
+                    family, 0, HGP_SCREEN_PREFLIGHT_DIGEST_ROOT,
                 )
-            )
-        payload["cells"].append(row)
-    payload["auxiliary_seed_catalog_sha256"] = sha256_json(
-        payload["auxiliary_seed_catalog"],
+                initial = (
+                    epsilon if family == "P" else uniform_hard_coset_state(
+                        model, syndrome,
+                        seed.seed("initialize", "hard_coset"),
+                    )
+                )
+                auxiliary_seed_catalog.append({
+                    "purpose": "map_portability_probe",
+                    "init_family": family,
+                    "seed_identity": seed.as_dict(),
+                })
+                probe = _run_sampler(
+                    MAP_METHOD_ID, model, frame, H, syndrome,
+                    MapMixtureConfig(
+                        cell["p"], portable_spec["map_preflight_burn"],
+                        portable_spec["map_preflight_measurement"],
+                    ), seed, initial,
+                    map_artifact,
+                )
+                evidence = _digest_result(probe)
+                full_row["map_portability_probes"].append({
+                    "init_family": family,
+                    "transcript_evidence": _project_transcript_evidence(
+                        evidence, "full",
+                    ),
+                })
+                portable_row["map_portability_probes"].append({
+                    "init_family": family,
+                    "transcript_evidence": _project_transcript_evidence(
+                        evidence, "portable",
+                    ),
+                })
+                acceptance_decision_catalog.append({
+                    "cell_fingerprint": _cell_fingerprint(cell),
+                    "method_id": MAP_METHOD_ID,
+                    "init_family": family,
+                    "acceptance_decision_sha256": evidence[
+                        "acceptance_decision_sha256"
+                    ],
+                })
+        full_payload["cells"].append(full_row)
+        portable_payload["cells"].append(portable_row)
+    auxiliary_seed_catalog_sha256 = sha256_json(auxiliary_seed_catalog)
+    acceptance_catalog_sha256 = sha256_json(acceptance_decision_catalog)
+    for payload in (full_payload, portable_payload):
+        payload["auxiliary_seed_catalog"] = auxiliary_seed_catalog
+        payload["auxiliary_seed_catalog_sha256"] = (
+            auxiliary_seed_catalog_sha256
+        )
+        payload["acceptance_decision_catalog"] = (
+            acceptance_decision_catalog
+        )
+        payload["acceptance_decision_catalog_sha256"] = (
+            acceptance_catalog_sha256
+        )
+    return build_hgp_preflight_evidence_bundle(
+        full_payload, portable_payload,
     )
-    return {**payload, "canonical_digest": sha256_json(payload)}
 
 
 def _lpt_makespan(durations, capacity):
