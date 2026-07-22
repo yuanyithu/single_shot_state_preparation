@@ -2,7 +2,9 @@ import copy
 import hashlib
 import importlib
 import json
+import os
 from pathlib import Path
+import subprocess
 from types import SimpleNamespace
 import time
 
@@ -22,6 +24,11 @@ SOURCE_COMMIT = "1" * 40
 ARCHIVE_SHA256 = "a" * 64
 SOURCE_MANIFEST_SHA256 = "b" * 64
 CONFIG_SHA256 = "c" * 64
+LAUNCHER_PATH = (
+    Path(__file__).resolve().parents[1]
+    / "validation/013_q0_hgp_global_screen_20260722"
+    / "launch_hgp_orchestrator.sh"
+)
 
 
 def _config():
@@ -98,6 +105,22 @@ def _write_success(path, stage):
     })
 
 
+def _launch_metadata(args, command_sha="9" * 64):
+    return {
+        "archive_sha256": args.archive_sha256,
+        "command_sha256": command_sha,
+        "launcher_version": orchestrator_module.ND0_LAUNCHER_VERSION,
+        "local_attestation_sha256": (
+            args.local_attestation_sha256
+            if args.phase == "measurement" else None
+        ),
+        "manifest_sha256": args.source_manifest_sha256,
+        "phase": args.phase,
+        "run_id": args.run_id,
+        "source_commit": args.source_commit,
+    }
+
+
 def test_stage_graph_is_verified_screen_only_and_preserves_frozen_placement(
     tmp_path,
 ):
@@ -168,6 +191,197 @@ def test_stage_launcher_uses_remote_screen_and_verified_bootstrap(
     assert orchestrator_module.WRAPPER_RELATIVE in remote
     assert " build-schedule " in remote
     assert kwargs == {"check": True}
+
+
+def test_nd0_outer_launcher_uses_exact_nohup_setsid_shape():
+    source = LAUNCHER_PATH.read_text(encoding="ascii")
+    normalized = " ".join(source.split())
+    guard = 'mkdir -m 700 -- "$launch_guard"'
+    detached = (
+        "EXP102_HGP_ORCHESTRATOR_PERSISTENCE=$persistence_token \\\n"
+        "EXP102_HGP_ORCHESTRATOR_GUARD=$launch_guard \\\n"
+        '  /usr/bin/nohup /usr/bin/setsid /bin/bash -lc "$inner" \\\n'
+        '  </dev/null >>"$log" 2>&1 &'
+    )
+
+    assert guard in source
+    assert detached in source
+    assert source.index(guard) < source.index("/usr/bin/nohup")
+    assert "screen -dmS" not in source
+    assert (
+        "conda run -n 11 --no-capture-output /usr/bin/setsid python -m"
+        in normalized
+    )
+    assert (
+        'expected_attestation=$run_root/control/'
+        'HGP_LOCAL_PREFLIGHT_ATTESTATION.json' in source
+    )
+    assert '[[ $local_attestation == "$expected_attestation" ]]' in source
+    assert '[[ $phase == preflight && $# -ne 5 ]]' in source
+    assert '[[ $# -eq 7 && $7 =~ ^[0-9a-f]{64}$ ]]' in source
+
+
+def test_nd0_persistence_guard_binds_phase_and_publishes_pid(
+    tmp_path, monkeypatch,
+):
+    base = tmp_path / ".single_shot"
+    (base / "logs").mkdir(parents=True)
+    args = SimpleNamespace(
+        run_id="exp102_q0_hgp_test",
+        phase="measurement",
+        source_commit=SOURCE_COMMIT,
+        archive_sha256=ARCHIVE_SHA256,
+        source_manifest_sha256=SOURCE_MANIFEST_SHA256,
+        local_attestation_sha256="e" * 64,
+    )
+    token = hashlib.sha256(args.run_id.encode("ascii")).hexdigest()[:8]
+    guard = (
+        base / "logs"
+        / f".{args.run_id}_hgp_orchestrator_{token}_{args.phase}.launch"
+    )
+    guard.mkdir()
+    _write_json(guard / "LAUNCH.json", _launch_metadata(args))
+    monkeypatch.setenv(
+        "EXP102_HGP_ORCHESTRATOR_PERSISTENCE",
+        orchestrator_module.ND0_PERSISTENCE_TOKEN,
+    )
+    monkeypatch.setenv("EXP102_HGP_ORCHESTRATOR_GUARD", str(guard))
+    monkeypatch.setattr(orchestrator_module.os, "getpid", lambda: 4242)
+    monkeypatch.setattr(orchestrator_module.os, "getsid", lambda _pid: 4242)
+
+    assert orchestrator_module._validate_nd0_persistence(args, base) == guard
+    assert (guard / "ORCHESTRATOR_PID").read_text(encoding="ascii") == "4242\n"
+    with pytest.raises(ValueError, match="PID metadata already exists"):
+        orchestrator_module._validate_nd0_persistence(args, base)
+
+    (guard / "ORCHESTRATOR_PID").unlink()
+    changed = _launch_metadata(args)
+    changed["local_attestation_sha256"] = None
+    _write_json(guard / "LAUNCH.json", changed)
+    with pytest.raises(ValueError, match="metadata identity"):
+        orchestrator_module._validate_nd0_persistence(args, base)
+
+
+def test_nd0_publishes_orchestrator_pid_before_archive_hashing(
+    tmp_path, monkeypatch,
+):
+    home = tmp_path / "home"
+    base = home / ".single_shot"
+    run_id = "exp102_q0_hgp_test"
+    deployment = base / "repos" / run_id
+    (deployment / "source").mkdir(parents=True)
+    (base / "logs").mkdir(parents=True)
+    (deployment / "SOURCE.tar").write_bytes(b"archive\n")
+    (deployment / "SOURCE_MANIFEST.json").write_bytes(b"manifest\n")
+    (deployment / "SOURCE_COMMIT").write_text(
+        SOURCE_COMMIT + "\n", encoding="ascii",
+    )
+    args = SimpleNamespace(
+        run_id=run_id,
+        phase="preflight",
+        source_commit=SOURCE_COMMIT,
+        archive_sha256=ARCHIVE_SHA256,
+        source_manifest_sha256=SOURCE_MANIFEST_SHA256,
+    )
+    events = []
+
+    def record_persistence(_args, _base):
+        events.append("pid")
+
+    def record_hash(path):
+        events.append(Path(path).name)
+        return {
+            "SOURCE.tar": ARCHIVE_SHA256,
+            "SOURCE_MANIFEST.json": SOURCE_MANIFEST_SHA256,
+        }[Path(path).name]
+
+    monkeypatch.setenv("EXP102_SOURCE_COMMIT", SOURCE_COMMIT)
+    monkeypatch.setattr(orchestrator_module.platform, "node", lambda: "nd-0")
+    monkeypatch.setattr(
+        orchestrator_module, "_validate_nd0_persistence", record_persistence,
+    )
+    monkeypatch.setattr(orchestrator_module, "_sha256_file", record_hash)
+
+    roots = orchestrator_module._require_verified_launch(args, home)
+
+    assert roots == (deployment, base / "runs" / run_id)
+    assert events == ["pid", "SOURCE.tar", "SOURCE_MANIFEST.json"]
+
+
+def test_nd0_launcher_atomic_guard_and_argument_rejection(tmp_path):
+    home = tmp_path / "home"
+    server_root = home / ".single_shot"
+    run_id = "exp102_q0_hgp_test"
+    deployment = server_root / "repos" / run_id
+    (deployment / "source").mkdir(parents=True)
+    (server_root / "logs").mkdir(parents=True)
+    archive = deployment / "SOURCE.tar"
+    manifest = deployment / "SOURCE_MANIFEST.json"
+    archive.write_bytes(b"archive-test\n")
+    manifest.write_bytes(b"manifest-test\n")
+    (deployment / "SOURCE_COMMIT").write_text(
+        SOURCE_COMMIT + "\n", encoding="ascii",
+    )
+    archive_sha = hashlib.sha256(archive.read_bytes()).hexdigest()
+    manifest_sha = hashlib.sha256(manifest.read_bytes()).hexdigest()
+    env = {**dict(os.environ), "HOME": str(home), "HOSTNAME": "nd-0"}
+
+    token = hashlib.sha256(run_id.encode("ascii")).hexdigest()[:8]
+    guard = (
+        server_root / "logs"
+        / f".{run_id}_hgp_orchestrator_{token}_preflight.launch"
+    )
+    guard.mkdir()
+    command = [
+        "bash", str(LAUNCHER_PATH), run_id, SOURCE_COMMIT, archive_sha,
+        manifest_sha, "preflight",
+    ]
+    completed = subprocess.run(
+        command, env=env, text=True, capture_output=True, check=False,
+    )
+    assert completed.returncode == 69
+    assert "launch guard already exists" in completed.stderr
+    assert not (
+        server_root / "logs" / f"{run_id}_hgp_orchestrator_preflight.log"
+    ).exists()
+
+    missing_measurement_args = subprocess.run(
+        [*command[:-1], "measurement"], env=env, text=True,
+        capture_output=True, check=False,
+    )
+    assert missing_measurement_args.returncode == 65
+    extra_preflight_args = subprocess.run(
+        [*command, "unexpected", "0" * 64], env=env, text=True,
+        capture_output=True, check=False,
+    )
+    assert extra_preflight_args.returncode == 65
+
+    injected = tmp_path / "injected"
+    malicious_run_id = f"bad;touch {injected}"
+    injection_attempt = subprocess.run(
+        [
+            "bash", str(LAUNCHER_PATH), malicious_run_id, SOURCE_COMMIT,
+            archive_sha, manifest_sha, "preflight",
+        ],
+        env=env, text=True, capture_output=True, check=False,
+    )
+    assert injection_attempt.returncode == 65
+    assert not injected.exists()
+
+    run_root = server_root / "runs" / run_id
+    run_root.mkdir(parents=True)
+    wrong_attestation = tmp_path / "attestation.json"
+    wrong_attestation.write_text("{}\n", encoding="ascii")
+    wrong_sha = hashlib.sha256(wrong_attestation.read_bytes()).hexdigest()
+    path_drift = subprocess.run(
+        [
+            "bash", str(LAUNCHER_PATH), run_id, SOURCE_COMMIT, archive_sha,
+            manifest_sha, "measurement", str(wrong_attestation), wrong_sha,
+        ],
+        env=env, text=True, capture_output=True, check=False,
+    )
+    assert path_drift.returncode == 65
+    assert "attestation path is not canonical" in path_drift.stderr
 
 
 def test_preflight_phase_stops_for_local_audit_without_attestation(

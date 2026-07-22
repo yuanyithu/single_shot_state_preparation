@@ -44,6 +44,15 @@ and one sentinel disorder cannot certify any `(m,p)` parameter point. This
 contract cannot create `READY_FOR_FORMAL`, `FROZEN_HELD_OUT_PASS`, a
 publication result or any of the 6144 production tasks.
 
+The first outer launch attempt from clean source
+`7654bcced23688705f396695370661199b81648a` exited before creating a run root,
+orchestrator log, stage marker or raw because `nd-0` has no `screen`
+executable. It launched no preflight or sampler and is infrastructure-only,
+not a scientific run. The successor source replaces only the `nd-0` outer
+control persistence with guarded `nohup` + `setsid`; all `nd-1`/`nd-2`/`nd-3`
+scientific stages remain isolated `screen` jobs. A fresh deployment/run is
+required rather than retrying that source in place.
+
 **Q=0 DIAGNOSTIC SCREEN UNRESOLVED / PRE-PILOT — formal pilot blocked, production not started**
 
 The fresh immutable run `exp102_q0_screen_diagnostic_20260721_342dd5b` completed the isolated

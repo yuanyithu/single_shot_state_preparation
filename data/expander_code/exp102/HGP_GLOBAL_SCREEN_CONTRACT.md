@@ -251,15 +251,27 @@ may freeze the 384-task control. The normal attestation status is `PASS` and
 requires byte-identical complete canonical digests. If an actual mismatch is
 observed, the automatic audit emits
 `MISMATCH_REQUIRES_PORTABILITY_REVIEW`, which grants no launch authority. This
-source accepts only an exact `PASS`; a future `PORTABLE_PASS` requires a new
-reviewed source commit that binds and executes a field-level comparator,
-proves all discrete transcripts exact and lists only the specifically observed
-derived-float ULP differences. No ULP whitelist is preregistered speculatively.
+contract and source accept only an exact `PASS`; `PORTABLE_PASS` is not a
+status in this contract and cannot be introduced by continuing the same run.
+Any future portability exception requires a different reviewed contract,
+source commit and fresh run. No ULP whitelist is preregistered speculatively.
 A local solver-version mismatch alone is not a conflict under the stored-provenance
 rule above, while any discrete state/anchor/proposal/transcript/hash mismatch
 is `CONFLICT`. No measurement node may be launched merely because three remote
 worker processes exited successfully; the aggregate report must be `PASS` and
 name one frozen common tier.
+
+The storage node `nd-0` has no `screen` executable. Its verified outer
+orchestrator therefore runs under fixed `/usr/bin/nohup` plus
+`/usr/bin/setsid`, with an atomic per-run/per-phase launch-guard directory,
+identity metadata and separate bootstrap/orchestrator PID records. The guard
+is never reused: a duplicate or failed detached launch requires a fresh
+deployment/run as otherwise specified by this contract. The Python
+orchestrator verifies the dedicated persistence token, canonical guard
+identity and that it is a session leader before it can create a stage. This
+change applies only to the `nd-0` control process. Every scientific preflight,
+control, sampler and analysis stage on `nd-1`/`nd-2`/`nd-3` still runs in its
+own immutable `screen` through the verified wrapper.
 
 Cross-node scientific arrays and decision transcripts must be bit identical.
 No ULP whitelist applies to categorical weights, states, labels, anchors,

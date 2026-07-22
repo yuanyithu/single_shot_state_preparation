@@ -11,6 +11,13 @@ source must first be completed, tested, committed and packaged from a clean Git
 archive; this README must not be read as evidence that a server job is already
 running or that a sampler has passed.
 
+One infrastructure-only launch from source
+`7654bcced23688705f396695370661199b81648a` stopped in the outer launcher
+because `nd-0` has no `screen`. It created no run root, orchestrator log,
+stage marker or raw and launched no preflight/sampler. That source is not
+retried in place; the guarded `nohup` + `setsid` launcher below requires a
+fresh deployment/run.
+
 Authority is limited to `DIAGNOSTIC_HARD_PAIR_FOUND`. This run cannot produce
 `READY_FOR_FORMAL`, `FROZEN_HELD_OUT_PASS`, publication data or any of the 6144
 production tasks.
@@ -93,9 +100,11 @@ one sentinel disorder cannot certify or rule out an entire `(m,p)` point.
 ## Required evidence sequence
 
 1. Build a clean source archive and bind its commit/archive/manifest SHAs.
-2. Run `orchestrate_hgp.py --phase preflight` from a verified nd-0 source in
-   `screen`; it launches schedule/artifact and all three node jobs through the
-   verified archive and immutable stage wrapper.
+2. Run `launch_hgp_orchestrator.sh ... preflight` on `nd-0`. Because `nd-0`
+   has no `screen`, this outer control process uses fixed `nohup` + `setsid`
+   with an atomic phase guard and PID metadata. It still launches every
+   schedule/artifact/preflight job on `nd-1`/`nd-2`/`nd-3` in an independent
+   `screen` through the verified archive and immutable stage wrapper.
 3. Fail closed on any source, digest, solver, transcript or reference/Numba
    difference; otherwise select the largest common resource tier that fits.
 4. Stop at the aggregate preflight boundary, pull the frozen artifacts and
@@ -104,18 +113,21 @@ one sentinel disorder cannot certify or rule out an entire `(m,p)` point.
    GF(2)/hash/proposal content without rerunning MILP under the local version.
    `local_preflight_audit.py` writes a self-hashed attestation; an exact
    mismatch is fail-closed and does not invent a float tolerance.
-5. Only after that audit, run `orchestrate_hgp.py --phase measurement` from the
-   same verified source before the control-freeze deadline, passing the
-   canonical server copy of `HGP_LOCAL_PREFLIGHT_ATTESTATION.json` and its file
-   SHA. It revalidates that attestation, all prior SUCCESS markers, aggregate
-   `PASS`, selected tier, source identity and deadlines before materializing
-   the immutable 384-task control.
+5. Only after that audit, run `launch_hgp_orchestrator.sh ... measurement`
+   from the same verified source before the control-freeze deadline, passing
+   the canonical, regular (non-symlink) server copy of
+   `HGP_LOCAL_PREFLIGHT_ATTESTATION.json` and its file SHA. The detached
+   orchestrator revalidates that attestation, its phase-bound launch guard, all
+   prior SUCCESS markers, aggregate `PASS`, selected tier, source identity and
+   deadlines before materializing the immutable 384-task control.
 6. Run fresh nd-2/nd-3 screen tasks without migration, resampling or in-place
    retry, then perform the frozen 91-worker full replay on nd-3.
 7. Pull all raw and terminal evidence locally, verify file/canonical hashes and
    independently replay state, label, weight, residual, proposal and transition
    records before accepting the terminal package.
 
-Any failed marker requires a fresh deployment/run ID. This directory will be
-updated with the actual clean source commit, run ID, selected tier, evidence
-hashes and terminal result only after those artifacts exist.
+Any failed marker or failed/duplicate `nd-0` launch guard requires a fresh
+deployment/run ID. The retained guard is not deleted for an in-place retry.
+This directory will be updated with the actual clean source commit, run ID,
+selected tier, evidence hashes and terminal result only after those artifacts
+exist.

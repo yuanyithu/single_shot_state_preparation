@@ -49,6 +49,8 @@ LOCAL_ATTESTATION_VERSION = "exp102.q0_hgp_global.screen.local_attestation.v1"
 LOCAL_SOLVER_POLICY = (
     "stored_generation_identity_exact_artifact_replay_no_local_milp"
 )
+ND0_PERSISTENCE_TOKEN = "exp102_q0_hgp_nd0_nohup_setsid_v1"
+ND0_LAUNCHER_VERSION = "exp102.q0_hgp.nd0_nohup_setsid.v1"
 SHA1_RE = re.compile(r"[0-9a-f]{40}")
 SHA256_RE = re.compile(r"[0-9a-f]{64}")
 RUN_ID_RE = re.compile(r"[A-Za-z0-9._-]+")
@@ -107,6 +109,70 @@ def _read_frozen_config(deployment_root, expected_archive_sha256):
     return config, hashlib.sha256(payload).hexdigest()
 
 
+def _validate_nd0_persistence(args, base):
+    if os.environ.get("EXP102_HGP_ORCHESTRATOR_PERSISTENCE") != (
+            ND0_PERSISTENCE_TOKEN):
+        raise ValueError("HGP orchestrator requires the nd-0 setsid launcher")
+    if os.getsid(0) != os.getpid():
+        raise ValueError("HGP orchestrator must be a detached session leader")
+
+    token = hashlib.sha256(args.run_id.encode("ascii")).hexdigest()[:8]
+    expected_guard = (
+        Path(base) / "logs"
+        / f".{args.run_id}_hgp_orchestrator_{token}_{args.phase}.launch"
+    )
+    supplied_guard = os.environ.get("EXP102_HGP_ORCHESTRATOR_GUARD")
+    if supplied_guard is None:
+        raise ValueError("HGP orchestrator launch guard is absent")
+    try:
+        guard = Path(supplied_guard).resolve(strict=True)
+        canonical_guard = expected_guard.resolve(strict=True)
+    except (FileNotFoundError, OSError) as exc:
+        raise ValueError("HGP orchestrator launch guard is invalid") from exc
+    if (guard != canonical_guard or not guard.is_dir()
+            or expected_guard.is_symlink()):
+        raise ValueError("HGP orchestrator launch guard is not canonical")
+
+    metadata_path = guard / "LAUNCH.json"
+    if not metadata_path.is_file() or metadata_path.is_symlink():
+        raise ValueError("HGP orchestrator launch metadata is invalid")
+    metadata = _read_json(metadata_path)
+    expected_attestation_sha = (
+        args.local_attestation_sha256
+        if args.phase == "measurement" else None
+    )
+    if (set(metadata) != {
+            "archive_sha256", "command_sha256", "launcher_version",
+            "local_attestation_sha256", "manifest_sha256", "phase",
+            "run_id", "source_commit"}
+            or metadata.get("launcher_version") != ND0_LAUNCHER_VERSION
+            or metadata.get("run_id") != args.run_id
+            or metadata.get("phase") != args.phase
+            or metadata.get("source_commit") != args.source_commit
+            or metadata.get("archive_sha256") != args.archive_sha256
+            or metadata.get("manifest_sha256")
+            != args.source_manifest_sha256
+            or metadata.get("local_attestation_sha256")
+            != expected_attestation_sha
+            or SHA256_RE.fullmatch(str(metadata.get("command_sha256", "")))
+            is None):
+        raise ValueError("HGP orchestrator launch metadata identity is invalid")
+
+    pid_path = guard / "ORCHESTRATOR_PID"
+    flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL
+    if hasattr(os, "O_NOFOLLOW"):
+        flags |= os.O_NOFOLLOW
+    try:
+        descriptor = os.open(pid_path, flags, 0o600)
+        with os.fdopen(descriptor, "wb") as handle:
+            handle.write(f"{os.getpid()}\n".encode("ascii"))
+            handle.flush()
+            os.fsync(handle.fileno())
+    except FileExistsError as exc:
+        raise ValueError("HGP orchestrator PID metadata already exists") from exc
+    return guard
+
+
 def _require_verified_launch(args, home):
     if RUN_ID_RE.fullmatch(args.run_id) is None:
         raise ValueError("HGP run ID is invalid")
@@ -117,8 +183,6 @@ def _require_verified_launch(args, home):
         raise ValueError("HGP deployment SHA256 is invalid")
     if os.environ.get("EXP102_SOURCE_COMMIT") != args.source_commit:
         raise ValueError("HGP orchestrator itself must run from verified source")
-    if not os.environ.get("STY"):
-        raise ValueError("HGP orchestrator must run inside screen")
     if platform.node().split(".", 1)[0] != "nd-0":
         raise ValueError("HGP orchestrator is owned by storage node nd-0")
 
@@ -135,6 +199,11 @@ def _require_verified_launch(args, home):
         raise FileNotFoundError(
             "HGP measurement requires the completed preflight run root"
         )
+
+    # Publish the detached session-leader PID before any potentially slow
+    # archive I/O, so the outer launcher never times out on an untracked
+    # orchestrator that can continue in its own session.
+    _validate_nd0_persistence(args, base)
     archive = deployment_root / "SOURCE.tar"
     manifest = deployment_root / "SOURCE_MANIFEST.json"
     marker = deployment_root / "SOURCE_COMMIT"
