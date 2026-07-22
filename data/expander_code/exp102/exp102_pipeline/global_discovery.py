@@ -1478,7 +1478,7 @@ def _constant_transport_ok(records, mask, common_value):
             opposite.append(record)
     if not opposite:
         return True
-    return any(
+    return all(
         np.any(character_values(record["burn_labels"], [mask])[:, 0] == common_value)
         for record in opposite
     )

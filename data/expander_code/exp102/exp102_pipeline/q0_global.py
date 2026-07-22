@@ -68,6 +68,42 @@ class GlobalConflictError(ValueError):
     """An identity, algebraic, replay, or transcript conflict."""
 
 
+def validate_observable_frame(model, frame):
+    """Verify that a logical frame is the canonical dual frame for ``model``."""
+    load_exp101()
+    from exp101_certified_src.gf2 import gf2_matmul
+    from exp101_certified_src.observables import build_observable_frame
+
+    if (getattr(frame, "num_qubits", None) != model.num_qubits
+            or getattr(frame, "k", None) != model.k):
+        raise GlobalConflictError("observable frame dimensions do not match the model")
+    W = np.asarray(getattr(frame, "W_basis", None))
+    if (W.shape != (model.k, model.num_qubits)
+            or not np.issubdtype(W.dtype, np.integer)
+            or np.any((W != 0) & (W != 1))):
+        raise GlobalConflictError("observable frame matrix is not canonical GF(2) data")
+    W = np.ascontiguousarray(W, dtype=np.uint8)
+    section = model.logical_sector_section
+    if getattr(frame, "section_fingerprint", None) != section.fingerprint():
+        raise GlobalConflictError("observable frame section does not match the model")
+    section_after_check = section.section_after_H(model.H_check)
+    if gf2_matmul(W, section_after_check).any():
+        raise GlobalConflictError("observable frame does not annihilate the section image")
+    if gf2_matmul(W, np.asarray(model.stabilizer_rows, dtype=np.uint8).T).any():
+        raise GlobalConflictError("observable frame does not annihilate stabilizers")
+    pairing = gf2_matmul(
+        W, np.asarray(model.logical_move_basis, dtype=np.uint8).T,
+    )
+    if not np.array_equal(pairing, np.eye(model.k, dtype=np.uint8)):
+        raise GlobalConflictError("observable frame is not dual to logical moves")
+    canonical = build_observable_frame(model)
+    if (not np.array_equal(W, canonical.W_basis)
+            or frame.section_fingerprint != canonical.section_fingerprint
+            or frame.fingerprint() != canonical.fingerprint()):
+        raise GlobalConflictError("observable frame is not the frozen canonical frame")
+    return True
+
+
 def _sha256_arrays(version, arrays, scalars=()):
     digest = hashlib.sha256()
     digest.update(str(version).encode("ascii") + b"\0")

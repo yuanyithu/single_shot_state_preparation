@@ -1,5 +1,49 @@
 # exp102 status
 
+**Q=0 HGP HARD-PAIR DIAGNOSTIC IMPLEMENTED / PRE-RUN -- formal work remains blocked**
+
+On 2026-07-22 the user authorized fresh server testing of the isolated
+`exp102.q0_hgp_global.screen.v1` diagnostic. The candidate HP32/HP64 sampler
+analytically collapses one HGP block, performs likelihood-power replica
+exchange on the exact marginal, and draws the eliminated block from its exact
+conditional. The independent MAM-IMH8 mechanism uses a frozen full-support
+multi-anchor independence proposal with the complete Hastings ratio. The
+canonical diagnostic config SHA256 is
+`3c65ef96ce231b4aea4499b5a6030f1cc82475117c5ee5ecc7633d972ef8edc9`.
+
+The frozen server scope contains 384 trajectories: HP32 and HP64 each run
+`HARD2+EASY3` with 16 planted and 16 exact-uniform starts per cell (320 total),
+while MAM-IMH8 runs only the two `HARD2` cells (64 total). MAP artifacts and
+50000-draw IS diagnostics are also limited to HARD2. Local probes showed that
+adding deterministic m3 near-MAP shells did not address the relevant basin:
+the planted start still accepted 0/8192 measurement proposals, the uniform
+start accepted only 1.5%, both weight-24 solves hit 180 seconds, and the m5
+primary solve also exceeded 180 seconds. Those known-failing EASY3 MAP tasks
+and near-MAP shells are excluded rather than optimized further.
+
+Small-code production-bound enumeration now directly exercises the reference
+B categorical and conditional A reconstruction paths on the n=10,k=4 and
+n=13,k=1 HGPs for zero/nonzero syndrome and p=.04,.10,.25. Complete fixed-order
+sweeps satisfy row normalization and stationarity, while each individual B
+heatbath block satisfies detailed balance, all within `1e-13`. Both public
+samplers independently bind the observable frame to the model before using RNG.
+Raw replay also reconstructs the collapsed B trace and gates every B bit,
+row/column parity, 64 frozen dense characters, `|B|` and `L(B)`; both catalog-
+average and per-character P/U and cross-method differences must pass. The
+workflow binds one immutable MAP artifact per hard cell, exact task/IS sets,
+source/archive/config/registry identity, structure-only staging validation,
+final bit-exact replay, and the real execution topology: distributed nd-2/nd-3
+generation followed by a frozen 91-worker nd-3 analyzer. Runtime projection
+counts those stages separately before applying the independent factor-two
+safety margin.
+
+No 013 server preflight, measurement raw, terminal report or sampler pass
+exists yet. The maximum possible outcome is only
+`DIAGNOSTIC_HARD_PAIR_FOUND`; EASY3 has no independent-method confirmation,
+and one sentinel disorder cannot certify any `(m,p)` parameter point. This
+contract cannot create `READY_FOR_FORMAL`, `FROZEN_HELD_OUT_PASS`, a
+publication result or any of the 6144 production tasks.
+
 **Q=0 DIAGNOSTIC SCREEN UNRESOLVED / PRE-PILOT — formal pilot blocked, production not started**
 
 The fresh immutable run `exp102_q0_screen_diagnostic_20260721_342dd5b` completed the isolated

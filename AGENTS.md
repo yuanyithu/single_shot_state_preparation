@@ -17,7 +17,7 @@ publication/FSS。014 中的 scan v2 聚合只作历史审计；旧 259 tests �
 `data/expander_code/exp101/PHYSICS_CONTRACT.md`（唯一物理权威）、`status.md` 和
 `validation/README.md`。关键硬约束：
 
-**exp102 当前为 `Q=0 DIAGNOSTIC SCREEN UNRESOLVED / PRE-PILOT`，不是已有物理结果。** 正式历史契约仍为
+**exp102 当前为 `Q=0 HGP HARD-PAIR DIAGNOSTIC / PRE-RUN`，不是已有物理结果。** 正式历史契约仍为
 `exp102.physics.v1 / exp102.q0_pt.v1 / exp102.scan.v1`。固定 Q32 + multi-swap PT-v2 已因 96 条轨迹
 认证往返总数为 0 而 `EXHAUSTED`；不得追加 S128、延长轮数或复用 raw。随后
 `exp102.q0_pa.discovery.v1` 的四个 transport autopsy 因条件 attempts<200 均为 `INCONCLUSIVE`，
@@ -55,6 +55,21 @@ self-hash，并只对这两个白名单字段允许已审计的 4-ULP 上限，�
 `a2c459ec9438e23f863c44528ac093c5b93d891b6a8bec0278b873fe47f2459a`；禁止恢复平台 `libm`
 fractional power。首个 `5e1f5aa` run 保持 `CONFLICT_CROSS_NODE_GAMMA_LIBM` 审计，15 个旧 bias raw
 永不复用。接手先读 `GLOBAL_SCREEN_DIAGNOSTIC_CONTRACT.md`、`validation/011_*` 和 `status.md`。
+
+2026-07-22 用户已批准新的隔离 HGP 诊断 `exp102.q0_hgp_global.screen.v1`，但服务器 preflight/raw
+尚未产生。HP32/HP64 使用 exact collapsed marginal + likelihood-power replica exchange；MAM-IMH8
+使用 full-support multi-anchor independence MH，只在两个 HARD2 cell 作独立确认。冻结任务为
+HP 的 HARD2+EASY3 320 条加 MAM HARD2 64 条，共 384 条；MAP artifact/50000-draw IS 也只限
+HARD2，最高状态仅 `DIAGNOSTIC_HARD_PAIR_FOUND`。m3 near-MAP shells 仍使 planted chain
+`0/8192` accepted，且 m3/m5 MILP 出现 180s 级风险，因此不得把 MAM 扩回 EASY3 或加入结果驱动
+near-MAP。canonical config SHA 为
+`3c65ef96ce231b4aea4499b5a6030f1cc82475117c5ee5ecc7633d972ef8edc9`；接手先读
+`HGP_GLOBAL_SCREEN_CONTRACT.md`、`validation/013_q0_hgp_global_screen_20260722/` 与 `status.md`。
+HP 每轮精确重抽 `A|B` 会制造新鲜条件噪声，不能用 full-state ESS 掩盖 collapsed `B` 卡住；013 raw
+必须独立重建并门禁全部 B-bit、行列 parity、64 个 dense characters、`|B|`、`L(B)`，且逐 character
+的 P/U 与 HP/MAM 均值差不能被平均 D2 稀释。
+该诊断即使全过也不能生成 `READY_FOR_FORMAL`，EASY3 仍缺独立方法确认，且全部正式
+tuning/held-out/production 门禁继续存在。
 
 若要继续正式实验，须另立经审查的新算法/科学契约与 fresh tuning/held-out，不得把重复 T3、延长链、
 删困难 disorder、缩范围或改窗口包装成原 discovery 成功。

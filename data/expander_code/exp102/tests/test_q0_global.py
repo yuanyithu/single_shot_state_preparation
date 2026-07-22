@@ -16,6 +16,7 @@ from data.expander_code.exp102.exp102_pipeline.global_discovery import (
     GAP_PANEL_SHA256,
     HARD_RAW_FIELDS,
     SMALL_PANEL_SHA256,
+    _constant_transport_ok,
     _parallel_validate_measurement_entry,
     bias_binding_from_raw,
     bias_task_identity,
@@ -88,6 +89,27 @@ def _seed(method, family="P", trajectory=0, namespace="test"):
         trajectory_index=trajectory,
         trajectory_namespace=namespace,
     )
+
+
+def test_constant_character_requires_every_opposite_chain_to_cross_in_burn():
+    mask = np.uint64(1)
+    records = [
+        {
+            "initial_label": np.uint64(1),
+            "burn_labels": np.asarray([1, 0], dtype=np.uint64),
+        },
+        {
+            "initial_label": np.uint64(1),
+            "burn_labels": np.asarray([1, 1], dtype=np.uint64),
+        },
+        {
+            "initial_label": np.uint64(0),
+            "burn_labels": np.asarray([0, 0], dtype=np.uint64),
+        },
+    ]
+    assert not _constant_transport_ok(records, mask, 1)
+    records[1]["burn_labels"][-1] = 0
+    assert _constant_transport_ok(records, mask, 1)
 
 
 def _coset_states(model, syndrome):

@@ -54,4 +54,12 @@ Current status is pre-pilot, not scientific certification.
   hard-coset candidates and all three defect-trace candidates passed 0/5 cells, so no method pair
   was selected. Completed metadata evidence includes an independent archive replay; this remains
   diagnostic only and grants no formal, held-out, or production authority.
+- `012_hgp_collapsed_power_pt_20260722/`: local conda-12 feasibility evidence for the exact
+  collapsed-HGP likelihood-power sampler. The short HP32 HARD2 probe motivated a frozen server
+  screen but is not reusable measurement, confirmation, held-out, or formal evidence.
+- `013_q0_hgp_global_screen_20260722/`: isolated HP32/HP64 plus MAM-IMH8 HARD2 diagnostic with
+  adversarial P/U starts, exact small-HGP oracles, canonical frame binding, explicit collapsed-B
+  slow-variable gates, immutable MAP artifacts, three-node runtime/digest consensus, and a
+  two-phase preflight/local-attestation/measurement workflow. It is currently `PRE-RUN`; even a
+  full pass can produce only `DIAGNOSTIC_HARD_PAIR_FOUND`, not formal readiness.
 - Held-out and production evidence do not exist. Their absence is an active production blocker.
