@@ -74,3 +74,25 @@ full-sector TI anchors, and 72-hour fail-closed decision tree are contract data.
 exists but the remote discovery has not run. Its strongest possible success is
 `READY_FOR_FORMAL`, which still requires a later clean `exp102.q0_global.v1` tuning and held-out
 campaign before production can be considered.
+
+## Logical-signature V0 boundary
+
+`exp102.q0_logical_stratified.v0.v1` is a deliberately narrower diagnostic for a new
+label-first independence-MH proposal.  It is not a continuation of the exhausted HGP/PT/PA
+screens and cannot reuse their raw, seeds, artifacts, estimates, or terminal statuses.  The only
+scheduled cell is `m08_c06, p=.04, d00, attempt022`; the two pre-registered proposal temperatures
+are `.5` and `1.0`, each with eight independent `P`, exact-K0 `U`, and legal low-energy
+signature-stratified `L` starts.
+
+Before a V0 trajectory can run, an immutable artifact must bind the code matrix, hard syndrome,
+full BpLSD decoded-candidate transcript, deterministic rank-first catalog selection, affine
+coordinates, proposal, source/config/registry/cell identity, and tail-start schedule.  Every raw
+stores both burn and measurement proposal/decision transcripts and is replayed before write.
+The V0 analyzer gates actual accepted cross-label changes, source-anchor diversity, character
+leave-return excursions, and `P/U/L` starts; total acceptance, local state changes, and proposal
+IS ESS are diagnostics only.
+
+The sole possible V0 success string is `LOGICAL_TRANSPORT_VIABLE_FOR_HARD2_SCREEN`.  It means
+only that the proposal merits a fresh HARD2 comparison with an independent confirmer.  It is not
+`READY_FOR_FORMAL`, does not certify convergence, and cannot authorize tuning, held-out, or any
+production task.
