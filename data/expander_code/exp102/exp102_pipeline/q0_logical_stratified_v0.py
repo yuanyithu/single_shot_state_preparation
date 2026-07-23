@@ -9,22 +9,25 @@ authorize a physics result, a tuning panel, or production.
 from __future__ import annotations
 
 import argparse
-import concurrent.futures
 import hashlib
 import json
 import os
 from pathlib import Path
+import socket
 import time
 
 import numpy as np
 
 from .io import atomic_json, atomic_npz, canonical_json, sha256_file, sha256_json
-from .q0_global import character_values, frozen_character_set, uniform_hard_coset_state
+from .q0_global import (
+    _signature_rank_masks,
+    character_values,
+    frozen_character_set,
+    uniform_hard_coset_state,
+)
 from .q0_logical_stratified import (
     LogicalStratifiedConfig,
-    LogicalStratifiedConflictError,
     LogicalStratifiedSeedIdentity,
-    STRATIFIED_METHOD_ID,
     _matrix_syndrome_sha256,
     build_hgp_signature_codebook,
     build_logical_stratified_frozen_artifact,
@@ -40,11 +43,12 @@ from .seeds import derive_seed
 from .worker import build_model
 
 
-V0_CONTRACT_VERSION = "exp102.q0_logical_stratified.v0.v1"
-V0_MANIFEST_VERSION = "exp102.q0_logical_stratified.v0.manifest.v2"
-V0_RAW_VERSION = "exp102.q0_logical_stratified.v0.raw.v1"
-V0_PREFLIGHT_VERSION = "exp102.q0_logical_stratified.v0.preflight.v1"
-V0_REPORT_VERSION = "exp102.q0_logical_stratified.v0.report.v1"
+V0_CONTRACT_VERSION = "exp102.q0_logical_stratified.v0.v2"
+V0_MANIFEST_VERSION = "exp102.q0_logical_stratified.v0.manifest.v3"
+V0_RAW_VERSION = "exp102.q0_logical_stratified.v0.raw.v2"
+V0_PREFLIGHT_VERSION = "exp102.q0_logical_stratified.v0.preflight.v2"
+V0_ARTIFACT_AUDIT_VERSION = "exp102.q0_logical_stratified.v0.artifact_audit.v1"
+V0_REPORT_VERSION = "exp102.q0_logical_stratified.v0.report.v2"
 V0_METHOD_IDS = {0.5: "LSI-IMH-T05", 1.0: "LSI-IMH-T10"}
 V0_CELL = {
     "code_id": "m08_c06",
@@ -53,11 +57,12 @@ V0_CELL = {
     "disorder_source": "attempt022",
 }
 V0_NODES = ("nd-2", "nd-3")
+V0_AUDIT_NODES = ("nd-1", "nd-2", "nd-3", "macmini")
 V0_FAMILIES = ("P", "U", "L")
 V0_TAU = (0.5, 1.0)
 V0_ARTIFACT_ROOT_RELPATH = "../artifacts"
 V0_CONFIG_FIELDS = {
-    "artifact", "candidates", "cell", "contract_version", "execution",
+    "artifact", "artifact_authority", "candidates", "cell", "contract_version", "execution",
     "frozen_nonbasis_characters", "gates", "init_families", "registry_sha256",
     "resource_tier", "scope", "seed_namespace", "trajectories_per_family",
 }
@@ -102,12 +107,17 @@ def _load_canonical_json(path):
 
 
 def load_v0_config(path, *, registry=None):
-    """Load the single pre-registered V0 schedule and reject broader scope."""
+    """Load the single pre-registered V0v2 schedule and reject broader scope."""
     value = _load_canonical_json(path)
     if set(value) != V0_CONFIG_FIELDS or value.get("contract_version") != V0_CONTRACT_VERSION:
         raise LogicalStratifiedV0ConflictError("V0 config schema/version changed")
     if value.get("cell") != V0_CELL:
         raise LogicalStratifiedV0ConflictError("V0 cell changed")
+    if value.get("artifact_authority") != {
+            "mode": "single_producer_algebraic_audit.v1",
+            "producer_node": "nd-1",
+    }:
+        raise LogicalStratifiedV0ConflictError("V0 artifact authority changed")
     artifact = value.get("artifact")
     if artifact != {
             "codebook_combination_order": 3,
@@ -135,10 +145,12 @@ def load_v0_config(path, *, registry=None):
             }
             or value.get("frozen_nonbasis_characters") != 64
             or value.get("gates") != {
-                "minimum_accepted_cross_label_changes_per_family": 32,
-                "minimum_chains_with_two_cross_label_changes_per_family": 6,
-                "minimum_distinct_catalog_sources_per_family": 4,
-                "minimum_leave_return_character_chains_per_family": 4,
+                "minimum_basis_character_leave_return_chains_per_family": 1,
+                "minimum_chains_with_eight_measurement_cross_label_changes_per_family": 6,
+                "minimum_distinct_measurement_catalog_sources_per_family": 16,
+                "minimum_measurement_accepted_cross_label_changes_per_family": 128,
+                "minimum_measurement_label_delta_rank_per_family": 64,
+                "minimum_nonbasis_character_leave_return_chains_per_family": 1,
             }
             or value.get("scope") != {
                 "formal_authorization": False,
@@ -146,7 +158,7 @@ def load_v0_config(path, *, registry=None):
                 "production_authorization": False,
                 "purpose": "diagnostic_only_not_a_posterior_or_physics_result",
             }
-            or value.get("seed_namespace") != "exp102.q0_logical_stratified.v0.20260723"):
+            or value.get("seed_namespace") != "exp102.q0_logical_stratified.v0.v2.20260723"):
         raise LogicalStratifiedV0ConflictError("V0 schedule/gates/scope changed")
     _require_sha(value.get("registry_sha256"), 64, "V0 registry SHA")
     if registry is not None and value["registry_sha256"] != registry["registry_sha256"]:
@@ -155,6 +167,20 @@ def load_v0_config(path, *, registry=None):
     result["v0_config_sha256"] = sha256_file(path)
     result["config_path"] = str(Path(path).resolve())
     return result
+
+
+def _hostname_short():
+    return socket.gethostname().split(".", 1)[0]
+
+
+def _artifact_authority(config, *, require_producer):
+    """Bind one artifact builder; every other host only verifies its bytes."""
+    authority = config["artifact_authority"]
+    if require_producer and _hostname_short() != authority["producer_node"]:
+        raise LogicalStratifiedV0ConflictError(
+            "V0 artifact construction must run on the frozen producer node",
+        )
+    return dict(authority)
 
 
 def _uniform_seed(registry, code, cell):
@@ -223,6 +249,7 @@ def prepare_v0_artifacts(registry_path, config_path, source_commit, archive_sha2
     _require_sha(source_manifest_sha256, 64, "source manifest SHA")
     registry = load_registry(registry_path)
     config = load_v0_config(config_path, registry=registry)
+    authority = _artifact_authority(config, require_producer=True)
     artifact_root = Path(artifact_root)
     if artifact_root.exists():
         raise FileExistsError(f"V0 artifact root already exists: {artifact_root}")
@@ -250,6 +277,7 @@ def prepare_v0_artifacts(registry_path, config_path, source_commit, archive_sha2
         tau = float(candidate["alpha_temperature"])
         identity = {
             "archive_sha256": archive_sha256,
+            "artifact_authority": authority,
             "cell_fingerprint": _cell_fingerprint(config["cell"]),
             "config_sha256": config["v0_config_sha256"],
             "method_id": candidate["method_id"],
@@ -275,6 +303,7 @@ def prepare_v0_artifacts(registry_path, config_path, source_commit, archive_sha2
             **_artifact_descriptor_file(relative, written),
         })
     identity = {
+        "artifact_authority": authority,
         "artifact_rows": artifact_rows,
         "cell": config["cell"],
         "codebook_sha256": codebook.codebook_sha256,
@@ -291,13 +320,62 @@ def prepare_v0_artifacts(registry_path, config_path, source_commit, archive_sha2
     return artifact_manifest
 
 
-def _load_artifact_manifest(artifact_root):
+def _load_artifact_manifest(artifact_root, config):
     path = Path(artifact_root) / "ARTIFACT_MANIFEST.json"
     value = _load_canonical_json(path)
     identity = dict(value)
     digest = identity.pop("artifact_manifest_sha256", None)
-    if digest != sha256_json(identity):
+    expected_fields = {
+        "artifact_authority", "artifact_rows", "cell", "codebook_sha256",
+        "config_sha256", "contract_version", "matrix_syndrome_sha256",
+        "registry_sha256", "tail_candidate_indices", "tail_indices_sha256",
+        "uniform_seed",
+    }
+    if (set(identity) != expected_fields
+            or digest != sha256_json(identity)
+            or value["artifact_authority"] != _artifact_authority(
+                config, require_producer=False,
+            )
+            or value["cell"] != config["cell"]
+            or value["contract_version"] != V0_CONTRACT_VERSION
+            or value["config_sha256"] != config["v0_config_sha256"]
+            or value["registry_sha256"] != config["registry_sha256"]):
         raise LogicalStratifiedV0ConflictError("V0 artifact manifest SHA changed")
+    for name in (
+            "codebook_sha256", "matrix_syndrome_sha256", "tail_indices_sha256"):
+        _require_sha(value[name], 64, f"V0 artifact manifest {name}")
+    tail = value["tail_candidate_indices"]
+    if (not isinstance(tail, list)
+            or len(tail) != config["trajectories_per_family"]
+            or any(isinstance(item, bool) or not isinstance(item, int)
+                   or item < 0 or item > np.iinfo(np.int32).max for item in tail)
+            or len(set(tail)) != len(tail)):
+        raise LogicalStratifiedV0ConflictError("V0 artifact tail schedule changed")
+    tail_array = np.asarray(tail, dtype=np.int32)
+    if hashlib.sha256(tail_array.astype(">i4").tobytes()).hexdigest() != value[
+            "tail_indices_sha256"]:
+        raise LogicalStratifiedV0ConflictError("V0 artifact tail SHA changed")
+    uniform_seed = value["uniform_seed"]
+    if (isinstance(uniform_seed, bool) or not isinstance(uniform_seed, int)
+            or not 0 <= uniform_seed < 1 << 64):
+        raise LogicalStratifiedV0ConflictError("V0 artifact uniform seed changed")
+    rows = value["artifact_rows"]
+    if not isinstance(rows, list) or len(rows) != len(config["candidates"]):
+        raise LogicalStratifiedV0ConflictError("V0 artifact row count changed")
+    expected_row_fields = {
+        "alpha_temperature", "method_id", "artifact_relpath",
+        "artifact_file_sha256", "artifact_content_sha256", "descriptor",
+    }
+    for row, candidate in zip(rows, config["candidates"]):
+        tau = candidate["alpha_temperature"]
+        if (not isinstance(row, dict) or set(row) != expected_row_fields
+                or row["alpha_temperature"] != tau
+                or row["method_id"] != candidate["method_id"]
+                or row["artifact_relpath"] != _artifact_relpath(tau)
+                or not isinstance(row["descriptor"], dict)):
+            raise LogicalStratifiedV0ConflictError("V0 artifact row changed")
+        _require_sha(row["artifact_file_sha256"], 64, "V0 artifact file SHA")
+        _require_sha(row["artifact_content_sha256"], 64, "V0 artifact content SHA")
     return value
 
 
@@ -340,12 +418,14 @@ def _task_identity(config, source_commit, archive_sha256, source_manifest_sha256
 
 
 def build_v0_manifest(registry_path, config_path, source_commit, archive_sha256,
-                      source_manifest_sha256, artifact_root, output_path=None):
+                      source_manifest_sha256, artifact_root, output_path=None,
+                      *, _require_producer=True):
     _require_sha(source_commit, 40, "source commit")
     _require_sha(archive_sha256, 64, "archive SHA")
     _require_sha(source_manifest_sha256, 64, "source manifest SHA")
     registry = load_registry(registry_path)
     config = load_v0_config(config_path, registry=registry)
+    authority = _artifact_authority(config, require_producer=_require_producer)
     artifact_root = Path(artifact_root).resolve()
     if output_path is not None:
         output_path = Path(output_path)
@@ -356,7 +436,12 @@ def build_v0_manifest(registry_path, config_path, source_commit, archive_sha256,
                 or output_path.name != "V0_MANIFEST.json"
                 or output_path.parent.name != "control"):
             raise LogicalStratifiedV0ConflictError("V0 manifest/artifact layout changed")
-    artifacts = _load_artifact_manifest(artifact_root)
+    artifacts = _load_artifact_manifest(artifact_root, config)
+    if artifacts["artifact_authority"] != authority:
+        raise LogicalStratifiedV0ConflictError("V0 artifact producer authority changed")
+    _, _, _, _, _, expected_uniform_seed, _, _ = _context(registry_path, config)
+    if artifacts["uniform_seed"] != int(expected_uniform_seed):
+        raise LogicalStratifiedV0ConflictError("V0 artifact uniform seed changed")
     expected_rows = [
         {"alpha_temperature": row["alpha_temperature"], "method_id": row["method_id"]}
         for row in artifacts["artifact_rows"]
@@ -367,8 +452,8 @@ def build_v0_manifest(registry_path, config_path, source_commit, archive_sha256,
     for row in artifacts["artifact_rows"]:
         for family in V0_FAMILIES:
             for trajectory in range(config["trajectories_per_family"]):
-                ordinal = len(tasks) % 24
-                node = V0_NODES[0] if ordinal < 12 else V0_NODES[1]
+                # Each adversarial start family must run on both sampling nodes.
+                node = V0_NODES[trajectory % len(V0_NODES)]
                 tasks.append(_task_identity(
                     config, source_commit, archive_sha256, source_manifest_sha256,
                     registry["registry_sha256"], row, family, trajectory, node,
@@ -376,6 +461,7 @@ def build_v0_manifest(registry_path, config_path, source_commit, archive_sha256,
     if len(tasks) != 48 or len({sha256_json(task) for task in tasks}) != len(tasks):
         raise AssertionError("V0 task schedule changed")
     identity = {
+        "artifact_authority": artifacts["artifact_authority"],
         "artifact_manifest_sha256": artifacts["artifact_manifest_sha256"],
         "artifact_root_relpath": V0_ARTIFACT_ROOT_RELPATH,
         "config_sha256": config["v0_config_sha256"],
@@ -401,7 +487,7 @@ def load_v0_manifest(path):
     identity = dict(value)
     digest = identity.pop("manifest_sha256", None)
     if (set(identity) != {
-            "artifact_manifest_sha256", "artifact_root_relpath", "config_sha256",
+            "artifact_authority", "artifact_manifest_sha256", "artifact_root_relpath", "config_sha256",
             "contract_version", "manifest_version", "registry_sha256",
             "source_commit", "archive_sha256", "source_manifest_sha256", "tasks",
         }
@@ -421,11 +507,84 @@ def validate_v0_manifest(manifest, registry_path, config_path, artifact_root):
         registry_path, config_path, manifest.get("source_commit", ""),
         manifest.get("archive_sha256", ""),
         manifest.get("source_manifest_sha256", ""),
-        artifact_root, None,
+        artifact_root, None, _require_producer=False,
     )
     if manifest != expected:
         raise LogicalStratifiedV0ConflictError("V0 manifest is noncanonical")
     return True
+
+
+def audit_v0_artifacts(registry_path, config_path, manifest_path):
+    """Algebraically audit the one frozen producer artifact without decoding anew."""
+    manifest = load_v0_manifest(manifest_path)
+    artifact_root = _manifest_artifact_root(manifest_path, manifest)
+    validate_v0_manifest(manifest, registry_path, config_path, artifact_root)
+    registry = load_registry(registry_path)
+    config = load_v0_config(config_path, registry=registry)
+    if manifest["artifact_authority"] != _artifact_authority(
+            config, require_producer=False,
+    ):
+        raise LogicalStratifiedV0ConflictError("V0 manifest artifact authority changed")
+    artifacts = _load_artifact_manifest(artifact_root, config)
+    _, code, H, model, frame, uniform_seed, _, syndrome = _context(registry_path, config)
+    if artifacts["uniform_seed"] != int(uniform_seed):
+        raise LogicalStratifiedV0ConflictError("V0 artifact uniform seed changed")
+    if artifacts["matrix_syndrome_sha256"] != _matrix_syndrome_sha256(model, syndrome):
+        raise LogicalStratifiedV0ConflictError("V0 artifact matrix/syndrome changed")
+    expected_tail = np.asarray(artifacts["tail_candidate_indices"], dtype=np.int32)
+    rows = []
+    for candidate in config["candidates"]:
+        task = next(
+            (item for item in manifest["tasks"]
+             if (item["artifact"]["method_id"] == candidate["method_id"]
+                 and item["init_family"] == V0_FAMILIES[0]
+                 and item["trajectory_index"] == 0)),
+        )
+        artifact = _artifact_for_task(artifact_root, task, model, frame)
+        identity = artifact.descriptor["identity"]
+        expected_identity = {
+            "archive_sha256": task["archive_sha256"],
+            "artifact_authority": manifest["artifact_authority"],
+            "cell_fingerprint": _cell_fingerprint(config["cell"]),
+            "config_sha256": task["config_sha256"],
+            "method_id": candidate["method_id"],
+            "registry_sha256": task["registry_sha256"],
+            "source_commit": task["source_commit"],
+            "source_manifest_sha256": task["source_manifest_sha256"],
+            "tail_indices_sha256": artifacts["tail_indices_sha256"],
+        }
+        if identity != expected_identity:
+            raise LogicalStratifiedV0ConflictError(
+                "V0 artifact identity changed",
+            )
+        if (artifact.codebook.codebook_sha256 != artifacts["codebook_sha256"]
+                or artifact.descriptor["matrix_syndrome_sha256"]
+                != artifacts["matrix_syndrome_sha256"]):
+            raise LogicalStratifiedV0ConflictError("V0 artifact matrix/codebook changed")
+        replayed_tail = _tail_indices(
+            artifact.codebook, artifact.transcript, artifact.catalog,
+            config["trajectories_per_family"],
+        )
+        if not np.array_equal(replayed_tail, expected_tail):
+            raise LogicalStratifiedV0ConflictError("V0 artifact tail schedule changed")
+        rows.append({
+            "method_id": candidate["method_id"],
+            "artifact_file_sha256": task["artifact"]["artifact_file_sha256"],
+            "artifact_content_sha256": task["artifact"]["artifact_content_sha256"],
+            "catalog_sha256": artifact.catalog.catalog_sha256,
+            "proposal_sha256": artifact.proposal.proposal_sha256,
+            "transcript_sha256": artifact.transcript.transcript_sha256,
+            "decoder_identity": artifact.transcript.decoder_identity,
+        })
+    identity = {
+        "artifact_authority": manifest["artifact_authority"],
+        "artifact_manifest_sha256": manifest["artifact_manifest_sha256"],
+        "artifact_rows": rows,
+        "artifact_audit_version": V0_ARTIFACT_AUDIT_VERSION,
+        "contract_version": V0_CONTRACT_VERSION,
+        "manifest_sha256": manifest["manifest_sha256"],
+    }
+    return {**identity, "artifact_audit_sha256": sha256_json(identity)}
 
 
 def _task_output_relpath(task):
@@ -559,6 +718,8 @@ def run_v0_node(manifest_path, registry_path, config_path, node, raw_root,
     """Run this node's fixed ownership slice with fork-shared frozen artifacts."""
     if node not in V0_NODES:
         raise ValueError("unknown V0 execution node")
+    if _hostname_short() != node:
+        raise LogicalStratifiedV0ConflictError("V0 node ownership host changed")
     num_workers = _require_positive_int(num_workers, "num_workers")
     manifest = load_v0_manifest(manifest_path)
     artifact_root = _manifest_artifact_root(manifest_path, manifest)
@@ -592,11 +753,12 @@ def run_v0_node(manifest_path, registry_path, config_path, node, raw_root,
 
 
 def _portable_raw_sha(raw):
+    """Hash the replay-defining discrete trace, excluding platform libm values."""
     digest = hashlib.sha256()
     for name in sorted(raw):
-        if name in {"core_seconds", "wall_seconds"}:
-            continue
         value = np.ascontiguousarray(np.asarray(raw[name]))
+        if name in {"core_seconds", "wall_seconds"} or value.dtype.kind == "f":
+            continue
         digest.update(name.encode("ascii") + b"\0")
         digest.update(value.dtype.str.encode("ascii") + b"\0")
         digest.update(np.asarray(value.shape, dtype=">u8").tobytes())
@@ -605,11 +767,15 @@ def _portable_raw_sha(raw):
 
 
 def preflight_v0(registry_path, config_path, manifest_path, node, output_path):
-    """Validate artifacts and replay six short fixed-clock probes on a node."""
+    """Audit one frozen artifact and replay six short fixed-clock probes."""
+    if node not in V0_AUDIT_NODES:
+        raise ValueError("unknown V0 preflight node")
+    if node.startswith("nd-") and _hostname_short() != node:
+        raise LogicalStratifiedV0ConflictError("V0 preflight host changed")
     manifest = load_v0_manifest(manifest_path)
     artifact_root = _manifest_artifact_root(manifest_path, manifest)
     validate_v0_manifest(manifest, registry_path, config_path, artifact_root)
-    tasks = [task for task in manifest["tasks"] if task["node"] == node]
+    artifact_audit = audit_v0_artifacts(registry_path, config_path, manifest_path)
     all_tasks = manifest["tasks"]
     context = _node_context(registry_path, config_path, artifact_root, all_tasks)
     registry, code, H, model, frame, uniform_seed, epsilon, syndrome, config, artifacts = context
@@ -630,12 +796,13 @@ def preflight_v0(registry_path, config_path, manifest_path, node, output_path):
             rows.append({
                 "alpha_temperature": tau,
                 "init_family": family,
-                "portable_raw_sha256": _portable_raw_sha(payload),
+                "portable_discrete_raw_sha256": _portable_raw_sha(payload),
                 "artifact_content_sha256": template["artifact"]["artifact_content_sha256"],
             })
     identity = {
         "contract_version": V0_CONTRACT_VERSION,
         "preflight_version": V0_PREFLIGHT_VERSION,
+        "artifact_audit_sha256": artifact_audit["artifact_audit_sha256"],
         "manifest_sha256": manifest["manifest_sha256"],
         "node": node,
         "rows": rows,
@@ -655,7 +822,17 @@ def _scalar(data, name):
     return np.asarray(value).item()
 
 
-def validate_v0_raw(path, manifest_path, registry_path, config_path):
+def _portable_float_replay_matches(observed, expected):
+    observed = np.asarray(observed, dtype=np.float64)
+    expected = np.asarray(expected, dtype=np.float64)
+    if (observed.shape != expected.shape or not np.all(np.isfinite(observed))
+            or not np.all(np.isfinite(expected))):
+        return False
+    scale = np.maximum(1.0, np.maximum(np.abs(observed), np.abs(expected)))
+    return bool(np.all(np.abs(observed - expected) <= 64.0 * np.finfo(np.float64).eps * scale))
+
+
+def validate_v0_raw(path, manifest_path, registry_path, config_path, *, portable=False):
     """Load a raw NPZ without pickle and deterministically replay all decisions."""
     manifest = load_v0_manifest(manifest_path)
     artifact_root = _manifest_artifact_root(manifest_path, manifest)
@@ -682,12 +859,10 @@ def validate_v0_raw(path, manifest_path, registry_path, config_path):
     context = _node_context(
         registry_path, config_path, artifact_root, [task],
     )
-    expected = _run_task_from_context(context, task)
-    expected_payload = _raw_payload(
-        task, expected, config=context[8], artifact_row=task["artifact"],
-        core_seconds=float(_scalar(raw, "core_seconds")),
-        wall_seconds=float(_scalar(raw, "wall_seconds")),
-    )
+    expected_payload = _run_task_from_context(context, task)
+    # Wall and CPU timing are evidence of resource use, not replay decisions.
+    expected_payload["core_seconds"] = np.float64(_scalar(raw, "core_seconds"))
+    expected_payload["wall_seconds"] = np.float64(_scalar(raw, "wall_seconds"))
     if set(raw) != set(expected_payload):
         raise LogicalStratifiedV0ConflictError("V0 raw schema changed")
     for name, expected_value in expected_payload.items():
@@ -695,12 +870,30 @@ def validate_v0_raw(path, manifest_path, registry_path, config_path):
             if not np.isfinite(float(_scalar(raw, name))) or float(_scalar(raw, name)) < 0.0:
                 raise LogicalStratifiedV0ConflictError("V0 raw timing is invalid")
             continue
+        if portable and np.asarray(expected_value).dtype.kind == "f":
+            if not _portable_float_replay_matches(raw[name], expected_value):
+                raise LogicalStratifiedV0ConflictError("V0 portable float replay changed")
+            continue
         if not np.array_equal(raw[name], np.asarray(expected_value)):
             raise LogicalStratifiedV0ConflictError(f"V0 raw replay changed: {name}")
     return task
 
 
+def _character_leave_return(labels, masks):
+    """Return one flag per character for a leave-and-return within one stage."""
+    signs = character_values(labels, masks)
+    origin = signs[0]
+    left = np.zeros(signs.shape[1], dtype=bool)
+    returned = np.zeros(signs.shape[1], dtype=bool)
+    for values in signs[1:]:
+        changed = values != origin
+        returned |= left & ~changed
+        left |= changed
+    return returned.astype(np.uint8)
+
+
 def _chain_transport(raw, k, masks, num_qubits):
+    """Extract measurement-only logical transport without signed-int masks."""
     labels = np.asarray(raw["measurement_labels"], dtype=np.uint64)
     previous = np.concatenate((
         np.asarray([np.uint64(_scalar(raw, "burn_label"))], dtype=np.uint64),
@@ -714,23 +907,16 @@ def _chain_transport(raw, k, masks, num_qubits):
     deltas = labels ^ previous
     source_indices = np.asarray(raw["measurement_proposal_anchor_index"], dtype=np.int16)
     sources = np.unique(source_indices[accepted_cross & (source_indices >= 0)])
-    all_labels = np.concatenate((
-        np.asarray([np.uint64(_scalar(raw, "initial_label"))], dtype=np.uint64),
-        np.asarray(raw["burn_labels"], dtype=np.uint64), labels,
+    masks = np.asarray(masks, dtype=np.uint64)
+    basis = np.asarray([
+        np.uint64(1) << np.uint64(bit) for bit in range(k)
+    ], dtype=np.uint64)
+    if masks.ndim != 1 or masks.size < k or not np.array_equal(masks[:k], basis):
+        raise LogicalStratifiedV0ConflictError("V0 diagnostic character order changed")
+    stage_labels = np.concatenate((
+        np.asarray([np.uint64(_scalar(raw, "burn_label"))], dtype=np.uint64), labels,
     ))
-    signs = character_values(all_labels, masks)
-    leave_return = 0
-    for column in range(signs.shape[1]):
-        origin = signs[0, column]
-        left = False
-        for value in signs[1:, column]:
-            if value != origin:
-                left = True
-            elif left:
-                leave_return = 1
-                break
-        if leave_return:
-            break
+    leave_return = _character_leave_return(stage_labels, masks)
     basis_changed = np.asarray([
         int(np.count_nonzero(accepted_cross & ((deltas >> np.uint64(bit)) & 1).astype(bool)))
         for bit in range(k)
@@ -738,10 +924,13 @@ def _chain_transport(raw, k, masks, num_qubits):
     return {
         "measurement_cross_label_changes": int(accepted_cross.sum()),
         "burn_cross_label_changes": int(_scalar(raw, "burn_cross_label_changes")),
-        "distinct_catalog_sources": [int(value) for value in sources],
-        "leave_return_character": int(leave_return),
+        "measurement_catalog_sources": [int(value) for value in sources],
+        "measurement_character_leave_return": [int(value) for value in leave_return],
         "basis_character_changes": basis_changed.tolist(),
         "accepted_cross_label_deltas": [int(value) for value in deltas[accepted_cross]],
+        "measurement_accepted_label_delta_rank": _signature_rank_masks(
+            deltas[accepted_cross], k,
+        ),
         "initial_weight": int(np.unpackbits(
             raw["initial_state_packed"], count=int(num_qubits),
             bitorder="little",
@@ -750,7 +939,83 @@ def _chain_transport(raw, k, masks, num_qubits):
     }
 
 
-def analyze_v0(raw_root, manifest_path, registry_path, config_path, output_path=None):
+def _transport_group_summary(subset, *, k, num_nonbasis, gates,
+                             trajectories_per_family):
+    """Apply the pre-registered full-rank transport gate to one start family."""
+    measurement_changes = [
+        int(row["measurement_cross_label_changes"]) for row in subset
+    ]
+    burn_changes = [int(row["burn_cross_label_changes"]) for row in subset]
+    sources = {
+        int(source) for row in subset
+        for source in row["measurement_catalog_sources"]
+    }
+    deltas = [
+        np.uint64(delta) for row in subset
+        for delta in row["accepted_cross_label_deltas"]
+    ]
+    expected_character_count = int(k) + int(num_nonbasis)
+    character_flags = (
+        np.asarray([
+            row["measurement_character_leave_return"] for row in subset
+        ], dtype=np.uint8)
+        if subset else np.zeros((0, expected_character_count), dtype=np.uint8)
+    )
+    if (character_flags.shape != (len(subset), expected_character_count)
+            or np.any((character_flags != 0) & (character_flags != 1))):
+        raise LogicalStratifiedV0ConflictError("V0 character transport trace changed")
+    basis_flags = character_flags[:, :k]
+    nonbasis_flags = character_flags[:, k:]
+    basis_counts = basis_flags.sum(axis=0, dtype=np.int32)
+    nonbasis_counts = nonbasis_flags.sum(axis=0, dtype=np.int32)
+    summary = {
+        "chain_count": len(subset),
+        "measurement_accepted_cross_label_changes": int(sum(measurement_changes)),
+        "burn_accepted_cross_label_changes": int(sum(burn_changes)),
+        "chains_with_eight_measurement_cross_label_changes": int(sum(
+            value >= 8 for value in measurement_changes
+        )),
+        "distinct_measurement_catalog_sources": len(sources),
+        "measurement_accepted_label_delta_rank": _signature_rank_masks(deltas, k),
+        "basis_character_leave_return_chains": basis_counts.tolist(),
+        "nonbasis_character_leave_return_chains": nonbasis_counts.tolist(),
+        "basis_characters_with_measurement_leave_return": int(
+            np.count_nonzero(basis_counts)
+        ),
+        "nonbasis_characters_with_measurement_leave_return": int(
+            np.count_nonzero(nonbasis_counts)
+        ),
+        "chains_with_any_measurement_character_leave_return": int(sum(
+            np.any(row["measurement_character_leave_return"]) for row in subset
+        )),
+        "median_wall_seconds": float(np.median([
+            row["wall_seconds"] for row in subset
+        ])) if subset else None,
+    }
+    summary["passes_transport_gate"] = bool(
+        summary["chain_count"] == trajectories_per_family
+        and summary["measurement_accepted_cross_label_changes"]
+        >= gates["minimum_measurement_accepted_cross_label_changes_per_family"]
+        and summary["chains_with_eight_measurement_cross_label_changes"]
+        >= gates[
+            "minimum_chains_with_eight_measurement_cross_label_changes_per_family"
+        ]
+        and summary["distinct_measurement_catalog_sources"]
+        >= gates["minimum_distinct_measurement_catalog_sources_per_family"]
+        and summary["measurement_accepted_label_delta_rank"]
+        >= gates["minimum_measurement_label_delta_rank_per_family"]
+        and np.all(basis_counts >= gates[
+            "minimum_basis_character_leave_return_chains_per_family"
+        ])
+        and np.all(nonbasis_counts >= gates[
+            "minimum_nonbasis_character_leave_return_chains_per_family"
+        ])
+    )
+    return summary
+
+
+def analyze_v0(raw_root, manifest_path, registry_path, config_path, output_path=None,
+               *, portable=False):
     """Analyze only pre-registered transport observables; never estimate q_top."""
     manifest = load_v0_manifest(manifest_path)
     artifact_root = _manifest_artifact_root(manifest_path, manifest)
@@ -765,6 +1030,8 @@ def analyze_v0(raw_root, manifest_path, registry_path, config_path, output_path=
     characters = frozen_character_set(
         model.k, character_seed, config["frozen_nonbasis_characters"],
     )
+    if characters.masks.size != model.k + config["frozen_nonbasis_characters"]:
+        raise LogicalStratifiedV0ConflictError("V0 diagnostic character count changed")
     raw_root = Path(raw_root)
     rows = []
     missing = []
@@ -773,7 +1040,9 @@ def analyze_v0(raw_root, manifest_path, registry_path, config_path, output_path=
         if not path.exists():
             missing.append(_task_output_relpath(task))
             continue
-        validate_v0_raw(path, manifest_path, registry_path, config_path)
+        validate_v0_raw(
+            path, manifest_path, registry_path, config_path, portable=portable,
+        )
         with np.load(path, allow_pickle=False) as data:
             raw = {name: data[name].copy() for name in data.files}
         row = {
@@ -797,37 +1066,10 @@ def analyze_v0(raw_root, manifest_path, registry_path, config_path, output_path=
                 if float(row["alpha_temperature"]) == tau
                 and row["init_family"] == family
             ]
-            changes = [
-                row["measurement_cross_label_changes"] + row["burn_cross_label_changes"]
-                for row in subset
-            ]
-            source_count = len({
-                source for row in subset for source in row["distinct_catalog_sources"]
-            })
-            grouped[str(tau)][family] = {
-                "chain_count": len(subset),
-                "accepted_cross_label_changes": int(sum(changes)),
-                "chains_with_two_cross_label_changes": int(sum(value >= 2 for value in changes)),
-                "distinct_catalog_sources": source_count,
-                "leave_return_character_chains": int(sum(
-                    row["leave_return_character"] for row in subset
-                )),
-                "median_wall_seconds": float(np.median([
-                    row["wall_seconds"] for row in subset
-                ])) if subset else None,
-            }
-        values = grouped[str(tau)]
-        for family, value in values.items():
-            value["passes_transport_gate"] = bool(
-                value["chain_count"] == config["trajectories_per_family"]
-                and value["accepted_cross_label_changes"]
-                >= gates["minimum_accepted_cross_label_changes_per_family"]
-                and value["chains_with_two_cross_label_changes"]
-                >= gates["minimum_chains_with_two_cross_label_changes_per_family"]
-                and value["distinct_catalog_sources"]
-                >= gates["minimum_distinct_catalog_sources_per_family"]
-                and value["leave_return_character_chains"]
-                >= gates["minimum_leave_return_character_chains_per_family"]
+            grouped[str(tau)][family] = _transport_group_summary(
+                subset, k=model.k,
+                num_nonbasis=config["frozen_nonbasis_characters"], gates=gates,
+                trajectories_per_family=config["trajectories_per_family"],
             )
     complete = not missing and len(rows) == len(manifest["tasks"])
     passing = [
@@ -843,6 +1085,7 @@ def analyze_v0(raw_root, manifest_path, registry_path, config_path, output_path=
         "contract_version": V0_CONTRACT_VERSION,
         "report_version": V0_REPORT_VERSION,
         "manifest_sha256": manifest["manifest_sha256"],
+        "portable_float_replay": bool(portable),
         "character_sha256": characters.character_sha256,
         "raw_rows": rows,
         "missing": missing,
@@ -874,6 +1117,10 @@ def _parser():
         item.add_argument("--artifact-root", required=True)
         if name == "build-manifest":
             item.add_argument("--output", required=True)
+    item = subparsers.add_parser("audit-artifacts")
+    item.add_argument("--registry", required=True)
+    item.add_argument("--config", required=True)
+    item.add_argument("--manifest", required=True)
     item = subparsers.add_parser("preflight")
     item.add_argument("--registry", required=True)
     item.add_argument("--config", required=True)
@@ -893,6 +1140,7 @@ def _parser():
     item.add_argument("--manifest", required=True)
     item.add_argument("--raw-root", required=True)
     item.add_argument("--output", required=True)
+    item.add_argument("--portable", action="store_true")
     return parser
 
 
@@ -908,6 +1156,8 @@ def main(argv=None):
             args.registry, args.config, args.source_commit, args.archive_sha256,
             args.source_manifest_sha256, args.artifact_root, args.output,
         )
+    elif args.command == "audit-artifacts":
+        result = audit_v0_artifacts(args.registry, args.config, args.manifest)
     elif args.command == "preflight":
         result = preflight_v0(
             args.registry, args.config, args.manifest, args.node, args.output,
@@ -920,6 +1170,7 @@ def main(argv=None):
     else:
         result = analyze_v0(
             args.raw_root, args.manifest, args.registry, args.config, args.output,
+            portable=args.portable,
         )
     print(canonical_json(result))
 

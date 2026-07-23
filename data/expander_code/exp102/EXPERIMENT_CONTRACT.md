@@ -96,3 +96,25 @@ The sole possible V0 success string is `LOGICAL_TRANSPORT_VIABLE_FOR_HARD2_SCREE
 only that the proposal merits a fresh HARD2 comparison with an independent confirmer.  It is not
 `READY_FOR_FORMAL`, does not certify convergence, and cannot authorize tuning, held-out, or any
 production task.
+
+## Logical-signature V0v2 boundary
+
+V0v1 is terminally `CONFLICT_CROSS_ENV_ARTIFACT_IDENTITY`; its source and
+artifact bytes must not be retried or repurposed.  The successor
+`exp102.q0_logical_stratified.v0.v2` is an equally narrow, fresh diagnostic
+whose config and procedures are frozen in
+`validation/015_q0_logical_stratified_v0b_20260723/`.  It fixes exactly one
+proposal producer (`nd-1`) under `single_producer_algebraic_audit.v1`.
+Other hosts audit the identical frozen bytes without rerunning BpLSD/MILP;
+their static artifact-audit SHA and fixed-probe discrete trace SHA must agree.
+
+V0v2 retains planted `P`, exact-K0 `U`, and legal decoded-tail `L` starts.
+It cannot replace these with physical all-zero starts because this hard
+syndrome is nonzero; shifted-coordinate zero is already `P`.  Its transport
+gate is measurement-only and requires, separately for each proposal
+temperature and each P/U/L family, 128 accepted cross-label moves, six chains
+with at least eight such moves, 16 catalog sources, rank-64 accepted label
+deltas, and leave-return coverage for every basis and frozen nonbasis
+character.  Burn-only movement, total acceptance, and same-sector changes are
+diagnostics, not success evidence.  A pass remains only
+`LOGICAL_TRANSPORT_VIABLE_FOR_HARD2_SCREEN` and has no formal authority.

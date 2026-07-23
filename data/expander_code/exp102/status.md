@@ -45,6 +45,23 @@ cross-version recomputation. It must also retain the P/U/legal-tail
 initialization red-team and cannot treat a physical all-zero state as legal
 for this nonzero-syndrome hard coset.
 
+**Q=0 LOGICAL-STRATIFIED V0v2 IMPLEMENTED / NOT YET DEPLOYED**
+
+The fresh successor contract is
+`exp102.q0_logical_stratified.v0.v2`, documented in
+`validation/015_q0_logical_stratified_v0b_20260723/`. It designates `nd-1`
+as the one artifact producer and requires `nd-1/nd-2/nd-3/macmini` to audit
+the exact frozen bytes algebraically rather than independently rerunning
+BpLSD/MILP. It also splits every P/U/L family across both sampling nodes and
+requires measurement-only rank-64 accepted label deltas plus leave-return
+coverage for all basis and frozen nonbasis characters. Local exp101+exp102
+regression passed 847 tests before deployment preparation.
+
+This is source-level validation only. No V0v2 deployment, artifact, manifest,
+cross-host audit, preflight, sampler raw, transport result, tuning, held-out,
+or production task exists yet. A future V0v2 run must use a fresh clean source
+archive and fresh run ID; it remains diagnostic-only even if it passes.
+
 **Q=0 HGP HARD-PAIR DIAGNOSTIC V2 UNRESOLVED -- formal work remains blocked**
 
 The immutable v2 run `exp102_q0_hgp_screen_v2_20260722_4d134ee` completed the

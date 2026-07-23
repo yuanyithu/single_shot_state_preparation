@@ -107,6 +107,7 @@ sampler config、pilot、held-out 和 6144 个生产任务均不存在。生产 
 `GLOBAL_SCREEN_DIAGNOSTIC_CONTRACT.md` 与 `status.md`。
 
 - **生产 convention 固定**：`sector=x_error`、`H_check=H_Z`、稳定子 move=`H_X` 行、logical move=`logical_X`、observable=`logical_Z`、制备态=`|+>_L`；对偶 `z_error/H_X` 才对应 `|0>_L`。现有矩阵接线不交换。
+- **跨环境 proposal artifact**：BpLSD/MILP 的多个版本可对同一 hard coset 给出不同但都代数有效的 anchor；不得要求这些重建结果逐字相同，也不得混用。`q0_logical_stratified.v0.v2` 只允许 `nd-1` 构造一次 artifact，其余节点/macmini 只审计同一冻结字节、代数和离散回放；不通过则 `CONFLICT`。
 - **生产 posterior 固定**：`pi(e|y_eff) ∝ exp[-K_p|e|-K_q|H_check e xor y_eff|]`，`y_eff=H_check epsilon_data_true xor measurement_error`；真实错误不得直接进入能量、Metropolis/TI/PT 比值。正式系综名为 `true_posterior`、`legacy_delta_only`，`paper_true_posterior/repo_compat` 只作先归一化的 deprecated alias。
 - **三种 section 不混用**：meta-check measurement-error decoder、preparation-chain representative、logical-sector section 的 domain/用途不同；q>0 的一般 `effective_syndrome` 不在 `im(H_check)`，禁止传给 logical-sector section。
 - **统计量不混称**：同时区分 absolute/relative characters、`posterior_mass_on_planted_class`、`posterior_purity` 与 `map_success_probability`；公共 `w0` 已废弃。exact/解析端点只填 algebraic MAP bounds，普通 TI 与 sampled 只填 plug-in estimated bounds，后者统一标注 `no confidence coverage`。只保证 boundary-only section shift 不变，不再声称任意 frame change 是 gauge。
