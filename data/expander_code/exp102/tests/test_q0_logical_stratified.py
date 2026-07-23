@@ -10,6 +10,7 @@ from data.expander_code.exp102.exp102_pipeline.q0_logical_stratified import (
     LogicalStratifiedSeedIdentity,
     STRATIFIED_METHOD_ID,
     _bits_to_uint64,
+    _gf2_row_products,
     _signature_rank_masks,
     _uint64_to_bits,
     build_logical_stratified_frozen_artifact,
@@ -97,6 +98,25 @@ def _catalog(model, frame, syndrome, max_anchors):
         codebook_sha256="a" * 64,
     )
     return catalog, states
+
+
+def test_sparse_gf2_candidate_replay_matches_dense_integer_product():
+    matrix = np.asarray([
+        [0, 0, 0, 0, 0, 0, 0],
+        [1, 0, 1, 0, 1, 0, 1],
+        [1, 1, 1, 1, 1, 1, 1],
+        [0, 1, 0, 0, 1, 1, 0],
+    ], dtype=np.uint8)
+    states = np.asarray([
+        [0, 0, 0, 0, 0, 0, 0],
+        [1, 0, 1, 0, 1, 0, 1],
+        [1, 1, 0, 0, 1, 1, 0],
+        [1, 1, 1, 1, 1, 1, 1],
+    ], dtype=np.uint8)
+    expected = (
+        matrix.astype(np.int64) @ states.T.astype(np.int64) % 2
+    ).astype(np.uint8)
+    assert np.array_equal(_gf2_row_products(matrix, states), expected)
 
 
 @pytest.mark.parametrize("classical", [

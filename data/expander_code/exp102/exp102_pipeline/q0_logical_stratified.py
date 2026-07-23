@@ -727,6 +727,22 @@ def _candidate_transcript_digest(codebook, valid, decoded_weights, decoded_packe
     )
 
 
+def _gf2_row_products(matrix, states):
+    """Compute ``matrix @ states.T`` over GF(2) without dense integer products."""
+    matrix = _as_bits(matrix, ndim=2, name="GF(2) matrix")
+    states = _as_bits(states, ndim=2, name="GF(2) states")
+    if matrix.shape[1] != states.shape[1]:
+        raise ValueError("GF(2) matrix/state dimensions are incompatible")
+    result = np.zeros((matrix.shape[0], states.shape[0]), dtype=np.uint8)
+    for row_index in range(matrix.shape[0]):
+        support = np.flatnonzero(matrix[row_index])
+        if support.size:
+            result[row_index] = np.bitwise_xor.reduce(
+                states[:, support], axis=1,
+            )
+    return result
+
+
 def validate_decoded_candidate_transcript(model, frame, H, syndrome, codebook,
                                           base_anchor, transcript):
     """Replay every decoder candidate against the augmented hard-coset system."""
@@ -756,20 +772,23 @@ def validate_decoded_candidate_transcript(model, frame, H, syndrome, codebook,
         transcript.decoded_packed, model.num_qubits, "transcript decoded states",
     )
     valid_indices = np.flatnonzero(transcript.valid)
+    augmented = np.vstack((model.H_check, frame.W_basis)).astype(np.uint8)
+    bit_positions = np.arange(model.k, dtype=np.uint64)
     for start in range(0, valid_indices.size, 1024):
         indices = valid_indices[start:start + 1024]
         states = np.unpackbits(
             packed[indices], axis=1, count=model.num_qubits, bitorder="little",
         ).astype(np.uint8, copy=False)
-        label_targets = np.asarray([
-            _uint64_to_bits(base_label ^ codebook.signatures[index], model.k)
-            for index in indices
-        ], dtype=np.uint8)
+        label_values = np.asarray(
+            codebook.signatures[indices] ^ np.uint64(base_label), dtype=np.uint64,
+        )
+        label_targets = (
+            (label_values[:, None] >> bit_positions[None, :]) & np.uint64(1)
+        ).astype(np.uint8)
         targets = np.concatenate((
             np.repeat(y[:, None], indices.size, axis=1), label_targets.T,
         ), axis=0)
-        augmented = np.vstack((model.H_check, frame.W_basis)).astype(np.int64)
-        recovered = (augmented @ states.T.astype(np.int64) % 2).astype(np.uint8)
+        recovered = _gf2_row_products(augmented, states)
         if (not np.array_equal(recovered, targets)
                 or not np.array_equal(
                     states.sum(axis=1).astype(np.int32),

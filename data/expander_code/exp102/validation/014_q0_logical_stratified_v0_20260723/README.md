@@ -11,3 +11,8 @@ Every command is executed from `run_verified_source.sh`; this wrapper only
 adds exclusive stage markers and logs.  A V0 report can say at most
 `LOGICAL_TRANSPORT_VIABLE_FOR_HARD2_SCREEN`, which is evidence for a later
 fresh HARD2 comparison, not convergence or authorization for exp102.
+
+The frozen manifest is always `control/V0_MANIFEST.json` and locates the
+immutable artifacts through `../artifacts`, never an absolute host path.
+Consequently a pulled run tree can be replayed unchanged on macmini; an
+altered layout or artifact digest is rejected before any raw is accepted.

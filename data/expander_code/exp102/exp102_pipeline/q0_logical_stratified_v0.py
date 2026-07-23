@@ -41,7 +41,7 @@ from .worker import build_model
 
 
 V0_CONTRACT_VERSION = "exp102.q0_logical_stratified.v0.v1"
-V0_MANIFEST_VERSION = "exp102.q0_logical_stratified.v0.manifest.v1"
+V0_MANIFEST_VERSION = "exp102.q0_logical_stratified.v0.manifest.v2"
 V0_RAW_VERSION = "exp102.q0_logical_stratified.v0.raw.v1"
 V0_PREFLIGHT_VERSION = "exp102.q0_logical_stratified.v0.preflight.v1"
 V0_REPORT_VERSION = "exp102.q0_logical_stratified.v0.report.v1"
@@ -55,6 +55,7 @@ V0_CELL = {
 V0_NODES = ("nd-2", "nd-3")
 V0_FAMILIES = ("P", "U", "L")
 V0_TAU = (0.5, 1.0)
+V0_ARTIFACT_ROOT_RELPATH = "../artifacts"
 V0_CONFIG_FIELDS = {
     "artifact", "candidates", "cell", "contract_version", "execution",
     "frozen_nonbasis_characters", "gates", "init_families", "registry_sha256",
@@ -300,6 +301,18 @@ def _load_artifact_manifest(artifact_root):
     return value
 
 
+def _manifest_artifact_root(manifest_path, manifest):
+    """Resolve the frozen artifact location relative to a portable manifest."""
+    path = Path(manifest_path).resolve()
+    if (manifest.get("artifact_root_relpath") != V0_ARTIFACT_ROOT_RELPATH
+            or path.name != "V0_MANIFEST.json" or path.parent.name != "control"):
+        raise LogicalStratifiedV0ConflictError("V0 artifact layout changed")
+    artifact_root = (path.parent / V0_ARTIFACT_ROOT_RELPATH).resolve()
+    if not artifact_root.is_dir():
+        raise LogicalStratifiedV0ConflictError("V0 artifact root is unavailable")
+    return artifact_root
+
+
 def _task_identity(config, source_commit, archive_sha256, source_manifest_sha256,
                    registry_sha256, artifact_row, family, trajectory, node):
     trajectory = _require_positive_int(trajectory + 1, "trajectory", minimum=1) - 1
@@ -333,6 +346,16 @@ def build_v0_manifest(registry_path, config_path, source_commit, archive_sha256,
     _require_sha(source_manifest_sha256, 64, "source manifest SHA")
     registry = load_registry(registry_path)
     config = load_v0_config(config_path, registry=registry)
+    artifact_root = Path(artifact_root).resolve()
+    if output_path is not None:
+        output_path = Path(output_path)
+        relative_artifact_root = os.path.relpath(
+            artifact_root, output_path.resolve().parent,
+        )
+        if (relative_artifact_root != V0_ARTIFACT_ROOT_RELPATH
+                or output_path.name != "V0_MANIFEST.json"
+                or output_path.parent.name != "control"):
+            raise LogicalStratifiedV0ConflictError("V0 manifest/artifact layout changed")
     artifacts = _load_artifact_manifest(artifact_root)
     expected_rows = [
         {"alpha_temperature": row["alpha_temperature"], "method_id": row["method_id"]}
@@ -354,7 +377,7 @@ def build_v0_manifest(registry_path, config_path, source_commit, archive_sha256,
         raise AssertionError("V0 task schedule changed")
     identity = {
         "artifact_manifest_sha256": artifacts["artifact_manifest_sha256"],
-        "artifact_root": str(Path(artifact_root).resolve()),
+        "artifact_root_relpath": V0_ARTIFACT_ROOT_RELPATH,
         "config_sha256": config["v0_config_sha256"],
         "contract_version": V0_CONTRACT_VERSION,
         "manifest_version": V0_MANIFEST_VERSION,
@@ -366,7 +389,7 @@ def build_v0_manifest(registry_path, config_path, source_commit, archive_sha256,
     }
     manifest = {**identity, "manifest_sha256": sha256_json(identity)}
     if output_path is not None:
-        path = Path(output_path)
+        path = output_path
         if path.exists():
             raise FileExistsError(f"V0 manifest already exists: {path}")
         atomic_json(path, manifest)
@@ -378,18 +401,19 @@ def load_v0_manifest(path):
     identity = dict(value)
     digest = identity.pop("manifest_sha256", None)
     if (set(identity) != {
-            "artifact_manifest_sha256", "artifact_root", "config_sha256",
+            "artifact_manifest_sha256", "artifact_root_relpath", "config_sha256",
             "contract_version", "manifest_version", "registry_sha256",
             "source_commit", "archive_sha256", "source_manifest_sha256", "tasks",
         }
             or identity["contract_version"] != V0_CONTRACT_VERSION
             or identity["manifest_version"] != V0_MANIFEST_VERSION
+            or identity["artifact_root_relpath"] != V0_ARTIFACT_ROOT_RELPATH
             or digest != sha256_json(identity)):
         raise LogicalStratifiedV0ConflictError("V0 manifest schema/SHA changed")
     return value
 
 
-def validate_v0_manifest(manifest, registry_path, config_path):
+def validate_v0_manifest(manifest, registry_path, config_path, artifact_root):
     """Rebuild the fixed schedule and reject any hand-edited task or artifact row."""
     if not isinstance(manifest, dict):
         raise TypeError("V0 manifest must be a dictionary")
@@ -397,7 +421,7 @@ def validate_v0_manifest(manifest, registry_path, config_path):
         registry_path, config_path, manifest.get("source_commit", ""),
         manifest.get("archive_sha256", ""),
         manifest.get("source_manifest_sha256", ""),
-        manifest.get("artifact_root", ""), None,
+        artifact_root, None,
     )
     if manifest != expected:
         raise LogicalStratifiedV0ConflictError("V0 manifest is noncanonical")
@@ -537,11 +561,12 @@ def run_v0_node(manifest_path, registry_path, config_path, node, raw_root,
         raise ValueError("unknown V0 execution node")
     num_workers = _require_positive_int(num_workers, "num_workers")
     manifest = load_v0_manifest(manifest_path)
-    validate_v0_manifest(manifest, registry_path, config_path)
+    artifact_root = _manifest_artifact_root(manifest_path, manifest)
+    validate_v0_manifest(manifest, registry_path, config_path, artifact_root)
     tasks = [task for task in manifest["tasks"] if task["node"] == node]
     if len(tasks) != 24:
         raise LogicalStratifiedV0ConflictError("V0 node ownership changed")
-    context = _node_context(registry_path, config_path, manifest["artifact_root"], tasks)
+    context = _node_context(registry_path, config_path, artifact_root, tasks)
     global _NODE_CONTEXT
     _NODE_CONTEXT = context
     raw_root = Path(raw_root)
@@ -582,10 +607,11 @@ def _portable_raw_sha(raw):
 def preflight_v0(registry_path, config_path, manifest_path, node, output_path):
     """Validate artifacts and replay six short fixed-clock probes on a node."""
     manifest = load_v0_manifest(manifest_path)
-    validate_v0_manifest(manifest, registry_path, config_path)
+    artifact_root = _manifest_artifact_root(manifest_path, manifest)
+    validate_v0_manifest(manifest, registry_path, config_path, artifact_root)
     tasks = [task for task in manifest["tasks"] if task["node"] == node]
     all_tasks = manifest["tasks"]
-    context = _node_context(registry_path, config_path, manifest["artifact_root"], all_tasks)
+    context = _node_context(registry_path, config_path, artifact_root, all_tasks)
     registry, code, H, model, frame, uniform_seed, epsilon, syndrome, config, artifacts = context
     rows = []
     for tau, artifact in sorted(artifacts.items()):
@@ -632,7 +658,8 @@ def _scalar(data, name):
 def validate_v0_raw(path, manifest_path, registry_path, config_path):
     """Load a raw NPZ without pickle and deterministically replay all decisions."""
     manifest = load_v0_manifest(manifest_path)
-    validate_v0_manifest(manifest, registry_path, config_path)
+    artifact_root = _manifest_artifact_root(manifest_path, manifest)
+    validate_v0_manifest(manifest, registry_path, config_path, artifact_root)
     try:
         with np.load(path, allow_pickle=False) as data:
             raw = {name: data[name].copy() for name in data.files}
@@ -653,7 +680,7 @@ def validate_v0_raw(path, manifest_path, registry_path, config_path):
     if task not in manifest["tasks"] or _scalar(raw, "task_fingerprint") != sha256_json(task):
         raise LogicalStratifiedV0ConflictError("V0 raw task changed")
     context = _node_context(
-        registry_path, config_path, manifest["artifact_root"], [task],
+        registry_path, config_path, artifact_root, [task],
     )
     expected = _run_task_from_context(context, task)
     expected_payload = _raw_payload(
@@ -726,7 +753,8 @@ def _chain_transport(raw, k, masks, num_qubits):
 def analyze_v0(raw_root, manifest_path, registry_path, config_path, output_path=None):
     """Analyze only pre-registered transport observables; never estimate q_top."""
     manifest = load_v0_manifest(manifest_path)
-    validate_v0_manifest(manifest, registry_path, config_path)
+    artifact_root = _manifest_artifact_root(manifest_path, manifest)
+    validate_v0_manifest(manifest, registry_path, config_path, artifact_root)
     registry = load_registry(registry_path)
     config = load_v0_config(config_path, registry=registry)
     _, code, H, model, frame, _, _, _ = _context(registry_path, config)
