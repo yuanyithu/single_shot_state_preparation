@@ -101,8 +101,9 @@ fi
   exit 69
 }
 mkdir -p "$stage_dir" "$(dirname "$log_file")"
-exec 9>"$stage_dir/stage.lock"
-flock -n 9 || exit 73
+# mkdir is atomic on every target host, unlike the Linux-only flock utility.
+mkdir "$stage_dir/.stage-lock" 2>/dev/null || exit 73
+: >"$stage_dir/stage.lock"
 for marker in RUNNING SUCCESS FAILED; do
   [[ ! -e "$stage_dir/$marker" ]] || {
     echo "V0v2 stage marker already exists: $stage_dir/$marker" >&2

@@ -342,7 +342,7 @@ def test_k64_measurement_transport_requires_full_rank_and_all_character_returns(
 
 
 def test_v0_wrapper_artifacts_handles_empty_prerequisites_under_nounset(tmp_path):
-    """The root stage must reach its controlled failure marker, not expand ()."""
+    """The root stage needs no flock binary or nonempty prerequisite array."""
     wrapper = (
         EXP102_ROOT
         / "validation/015_q0_logical_stratified_v0b_20260723/run_v0_stage.sh"
@@ -359,9 +359,6 @@ def test_v0_wrapper_artifacts_handles_empty_prerequisites_under_nounset(tmp_path
         encoding="ascii",
     )
     fake_python.chmod(0o755)
-    fake_flock = fake_bin / "flock"
-    fake_flock.write_text("#!/usr/bin/env bash\nexit 0\n", encoding="ascii")
-    fake_flock.chmod(0o755)
     environment = os.environ.copy()
     environment["EXP102_SOURCE_COMMIT"] = "1" * 40
     environment["PATH"] = f"{fake_bin}{os.pathsep}{environment['PATH']}"
@@ -380,5 +377,8 @@ def test_v0_wrapper_artifacts_handles_empty_prerequisites_under_nounset(tmp_path
     failed = json.loads((stage_dir / "FAILED").read_text(encoding="ascii"))
     assert failed["exit_code"] == 23
     assert failed["stage"] == "artifacts"
+    assert (stage_dir / ".stage-lock").is_dir()
+    assert (stage_dir / "stage.lock").is_file()
     assert not (stage_dir / "RUNNING").exists()
     assert "unbound variable" not in completed.stderr
+    assert "flock: command not found" not in completed.stderr

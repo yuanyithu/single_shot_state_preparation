@@ -57,7 +57,8 @@ requires measurement-only rank-64 accepted label deltas plus leave-return
 coverage for all basis and frozen nonbasis characters. The original source
 validation passed 847 exp101+exp102 tests. The bootstrap repair adds a `set -u`
 empty-prerequisite wrapper regression; its follow-up full suite passed `848
-passed, 4 warnings` in 311.78 seconds.
+passed, 4 warnings` in 311.78 seconds. The subsequent portable-lock repair
+repeated the full suite with `848 passed, 4 warnings` in 307.14 seconds.
 
 The first clean-source V0v2 bootstrap attempt,
 `exp102_q0_lsi_v0b_20260723_5aab1d7` (source
@@ -74,6 +75,25 @@ transport result, tuning, held-out, or production task, and must not be
 retried in place. The successor must use the repaired wrapper, a new clean
 source archive, and a fresh run ID; it remains diagnostic-only even if it
 passes.
+
+The next clean-source attempt, `exp102_q0_lsi_v0c_20260723_a49910a`, reached
+its Linux-only artifact and manifest stages (artifact-manifest SHA256
+`9faaaafd4db1fd017d400967a4b989c0627835b46c64f13e0426297ecbebecfa`,
+V0-manifest SHA256
+`4d10720065998dd4d6acd1f38acbc58fb1f8c1878d96c9c71283005d4f736720`)
+and all three Linux algebraic audits. Its source was
+`a49910a07acf0949e5e7b6fe39532e5d30a81f9f`, archive SHA256
+`b06ab2b48b9d57a32027eaec9b249582dd70f1ac346583a55a89e614d509051d`, and
+source-manifest SHA256
+`157d9ff2d7dd159868512da578409b84f2b026f572008abcd1c3f5fa17357695`.
+The mandatory macmini audit stopped before module execution because the V0
+wrapper called Linux-only `flock`, which is absent from conda-12. This is
+`BOOTSTRAP_LOCK_PORTABILITY_FAILURE`, not a disagreement of the frozen
+artifact and not sampler evidence. The local partial stage contains only an
+empty lock file; no macmini audit payload, preflight, sampler raw, transport
+result, tuning, held-out, or production task exists. The v0c artifact binds
+the old source/archive identity and must not be reused after the portable-lock
+repair; a fresh clean-source run is required.
 
 **Q=0 HGP HARD-PAIR DIAGNOSTIC V2 UNRESOLVED -- formal work remains blocked**
 
