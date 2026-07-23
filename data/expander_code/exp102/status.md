@@ -1,5 +1,50 @@
 # exp102 status
 
+**Q=0 LOGICAL-STRATIFIED V0 ARTIFACT PORTABILITY CONFLICT -- sampler stage did not start**
+
+The clean-source run `exp102_q0_lsi_v0_20260723_b9a08a4` completed only its
+`01_artifacts` stage with an exclusive `SUCCESS` marker. Its source was
+`b9a08a4905e4c8e999e0c9e5b3408f20e83c4436`, archive SHA256
+`a53515a6af914077303b040caa6d3b5046af0054cf8bc3683c10289e1548ae53`,
+source-manifest SHA256
+`f151754e619f233e8abd544ea4a5d1bb6ec58cfc6c7f999866bd08680e0712a0`,
+registry SHA256
+`883730e0ba548f6b358187d8f123fdd4d8aeb116f4bacda363c35c16d01ae40b`,
+and V0 config SHA256
+`55d410248adb5975aa162b0cc0406ffe1a0bfa8199435a04d5862b999b803f8e`.
+It is terminally `CONFLICT_CROSS_ENV_ARTIFACT_IDENTITY`, not a sampler
+failure, physics result, or mathematical impossibility.
+
+The mandatory artifact equality check failed before a portable
+`control/V0_MANIFEST.json` could be created. macmini's full artifact manifest
+was `f90fc8d23be45e7b5122424e96fe5d6769aa73cf20339dcc0e6da814db67e64f`
+(file SHA256 `3b319c59161f9413a7113644622721745ee95daf3628ca2c45bd4824b3efe6ee`),
+whereas nd-1 produced
+`6171de3b81a6f84ba070ba62fb7c52620687284c860d0a0bc9513b8a51d74b98`
+(file SHA256 `778e5f5e78bb1bb25d6f806f19bb5d9577781714f9ccd1f70e2b36a28196e1bd`).
+The common classical matrix, codebook, syndrome, frame, registry, source and
+all V0 scalar settings agree. The differing dependency stacks do not:
+macmini used `ldpc/numpy/scipy=2.4.1/2.4.1/1.17.0`, while nd-1 used
+`2.3.7/2.3.4/1.16.3`. Their MILP base-anchor SHAs differ, and 112866 of the
+113566 BpLSD decoded candidate states (112093 recorded weights) consequently
+differ; the rank-complete 128-anchor catalog, S-tail schedule and both
+proposal SHAs therefore differ too. Both artifacts have `113566/113566`
+valid candidates, and a local direct GF(2) audit confirmed the nd-1 artifact's
+128 retained states, labels and transcript linkage. Internal algebraic
+validity does not make two differently frozen proposals interchangeable.
+
+No V0 manifest, cross-node preflight, sampler trajectory, sampler raw,
+transport report, tuning, held-out or production task was created. The pulled
+evidence is retained under
+`validation/014_q0_logical_stratified_v0_20260723/remote_run/exp102_q0_lsi_v0_20260723_b9a08a4/`;
+the run must not be retried or repurposed. A successor requires a newly
+reviewed contract that either pins one identical decoder/solver stack for all
+artifact builders or freezes one producer artifact and limits other platforms
+to algebraic verification, while preserving fail-closed rejection of any
+cross-version recomputation. It must also retain the P/U/legal-tail
+initialization red-team and cannot treat a physical all-zero state as legal
+for this nonzero-syndrome hard coset.
+
 **Q=0 HGP HARD-PAIR DIAGNOSTIC V2 UNRESOLVED -- formal work remains blocked**
 
 The immutable v2 run `exp102_q0_hgp_screen_v2_20260722_4d134ee` completed the
