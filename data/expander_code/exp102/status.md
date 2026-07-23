@@ -45,7 +45,7 @@ cross-version recomputation. It must also retain the P/U/legal-tail
 initialization red-team and cannot treat a physical all-zero state as legal
 for this nonzero-syndrome hard coset.
 
-**Q=0 LOGICAL-STRATIFIED V0v2 IMPLEMENTED / NOT YET DEPLOYED**
+**Q=0 LOGICAL-STRATIFIED V0v2 IMPLEMENTED / BOOTSTRAP FAILURE / NOT YET SAMPLED**
 
 The fresh successor contract is
 `exp102.q0_logical_stratified.v0.v2`, documented in
@@ -54,13 +54,26 @@ as the one artifact producer and requires `nd-1/nd-2/nd-3/macmini` to audit
 the exact frozen bytes algebraically rather than independently rerunning
 BpLSD/MILP. It also splits every P/U/L family across both sampling nodes and
 requires measurement-only rank-64 accepted label deltas plus leave-return
-coverage for all basis and frozen nonbasis characters. Local exp101+exp102
-regression passed 847 tests before deployment preparation.
+coverage for all basis and frozen nonbasis characters. The original source
+validation passed 847 exp101+exp102 tests. The bootstrap repair adds a `set -u`
+empty-prerequisite wrapper regression; its follow-up full suite passed `848
+passed, 4 warnings` in 311.78 seconds.
 
-This is source-level validation only. No V0v2 deployment, artifact, manifest,
-cross-host audit, preflight, sampler raw, transport result, tuning, held-out,
-or production task exists yet. A future V0v2 run must use a fresh clean source
-archive and fresh run ID; it remains diagnostic-only even if it passes.
+The first clean-source V0v2 bootstrap attempt,
+`exp102_q0_lsi_v0b_20260723_5aab1d7` (source
+`5aab1d73d3ebf258ee9757f60b4a2343cb0c506a`, archive SHA256
+`e69348066f188d63ee58d4b6c84ce8fdc66d80f0821320b7584c2f2788c1b2fb`,
+source-manifest SHA256
+`f7dfd3fe5b9671c1be531b75a20b25a1c4ce2fdb1a16ea1f8cb69e590e21533d`),
+stopped before the artifact command or even its stage directory was created.
+Under `set -u`, `run_v0_stage.sh` expanded an empty root-stage
+`prerequisites` array. This is terminally `BOOTSTRAP_WRAPPER_FAILURE` for that
+deployment, not an artifact, sampler, physics, or convergence result. It
+created no artifact, manifest, cross-host audit, preflight, sampler raw,
+transport result, tuning, held-out, or production task, and must not be
+retried in place. The successor must use the repaired wrapper, a new clean
+source archive, and a fresh run ID; it remains diagnostic-only even if it
+passes.
 
 **Q=0 HGP HARD-PAIR DIAGNOSTIC V2 UNRESOLVED -- formal work remains blocked**
 

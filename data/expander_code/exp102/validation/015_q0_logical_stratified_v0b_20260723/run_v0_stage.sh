@@ -80,19 +80,21 @@ case "$stage" in
 esac
 
 prerequisite_hashes=()
-for marker in "${prerequisites[@]}"; do
-  [[ -f $marker && ${marker##*/} == SUCCESS ]] || {
-    echo "missing V0v2 prerequisite SUCCESS marker: $marker" >&2
-    exit 68
-  }
-  marker_stage=$(sed -n 's/.*"stage":"\([^"]*\)".*/\1/p' "$marker")
-  marker_source=$(sed -n 's/.*"source_commit":"\([0-9a-f]*\)".*/\1/p' "$marker")
-  [[ $marker_stage == "$expected_prerequisite" && $marker_source == "$EXP102_SOURCE_COMMIT" ]] || {
-    echo "invalid V0v2 prerequisite marker: $marker" >&2
-    exit 68
-  }
-  prerequisite_hashes+=("$(sha256sum "$marker" | awk '{print $1}')")
-done
+if [[ ${#prerequisites[@]} -gt 0 ]]; then
+  for marker in "${prerequisites[@]}"; do
+    [[ -f $marker && ${marker##*/} == SUCCESS ]] || {
+      echo "missing V0v2 prerequisite SUCCESS marker: $marker" >&2
+      exit 68
+    }
+    marker_stage=$(sed -n 's/.*"stage":"\([^"]*\)".*/\1/p' "$marker")
+    marker_source=$(sed -n 's/.*"source_commit":"\([0-9a-f]*\)".*/\1/p' "$marker")
+    [[ $marker_stage == "$expected_prerequisite" && $marker_source == "$EXP102_SOURCE_COMMIT" ]] || {
+      echo "invalid V0v2 prerequisite marker: $marker" >&2
+      exit 68
+    }
+    prerequisite_hashes+=("$(sha256sum "$marker" | awk '{print $1}')")
+  done
+fi
 
 [[ ! -e $log_file ]] || {
   echo "V0v2 stage log already exists: $log_file" >&2
@@ -109,8 +111,11 @@ for marker in RUNNING SUCCESS FAILED; do
 done
 
 command_sha256=$(printf '%q\0' "$@" | sha256sum | awk '{print $1}')
-stage_fingerprint=$(printf '%s\0' "$stage" "$EXP102_SOURCE_COMMIT" \
-  "$command_sha256" "${prerequisite_hashes[@]}" | sha256sum | awk '{print $1}')
+fingerprint_values=("$stage" "$EXP102_SOURCE_COMMIT" "$command_sha256")
+if [[ ${#prerequisite_hashes[@]} -gt 0 ]]; then
+  fingerprint_values+=("${prerequisite_hashes[@]}")
+fi
+stage_fingerprint=$(printf '%s\0' "${fingerprint_values[@]}" | sha256sum | awk '{print $1}')
 printf '{"stage":"%s","source_commit":"%s","stage_fingerprint":"%s"}\n' \
   "$stage" "$EXP102_SOURCE_COMMIT" "$stage_fingerprint" >"$stage_dir/RUNNING"
 

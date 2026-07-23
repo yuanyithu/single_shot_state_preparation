@@ -1,6 +1,9 @@
 import hashlib
 import json
+import os
+from pathlib import Path
 import shutil
+import subprocess
 from types import SimpleNamespace
 
 import numpy as np
@@ -28,6 +31,7 @@ from data.expander_code.exp102.exp102_pipeline.registry import load_registry
 
 
 REGISTRY_PATH = "data/expander_code/exp102/registry/registry.json"
+EXP102_ROOT = Path(__file__).resolve().parents[1]
 
 
 def _config_path():
@@ -335,3 +339,46 @@ def test_k64_measurement_transport_requires_full_rank_and_all_character_returns(
     )
     assert low_rank["measurement_accepted_label_delta_rank"] == 1
     assert not failed["passes_transport_gate"]
+
+
+def test_v0_wrapper_artifacts_handles_empty_prerequisites_under_nounset(tmp_path):
+    """The root stage must reach its controlled failure marker, not expand ()."""
+    wrapper = (
+        EXP102_ROOT
+        / "validation/015_q0_logical_stratified_v0b_20260723/run_v0_stage.sh"
+    )
+    fake_bin = tmp_path / "bin"
+    fake_bin.mkdir()
+    fake_python = fake_bin / "python"
+    fake_python.write_text(
+        "#!/usr/bin/env bash\n"
+        "[[ ${1:-} == -m && ${2:-} == "
+        "data.expander_code.exp102.exp102_pipeline.q0_logical_stratified_v0 "
+        "&& ${3:-} == prepare-artifacts ]] || exit 91\n"
+        "exit 23\n",
+        encoding="ascii",
+    )
+    fake_python.chmod(0o755)
+    fake_flock = fake_bin / "flock"
+    fake_flock.write_text("#!/usr/bin/env bash\nexit 0\n", encoding="ascii")
+    fake_flock.chmod(0o755)
+    environment = os.environ.copy()
+    environment["EXP102_SOURCE_COMMIT"] = "1" * 40
+    environment["PATH"] = f"{fake_bin}{os.pathsep}{environment['PATH']}"
+    stage_dir = tmp_path / "artifacts-stage"
+    log_file = tmp_path / "artifacts.log"
+
+    completed = subprocess.run(
+        [
+            "bash", str(wrapper), "artifacts", str(stage_dir), str(log_file),
+            "--", "python", "-m", v0.__name__, "prepare-artifacts",
+        ],
+        check=False, capture_output=True, text=True, env=environment,
+    )
+
+    assert completed.returncode == 23, completed.stderr
+    failed = json.loads((stage_dir / "FAILED").read_text(encoding="ascii"))
+    assert failed["exit_code"] == 23
+    assert failed["stage"] == "artifacts"
+    assert not (stage_dir / "RUNNING").exists()
+    assert "unbound variable" not in completed.stderr
