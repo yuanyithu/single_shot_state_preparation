@@ -264,6 +264,11 @@ Current status is pre-pilot, not scientific certification.
 - `052_q0_random_full_column_t1_m8_20260724/`: frozen fresh T1 m8 contract with P, independent
   exact-K0 U, two B-distinct truth-free MAP, and eight low-energy B/logical-distinct S starts.
   It freezes 40 tasks at 2048+8192 clocks, full logical/B diagnostics, clean-archive binding, and
-  three-node exact/runtime preflight. No measurement raw exists yet; a pass can only authorize a
-  fresh m6 T1 and then separately frozen T/2T HARD2 work.
+  three-node exact/runtime preflight. The immutable run from source `6fa489f` reached exact mass
+  and transcript consensus, but all three replay-inclusive trajectory projections exceeded the
+  frozen two-hour cap (`24701/24812/29871` seconds), so aggregate status is
+  `RUNTIME_EXHAUSTED` and measurement raw count is zero. Independent audit SHA
+  `817425db...75c6d` verifies the full evidence and decision. This is an implementation/resource
+  failure before convergence testing, not a physical failure or impossibility result, and grants
+  no m6, HARD2, formal, held-out, or production authority.
 - Held-out and production evidence do not exist. Their absence is an active production blocker.

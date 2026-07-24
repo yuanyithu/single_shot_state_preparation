@@ -195,14 +195,20 @@ B 几乎冻结，`A|B` 精确重抽仍会制造 visible logical-label changes，
 所以 **logical/state change 不能替代 B 慢变量门**。050 的两个 truth-free MAP anchors 只证明 T1 下某一
 两列桥有足够 expected first departures，不是 sampler pass；051 独立重算保留 047/049 失败和 050 的窄权限。
 
-fresh `exp102.q0_random_full_column.t1_m8.v0` 已冻结但尚无 measurement raw。它不用物理零态（该非零
+fresh `exp102.q0_random_full_column.t1_m8.v0` 已冻结并完成三节点 preflight，但没有 measurement raw。它不用物理零态（该非零
 syndrome 下非法；shifted zero 就是 P），而用 P、独立 exact-K0 U、两个 B-distinct MAP 及 8 个低能
 B/logical-distinct S starts 各 8 条，固定 `2048+8192` clocks。S 中故意保留一个与 MAP 同 B、不同 logical
 label 的起点，以区分 A/logical redraw 与真实 B transport。三节点 clean-archive preflight 必须在固定四并发
 下 exact digest 一致且 replay-inclusive 单 trajectory 投影 `<=2h` 才能启动；本地四并发超时不具有远端
 判定权限。门禁必须保留 character-U-statistic q_top/D2、full/B weight、B likelihood、全部 B bit/row/column
 和 dense characters、logical characters、Rhat/ESS、constant-character burn crossing、MAP 双向 basin visits。
-最高权限仅 `DIAGNOSTIC_RFCG_T1_M8_VIABLE`；之后仍须 fresh m6 T1 和 fresh T/2T HARD2，不能直接进 formal。
+immutable run `exp102_q0_rfcg_t1_m8_20260724_6fa489f` 的三节点 mass/transcript exact consensus 通过，
+但 nd-1/2/3 replay-inclusive 单 trajectory 投影分别为 `24701.47/24812.06/29871.42s`，全部超过冻结的
+7200s 上限，故 aggregate 终态为 `RUNTIME_EXHAUSTED`，measurement raw 数为 0。本地 conda-12 独立审计
+复核全部 self-hash、control/schedule、40-task ownership、runtime 算术和 raw absence，audit SHA 为
+`817425dbaa6a9e5d90d03d34efe16f957beb7424eddd27dcde7cf12d60d75c6d`。这不是收敛失败、物理参数点失败或
+数学不可能，只说明该冻结实现/clock/replay/并发无法满足两小时资源契约；不得绕过 gate、缩短链或事后改 cap。
+没有 m6/HARD2/formal/held-out/production 权限；若做性能后继必须另立 fresh contract/source/seeds/raw。
 
 若要继续正式实验，须另立经审查的新算法/科学契约与 fresh tuning/held-out，不得把重复 T3、延长链、
 删困难 disorder、缩范围或改窗口包装成原 discovery 成功。

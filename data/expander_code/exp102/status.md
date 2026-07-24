@@ -1,6 +1,6 @@
 # exp102 status
 
-**RANDOM FULL-B-COLUMN T1 m8 DIAGNOSTIC FROZEN -- REMOTE PREFLIGHT NOT YET RUN**
+**RANDOM FULL-B-COLUMN T1 m8 DIAGNOSTIC RUNTIME_EXHAUSTED -- NO MEASUREMENT RAW**
 
 The direct dressed-logical-XOR structure probe (validation 047) is terminally
 `LOCAL_CENTER_PRESERVING_STRUCTURE_NOT_VIABLE`: its 127-move catalog is
@@ -26,7 +26,7 @@ reconstructed 047/049/050 and preserved these exact permissions and failures
 omitted transitive dependencies; the raw failure is audited, but its source
 identity is not upgraded.
 
-The fresh successor `exp102.q0_random_full_column.t1_m8.v0` is now frozen in
+The fresh successor `exp102.q0_random_full_column.t1_m8.v0` was frozen in
 validation 052.  It uses 2048 burn plus 8192 measurement full-column clocks
 for 8 independent trajectories in each of P, exact-K0 U, two truth-free
 B-distinct MAP families, and an 8-state truth-free low-energy S family whose
@@ -38,13 +38,26 @@ constant-character burn crossing, and bidirectional MAP-basin visits.  The
 physical zero state remains illegal for this nonzero syndrome; shifted zero is
 already P.
 
-No T1 measurement raw exists yet.  The next action is three-node verified
-preflight with full clean-archive identity and a fixed four-worker contention
-probe.  Measurement may start only if all nd-1/nd-2/nd-3 mass/transcript
-digests agree and each replay-inclusive trajectory projects below two hours.
-Even a pass has only `DIAGNOSTIC_RFCG_T1_M8_VIABLE` authority and must be
-followed by fresh m6 T1 and fresh T/2T HARD2 work; it is not
-`READY_FOR_FORMAL`.
+The immutable remote run `exp102_q0_rfcg_t1_m8_20260724_6fa489f` completed
+three-node verified preflight from source
+`6fa489f838dffea15b07e1ef3b3fbee3951dd3c0`.  All nodes agreed exactly on the
+mass table and four portable transcripts (`exact_consensus=true`), but the
+fixed four-worker replay-inclusive projections were `24701.47/24812.06/29871.42`
+seconds per trajectory on nd-1/nd-2/nd-3, versus the frozen 7200-second cap.
+Aggregate status is therefore `RUNTIME_EXHAUSTED`, and measurement raw count is
+zero.  The conda-12 independent audit verifies the control/schedule identities,
+40 tasks and 14/13/13 ownership, stage markers, all node/aggregate self-hashes,
+runtime arithmetic, exact consensus, and raw absence; its status is
+`INDEPENDENT_PREFLIGHT_AUDIT_PASS_RUNTIME_EXHAUSTED_CONFIRMED`, audit SHA
+`817425dbaa6a9e5d90d03d34efe16f957beb7424eddd27dcde7cf12d60d75c6d`.
+
+This does not test convergence and does not reject the physical cell or random
+full-column mechanism mathematically.  It only says this frozen implementation,
+clock, replay, concurrency, and two-hour resource contract cannot proceed.  No
+m6 T1, HARD2, formal, held-out, `READY_FOR_FORMAL`, or production authority is
+created.  A performance-changing successor requires a new scientific/runtime
+contract and fresh source/seeds/raw; the failed gate must not be bypassed by
+shortening the chain or weakening the cap after seeing the projection.
 
 **BP-SYSTEMATIC INDEPENDENCE-MH IS EXACT BUT STICKY ON ADVERSARIAL LOW-ENERGY
 STARTS -- NO HARD2 OR REMOTE LAUNCH**
