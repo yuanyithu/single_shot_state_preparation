@@ -1,6 +1,7 @@
 # exp102 status
 
-**RANDOM FULL-B-COLUMN T1 m8 DIAGNOSTIC RUNTIME_EXHAUSTED -- NO MEASUREMENT RAW**
+**RANDOM FULL-B-COLUMN STREAMING PREFLIGHT CONFLICT AND RUNTIME_EXHAUSTED --
+NO T1 OR MEASUREMENT RAW**
 
 The direct dressed-logical-XOR structure probe (validation 047) is terminally
 `LOCAL_CENTER_PRESERVING_STRUCTURE_NOT_VIABLE`: its 127-move catalog is
@@ -58,6 +59,35 @@ m6 T1, HARD2, formal, held-out, `READY_FOR_FORMAL`, or production authority is
 created.  A performance-changing successor requires a new scientific/runtime
 contract and fresh source/seeds/raw; the failed gate must not be bypassed by
 shortening the chain or weakening the cap after seeing the projection.
+
+Validation 053 then tested a fresh memory-streaming implementation of the same
+exact random-scan full-B-column heatbath.  The authoritative macmini preflight
+from source `de68bbc06aa729063b24c1f40ba23cc404a44c9c` passed: all 12 complete
+`2^24` legacy/streaming CDFs were byte-identical, speedup was `4.9391x`, and
+the worst replay-inclusive T1 projection was `2432.39s`.  The immutable remote
+run `exp102_q0_streaming_preflight_20260724_de68bbc` did not pass.  Every Linux
+node had exactly one legacy/streaming byte mismatch (`U0,column=11`), so all
+node reports and aggregate correctly terminated as `CONFLICT` under the
+pre-registered any-mismatch rule.
+
+This was not a disagreement among the proposed streaming kernels: the complete
+streaming CDF SHA catalog and all four PortablePrng sampling/replay transcript
+hashes agree across macmini and nd-1/2/3.  The mismatch is isolated to the
+Linux legacy dense floating reference.  It is nevertheless terminal for this
+frozen run.  Independently, the remote speedups were only `2.5911x/2.5372x/
+1.3823x`, and worst projections were `8797.83/9144.89/17760.30s`, all beyond
+the required `4.2x` and/or `7200s` gates.  Therefore fixing or reinterpreting
+the float comparison would still not authorize T1.  No T1 raw was generated.
+The independent audit preserves this combined outcome as
+`INDEPENDENT_AUDIT_PASS_CONFLICT_AND_RUNTIME_EXHAUSTION_CONFIRMED`, audit SHA
+`6426a1a01c01747f474d587a10cdb6db9e53db09112193499a8f9307adb7640f`.
+
+A possible fresh successor may exploit the audited positive-mass range to
+replace log/exp plus the 128 MiB full CDF with a fixed-order direct-weight block
+sum, but it must first pass new exact small-HGP, underflow, portable replay,
+and three-node runtime gates.  This is an implementation hypothesis, not an
+authorization to reuse 053 evidence, remove adversarial starts, shorten T1,
+or claim convergence.
 
 **BP-SYSTEMATIC INDEPENDENCE-MH IS EXACT BUT STICKY ON ADVERSARIAL LOW-ENERGY
 STARTS -- NO HARD2 OR REMOTE LAUNCH**

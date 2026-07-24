@@ -210,6 +210,18 @@ immutable run `exp102_q0_rfcg_t1_m8_20260724_6fa489f` 的三节点 mass/transcri
 数学不可能，只说明该冻结实现/clock/replay/并发无法满足两小时资源契约；不得绕过 gate、缩短链或事后改 cap。
 没有 m6/HARD2/formal/held-out/production 权限；若做性能后继必须另立 fresh contract/source/seeds/raw。
 
+其 memory-streaming 后继 validation 053 在 macmini 上 12/12 完整 CDF byte equality、`4.9391x` speedup
+和 `2432.39s` T1 投影均过，但 fresh 三节点 run
+`exp102_q0_streaming_preflight_20260724_de68bbc` 终止为 **`CONFLICT` 且独立 runtime-exhausted**，没有
+T1 raw。Linux 三节点都只有 `U0,column=11` 的 legacy-dense/streaming CDF byte mismatch；proposed
+streaming CDF 的完整 SHA catalog 和四条 PortablePrng sampling/replay transcript 反而在 macmini/三节点
+完全一致，所以不得把它误写成 streaming sampler 跨节点随机漂移，也不得事后忽略冻结的 any-mismatch
+门。更独立的阻断是 nd-1/2/3 speedup 仅 `2.5911/2.5372/1.3823x`、T1 replay-inclusive 投影为
+`8797.83/9144.89/17760.30s`，仍未过 `4.2x/7200s` 门。audit SHA 为
+`6426a1a01c01747f474d587a10cdb6db9e53db09112193499a8f9307adb7640f`。后继若利用正质量范围改成直接
+weight/fixed-block exact heatbath，必须 fresh source/contract 并重做 small exact、underflow、portable
+replay 与三节点 runtime；不得复用 053、删 P/U/MAP/S、缩短 T1 或先看 q_top。
+
 若要继续正式实验，须另立经审查的新算法/科学契约与 fresh tuning/held-out，不得把重复 T3、延长链、
 删困难 disorder、缩范围或改窗口包装成原 discovery 成功。
 PT/PA/global discovery raw 均不得进入正式 merge/freezer。48-code registry 已冻结，但正式新
