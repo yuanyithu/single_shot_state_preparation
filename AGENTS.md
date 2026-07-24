@@ -97,6 +97,113 @@ digest 漂移而终止 `CONFLICT`，从未产生 measurement raw；仍不得续�
 diagnostic，当前也没有 `READY_FOR_FORMAL`；EASY3 独立确认、fresh T/2T、扩展 panels、正式 tuning、
 held-out 与 production 全部仍缺失。
 
+2026-07-23 的 local-only `CSMC64-B8-S1-N128` 已终止为
+`LOCAL_COLLAPSED_SMC_WEIGHT_OR_GENEALOGY_NOT_VIABLE`：它在 m8 hard cell 上从数学正确的
+`lambda=0` iid Bernoulli B base 出发，八个 N128 populations 均通过 exact small-HGP / reference-Numba、
+完整 seed replay 和独立 raw-only audit，但 63 次**无条件** systematic resampling 使 root ESS 在 stage 31
+已降至 median `1.22/128`、终态仅 1--5 roots (ESS 1.00--2.74)。其 fresh 的无 resampling 后继
+`CAIS64-B8-S1-N128` 也已终止为 `LOCAL_COLLAPSED_AIS_PATH_WEIGHT_NOT_VIABLE`：八个 exact-base
+paths 虽无 clone、且 replay/不调用 AIS engine 的 raw-only audit 均通过，终态 full-path ESS/N 仍只有
+`.0078125--.0100431`（门槛 `.25`）、最大权重 `.872760--1`（门槛 `.10`），cold endpoint median ESS
+约 `1.000002/128`。关键新坑是：**逐级 CESS 看似约 .9N 不保证独立根，去掉 resampling 也不保证完整
+AIS 路径权重不塌缩；必须看 full-path ESS/最大权重及独立重算的 AIS 时序公式。** 两份 raw 均不得补长、
+合并、作 q_top 或送 HARD2；不能据此说全部 collapsed SMC/AIS 不可能。后续若评估新 annealing，必须
+另立 fresh config/seeds/raw，并同时报告 full-path weights、root ancestry（若有重采样）和为何其 AIS/SMC
+weight formula 对所用可逆 mutation kernel 正确；不要用 P/U/L 或物理零态替换这个 exact-base initializer。
+
+2026-07-24 的 fresh local IID-MIS m8 诊断终止为
+`LOCAL_IID_IS_EMPIRICAL_FEASIBILITY_UNRESOLVED`：每个 block 对多个 proposal 等量抽样时，目标
+mixture density 必须是同样的**均匀** mixture，不能事后改 mixture weights。旧
+MAM/T05/mixture 的 min block ESS 仅 `22.09/28.91/28.78`（门槛 `50`），max weight 为
+`.1522/.1629/.1574`（门槛 `.10`）。其 component-provenanced 后继
+`LOCAL_BP_SYSTEMATIC_IID_FEASIBILITY_UNRESOLVED` 又表明一个更细的契约坑：BP-SYS-F64/R64
+单独都通过 ESS/最大权重 gate，但预冻结的三源等权 mixture 因 MAM-source blocks 只有 ESS `23.48`
+和最大权重 `.14695` 而失败。**只要 stress proposal 被放进 estimator 的 mixture，mixture gate 就会让它
+实际拥有 veto；不得在看见结果后剔除它并把 BP-only 说成通过。** 后继若真要评估 BP-only，必须另立
+fresh contract/seeds/raw，明确 stress source 是仅报告还是 estimator 的一部分。
+
+更根本的坑是：**full support、cross-proposal agreement、低 jackknife SE 甚至看似很高的 collision 值
+都不能认证未观测 target tail；反过来，低温链未在 measurement 内遍历全部 logical directions 也不是
+purity 正确性的数学必要条件。** 不得加样、放宽门或把诊断数报为 q_top；任何 successor 都必须保存
+source 之外的 anchor/component provenance，并有独立 tail/normalizer 证据或确认方法。不要以所有链从
+P/物理零态开始来规避这个问题；非零 syndrome 的物理零态仍不在支持上。
+
+2026-07-24 的 strict depth-two collapsed-B envelope 又确认一个容易忽略的区别：**更快地算出一个
+global upper bound，不等于该 bound 对交付目标足够紧。** 在 m8 hard sentinel 上，width-25 contraction
+虽只用 `3.14s`、峰值约 `2.50GB`，但两个非 planted retained B marginals 的 tail/retained 上界仍是
+`9.40e84`（目标 `<=.01`）。不要把 runtime PASS、更多 MCMC clocks、换成共同 P/零初态或漂亮的局部
+ESS 当作缩小这 87 个数量级 global-mass 缺口的理由；要继续必须另立能说明 tightness 与资源的契约，且
+depth-two 的负结果只排除该 factorized envelope，不可泛化成数学不可能。
+
+2026-07-24 的 local HCA 调查也已完成。035 的 single-copy character WMC 在两种编码下 min-degree
+width 都为 `378`，min-fill 在 120s 前已经超过 width `102`；036 的最佳 linear-code trellis exponent
+为 `584`，均不能作为当前 exact-normalizer 路线。037/038 的 tensor-logical Houdayer 坐标在真实低能对上
+只产生整对 replica exchange；039 唯一预注册的 canonical-reduced 坐标虽在 120 个 L/L 对中有 102 个
+产生真实新 unordered pair（例如 `67+67 -> 63+71`），但 P/L 仍只是 whole swap。随后的精确
+HCA-RHB1 pair kernel（每 replica 832 random-scan coordinate heatbath 加一 HCA；small-HGP 完整
+stationarity、replay、raw-only audit 均过，固定 `128+1024` clocks runtime 约 22s）在 fresh PP/UU/LL/PL
+八对各族屏幕终止为 `LOCAL_HOUDAYER_PAIR_TRANSPORT_UNRESOLVED`：PP/LL/PL 在 normalized pair weight
+约 `.03886` 一致，LL 有 1091 个真新 pair event；但 exact-K0 U/U 为 `.1486354`，相对 PP 差
+`.1097799`、basis gap `1.4603271`、early/late fail，且 8 条 U/U 的 1024 个 measurement HCA 每条都只
+是 whole-pair exchange、零真新 pair。**可见的低能 L/L recombination 不能替代从均匀 hard coset 到目标
+低能区的运输。** 不得删除 U/U、延长/合并 041 raw、改阈值或改成共同 P/物理零初态；非零 syndrome 下物理
+零非法、平移坐标零就是 P。该结果只排除这个 HCA kernel/budget，不是 `IMPOSSIBLE`，也不授权 remote、
+formal、held-out 或 production。接手需读 `validation/035_*`--`042_*`、尤其 041 raw audit 与
+`status.md`；下一候选必须先证明其如何解决 U transport，并保持独立 tail/normalizer 或独立 confirmation
+路径，不能只优化 HCA event 数、acceptance、ESS 或低能 L/L 图像。
+
+同日的 `043_q0_collapsed_houdayer_structure_feasibility_20260724` 进一步排除了一个表面上很自然但
+其实偏离慢变量的后继：在精确 collapsed-B 边缘上，完整 factor component 的 Houdayer swap 虽代数正确，
+但 16 个 P/low-energy-L、120 个 L/L 和 64 个 P/rank-complete-L 冻结对的 B masks 全部相同；物理 logical
+label 的低能变化全在已被 HP64 精确热浴的 A 中。独立 U/U 对有 284 个不同 B bit，却只有一个完整 component，
+仍只是 whole-pair exchange。small-HGP 的转换、不变量、involution、detailed balance 和 stationarity 都已穷举
+通过，故终态是 `COLLAPSED_B_HCA_NO_LOW_ENERGY_RECOMBINATION`，不是实现失败。**“对真实 state 有变动”或
+“pair 代数正确”不等于推动交付所需的 B/logical 慢变量。** 不得据此实现 HP64+B-HCA、优化其 acceptance/state
+changes 或把它包装成独立 confirmation；该结构性负结果只排除该 frozen collapsed-B HCA，不表示 HP64、HCA、
+q=0 或后验数学上不可能。
+
+同日的 `044_q0_bp_dominance_witness_feasibility_20260724` 钉住了 importance/rejection 路线的另一处
+容易自欺的环节：两个 BP-systematic source 的有限 ESS 看起来很好，并不自动给出 `pi/q` 的全局上界。对
+1691 个预冻结合法 planted/logical/systematic-coordinate witnesses，以精确三 component mixture density 和
+outward Decimal rounding 计算后，唯一无需解决原问题的 normalizer 上界
+`Z<=.96^-1600` 只给出 `sup(pi/q)` 的微小下界（forward `5.53e-63`、reverse `2.54e-53`），所以终态是
+`BP_MIXTURE_REJECTION_ENVELOPE_WITNESS_INCONCLUSIVE`，绝不是 BP 通过。**一个 proposal 的局部 overlap、
+低 jackknife SE 或 full support 都不能替代 tight global normalizer/tail bound；用过松的 `Pr(y)<=1` 也不能
+把“没有找到坏 witness”说成 coverage。** 不得据此开 BP-only IID/rejection sampler、报告 q_top 或以 P/common
+start 绕过 MCMC 对抗初态；要继续此路线须先独立得到紧的 hard-coset normalizer 上界，而那正是尚未解决的
+global-mass 问题。
+
+随后 fresh `exp102.q0_bp_imh.local.v1` 直接把 BP-SYS-F64/R64 的精确 full-support mixture 用作
+independence-MH proposal；small-HGP 完整 transition matrix、detailed balance/stationarity、18 项 focused
+测试、24/24 raw replay 和不调用 sampler/runner 的 55296-step `allow_pickle=False` audit 均通过，但终态为
+`LOCAL_BP_IMH_TRANSPORT_UNRESOLVED`。P 与 8 个不同合法低能 L 在 burn/measurement 都是零真实移动；U
+虽在 burn 用 1--3 次真实移动冷却，却全部落到同一个 weight-62、P-label state，measurement 仅 0--2 次真实
+移动。P 最大 measurement log acceptance 也只有 `-53.13`，L 最好为 `-47.79`（最差 `-88.69`），说明
+proposal 对 high-`pi/q` 低能态严重供给不足；大量 U accepted counters 是同态 self-proposal，不是运输。
+P/L 的 full-label `D2_norm=1`，U/L 为 `.998413`。注意 full-label D2 是本次 raw 前补上的必要门：相同 purity
+和全部 basis means 仍可能对应互不相交的 sector supports。045 v0 仅因 relative output receipt 路径错误在
+首 raw 后终止为 infrastructure failure，raw 禁用；046 v1 使用 fresh contract/config/seeds，零复用。不得把
+BP 当 U 冷却器再接旧 full-row Gibbs 就宣称成功：BP 把 U 全送入 P logical label，而旧 full-row 又把 P/L
+送入同一冻结 B basin，三族一致可能只是共同塌缩。后继必须有结果无关的 high-`pi/q` signature/basin coverage
+与独立 B/tail 证据，不能只优化 accepted/self-loop 计数、统一初态、延长链或直接送 HARD2/remote。
+
+2026-07-24 的 047--051 又排除了一个“共同落入低能 basin 就算收敛”的盲区。truth-free dressed logical
+XOR catalog 虽代数正确且 signature rank=64，但 T3 下 BASE/P 可达 rank 仅 `4/1`，并会把全部低能 L
+向同一 label 拉回，故终止为 `LOCAL_CENTER_PRESERVING_STRUCTURE_NOT_VIABLE`。exact random-scan
+full-B-column Gibbs 的 small-HGP detailed balance/stationarity 与 bit replay 通过；但 049 短跑中 P/L 的
+B 几乎冻结，`A|B` 精确重抽仍会制造 visible logical-label changes，U 的 B weight/likelihood 仍完全分离，
+所以 **logical/state change 不能替代 B 慢变量门**。050 的两个 truth-free MAP anchors 只证明 T1 下某一
+两列桥有足够 expected first departures，不是 sampler pass；051 独立重算保留 047/049 失败和 050 的窄权限。
+
+fresh `exp102.q0_random_full_column.t1_m8.v0` 已冻结但尚无 measurement raw。它不用物理零态（该非零
+syndrome 下非法；shifted zero 就是 P），而用 P、独立 exact-K0 U、两个 B-distinct MAP 及 8 个低能
+B/logical-distinct S starts 各 8 条，固定 `2048+8192` clocks。S 中故意保留一个与 MAP 同 B、不同 logical
+label 的起点，以区分 A/logical redraw 与真实 B transport。三节点 clean-archive preflight 必须在固定四并发
+下 exact digest 一致且 replay-inclusive 单 trajectory 投影 `<=2h` 才能启动；本地四并发超时不具有远端
+判定权限。门禁必须保留 character-U-statistic q_top/D2、full/B weight、B likelihood、全部 B bit/row/column
+和 dense characters、logical characters、Rhat/ESS、constant-character burn crossing、MAP 双向 basin visits。
+最高权限仅 `DIAGNOSTIC_RFCG_T1_M8_VIABLE`；之后仍须 fresh m6 T1 和 fresh T/2T HARD2，不能直接进 formal。
+
 若要继续正式实验，须另立经审查的新算法/科学契约与 fresh tuning/held-out，不得把重复 T3、延长链、
 删困难 disorder、缩范围或改窗口包装成原 discovery 成功。
 PT/PA/global discovery raw 均不得进入正式 merge/freezer。48-code registry 已冻结，但正式新

@@ -66,4 +66,204 @@ Current status is pre-pilot, not scientific certification.
   cells, and both HP/MAM pairs passed 0/4 agreement comparisons. Post-run raw shows that m8 MAM
   state changes were overwhelmingly within one logical sector because both minimum-weight anchors
   had the same logical signature. This remains diagnostic only and grants no formal readiness.
+- `020_q0_collapsed_smc_v0_20260723/`: local exact-base collapsed-SMC feasibility diagnostic on
+  the m8 hard cell. Small HGP enumeration verifies the collapsed target and reference/Numba
+  transcript identity; all eight frozen N=128 populations then pass full seed replay and a
+  raw-only audit. The terminal status is `LOCAL_COLLAPSED_SMC_WEIGHT_OR_GENEALOGY_NOT_VIABLE`:
+  forced systematic resampling at all 63 nonzero bridge levels collapses final roots to 1--5
+  (ESS 1.00--2.74), even though many individual incremental CESS values are near .9N. This
+  rejects only that always-resample configuration, produces no q_top, and grants no remote,
+  formal, held-out, or production authority.
+- `021_q0_collapsed_ais_v0_20260723/`: fresh no-resampling exact-base AIS diagnostic on the
+  same m8 hard cell. Its eight frozen N=128 paths pass deterministic seed replay and a separate
+  raw-only audit which independently rebuilds the iid base, HGP/coset algebra, full AIS weights,
+  gates, and report identities without importing the AIS engine. All eight nevertheless end with
+  full-path ESS/N only `.0078125--.0100431` and a dominant final weight `.872760--1.000000`, so
+  the terminal status is `LOCAL_COLLAPSED_AIS_PATH_WEIGHT_NOT_VIABLE`. This distinguishes late
+  path-weight concentration from the prior SMC genealogy collapse, rejects only CAIS64-B8-S1-N128,
+  produces no q_top, and grants no remote, formal, held-out, or production authority.
+- `022_q0_full_row_gibbs_v0_20260724/`: local exact collapsed-HGP full-row Gibbs feasibility
+  screen on the m8 hard cell. Exact n=10/n=13 oracle tests, detailed balance/stationarity,
+  reference/Numba transcripts, and the k=64 bit-63 boundary pass (`42` focused tests); the 24
+  frozen P/U/legal-low-energy-L trajectories also pass full seed replay and a raw-only audit that
+  does not import the sampler or runner. The terminal status is nevertheless
+  `LOCAL_LOGICAL_TRANSPORT_NOT_VIABLE`: P/L both reach a legal weight-63 state, while every U
+  measurement remains at weight at least 248. With hard-coset dimension 832, the target-support
+  upper bound `2**832*(.04/.96)**(248-63)` is only `1.3118273337331353e-05`. Thus this is not
+  merely an all-character leave-return gate false negative; it is adversarial-init nonconvergence
+  inside a bounded negligible target-mass region. It rejects only FRG-VE1 V0 and grants no remote,
+  formal, held-out, or production authority.
+- `023_q0_uniform_anchor_pt_v0_20260724/`: local uniform-anchored full-energy collapsed-B
+  replica-exchange screen on the m8 hard cell. All 48 P/exact-K0-U/legal-low-energy-L trajectories
+  have immutable raw and a separate bit-exact replay plus raw-only audit. Both UARE32-R1 and
+  UARE64-R1 leave U at minimum measurement weight 247--262 while P/L agree near legal weight 63;
+  the loose hard-coset support bound makes that observed U region negligible. The terminal status
+  is `LOCAL_UNRESOLVED_UNIFORM_ANCHOR_TRANSPORT`; it rejects only these configurations and grants
+  no q_top, remote, formal, held-out, or production authority.
+- `024_q0_aux_stabilizer_v0_20260724/`: local auxiliary-stabilizer replica-exchange screen on
+  the same m8 hard cell. Two frozen configurations, 32 and 64 replicas, use 48 total P/exact-K0-U/
+  legal-low-energy-L trajectories, full bit-exact replay, and an independent pickle-free raw audit.
+  P/L agreement does not rescue either candidate: U differs from both in weight, complete score,
+  all 128 logical characters, and most B masks, while fixed-clock stability also fails. The
+  conservative target-support bound is inconclusive at the U weights, so the terminal
+  `LOCAL_AUXILIARY_STABILIZER_TRANSPORT_UNRESOLVED` result is a finite-budget convergence failure,
+  not a negligible-mass or impossibility claim. It grants no q_top, remote, formal, held-out, or
+  production authority.
+- `025_q0_sector_bridge_feasibility_20260724/`: exact fixed-sector free-energy bridge algebra
+  plus local m8 overlap diagnostic. V1's reverse-side exponent error is retained and invalidated
+  for audit; V2 fixes it and passes the bidirectional small-HGP oracle, but its twelve-clock P/S
+  bridge traces are almost entirely pinned and P has a 20 percent forward/reverse product gap.
+  The terminal `LOCAL_FIXED_SECTOR_BRIDGE_OVERLAP_UNRESOLVED` result has no sector-mass or q_top
+  claim and cannot authorize remote work.
+- `026_q0_purity_wmc_feasibility_20260724/`: direct purity weighted-model-count feasibility. It
+  confirms the correct one-copy `Z` and equal-logical-label two-copy `C` target, but the existing
+  exact ternary-XOR elimination reaches width 67 for Z and 66 for C by the width-64 cap. This
+  rules out only that encoding at the tested cap, not another exact contraction, a certified
+  collapsed-B bound, or the posterior.
+- `027_q0_collapsed_tail_bound_feasibility_20260724/`: directed-rounding collapsed-B factor-max
+  envelope on the m8 hard cell. Exact small-code tests verify the envelope contains the true
+  rational mass. On m8 it remains about `10^311.34` above the truth-free B=0 lower anchor after
+  one row and requires width 25 at two rows, above the cap 18. The terminal
+  `LOCAL_COLLAPSED_B_FACTOR_ENVELOPE_NOT_VIABLE_WITHIN_V0_CAP` rejects only that loose envelope;
+  it produces no posterior, purity, q_top, remote, formal, held-out, or production authority.
+- `028_q0_full_column_gibbs_v0_20260724/`: exact full-B-column (`2^24` state) collapsed-HGP
+  heatbath. Its n=10/n=13 exhaustive conditional, detailed-balance, stationarity, hard-coset,
+  and replay checks pass, but an outcome-blind m8 timing gate measures `.278952` seconds per
+  column conditional. A minimum T1 trajectory has 245,760 such updates, so the frozen
+  factor-two projection is `137111.403` seconds (about 38.1 hours) versus the two-hour cap.
+  Terminal status is `RUNTIME_EXHAUSTED`; it creates no P/U/L raw, q_top, remote, formal,
+  held-out, or production authority.
+- `029_q0_crossfit_is_feasibility_20260724/`: historical proposal-only cross-fit diagnostics for
+  the old MAM and LSI artifacts. They generate no fresh samples and deliberately establish no
+  posterior, coverage, or launch authority; their sole purpose was to justify a separately
+  frozen fresh-IID schedule rather than selecting a favorable old estimate.
+- `030_q0_iid_is_preflight_20260724/`: outcome-blind local algebra/runtime preflight for a
+  prospective three-proposal IID-MIS schedule. It verifies legal hard-coset draws and cross-density
+  cost without reading a weight or sector statistic; it has no posterior or remote authority.
+- `031_q0_iid_is_local_v0_20260724/`: fresh 49,152-draw, three-proposal IID-MIS diagnostic on
+  the m8 hard sentinel. Raw-only replay passes, eliminating MCMC initialization and transport as
+  explanations, but all primary importance views fail their frozen block-weight gates (minimum
+  ESS `22.09--28.91 < 50`, maximum normalized weight `.1522--.1629 > .10`). Its terminal status
+  is `LOCAL_IID_IS_EMPIRICAL_FEASIBILITY_UNRESOLVED`; its apparent `.98--.993` collision values
+  are diagnostics only, not q_top or posterior results. Full support and inter-proposal agreement
+  do not certify an unobserved target tail, so this result grants no remote, formal, held-out, or
+  production authority.
+- `032_q0_bp_systematic_preflight_20260724/`: outcome-blind preflight for two independently
+  ordered BP-guided systematic hard-coset proposals. Both exact coordinate bijections and
+  densities replay, with construction near `.8` seconds and direct draws near `1.1` ms; fixed
+  loopy-BP messages remain oscillatory, which is a proposal-quality warning rather than a
+  density error. It reads no target weight, label, or purity and has no posterior authority.
+- `033_q0_bp_systematic_iid_local_v0_20260724/`: fresh 49,152-draw component-provenanced
+  BP-systematic IID-MIS test on the same m8 hard sentinel. Runner replay and the independent
+  pickle-free raw analysis pass. Both BP sources individually meet their frozen ESS/maximum-weight
+  gates and agree under the predeclared diagnostic tolerances, but the required equal mixture of
+  BP-SYS-F64, BP-SYS-R64, and MAM-IMH8 fails (`min ESS=23.48 < 50`, `max weight=.14695 > .10`)
+  through MAM-source blocks. Its terminal status is
+  `LOCAL_BP_SYSTEMATIC_IID_FEASIBILITY_UNRESOLVED`. This rejects the frozen three-source schedule;
+  it does not permit retrospectively dropping MAM to claim a BP-only pass, and it supplies no
+  tail/normalizer bound, remote, formal, held-out, or production authority.
+- `034_q0_collapsed_tail_depth2_feasibility_20260724/`: local exact-rational strict-tail
+  feasibility probe for the same m8 hard sentinel. A depth-two, width-25 directed-rounding
+  collapsed-B partition upper envelope completes inside its frozen resource gates (`3.14` seconds,
+  2.50 GB peak RSS), but two fixed non-planted MAP-derived B marginals retain only `3.30805e-96`
+  scaled lower mass against a total upper bound `3.11016e-11`. The resulting rigorous
+  tail/retained ratio `9.40179e84` misses the frozen `.01` goal by about 87 decimal orders, so its
+  terminal status is `DEPTH2_ENVELOPE_NOT_TIGHT_ENOUGH`. This rejects only this factorized
+  envelope, not q=0 or all certified normalizer routes; it yields no posterior, q_top, remote,
+  formal, held-out, or production authority.
+- `035_q0_character_wmc_structure_feasibility_20260724/`: one-copy signed-character WMC
+  structural probe on the m8 hard sentinel. Both raw-H_Z and ternary-XOR encodings reach
+  min-degree induced width `378`; min-fill exceeds observed width `102` before its frozen
+  120-second cap. It rejects only these exact-elimination encodings/orders and calculates no
+  `Z_u`, posterior, purity, q_top, or formal result.
+- `036_q0_trellis_wmc_structure_feasibility_20260724/`: independent linear-code trellis
+  structure probe. The best of seven deterministic HGP-aware/Tanner orders has state exponent
+  `584`, far beyond the frozen exponent-24 actionability cap. It rejects only the tested trellis
+  representations/orders, not exact WMC or the q=0 posterior.
+- `037_q0_houdayer_structure_feasibility_20260724/`: coordinate-only generalized-Houdayer
+  structure probe using H_X plus a tensor logical complement. It establishes the pair-target
+  algebra but shows a generic exact-uniform coordinate pair is one connected component; it is not
+  MCMC or a transport result.
+- `038_q0_houdayer_real_logicals_feasibility_20260724/`: frozen real low-energy pair probe for
+  the tensor-logical HCA coordinates. All 200 P/L and L/L evaluations yield only whole-replica
+  exchanges and zero new unordered pair states. This rejects that coordinate choice as a useful
+  global transport mechanism, not all Houdayer bases.
+- `039_q0_houdayer_reduced_logicals_feasibility_20260724/`: the sole pre-registered canonical
+  reduced-logical coordinate counterfactual. P/L remains whole-pair only, but 102 of 120 frozen
+  low-energy L/L pairs split into two components and create genuine new unordered pairs; this
+  structural signal justified, but did not certify, an exact local pair-kernel test.
+- `040_q0_houdayer_pair_runtime_preflight_20260724/` and
+  `042_q0_houdayer_pair_runtime_rebind_20260724/`: outcome-blind local timing preflights for
+  HCA-RHB1 (832 random-scan coordinate heatbaths per replica plus one complete-component HCA
+  move per clock). The source-rebound report projects about `22.0` seconds per 128+1024-clock
+  pair trajectory with twofold safety, so it permits a local diagnostic only.
+- `041_q0_houdayer_pair_local_v0_20260724/`: fresh 32-raw local HCA-RHB1 adversarial-pair
+  screen. Complete small-code stationarity, deterministic replay, and a sampler-independent
+  no-pickle raw audit pass, but U/U fails: its normalized pair weight is `.1486354` versus
+  `.0388554` for PP, every U/U trajectory has zero genuine new unordered-pair events, and each
+  of its 1024 measurement HCA operations is only a whole-pair exchange. LL has 1,091 genuine
+  events and agrees with PP/PL, showing that visible low-energy recombination does not solve
+  exact-uniform-to-low-energy transport. Terminal status is
+  `LOCAL_HOUDAYER_PAIR_TRANSPORT_UNRESOLVED`; it rejects only this kernel/budget and has no
+  posterior, q_top, remote, formal, held-out, or production authority.
+- `043_q0_collapsed_houdayer_structure_feasibility_20260724/`: a frozen local structural
+  counterfactual for exact Houdayer swaps in the actual collapsed-B marginal, not an MCMC
+  measurement. Small-HGP exhaustive checks verify B conversion, factor-pair invariance,
+  involution, detailed balance, and stationarity. On the m8 hard sentinel, all 16 P/low-energy-L
+  records, all 120 L/L pairs, and all 64 P/rank-complete-L controls have identical B masks despite
+  distinct physical logical labels; the frozen low-energy logical directions lie entirely in A.
+  The independent exact-K0 U/U pair has 284 differing B bits but a single component, hence only a
+  whole-pair exchange. Terminal `COLLAPSED_B_HCA_NO_LOW_ENERGY_RECOMBINATION` rejects direct
+  HP64-plus-collapsed-B HCA as optimization of the wrong slow variable. It creates no q_top,
+  convergence, remote, formal, held-out, or production authority.
+- `044_q0_bp_dominance_witness_feasibility_20260724/`: a local, no-sample structural check of
+  whether the frozen three-component BP-systematic mixtures could be made into strict rejection
+  envelopes. It scores 1,691 predetermined legal planted/logical/systematic-coordinate witnesses
+  with the exact mixture density and directed Decimal rounding. The only available universal
+  normalizer inequality, `Z <= (.96)^(-1600)`, makes the resulting rigorous witness lower bounds
+  on `sup pi/q` tiny (`5.53e-63` forward and `2.54e-53` reverse), so terminal
+  `BP_MIXTURE_REJECTION_ENVELOPE_WITNESS_INCONCLUSIVE` is explicitly not a BP pass. It exposes
+  that a useful dominance certificate first needs the same missing tight global normalizer/tail
+  bound; it grants no BP-only IID, rejection-sampling, q_top, remote, formal, held-out, or
+  production authority.
+- `045_q0_bp_imh_local_v0_20260724/`: immutable infrastructure-failed BP-IMH attempt. It wrote
+  a 24-task manifest and one raw, then mixed a relative output path with an absolute receipt root.
+  Terminal status is `INFRASTRUCTURE_FAILED_RELATIVE_OUTPUT_PATH`; the lone raw is explicitly
+  forbidden and there is no receipt, report, sampler conclusion, or reuse authority.
+- `046_q0_bp_imh_local_v1_20260724/`: fresh-seed exact BP-systematic independence-MH diagnostic
+  on the m8 hard sentinel. Eighteen pre-raw tests include complete small-code stationarity and a
+  full-label D2 counterexample; 24/24 P/U/distinct-L raw then pass exact runner replay and an
+  independent 55,296-step no-pickle MH audit. Terminal status is
+  `LOCAL_BP_IMH_TRANSPORT_UNRESOLVED`: P and L make zero real moves, while U makes only 1--3 burn
+  and 0--2 measurement moves before all chains collapse to the same weight-62/P-label state.
+  High observed acceptance counts in U are overwhelmingly accepted self-proposals. P/L
+  `D2_norm=1`, so this exact kernel is sticky rather than globally mixed and grants no HARD2,
+  remote, posterior, formal, held-out, or production authority.
+- `047_q0_center_preserving_structure_20260724/`: truth-free dressed logical-XOR structural
+  probe. The 127-move catalog is algebraically valid and rank 64, but its accessible signature
+  ranks are only 4 from BASE and 1 from P; all frozen L starts have downhill routes to the same
+  label and the optimistic full-rank scheduler bottleneck is `1.70e-10` expected accepts per
+  direction. Terminal `LOCAL_CENTER_PRESERVING_STRUCTURE_NOT_VIABLE` rejects this common-basin
+  collapse route without claiming q=0 impossible.
+- `048_q0_random_full_column_local_v0_20260724/`: infrastructure-aborted first random-full-column
+  wrapper. It used the reference mass-table path, stopped after one forbidden P raw, and is never
+  continued or reused.
+- `049_q0_random_full_column_local_v1_20260724/`: fresh 64+256-update exact random-scan
+  full-B-column screen with P/U/L starts. All 12 raw replay, but every transport/agreement gate
+  fails. In particular, exact A redraw creates logical-label activity while P/L B blocks remain
+  almost frozen; U remains separated in B weight and likelihood. Terminal
+  `LOCAL_RANDOM_FULL_COLUMN_TRANSPORT_UNRESOLVED` is a short-screen failure, not a T1 result.
+- `050_q0_full_column_map_bridge_structure_20260724/`: truth-free two-MAP-anchor bridge probe.
+  The legal weight-62 anchors share a logical label and differ in six B bits across columns 11/17.
+  Correct column order gives about `.03846` first-step conditional probability and `16.4` expected
+  first departures over T1. This only justifies a fresh B-distinct T1 screen.
+- `051_q0_global_move_independent_audit_20260724/`: independent algebra/raw-only audit of
+  047/049/050. It reproduces every relevant hash, transition, state, label, weight, likelihood,
+  gate, and bridge probability, preserving both failures and 050's narrow structural permission.
+  It also records the incomplete transitive source identity in historical 049.
+- `052_q0_random_full_column_t1_m8_20260724/`: frozen fresh T1 m8 contract with P, independent
+  exact-K0 U, two B-distinct truth-free MAP, and eight low-energy B/logical-distinct S starts.
+  It freezes 40 tasks at 2048+8192 clocks, full logical/B diagnostics, clean-archive binding, and
+  three-node exact/runtime preflight. No measurement raw exists yet; a pass can only authorize a
+  fresh m6 T1 and then separately frozen T/2T HARD2 work.
 - Held-out and production evidence do not exist. Their absence is an active production blocker.
