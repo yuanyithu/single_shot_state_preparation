@@ -121,6 +121,25 @@ bidirectional MAP-basin, and B-column/label-change gates remain mandatory.
 No m6, HARD2, formal, held-out, `READY_FOR_FORMAL`, or production authority
 exists until the fresh T1 raw passes those gates.
 
+Validation 055 freezes that fresh successor as
+`exp102.q0_random_full_column_direct_block.t1_m8.v1`.  Its new control keeps the
+same outcome-blind P/U/M0/M1/S geometry but refreshes every schedule seed and
+logical/B character; all four seed fields have zero overlap with validation
+052.  The implementation is bound byte-for-byte to the two validation-054
+sampler files and portable artifact.  Before launch, a real miniature direct
+raw and full replay exposed and fixed three dormant analyzer hazards: missing
+direct `version/conditional_engine` binding, a missing `state_label` import,
+and a one-ULP B-likelihood false conflict from using a different sum order.
+The new analyzer independently rebuilds factor indices, preserves the frozen
+kernel sum order, and rejects a tampered engine identity.
+
+Validation 055 is currently **pre-measurement**.  Its final source must rerun
+the complete validation-054 portable/runtime preflight on all three Linux
+nodes and pass its own schedule-bound three-node preflight before any of the
+40 trajectories starts.  A local smoke or unit-test pass is not measurement
+authorization.  See `RANDOM_FULL_COLUMN_DIRECT_BLOCK_T1_CONTRACT.md` and
+`validation/055_q0_random_full_column_direct_block_t1_m8_20260724/`.
+
 **BP-SYSTEMATIC INDEPENDENCE-MH IS EXACT BUT STICKY ON ADVERSARIAL LOW-ENERGY
 STARTS -- NO HARD2 OR REMOTE LAUNCH**
 

@@ -240,6 +240,17 @@ full/B D2、weight/likelihood、B bit/row/column/dense、logical、Rhat/ESS、bu
 basin 与 B-column/label-change 门。非零 syndrome 下物理零态不在支持集，shifted zero 已是 P；全部从
 P/零态开始只会掩盖慢混合。T1 未通过前不得运行 m6/HARD2 或 formal/held-out/production。
 
+fresh successor validation 055 已冻结为
+`exp102.q0_random_full_column_direct_block.t1_m8.v1`，目前仍是 **pre-measurement**。它保持 validation
+052 的 P/U/M0/M1/S 几何，但 fresh control 重抽全部 schedule seeds 与 logical/B characters；四类 seed
+与 052 overlap 均为 0，并 byte-bind validation 054 的两个 sampler 源文件与 portable artifact。pre-run
+red-team 用真实 miniature direct raw+full replay 找到并修复三个 dormant analyzer 坑：没有绑定 direct
+`version/conditional_engine`、漏 import `state_label`、以及 B-likelihood 使用不同求和顺序导致 1 ULP 假
+冲突；055 现独立重建 factor indices、复现冻结求和顺序并对篡改 engine fail closed。最终 source 必须先在
+三节点重新跑完整 054 portable/runtime preflight，再过 055 schedule-bound preflight，才可启动 40 条轨迹；
+本地测试不构成 measurement 权限。合同与 review 见
+`RANDOM_FULL_COLUMN_DIRECT_BLOCK_T1_CONTRACT.md`、`validation/055_*/PRE_RUN_RED_TEAM.md`。
+
 若要继续正式实验，须另立经审查的新算法/科学契约与 fresh tuning/held-out，不得把重复 T3、延长链、
 删困难 disorder、缩范围或改窗口包装成原 discovery 成功。
 PT/PA/global discovery raw 均不得进入正式 merge/freezer。48-code registry 已冻结，但正式新
