@@ -68,6 +68,7 @@ ROOT = Path(__file__).resolve().parent
 EXP102_ROOT = ROOT.parents[1]
 CONFIG_PATH = EXP102_ROOT / "config/q0_random_full_column_direct_block.preflight.v1.json"
 REVIEW_PATH = EXP102_ROOT / "RANDOM_FULL_COLUMN_DIRECT_BLOCK_REVIEW.md"
+REFERENCE_PATH = ROOT / "portable_reference.v1.json"
 CONTROL_ROOT = EXP102_ROOT / "validation/052_q0_random_full_column_t1_m8_20260724"
 WORKFLOW_052 = import_module(
     "data.expander_code.exp102.validation."
@@ -134,6 +135,20 @@ def validate_config(config):
         "t1_measurement_updates": 8192,
         "trajectory_wall_cap_seconds": 7200.0,
     }, "direct-block resource contract changed")
+    require(config["portable_reference"] == {
+        "file_sha256": "03d5b235b05fa23982f18e916f00c483b14be24adf1492fa63e6e8aa2da92ff1",
+        "origin_report_sha256": (
+            "aeb1996d3529aa15cdd841b39640a1fb96abd8fa6000b7ef46bdf7d3af775410"
+        ),
+        "origin_source_commit": "a0d4dbf6451240f0c2e07057d45206427ef09db0",
+        "path": (
+            "validation/054_q0_random_full_column_direct_block_preflight_20260724/"
+            "portable_reference.v1.json"
+        ),
+        "reference_sha256": (
+            "a5f20a2d324798db289756d6e9cb1c09fad3fad34672ea2a23b7dee4e38f2d4f"
+        ),
+    }, "direct-block portable reference changed")
     require(config["source_control"] == {
         "control_content_sha256": (
             "b99fb047e787fd999cde113bd3c64a1e9ef0e41e805d79a3d6d5f7995b6b8df6"
@@ -150,6 +165,23 @@ def validate_config(config):
     )
     require(FULL_COLUMN_DIRECT_BLOCK_BITS == config["correctness"]["block_bits"],
             "direct-block source partition changed")
+
+
+def load_portable_reference(config):
+    identity = config["portable_reference"]
+    require(sha256_file(REFERENCE_PATH) == identity["file_sha256"],
+            "portable reference file hash changed")
+    reference = load_canonical(REFERENCE_PATH)
+    claimed = reference["reference_sha256"]
+    core = {key: value for key, value in reference.items()
+            if key != "reference_sha256"}
+    require(sha256_json(core) == claimed == identity["reference_sha256"],
+            "portable reference self-hash changed")
+    require(reference["origin_source_commit"] == identity["origin_source_commit"],
+            "portable reference origin source changed")
+    require(reference["origin_report_sha256"] == identity["origin_report_sha256"],
+            "portable reference origin report changed")
+    return reference
 
 
 def load_context(config, config_sha):
@@ -325,6 +357,28 @@ def full_weight_checks(context, config, mass):
     return {"all_pass": bool(all_pass), "probes": probes}
 
 
+def block_catalog(correctness):
+    return [
+        {
+            "block_subtotals_sha256": row["block_subtotals_sha256"],
+            "column": int(row["column"]),
+            "state": row["state"],
+        }
+        for row in correctness["probes"]
+    ]
+
+
+def transcript_catalog(runtime):
+    return [
+        {
+            "index": int(row["index"]),
+            "state": row["state"],
+            "transcript_sha256": row["transcript_sha256"],
+        }
+        for row in runtime
+    ]
+
+
 class _FixedRng:
     def __init__(self, value):
         self.value = float(value)
@@ -386,6 +440,7 @@ def run_focused_tests():
         sys.executable, "-m", "pytest", "-q", "-p", "no:cacheprovider",
         "data/expander_code/exp102/tests/test_q0_hgp_full_column_gibbs.py",
         "data/expander_code/exp102/tests/test_q0_hgp_random_full_column.py",
+        "data/expander_code/exp102/tests/test_q0_random_full_column_direct_block_preflight.py",
     )
     completed = subprocess.run(
         command, cwd=PROJECT_ROOT, check=True, capture_output=True, text=True,
@@ -474,10 +529,15 @@ def source_identity(source_commit, config_sha):
         "full_column": EXP102_ROOT / "exp102_pipeline/q0_hgp_full_column_gibbs.py",
         "global": EXP102_ROOT / "exp102_pipeline/q0_global.py",
         "random_full_column": EXP102_ROOT / "exp102_pipeline/q0_hgp_random_full_column.py",
+        "reference": REFERENCE_PATH,
         "review": REVIEW_PATH,
         "runner": Path(__file__).resolve(),
         "test_full_column": EXP102_ROOT / "tests/test_q0_hgp_full_column_gibbs.py",
         "test_random_full_column": EXP102_ROOT / "tests/test_q0_hgp_random_full_column.py",
+        "test_preflight": (
+            EXP102_ROOT / "tests/test_q0_random_full_column_direct_block_preflight.py"
+        ),
+        "reference_freezer": ROOT / "freeze_local_reference.py",
         "workflow_052": CONTROL_ROOT / "workflow.py",
     }
     hashes = {name: sha256_file(path) for name, path in files.items()}
@@ -496,6 +556,7 @@ def main():
     verify_clean_source(args.source_commit)
     config = load_canonical(CONFIG_PATH)
     validate_config(config)
+    reference = load_portable_reference(config)
     config_sha = sha256_file(CONFIG_PATH)
     tests = run_focused_tests()
     context = load_context(config, config_sha)
@@ -519,7 +580,14 @@ def main():
     _RUNTIME_CONTEXT = None
 
     resource = config["resource"]
-    exact_pass = correctness["all_pass"]
+    block_reference_pass = (
+        block_catalog(correctness) == reference["block_subtotal_catalog"]
+    )
+    transcript_reference_pass = (
+        transcript_catalog(runtime) == reference["runtime_transcript_catalog"]
+    )
+    portable_reference_pass = block_reference_pass and transcript_reference_pass
+    exact_pass = correctness["all_pass"] and portable_reference_pass
     speed_pass = (
         timing["speedup_over_streaming"]
         >= resource["local_min_streaming_speedup"]
@@ -542,12 +610,14 @@ def main():
         "checks": {
             "full_m8_weight_identity": exact_pass,
             "local_minimum_streaming_speedup": speed_pass,
+            "portable_reference": portable_reference_pass,
             "runtime_projection": runtime_pass,
         },
         "config_sha256": config_sha,
         "correctness": correctness,
         "focused_tests": tests,
         "node": args.node,
+        "portable_reference_sha256": reference["reference_sha256"],
         "report_version": REPORT_VERSION,
         "runtime": runtime,
         "source_identity": source_identity(args.source_commit, config_sha),
