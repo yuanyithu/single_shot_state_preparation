@@ -1,5 +1,41 @@
 # exp102 status
 
+**FULL-B-ROW ELIMINATION VALIDATION 058 TERMINAL -- LOCAL CONDITIONAL
+FEASIBLE, STANDALONE LOW-ENERGY TRANSPORT NOT VIABLE**
+
+Validation 058 implements the exact collapsed full-B-row conditional with a
+state-independent variable-elimination plan.  The frozen m8 graph has induced
+width 12 and largest factor 8192.  Complete n=10/n=13 HGP enumeration verifies
+the conditional, normalizer, detailed balance, complete-sweep stationarity and
+PortablePrng/cache replay (`20 passed`).  The 128 MiB mass table builds in
+`.316s`; measured row cost `.01291s`, incremental peak about 17 MiB and
+factor-two T1 projection `264.39s` all pass the local resource gate.  Primary
+feasibility report status/SHA is `LOCAL_FULL_ROW_CONDITIONAL_FEASIBLE` /
+`0f99bba4...172da`.  The final exp101+exp102 regression is `1020 passed` with
+four existing warnings.  This status means only exact and computationally
+feasible.
+
+The scientific result is negative for the standalone kernel.  On the frozen
+legal P/M0/S0 low-energy states, median conditional entropy is zero, median
+expected Hamming change is about `1.2e-21--1.9e-21`, minimum row self
+probability is at least `.9999999926`, and a sampled complete sweep changes
+zero rows.  By contrast, exact-K0 U has median entropy `2.619` bits and median
+expected change `11.645` bits; its first sweep changes all 24 rows/294 bits.
+An independent target-only elimination reproduces the expected changes within
+`7.8e-13` and bounds the probability of even one low-energy row change over
+10240 cyclic updates below `9.9e-6`; audit status/SHA is
+`INDEPENDENT_TARGET_AUDIT_PASS_LOCAL_FULL_ROW_CONDITIONAL_FEASIBLE` /
+`3845759b...bd1`.
+
+Therefore no standalone T1 screen or remote job is launched.  The row block
+may only be considered later as an exact U-collapse component in a fresh mixed
+kernel whose other move demonstrably transports among low-energy B basins.
+It is not a convergence result, q_top, parameter-point failure, `IMPOSSIBLE`,
+or formal/held-out/production authority.  It also shares the collapsed-B
+identity with HP/direct-column methods and cannot be the missing independent
+confirmation.  Physical zero remains illegal for the nonzero syndrome;
+shifted zero remains P, and P/U/MAP/S must remain adversarial starts.
+
 **COLLAPSED PHYSICAL-P PT VALIDATION 057 TERMINAL --
 LOCAL T1 PAIR UNRESOLVED; NO REMOTE OR FORMAL AUTHORITY**
 

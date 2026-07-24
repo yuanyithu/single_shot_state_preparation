@@ -293,4 +293,17 @@ Current status is pre-pilot, not scientific certification.
   despite thousands of visible U label changes. Audit SHA is `ada30d3c...b08e`. This is a frozen
   T1 sampler failure, not physical q_top or impossibility, and grants no m6/HARD2/formal/held-out/
   production authority.
+- `057_q0_hgp_physical_pt_oracle_20260724/`: exact collapsed physical-p PT oracle and frozen local
+  CPPT32 P/U T1 pair. Small-HGP cold-target, local/swap stationarity, p=.5 and portable k=64 tests
+  pass, and the m8 table/runtime gates are feasible, but both T1 trajectories have zero round trips
+  and retain large logical/B distribution disagreement. Independent raw-only status is
+  `INDEPENDENT_RAW_ONLY_AUDIT_PASS_LOCAL_T1_PAIR_UNRESOLVED`. No remote work was launched; this
+  rejects only CPPT32 at the frozen pair/budget and cannot independently confirm HP64.
+- `058_q0_full_row_elimination_feasibility_20260724/`: exact 24-bit full-B-row conditional using a
+  deterministic width-12 variable-elimination plan. Complete small-HGP conditional, detailed
+  balance, stationarity and replay tests pass, and local m8 runtime is inexpensive. Exact frozen
+  P/U/M0/S0 statistics nevertheless show that P/M0/S0 have less than `9.9e-6` union-bound chance
+  of even one row move over 10240 cyclic updates, while U changes aggressively. An independent
+  target-only elimination confirms this. Terminal interpretation is local conditional feasibility
+  but standalone low-energy transport non-viability; no T1/remote/q_top/formal authority exists.
 - Held-out and production evidence do not exist. Their absence is an active production blocker.

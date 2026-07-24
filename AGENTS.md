@@ -291,6 +291,20 @@ sampler/runner/analyzer，状态 `INDEPENDENT_RAW_ONLY_AUDIT_PASS_LOCAL_T1_PAIR_
 不可能，但 CPPT 与 HP64 同属 collapsed-B tempering，即使新后继通过也不能充当机制独立确认。后续优先做
 直接攻击 B 慢变量的正交 hard-coset kernel 或严格 oracle，而不是继续优化 ladder 密度/round-trip 表象。
 
+2026-07-24 的 validation 058 exact full-B-row elimination 已本地终止为
+**`LOCAL CONDITIONAL FEASIBLE / STANDALONE LOW-ENERGY TRANSPORT NOT VIABLE`**，未启动服务器。m8 行条件的
+deterministic min-fill width=`12`、最大 factor=`8192`；n=10/13 完整枚举、row detailed balance、full-sweep
+stationarity 和 PortablePrng/cache replay 共 20 项通过。128 MiB mass 构造 `.316s`，row update
+`.01291s`、17 MiB incremental peak、factor-two T1 投影 `264.39s`，所以 runtime 不是问题。关键反例是
+P/M0/S0 的 median entropy=0、median expected row change 仅 `1.2e-21--1.9e-21`，完整 sweep 全部 0 move；
+exact-K0 U 则 median expected change=`11.645`、首 sweep 改 24 rows/294 bits。独立 target-only elimination
+复核到 `7.8e-13`，并给出 P/M0/S0 在 10240 cyclic updates 内至少一次 row move 的 union bound 均
+`<9.9e-6`（primary/audit SHA=`0f99bba4...172da/3845759b...bd1`）。因此不得浪费资源跑 standalone T1 或
+把“U 快速下降”当作全局混合；该 row block 只能在 fresh contract 下作为混合 kernel 的 U-collapse 组件，
+另一个 move 必须负责低能 B-basin transport。它仍与 HP/direct-column 共享 collapsed-B 错误模式，不能充当
+机制独立确认；P/U/MAP/S 与 B-character 门必须保留，不能统一到 P/零态。最终 exp101+exp102 回归为
+`1020 passed, 4 existing warnings`。
+
 若要继续正式实验，须另立经审查的新算法/科学契约与 fresh tuning/held-out，不得把重复 T3、延长链、
 删困难 disorder、缩范围或改窗口包装成原 discovery 成功。
 PT/PA/global discovery raw 均不得进入正式 merge/freezer。48-code registry 已冻结，但正式新
