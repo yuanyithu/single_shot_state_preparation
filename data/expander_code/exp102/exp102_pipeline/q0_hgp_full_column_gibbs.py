@@ -36,6 +36,12 @@ FULL_COLUMN_GIBBS_KERNEL = "exact_collapsed_full_B_column_heatbath.v1"
 FULL_COLUMN_GIBBS_METHOD_ID = "FCG-C24"
 FULL_COLUMN_STREAMING_VERSION = "exp102.q0_hgp_full_column_streaming.v1"
 FULL_COLUMN_STREAMING_KERNEL = "exact_collapsed_full_B_column_heatbath_streaming.v1"
+FULL_COLUMN_DIRECT_BLOCK_VERSION = "exp102.q0_hgp_full_column_direct_block.v1"
+FULL_COLUMN_DIRECT_BLOCK_KERNEL = (
+    "exact_collapsed_full_B_column_heatbath_direct_positive_block.v1"
+)
+FULL_COLUMN_DIRECT_BLOCK_BITS = 12
+FULL_COLUMN_DIRECT_MIN_NORMAL_MARGIN_LOG = math.log(float(1 << 20))
 FULL_COLUMN_COUNTER_NAMES = (
     "column_updates",
     "column_changes",
@@ -117,6 +123,49 @@ class FullColumnStreamingWorkspace:
     def __post_init__(self):
         if self.cdf.ndim != 1 or self.cdf.dtype != np.float64:
             raise ValueError("streaming full-column workspace is invalid")
+
+
+@dataclass(frozen=True)
+class FullColumnDirectBlockCache:
+    """State-independent data for direct positive-weight block sampling."""
+
+    rows: int
+    p: float
+    block_bits: int
+    mass: np.ndarray
+    mass_min: float
+    popcount16: np.ndarray
+    odds_powers: np.ndarray
+
+    def __post_init__(self):
+        if not 1 <= int(self.rows) <= 24:
+            raise ValueError("direct-block full-column rows are invalid")
+        if int(self.block_bits) != min(FULL_COLUMN_DIRECT_BLOCK_BITS, int(self.rows)):
+            raise ValueError("direct-block partition changed")
+        if (not math.isfinite(float(self.p)) or not 0.0 < float(self.p) < 0.5
+                or self.popcount16.shape != (1 << 16,)
+                or self.popcount16.dtype != np.uint8
+                or self.mass.shape != (1 << int(self.rows),)
+                or self.mass.dtype != np.float64
+                or not math.isfinite(float(self.mass_min))
+                or not float(self.mass_min) > 0.0
+                or self.odds_powers.shape != (int(self.rows) + 1,)
+                or self.odds_powers.dtype != np.float64
+                or not np.all(np.isfinite(self.odds_powers))
+                or not np.all(self.odds_powers > 0.0)):
+            raise ValueError("direct-block full-column cache is invalid")
+
+
+@dataclass
+class FullColumnDirectBlockWorkspace:
+    """Only one subtotal per fixed candidate block is materialized."""
+
+    block_sums: np.ndarray
+
+    def __post_init__(self):
+        if (self.block_sums.ndim != 1 or self.block_sums.dtype != np.float64
+                or self.block_sums.size <= 0):
+            raise ValueError("direct-block full-column workspace is invalid")
 
 
 @dataclass(frozen=True)
@@ -234,6 +283,39 @@ def build_full_column_streaming_workspace(cache):
     )
 
 
+def build_full_column_direct_block_cache(rows, p, mass):
+    """Build the fixed 2**12 block partition and direct prior weights."""
+    rows = int(rows)
+    p = float(p)
+    if not 1 <= rows <= 24 or not math.isfinite(p) or not 0.0 < p < 0.5:
+        raise ValueError("invalid direct-block full-column cache parameters")
+    mass = np.ascontiguousarray(mass, dtype=np.float64)
+    if (mass.shape != (1 << rows,) or not np.all(np.isfinite(mass))
+            or not np.all(mass > 0.0)):
+        raise ValueError("invalid direct-block full-column mass table")
+    odds = p / (1.0 - p)
+    return FullColumnDirectBlockCache(
+        rows=rows,
+        p=p,
+        block_bits=min(FULL_COLUMN_DIRECT_BLOCK_BITS, rows),
+        mass=mass,
+        mass_min=float(np.min(mass)),
+        popcount16=_popcount_table_16(),
+        odds_powers=np.asarray(
+            [odds ** weight for weight in range(rows + 1)], dtype=np.float64,
+        ),
+    )
+
+
+def build_full_column_direct_block_workspace(cache):
+    if not isinstance(cache, FullColumnDirectBlockCache):
+        raise TypeError("direct-block workspace needs a direct-block cache")
+    block_count = 1 << (cache.rows - cache.block_bits)
+    return FullColumnDirectBlockWorkspace(
+        block_sums=np.empty(block_count, dtype=np.float64),
+    )
+
+
 def collapsed_a_syndromes(H, syndrome, b_columns):
     """Rebuild packed A-column syndromes ``Y xor B H`` from a B state."""
     H = _as_binary_matrix(H)
@@ -339,6 +421,251 @@ if njit is not None:
         return total
 else:  # pragma: no cover - exercised by the explicit engine guard.
     _streaming_cdf_numba = None
+
+
+def _direct_candidate_weight_reference(candidate, mass, bases, odds_powers,
+                                       popcount16):
+    popcount = (
+        int(popcount16[candidate & 0xFFFF])
+        + int(popcount16[candidate >> 16])
+    )
+    weight = float(odds_powers[popcount])
+    for factor in range(bases.size):
+        weight *= float(mass[candidate ^ int(bases[factor])])
+    return weight
+
+
+def _direct_block_sums_reference(mass, bases, odds_powers, popcount16,
+                                 block_bits, block_sums):
+    block_size = 1 << int(block_bits)
+    total = 0.0
+    for block in range(block_sums.size):
+        subtotal = 0.0
+        start = block * block_size
+        for candidate in range(start, start + block_size):
+            subtotal += _direct_candidate_weight_reference(
+                candidate, mass, bases, odds_powers, popcount16,
+            )
+        block_sums[block] = subtotal
+        total += subtotal
+    return total
+
+
+def _direct_block_select_reference(mass, bases, odds_powers, popcount16,
+                                   block_bits, block_sums, threshold):
+    prefix = 0.0
+    selected_block = block_sums.size - 1
+    for block in range(block_sums.size):
+        next_prefix = prefix + float(block_sums[block])
+        if float(threshold) < next_prefix:
+            selected_block = block
+            break
+        prefix = next_prefix
+    block_size = 1 << int(block_bits)
+    start = selected_block * block_size
+    cumulative = prefix
+    for candidate in range(start, start + block_size):
+        cumulative += _direct_candidate_weight_reference(
+            candidate, mass, bases, odds_powers, popcount16,
+        )
+        if float(threshold) < cumulative:
+            return candidate
+    return start + block_size - 1
+
+
+if njit is not None:
+    @njit(cache=True, inline="always")
+    def _direct_candidate_weight_numba(candidate, mass, bases, odds_powers,
+                                       popcount16):
+        popcount = (
+            int(popcount16[candidate & 0xFFFF])
+            + int(popcount16[candidate >> 16])
+        )
+        weight = odds_powers[popcount]
+        for factor in range(bases.size):
+            weight *= mass[candidate ^ int(bases[factor])]
+        return weight
+
+    @njit(cache=True)
+    def _direct_block_sums_numba(mass, bases, odds_powers, popcount16,
+                                 block_bits, block_sums):
+        block_size = 1 << int(block_bits)
+        total = 0.0
+        for block in range(block_sums.size):
+            subtotal = 0.0
+            start = block * block_size
+            for candidate in range(start, start + block_size):
+                subtotal += _direct_candidate_weight_numba(
+                    candidate, mass, bases, odds_powers, popcount16,
+                )
+            block_sums[block] = subtotal
+            total += subtotal
+        return total
+
+    @njit(cache=True)
+    def _direct_block_select_numba(mass, bases, odds_powers, popcount16,
+                                   block_bits, block_sums, threshold):
+        prefix = 0.0
+        selected_block = block_sums.size - 1
+        for block in range(block_sums.size):
+            next_prefix = prefix + block_sums[block]
+            if threshold < next_prefix:
+                selected_block = block
+                break
+            prefix = next_prefix
+        block_size = 1 << int(block_bits)
+        start = selected_block * block_size
+        cumulative = prefix
+        for candidate in range(start, start + block_size):
+            cumulative += _direct_candidate_weight_numba(
+                candidate, mass, bases, odds_powers, popcount16,
+            )
+            if threshold < cumulative:
+                return candidate
+        return start + block_size - 1
+else:  # pragma: no cover - exercised by the explicit engine guard.
+    _direct_block_sums_numba = None
+    _direct_block_select_numba = None
+
+
+def _direct_block_underflow_certificate(cache, factor_count):
+    log_lower_bound = (
+        math.log(float(cache.odds_powers[-1]))
+        + int(factor_count) * math.log(float(cache.mass_min))
+    )
+    required = math.log(float(np.finfo(np.float64).tiny)) + (
+        FULL_COLUMN_DIRECT_MIN_NORMAL_MARGIN_LOG
+    )
+    if not math.isfinite(log_lower_bound) or not log_lower_bound > required:
+        raise FullColumnGibbsConflictError(
+            "direct-block candidate weights lack the frozen normal-range margin",
+        )
+    return log_lower_bound
+
+
+def _column_direct_block_sums_unchecked(
+        H, b_columns, a_syndromes, column_index, mass, cache, workspace, *,
+        engine):
+    rows, _ = H.shape
+    column_index = int(column_index)
+    if not 0 <= column_index < rows:
+        raise ValueError("direct-block full-column index is invalid")
+    if (not isinstance(cache, FullColumnDirectBlockCache)
+            or not isinstance(workspace, FullColumnDirectBlockWorkspace)
+            or cache.rows != rows
+            or workspace.block_sums.shape
+            != (1 << (rows - cache.block_bits),)):
+        raise FullColumnGibbsConflictError("direct-block full-column cache mismatch")
+    if mass is not cache.mass:
+        raise FullColumnGibbsConflictError(
+            "direct-block full-column mass is not bound to its cache",
+        )
+    old = np.uint32(b_columns[column_index])
+    neighbors = np.flatnonzero(H[column_index]).astype(np.int32)
+    if neighbors.size == 0:
+        raise FullColumnGibbsConflictError(
+            "direct-block full-column update has no likelihood factors",
+        )
+    log_lower_bound = _direct_block_underflow_certificate(cache, neighbors.size)
+    bases = np.ascontiguousarray(a_syndromes[neighbors] ^ old, dtype=np.uint32)
+    arguments = (
+        mass, bases, cache.odds_powers, cache.popcount16, cache.block_bits,
+        workspace.block_sums,
+    )
+    if engine == "reference":
+        total = _direct_block_sums_reference(*arguments)
+    elif engine == "numba":
+        if _direct_block_sums_numba is None:
+            raise FullColumnGibbsConflictError("Numba direct-block engine is unavailable")
+        total = _direct_block_sums_numba(*arguments)
+    else:
+        raise ValueError("direct-block full-column engine must be reference or numba")
+    if (not math.isfinite(float(total)) or not float(total) > 0.0
+            or not np.all(np.isfinite(workspace.block_sums))
+            or not np.all(workspace.block_sums > 0.0)):
+        raise FullColumnGibbsConflictError("direct-block full-column weights vanished")
+    return neighbors, bases, float(total), log_lower_bound
+
+
+def full_column_direct_block_subtotals(
+        H, syndrome, b_columns, a_syndromes, column_index, mass, *, cache=None,
+        workspace=None, engine="numba"):
+    """Expose frozen subtotals for portability and runtime preflights."""
+    H = _validate_collapsed_state(H, syndrome, b_columns, a_syndromes)
+    if cache is None:
+        raise ValueError("direct-block subtotals require a p-bound cache")
+    workspace = (
+        build_full_column_direct_block_workspace(cache)
+        if workspace is None else workspace
+    )
+    _, _, total, log_lower_bound = _column_direct_block_sums_unchecked(
+        H, b_columns, a_syndromes, column_index, mass, cache, workspace,
+        engine=engine,
+    )
+    return workspace.block_sums.copy(), total, log_lower_bound
+
+
+def full_column_direct_block_conditional_probabilities(
+        H, syndrome, b_columns, a_syndromes, column_index, mass, *, cache=None):
+    """Return direct positive probabilities for exact small-code checks."""
+    H = _validate_collapsed_state(H, syndrome, b_columns, a_syndromes)
+    if cache is None:
+        raise ValueError("direct-block conditional requires a p-bound cache")
+    rows, _ = H.shape
+    mass = np.asarray(mass, dtype=np.float64)
+    old = np.uint32(b_columns[int(column_index)])
+    neighbors = np.flatnonzero(H[int(column_index)]).astype(np.int32)
+    if mass is not cache.mass:
+        raise FullColumnGibbsConflictError(
+            "direct-block conditional mass is not bound to its cache",
+        )
+    _direct_block_underflow_certificate(cache, neighbors.size)
+    bases = np.ascontiguousarray(a_syndromes[neighbors] ^ old, dtype=np.uint32)
+    probabilities = np.empty(1 << rows, dtype=np.float64)
+    total = 0.0
+    for candidate in range(probabilities.size):
+        weight = _direct_candidate_weight_reference(
+            candidate, mass, bases, cache.odds_powers, cache.popcount16,
+        )
+        probabilities[candidate] = weight
+        total += weight
+    if not math.isfinite(total) or not total > 0.0:
+        raise FullColumnGibbsConflictError("direct-block probabilities vanished")
+    probabilities /= total
+    return probabilities
+
+
+def full_column_direct_block_gibbs_update(
+        b_columns, a_syndromes, H, syndrome, column_index, mass, cache,
+        workspace, rng, *, engine="numba"):
+    """Heatbath one B column using fixed direct-positive subtotal blocks."""
+    H = _validate_collapsed_state(H, syndrome, b_columns, a_syndromes)
+    neighbors, bases, total, _ = _column_direct_block_sums_unchecked(
+        H, b_columns, a_syndromes, column_index, mass, cache, workspace,
+        engine=engine,
+    )
+    threshold = float(rng.random()) * total
+    arguments = (
+        np.asarray(mass, dtype=np.float64), bases, cache.odds_powers,
+        cache.popcount16, cache.block_bits, workspace.block_sums, threshold,
+    )
+    if engine == "reference":
+        selected = int(_direct_block_select_reference(*arguments))
+    elif engine == "numba":
+        if _direct_block_select_numba is None:
+            raise FullColumnGibbsConflictError("Numba direct-block engine is unavailable")
+        selected = int(_direct_block_select_numba(*arguments))
+    else:
+        raise ValueError("direct-block full-column engine must be reference or numba")
+    column_index = int(column_index)
+    old = np.uint32(b_columns[column_index])
+    new = np.uint32(selected)
+    delta = old ^ new
+    b_columns[column_index] = new
+    if delta:
+        for factor in neighbors:
+            a_syndromes[int(factor)] ^= delta
+    return bool(delta), int(int(delta).bit_count())
 
 
 def _column_streaming_cdf_unchecked(H, b_columns, a_syndromes, column_index,

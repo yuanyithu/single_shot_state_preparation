@@ -11,12 +11,18 @@ from data.expander_code.exp102.exp102_pipeline.q0_hgp_collapsed import (
     build_classical_coset_mass,
 )
 from data.expander_code.exp102.exp102_pipeline.q0_hgp_full_column_gibbs import (
+    FullColumnGibbsConflictError,
     FullColumnGibbsConfig,
     build_full_column_candidate_cache,
+    build_full_column_direct_block_cache,
+    build_full_column_direct_block_workspace,
     build_full_column_streaming_cache,
     build_full_column_streaming_workspace,
     build_full_column_workspace,
     collapsed_a_syndromes,
+    full_column_direct_block_conditional_probabilities,
+    full_column_direct_block_gibbs_update,
+    full_column_direct_block_subtotals,
     full_column_conditional_probabilities,
     full_column_gibbs_update,
     full_column_streaming_conditional_probabilities,
@@ -134,6 +140,51 @@ def test_streaming_reference_and_numba_match_exact_conditional(
 @pytest.mark.parametrize("H", SMALL_H)
 @pytest.mark.parametrize("p", [0.04, 0.10, 0.25])
 @pytest.mark.parametrize("nonzero_syndrome", [False, True])
+def test_direct_block_conditional_matches_direct_enumeration(
+        H, p, nonzero_syndrome):
+    model, _ = build_model(H)
+    epsilon, syndrome = _syndrome(model, nonzero_syndrome)
+    b_columns, a_syndromes, _ = _initial_collapsed_masks(epsilon, syndrome, H)
+    mass = build_classical_coset_mass(H, p, engine="reference")
+    log_mass = np.log(mass)
+    cache = build_full_column_direct_block_cache(H.shape[0], p, mass)
+    for column in range(H.shape[0]):
+        actual = full_column_direct_block_conditional_probabilities(
+            H, syndrome.reshape(H.shape), b_columns, a_syndromes, column,
+            mass, cache=cache,
+        )
+        expected = _direct_column_probabilities(
+            H, b_columns, a_syndromes, column, log_mass, p,
+        )
+        assert np.max(np.abs(actual - expected)) <= 2e-13
+
+
+@pytest.mark.parametrize("H", SMALL_H)
+@pytest.mark.parametrize("p", [0.04, 0.10, 0.25])
+@pytest.mark.parametrize("nonzero_syndrome", [False, True])
+def test_direct_block_reference_and_numba_subtotals_are_identical(
+        H, p, nonzero_syndrome):
+    model, _ = build_model(H)
+    epsilon, syndrome = _syndrome(model, nonzero_syndrome)
+    b_columns, a_syndromes, _ = _initial_collapsed_masks(epsilon, syndrome, H)
+    mass = build_classical_coset_mass(H, p, engine="reference")
+    cache = build_full_column_direct_block_cache(H.shape[0], p, mass)
+    for column in range(H.shape[0]):
+        reference = full_column_direct_block_subtotals(
+            H, syndrome.reshape(H.shape), b_columns, a_syndromes, column,
+            mass, cache=cache, engine="reference",
+        )
+        accelerated = full_column_direct_block_subtotals(
+            H, syndrome.reshape(H.shape), b_columns, a_syndromes, column,
+            mass, cache=cache, engine="numba",
+        )
+        assert np.array_equal(reference[0], accelerated[0])
+        assert reference[1:] == accelerated[1:]
+
+
+@pytest.mark.parametrize("H", SMALL_H)
+@pytest.mark.parametrize("p", [0.04, 0.10, 0.25])
+@pytest.mark.parametrize("nonzero_syndrome", [False, True])
 def test_single_column_detailed_balance_and_full_sweep_stationarity(H, p, nonzero_syndrome):
     model, _ = build_model(H)
     _, syndrome_flat = _syndrome(model, nonzero_syndrome)
@@ -213,6 +264,52 @@ def test_streaming_update_matches_legacy_decision_and_preserves_syndromes():
     assert np.array_equal(first_b, second_b)
     assert np.array_equal(first_a, second_a)
     assert np.array_equal(second_a, collapsed_a_syndromes(H, syndrome, second_b))
+
+
+@pytest.mark.parametrize("engine", ["reference", "numba"])
+def test_direct_block_update_matches_legacy_decision_and_preserves_syndromes(engine):
+    H = SMALL_H[1]
+    p = 0.04
+    model, _ = build_model(H)
+    epsilon, syndrome_flat = _syndrome(model, True)
+    syndrome = syndrome_flat.reshape(H.shape)
+    first_b, first_a, _ = _initial_collapsed_masks(epsilon, syndrome_flat, H)
+    second_b, second_a = first_b.copy(), first_a.copy()
+    mass = build_classical_coset_mass(H, p, engine="reference")
+    legacy_cache = build_full_column_candidate_cache(H.shape[0], p)
+    direct_cache = build_full_column_direct_block_cache(H.shape[0], p, mass)
+    legacy = full_column_gibbs_update(
+        first_b, first_a, H, syndrome, 0, np.log(mass), legacy_cache,
+        build_full_column_workspace(legacy_cache), _DeterministicRng(0.731),
+    )
+    direct = full_column_direct_block_gibbs_update(
+        second_b, second_a, H, syndrome, 0, mass, direct_cache,
+        build_full_column_direct_block_workspace(direct_cache),
+        _DeterministicRng(0.731), engine=engine,
+    )
+    assert legacy == direct
+    assert np.array_equal(first_b, second_b)
+    assert np.array_equal(first_a, second_a)
+    assert np.array_equal(second_a, collapsed_a_syndromes(H, syndrome, second_b))
+
+
+def test_direct_block_rejects_candidate_weight_underflow_risk():
+    H = SMALL_H[1]
+    p = 0.04
+    model, _ = build_model(H)
+    epsilon, syndrome_flat = _syndrome(model, True)
+    syndrome = syndrome_flat.reshape(H.shape)
+    b_columns, a_syndromes, _ = _initial_collapsed_masks(
+        epsilon, syndrome_flat, H,
+    )
+    mass = np.full(1 << H.shape[0], 1e-300, dtype=np.float64)
+    cache = build_full_column_direct_block_cache(H.shape[0], p, mass)
+    with pytest.raises(FullColumnGibbsConflictError, match="normal-range margin"):
+        full_column_direct_block_gibbs_update(
+            b_columns, a_syndromes, H, syndrome, 0, mass, cache,
+            build_full_column_direct_block_workspace(cache),
+            _DeterministicRng(0.5), engine="numba",
+        )
 
 
 def test_full_column_trajectory_replays_exactly():

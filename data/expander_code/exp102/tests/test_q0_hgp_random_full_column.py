@@ -10,15 +10,20 @@ from data.expander_code.exp102.exp102_pipeline.q0_hgp_collapsed import (
 )
 from data.expander_code.exp102.exp102_pipeline.q0_hgp_full_column_gibbs import (
     build_full_column_candidate_cache,
+    build_full_column_direct_block_cache,
     build_full_column_workspace,
     full_column_conditional_probabilities,
+    full_column_direct_block_conditional_probabilities,
 )
 from data.expander_code.exp102.exp102_pipeline.q0_hgp_random_full_column import (
     RandomFullColumnConfig,
+    RandomFullColumnDirectBlockConfig,
     RandomFullColumnStreamingConfig,
+    replay_random_full_column_direct_block_trajectory,
     replay_random_full_column_trajectory,
     replay_random_full_column_streaming_trajectory,
     run_random_full_column_trajectory,
+    run_random_full_column_direct_block_trajectory,
     run_random_full_column_streaming_trajectory,
 )
 from data.expander_code.exp102.exp102_pipeline.worker import build_model
@@ -53,7 +58,9 @@ def _syndrome(model, nonzero):
 @pytest.mark.parametrize("H", SMALL_H)
 @pytest.mark.parametrize("p", [0.04, 0.10, 0.25])
 @pytest.mark.parametrize("nonzero", [False, True])
-def test_random_scan_mixture_of_full_column_conditionals_is_stationary(H, p, nonzero):
+@pytest.mark.parametrize("conditional_engine", ["legacy", "direct_block"])
+def test_random_scan_mixture_of_full_column_conditionals_is_stationary(
+        H, p, nonzero, conditional_engine):
     model, _ = build_model(H)
     syndrome = _syndrome(model, nonzero)
     states = _hard_coset_states(model, syndrome)
@@ -66,16 +73,23 @@ def test_random_scan_mixture_of_full_column_conditionals_is_stationary(H, p, non
     log_mass = np.log(mass)
     cache = build_full_column_candidate_cache(rows, p)
     workspace = build_full_column_workspace(cache)
+    direct_cache = build_full_column_direct_block_cache(rows, p, mass)
     transition = np.zeros((states.shape[0], states.shape[0]), dtype=np.float64)
     for source, state in enumerate(states):
         A, B = split_hgp_state(state, H)
         del A
         b_columns, a_syndromes, _ = _initial_collapsed_masks(state, syndrome, H)
         for column in range(rows):
-            probabilities = full_column_conditional_probabilities(
-                H, syndrome.reshape(H.shape), b_columns, a_syndromes,
-                column, log_mass, cache=cache, workspace=workspace,
-            )
+            if conditional_engine == "legacy":
+                probabilities = full_column_conditional_probabilities(
+                    H, syndrome.reshape(H.shape), b_columns, a_syndromes,
+                    column, log_mass, cache=cache, workspace=workspace,
+                )
+            else:
+                probabilities = full_column_direct_block_conditional_probabilities(
+                    H, syndrome.reshape(H.shape), b_columns, a_syndromes,
+                    column, mass, cache=direct_cache,
+                )
             for candidate, probability in enumerate(probabilities):
                 target_B = B.copy()
                 target_B[:, column] = np.asarray(
@@ -147,6 +161,34 @@ def test_streaming_random_full_column_matches_legacy_and_replays(H):
         streaming,
     )
     assert str(streaming["conditional_engine"].item()) == "numba_streaming_cdf"
+
+
+@pytest.mark.parametrize("H", SMALL_H)
+def test_direct_block_random_full_column_matches_legacy_and_replays(H):
+    model, frame = build_model(H)
+    syndrome = _syndrome(model, True)
+    initial = model.logical_sector_section.apply(syndrome, strict=True)
+    legacy_config = RandomFullColumnConfig(
+        p=0.10, burn_updates=3, measurement_updates=8,
+    )
+    direct_config = RandomFullColumnDirectBlockConfig(
+        p=0.10, burn_updates=3, measurement_updates=8,
+    )
+    legacy = run_random_full_column_trajectory(
+        model, frame, H, syndrome, legacy_config, initial, 11, 12, 13,
+    )
+    direct = run_random_full_column_direct_block_trajectory(
+        model, frame, H, syndrome, direct_config, initial, 11, 12, 13,
+    )
+    for name in set(legacy) - {"seed_identity_sha256"}:
+        assert np.array_equal(legacy[name], direct[name])
+    assert replay_random_full_column_direct_block_trajectory(
+        model, frame, H, syndrome, direct_config, initial, 11, 12, 13,
+        direct,
+    )
+    assert str(direct["conditional_engine"].item()) == (
+        "numba_direct_positive_fixed_block_12"
+    )
 
 
 def test_random_full_column_config_rejects_sweep_ambiguity():
