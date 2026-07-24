@@ -258,6 +258,19 @@ preflight 三节点 exact consensus PASS，T1 投影 `4216.16/4149.15/4549.57s`�
 replay 的 probe 或冻结 intercept/slope 估计，同时不改 T1、7200s cap、五类初态和统计门。合同与证据见
 `RANDOM_FULL_COLUMN_DIRECT_BLOCK_T1_CONTRACT.md`、`validation/055_*/`。
 
+fresh validation 056 已冻结
+`exp102.q0_random_full_column_direct_block.t1_m8.v2`，目前是 **pre-schedule/pre-measurement**。它没有改
+sampler、T1、7200s cap、P/U/M0/M1/S x8 或任何统计门，只替换 055 的错误 runtime estimator。每节点用
+两个独立 cold 4-process batch 跑 `8+128` 与 `16+256` updates，P/M0/S0/U0 均实际执行 sampling+full bit
+replay；sampling/replay 分别拟合一次 startup intercept 与 per-update slope，投影 10240 updates 后乘原 factor
+2 并取最坏 family。任一 component slope 非正即 `RUNTIME_ESTIMATOR_UNSTABLE`，不得 favorable fallback。
+本地真实 smoke 全部 slope 为正，最坏投影约 `1348.4s`，但不能替代三 Linux 节点。config/control/manifest
+SHA 为 `70285cf7...899d / 49665fb9...9c48 / fd31f5a7...3ce7`；fresh logical/B characters 为
+`347ec3cf...8467 / 4cdbaf99...03be`，四类 40-task seeds 与 055 均无 overlap。conda-12 回归 exp102
+`617 passed`、exp101 `366 passed`。最终 source 仍须完整重跑 054 portable/runtime 和 056 schedule-bound
+preflight，双 aggregate PASS 前禁止 measurement；详见
+`RANDOM_FULL_COLUMN_DIRECT_BLOCK_T1_V2_CONTRACT.md`、`validation/056_*/PRE_RUN_RED_TEAM.md`。
+
 若要继续正式实验，须另立经审查的新算法/科学契约与 fresh tuning/held-out，不得把重复 T3、延长链、
 删困难 disorder、缩范围或改窗口包装成原 discovery 成功。
 PT/PA/global discovery raw 均不得进入正式 merge/freezer。48-code registry 已冻结，但正式新

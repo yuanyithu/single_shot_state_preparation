@@ -1,7 +1,7 @@
 # exp102 status
 
-**DIRECT-BLOCK M8 T1 VALIDATION 055 STOPPED BY A FALSE-NEGATIVE RUNTIME
-PREFLIGHT -- NO CONVERGENCE OR PHYSICAL RESULT YET**
+**RUNTIME-CORRECTED DIRECT-BLOCK M8 T1 VALIDATION 056 FROZEN LOCALLY --
+PENDING THREE-NODE PREFLIGHT; NO CONVERGENCE OR PHYSICAL RESULT YET**
 
 The direct dressed-logical-XOR structure probe (validation 047) is terminally
 `LOCAL_CENTER_PRESERVING_STRUCTURE_NOT_VIABLE`: its 127-move catalog is
@@ -163,6 +163,27 @@ intercept/slope design) while retaining T1, the 7200-second cap, all five
 adversarial initial families, full replay, and every statistical gate.  It must
 use fresh source/contract/schedule/seeds/raw.  No m6, HARD2, formal, held-out,
 `READY_FOR_FORMAL`, or production authority exists.
+
+Validation 056 now freezes that fresh successor as
+`exp102.q0_random_full_column_direct_block.t1_m8.v2`.  It changes only the
+runtime estimator: separate cold four-process batches run `8+128` and `16+256`
+updates for P/M0/S0/U0, and both sampling and complete bit replay are timed.
+For each component it fits one nonnegative startup intercept and a per-update
+slope, projects 10,240 updates, applies the unchanged factor two, and takes the
+worst family.  Every sampling and replay slope must be positive; otherwise the
+run is `RUNTIME_ESTIMATOR_UNSTABLE`.  The 7200-second cap is unchanged.
+
+The sampler, exact hard-coset target, T1 clock, P/U/M0/M1/S x8 panel, all
+character/D2/weight/likelihood/Rhat/ESS/crossing/basin gates, and maximum
+diagnostic-only permission are unchanged.  Config/control/manifest SHA are
+`70285cf7...899d` / `49665fb9...9c48` / `fd31f5a7...3ce7`; fresh logical/B
+character SHA are `347ec3cf...8467` / `4cdbaf99...03be`.  All four 40-task seed
+fields are disjoint from 055 at the same source identity.  A real local
+two-length sampling+replay smoke had positive component slopes and worst
+factor-two projection about 1348.4 seconds.  Full conda-12 regressions pass
+(exp102 617, exp101 366).  This remains pre-schedule/pre-measurement until the
+final source passes both the complete validation-054 three-node preflight and
+the new schedule-bound three-node preflight.  No q_top or sampler result exists.
 
 **BP-SYSTEMATIC INDEPENDENCE-MH IS EXACT BUT STICKY ON ADVERSARIAL LOW-ENERGY
 STARTS -- NO HARD2 OR REMOTE LAUNCH**
