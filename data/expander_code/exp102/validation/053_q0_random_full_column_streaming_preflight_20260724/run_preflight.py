@@ -9,6 +9,7 @@ from importlib import import_module
 import json
 import math
 import multiprocessing
+import os
 from pathlib import Path
 import statistics
 import subprocess
@@ -83,16 +84,20 @@ def load_canonical(path):
 
 
 def verify_clean_source(expected_commit):
-    head = subprocess.run(
-        ("git", "-C", str(PROJECT_ROOT), "rev-parse", "HEAD"),
-        check=True, capture_output=True, text=True,
-    ).stdout.strip()
-    status = subprocess.run(
-        ("git", "-C", str(PROJECT_ROOT), "status", "--porcelain", "--untracked-files=all"),
-        check=True, capture_output=True, text=True,
-    ).stdout
-    require(head == expected_commit, "source commit does not match HEAD")
-    require(not status, "streaming preflight requires a clean source worktree")
+    if (PROJECT_ROOT / ".git").exists():
+        head = subprocess.run(
+            ("git", "-C", str(PROJECT_ROOT), "rev-parse", "HEAD"),
+            check=True, capture_output=True, text=True,
+        ).stdout.strip()
+        status = subprocess.run(
+            ("git", "-C", str(PROJECT_ROOT), "status", "--porcelain", "--untracked-files=all"),
+            check=True, capture_output=True, text=True,
+        ).stdout
+        require(head == expected_commit, "source commit does not match HEAD")
+        require(not status, "streaming preflight requires a clean source worktree")
+    else:
+        require(os.environ.get("EXP102_SOURCE_COMMIT") == expected_commit,
+                "verified archive source identity is missing")
 
 
 def validate_config(config):
@@ -389,7 +394,10 @@ def main():
     elif not speed_pass or not runtime_pass:
         status = "RUNTIME_EXHAUSTED"
     else:
-        status = "STREAMING_PREFLIGHT_LOCAL_PASS"
+        status = (
+            "STREAMING_PREFLIGHT_LOCAL_PASS"
+            if args.node == "macmini" else "STREAMING_PREFLIGHT_NODE_PASS"
+        )
     core = {
         "checks": {
             "m8_cdf_byte_equivalence": exact_pass,
