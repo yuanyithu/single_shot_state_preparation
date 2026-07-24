@@ -305,6 +305,19 @@ exact-K0 U 则 median expected change=`11.645`、首 sweep 改 24 rows/294 bits�
 机制独立确认；P/U/MAP/S 与 B-character 门必须保留，不能统一到 P/零态。最终 exp101+exp102 回归为
 `1020 passed, 4 existing warnings`。
 
+2026-07-24 validation 059 把 058 full-row 与 056 direct-positive full-column 按每 clock 各一次组成严格 exact
+hybrid，并以 source `1e9097644dbed0ccb6cd61da1dc80d57413ce4bb` 完成本地 P/U/M0/S0 各 4 条
+`256+1024` pilot；16/16 raw 与 full replay 全过，但终态为
+**`LOCAL_HYBRID_B_NECESSARY_GATES_FAIL`**。低能三族 late B weight/likelihood 约 `.039--.042/-5.1`，U 仍为
+`.10823/-11.2326`；U/P B-weight、likelihood、B-bit-MSD 差为 `.06901/6.0030/.04992`，四条 U burn endpoint
+零条通过宽松 `.065/-6.5` gate，U 自身 likelihood 前后段仍漂移 `.5695`。U burn 虽有 21--25 个 row changes，
+measurement 只剩 1--3，说明 row block 约扫一轮后就在错误高能 basin 冻住，column block 未修复。raw-only
+audit 不调用 sampler/kernel/analyzer，逐 clock 重建 B/cache/state/label/weight/likelihood/counter/seed/gate，状态
+`INDEPENDENT_RAW_AUDIT_PASS_LOCAL_HYBRID_B_NECESSARY_GATES_FAIL`（primary/raw-set/audit SHA=
+`2f25aa7c...873ba/db6a303e...cd88/443d461d...b7c`）。不得把它部署 nd-2/nd-3、补长、与 056 合并或报 q_top；
+下一候选必须协调多行/多列或以别的机制跨过 collapsed-B basin barrier，而不是继续排列两个单 block exact
+kernel。
+
 若要继续正式实验，须另立经审查的新算法/科学契约与 fresh tuning/held-out，不得把重复 T3、延长链、
 删困难 disorder、缩范围或改窗口包装成原 discovery 成功。
 PT/PA/global discovery raw 均不得进入正式 merge/freezer。48-code registry 已冻结，但正式新

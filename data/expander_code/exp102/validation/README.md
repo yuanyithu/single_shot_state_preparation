@@ -306,4 +306,12 @@ Current status is pre-pilot, not scientific certification.
   of even one row move over 10240 cyclic updates, while U changes aggressively. An independent
   target-only elimination confirms this. Terminal interpretation is local conditional feasibility
   but standalone low-energy transport non-viability; no T1/remote/q_top/formal authority exists.
+- `059_q0_hybrid_row_column_local_pilot_20260724/`: frozen local composition of one exact
+  direct-positive B-column and one exact full-B-row heatbath per macroclock. All 16 P/U/M0/S0
+  256+1024-clock raw replay and a sampler-independent transition/raw audit passes, but the
+  necessary B-distribution gates fail: U remains at normalized B weight `.10823` and likelihood
+  per factor `-11.2326`, versus about `.04/-5.1` for all low-energy families. The row block changes
+  21--25 rows during U burn and then only 1--3 in measurement, so the proposed U-collapse plus
+  low-energy-column-transport division of labor is falsified. No remote/T1/q_top/formal authority
+  exists.
 - Held-out and production evidence do not exist. Their absence is an active production blocker.

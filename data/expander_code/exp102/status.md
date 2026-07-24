@@ -1,5 +1,44 @@
 # exp102 status
 
+**HYBRID ROW-COLUMN VALIDATION 059 TERMINAL -- LOCAL B-TRANSPORT NECESSARY
+GATES FAIL; NO REMOTE OR FORMAL AUTHORITY**
+
+Validation 059 freezes `HRC1-C24-DPB12-R24-VE12`: every macroclock applies one
+uniform exact direct-positive B-column heatbath followed by one uniform exact
+full-B-row elimination heatbath, then draws A|B exactly at observation clocks.
+Complete small-HGP matrices verify the ordered clock preserves the strict
+collapsed target, and focused/related tests pass.  Source
+`1e9097644dbed0ccb6cd61da1dc80d57413ce4bb` then runs the pre-registered local
+P/U/M0/S0 x4 panel at 256+1024 clocks; all 16 raw and full replays complete.
+The post-run focused and complete exp101+exp102 regressions are `107 passed`
+and `1033 passed, 4 existing warnings`, respectively.
+
+The hypothesized division of labor is falsified.  P/M0/S0 late normalized B
+weights are `.03922/.04065/.04159` with likelihood per factor
+`-5.2297/-5.1555/-5.0977`; U remains at `.10823/-11.2326`.  U/P differences
+are `.06901` in B weight, `6.0030` in likelihood and `.04992` in all-B-bit mean
+square distance.  Each U chain changes 21--25 rows during burn but only 1--3
+rows during measurement, showing it makes roughly one early row sweep and then
+freezes in the wrong high-energy basin.  Zero of four U endpoints pass the
+loose `.065/-6.5` collapse gate, and U still has first/last likelihood drift
+`.5695`.
+
+Primary status/report/raw-set SHA are
+`LOCAL_HYBRID_B_NECESSARY_GATES_FAIL` / `2f25aa7c...873ba` /
+`db6a303e...cd88`.  A sampler-independent raw auditor reconstructs every
+column/row transition, cached syndrome, state/B block, label, weight,
+likelihood, counter, seed, summary and gate as
+`INDEPENDENT_RAW_AUDIT_PASS_LOCAL_HYBRID_B_NECESSARY_GATES_FAIL`, SHA
+`443d461d...b7c`.  Runtime and replay pass, so this is a sampler transport
+failure rather than infrastructure failure.
+
+No nd-2/nd-3 task is launched.  The 059 raw cannot be extended, pooled or
+reported as q_top.  The failure is not a physical parameter-point result or
+`IMPOSSIBLE`; it rejects this fixed one-row/one-column composition and budget.
+A meaningful successor must coordinate multiple rows/columns or otherwise
+cross the collapsed-B basin barrier.  Common P/zero starts remain forbidden,
+and this collapsed mechanism still cannot provide independent confirmation.
+
 **FULL-B-ROW ELIMINATION VALIDATION 058 TERMINAL -- LOCAL CONDITIONAL
 FEASIBLE, STANDALONE LOW-ENERGY TRANSPORT NOT VIABLE**
 
