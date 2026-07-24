@@ -3,6 +3,7 @@ import json
 from pathlib import Path
 import subprocess
 import sys
+from types import SimpleNamespace
 
 import numpy as np
 
@@ -137,3 +138,21 @@ def test_v2_analyzer_and_shell_versions_are_fresh():
     assert analyzer.REPORT_VERSION.endswith("direct_block.t1_m8.report.v2")
     run_stage = Path(analyzer._workflow.ROOT) / "run_stage.sh"
     subprocess.run(["bash", "-n", str(run_stage)], check=True)
+
+
+def test_constant_b_freeze_uses_signed_character_values():
+    analyzer = import_module(
+        "data.expander_code.exp102.validation."
+        "052_q0_random_full_column_t1_m8_20260724.analyze_t1"
+    )
+    b_set = SimpleNamespace(
+        masks_packed=np.asarray([[1]], dtype=np.uint8), size=1,
+    )
+    records = [{
+        "b_packed": np.ones((4, 1), dtype=np.uint8),
+        "burn_b_packed": np.zeros((4, 1), dtype=np.uint8),
+        "family": "P",
+        "index": 0,
+        "initial_b_packed": np.ones(1, dtype=np.uint8),
+    }]
+    assert analyzer._constant_b_freeze_failures(records, b_set) == []

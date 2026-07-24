@@ -271,4 +271,26 @@ Current status is pre-pilot, not scientific certification.
   `817425db...75c6d` verifies the full evidence and decision. This is an implementation/resource
   failure before convergence testing, not a physical failure or impossibility result, and grants
   no m6, HARD2, formal, held-out, or production authority.
+- `053_q0_random_full_column_streaming_preflight_20260724/`: exact memory-streaming successor
+  preflight. The proposed streaming CDF and all portable transcripts agree across nodes, but the
+  frozen legacy-byte comparison differs once per Linux node and the remote speed/runtime gates
+  also fail. Terminal evidence is `CONFLICT` plus independent runtime exhaustion; no measurement
+  raw exists.
+- `054_q0_random_full_column_direct_block_preflight_20260724/`: exact positive-weight,
+  fixed-`2^12`-candidate-block implementation of the full-column conditional. Complete `2^24`
+  numeric checks, macmini/three-node portable transcripts, and the replay-inclusive runtime gate
+  pass. This authorizes only a fresh m8 T1 diagnostic, not convergence or physics.
+- `055_q0_random_full_column_direct_block_t1_m8_20260724/`: first fresh direct-block T1 contract.
+  Its final immutable run passes the complete 054 preflight but its own 10-update estimator
+  repeats fixed startup overhead when extrapolating, so it terminates at preflight as
+  `RUNTIME_EXHAUSTED` with zero measurement raw. The failure is resource-estimator-specific, not
+  a sampler result.
+- `056_q0_random_full_column_direct_block_t1_m8_v2_20260724/`: runtime-corrected immutable m8 T1
+  diagnostic from source `6933e319...`. Both three-node preflights pass and fixed `14/13/13`
+  ownership completes all 40 raw. Primary and independent raw-only analyses agree on terminal
+  `UNRESOLVED_DIRECT_BLOCK_T1_M8`: every family fails Rhat/ESS, and exact-K0 U remains at
+  normalized weight `.097775` versus about `.03888` for P/M0/M1/S. P/U `delta q_top=.90374`
+  despite thousands of visible U label changes. Audit SHA is `ada30d3c...b08e`. This is a frozen
+  T1 sampler failure, not physical q_top or impossibility, and grants no m6/HARD2/formal/held-out/
+  production authority.
 - Held-out and production evidence do not exist. Their absence is an active production blocker.

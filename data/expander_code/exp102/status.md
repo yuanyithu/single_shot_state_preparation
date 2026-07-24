@@ -1,7 +1,7 @@
 # exp102 status
 
-**RUNTIME-CORRECTED DIRECT-BLOCK M8 T1 VALIDATION 056 FROZEN LOCALLY --
-PENDING THREE-NODE PREFLIGHT; NO CONVERGENCE OR PHYSICAL RESULT YET**
+**DIRECT-BLOCK M8 T1 VALIDATION 056 TERMINAL --
+UNRESOLVED SAMPLER CONVERGENCE; NO PHYSICAL RESULT OR M6 AUTHORITY**
 
 The direct dressed-logical-XOR structure probe (validation 047) is terminally
 `LOCAL_CENTER_PRESERVING_STRUCTURE_NOT_VIABLE`: its 127-move catalog is
@@ -164,26 +164,48 @@ adversarial initial families, full replay, and every statistical gate.  It must
 use fresh source/contract/schedule/seeds/raw.  No m6, HARD2, formal, held-out,
 `READY_FOR_FORMAL`, or production authority exists.
 
-Validation 056 now freezes that fresh successor as
-`exp102.q0_random_full_column_direct_block.t1_m8.v2`.  It changes only the
-runtime estimator: separate cold four-process batches run `8+128` and `16+256`
-updates for P/M0/S0/U0, and both sampling and complete bit replay are timed.
-For each component it fits one nonnegative startup intercept and a per-update
-slope, projects 10,240 updates, applies the unchanged factor two, and takes the
-worst family.  Every sampling and replay slope must be positive; otherwise the
-run is `RUNTIME_ESTIMATOR_UNSTABLE`.  The 7200-second cap is unchanged.
+Validation 056 froze that fresh successor as
+`exp102.q0_random_full_column_direct_block.t1_m8.v2`.  The immutable run
+`exp102_q0_direct_block_t1_m8_v2_20260724_6933e31` used source
+`6933e319b27840976f34e27c0d11313b6973cbe3`, archive
+`b62d0e22...13eb5`, manifest `135eb089...17e48`, and schedule
+`ca057fbc...58d3`.  The complete validation-054 portable preflight and fresh
+two-length v2 preflight both passed exact three-node consensus; the latter's
+worst replay-inclusive factor-two T1 projection was `6550.3213s < 7200s`.
+Fixed `14/13/13` ownership then completed all 40 measurement raw with no reuse.
 
-The sampler, exact hard-coset target, T1 clock, P/U/M0/M1/S x8 panel, all
-character/D2/weight/likelihood/Rhat/ESS/crossing/basin gates, and maximum
-diagnostic-only permission are unchanged.  Config/control/manifest SHA are
-`70285cf7...899d` / `49665fb9...9c48` / `fd31f5a7...3ce7`; fresh logical/B
-character SHA are `347ec3cf...8467` / `4cdbaf99...03be`.  All four 40-task seed
-fields are disjoint from 055 at the same source identity.  A real local
-two-length sampling+replay smoke had positive component slopes and worst
-factor-two projection about 1348.4 seconds.  Full conda-12 regressions pass
-(exp102 617, exp101 366).  This remains pre-schedule/pre-measurement until the
-final source passes both the complete validation-054 three-node preflight and
-the new schedule-bound three-node preflight.  No q_top or sampler result exists.
+The frozen primary analyzer returned **`UNRESOLVED_DIRECT_BLOCK_T1_M8`**,
+report SHA `e1bfb340...6015` and raw-set SHA `a267ded6...2259`.  An out-of-band
+`allow_pickle=False` auditor independently reconstructed the PortablePrng K0
+starts, hard-coset algebra, every B transcript/state/label/weight/likelihood,
+q_top/D2, Rhat/ESS, all family/pair gates, MAP bridge, constant-character rule,
+and terminal status without calling the sampler, replay runner, or primary
+analyzer.  It returned `INDEPENDENT_RAW_ONLY_AUDIT_PASS`, audit SHA
+`ada30d3c...b08e`.
+
+All five families fail within-family Rhat/ESS.  P/M0/M1/S are close in q_top
+(`.90378--.92260`) and mean weight (`.0388708--.0388953`), but their max Rhat
+is `1.1335--1.3048` and min ESS only `66.86--87.61`; their pairwise pooled-B
+Rhat and B-character means also fail.  U exposes the decisive global failure:
+after 2048 burn updates its normalized state/B weights remain
+`.097775/.101909`, versus about `.03888/.0400` for low-energy starts.  U has
+`q_top=.0000405`, max Rhat `inf`, min ESS `39.75`, and every U/low-energy pair
+fails all eight distribution gates.  For P/U, `delta q_top=.90374`, logical D2
+upper `.93903`, B-character D2 upper `.20827`, and 466 B characters fail their
+mean gate.  Yet every U chain records at least 580 B-column and 2406 label
+changes, while the bidirectional MAP bridge passes in all M0/M1 chains.  Thus
+visible motion and a known basin bridge do not establish global equilibration.
+
+This is a fixed-budget sampler failure, not a physical q_top or proof that the
+cell is impossible.  No m6, HARD2, formal, held-out, `READY_FOR_FORMAL`, or
+production authority exists.  The raw may not be extended or merged with a
+successor, and U/MAP/S may not be replaced by common P starts; physical zero is
+outside the hard coset and shifted zero is already P.  The primary analyzer
+also emitted a `uint8` underflow warning in its constant-character helper.  No
+B character was globally constant, so the corrected independent computation
+also has zero freeze failures and the terminal result is unchanged.  A fresh
+successor must use signed arithmetic, a new contract/source/seeds/raw, and --
+under the user's current resource rule -- only nd-2/nd-3.
 
 **BP-SYSTEMATIC INDEPENDENCE-MH IS EXACT BUT STICKY ON ADVERSARIAL LOW-ENERGY
 STARTS -- NO HARD2 OR REMOTE LAUNCH**

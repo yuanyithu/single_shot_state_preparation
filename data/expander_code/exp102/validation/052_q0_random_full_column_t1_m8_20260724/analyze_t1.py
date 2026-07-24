@@ -571,7 +571,7 @@ def _constant_b_freeze_failures(all_records, b_set):
         for row in all_records:
             initial = int(1 - 2 * _b_character_bits(
                 row["initial_b_packed"][None, :], mask,
-            )[0, 0])
+            ).astype(np.int8)[0, 0])
             if initial == common:
                 continue
             burn = 1 - 2 * _b_character_bits(row["burn_b_packed"], mask).astype(np.int8)

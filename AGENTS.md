@@ -258,18 +258,26 @@ preflight 三节点 exact consensus PASS，T1 投影 `4216.16/4149.15/4549.57s`�
 replay 的 probe 或冻结 intercept/slope 估计，同时不改 T1、7200s cap、五类初态和统计门。合同与证据见
 `RANDOM_FULL_COLUMN_DIRECT_BLOCK_T1_CONTRACT.md`、`validation/055_*/`。
 
-fresh validation 056 已冻结
-`exp102.q0_random_full_column_direct_block.t1_m8.v2`，目前是 **pre-schedule/pre-measurement**。它没有改
-sampler、T1、7200s cap、P/U/M0/M1/S x8 或任何统计门，只替换 055 的错误 runtime estimator。每节点用
-两个独立 cold 4-process batch 跑 `8+128` 与 `16+256` updates，P/M0/S0/U0 均实际执行 sampling+full bit
-replay；sampling/replay 分别拟合一次 startup intercept 与 per-update slope，投影 10240 updates 后乘原 factor
-2 并取最坏 family。任一 component slope 非正即 `RUNTIME_ESTIMATOR_UNSTABLE`，不得 favorable fallback。
-本地真实 smoke 全部 slope 为正，最坏投影约 `1348.4s`，但不能替代三 Linux 节点。config/control/manifest
-SHA 为 `70285cf7...899d / 49665fb9...9c48 / fd31f5a7...3ce7`；fresh logical/B characters 为
-`347ec3cf...8467 / 4cdbaf99...03be`，四类 40-task seeds 与 055 均无 overlap。conda-12 回归 exp102
-`617 passed`、exp101 `366 passed`。最终 source 仍须完整重跑 054 portable/runtime 和 056 schedule-bound
-preflight，双 aggregate PASS 前禁止 measurement；详见
-`RANDOM_FULL_COLUMN_DIRECT_BLOCK_T1_V2_CONTRACT.md`、`validation/056_*/PRE_RUN_RED_TEAM.md`。
+fresh validation 056
+`exp102.q0_random_full_column_direct_block.t1_m8.v2` 已终止为
+**`UNRESOLVED_DIRECT_BLOCK_T1_M8`**。immutable run
+`exp102_q0_direct_block_t1_m8_v2_20260724_6933e31`（source
+`6933e319b27840976f34e27c0d11313b6973cbe3`）先通过完整 054 portable preflight 与 fresh 两长度 runtime
+preflight，最坏 factor-two T1 投影 `6550.3213s<7200s`；随后固定 `14/13/13` ownership 完成 40/40 raw，
+无复用。primary report/raw-set SHA 为 `e1bfb340...6015 / a267ded6...259`；不调用 sampler/replay/analyzer
+的 raw-only audit 独立重算全部 states/B/labels/likelihood/q_top/D2/Rhat/ESS/family/pair/terminal gates，状态
+`INDEPENDENT_RAW_ONLY_AUDIT_PASS`，SHA `ada30d3c...b08e`。
+
+这是冻结 T1 下的 sampler 收敛失败，不是 runtime/infrastructure、物理 q_top 或 `IMPOSSIBLE`。P/M0/M1/S
+虽互相给出 `q_top=.90378--.92260`、normalized weight 约 `.03888`，五族仍全部 Rhat/ESS fail；低能族
+max Rhat `1.1335--1.3048`、min ESS `66.86--87.61`。U 更明确地停在 normalized state/B weight
+`.097775/.101909`，而低能族约 `.03888/.0400`；U `q_top=.0000405`、max Rhat=`inf`、min ESS=`39.75`，
+所有 U/低能 pair 的八个分布门全失败。U 每条 measurement 仍至少有 580 个 B-column 和 2406 个 label
+changes，因此“链在动”不等于向目标输运。MAP bridge 双向全过也不能替代全局混合。不得补钟、合并 raw、
+删 U/MAP/S 或全部从 P/零态开始；物理零态仍非法，shifted zero 就是 P。primary constant-character helper
+还暴露 `uint8` 下溢 warning，但本 run 没有 globally constant B character，corrected audit 同为零 freeze
+failures，终态不受影响；后继须用 signed arithmetic 并加回归。详见
+`RANDOM_FULL_COLUMN_DIRECT_BLOCK_T1_V2_CONTRACT.md` 与 `validation/056_*/README.md`。
 
 若要继续正式实验，须另立经审查的新算法/科学契约与 fresh tuning/held-out，不得把重复 T3、延长链、
 删困难 disorder、缩范围或改窗口包装成原 discovery 成功。
@@ -337,6 +345,9 @@ MCMC 三类 move ↔ 该分解：single-bit 翻转一般同时动 **T 与 S**（
   - 使用命令`ssh yuany`可以登录到存储节点(nd-0)，文件传输可以在这个节点与本地实现
   - 当登录到nd-0之后进一步使用命令`ssh nd-3`或`ssh nd-1`或`ssh nd-2`可以登录到计算节点，计算节点与存储节点共享存储，计算应在这个节点开展
   - 运行python请使用名为`11`的conda环境，运行请开启`screen`后台运行
+  - **2026-07-24 起新开的 exp102 实验只允许使用 `nd-2` 或 `nd-3`，不得把 `nd-1` 写入 fresh
+    preflight、schedule、capacity 或 ownership。** 已在该要求提出前启动的 validation 056 三节点 run 仅按
+    原 immutable contract 收尾；不得把它复制为后继节点配置。
   - **服务器根目录唯一为 `~/.single_shot/`（launcher 的 `REMOTE_BASE`），是 Project D 在服务器上的唯一落脚点**；其它项目（N01 / A14 / QEDC / BP_OSD / QEM_QEC 等）与本项目无关，不要读写或混入。根目录下只长期保留两个子目录：`runs/`（唯一的实验产物文件夹，每次实验一个带编号子目录 `expNN_…`，与本地 `data/` 编号一一对应）和 `logs/`（launcher 日志）。索引见 `~/.single_shot/SERVER_README.md`。
   - **保持有序、用完即清**：`repos/`（每次 launch tar 过去的 src 副本）、`mpl-cache/`、`*code*` 快照、profile/smoke/benchmark 等都是 scratch，由 launcher 自动重建——把一个 run 的结果 tar 回本地 `data/` 并校验后，应删掉该 run 的 `repos/` 副本和临时 cache，长期只留 `runs/` 下最终 NPZ/产物。不要再在根目录散放代码快照或散乱命名的 run。
   - 本地 `data/` + git 是 single source of truth；服务器 `runs/` 只是 NPZ 的异地备份，不在服务器上做分析。（2026-06-15 已清理：删除 ~30G repos/代码快照/profile/smoke/早期摸底 scratch，59 个编号实验归拢到 `runs/`。）
