@@ -1,7 +1,7 @@
 # exp102 status
 
-**DIRECT-BLOCK RANDOM FULL-B-COLUMN PREFLIGHT PASS -- FRESH M8 T1 AUTHORIZED,
-BUT NO CONVERGENCE OR PHYSICAL RESULT YET**
+**DIRECT-BLOCK M8 T1 VALIDATION 055 STOPPED BY A FALSE-NEGATIVE RUNTIME
+PREFLIGHT -- NO CONVERGENCE OR PHYSICAL RESULT YET**
 
 The direct dressed-logical-XOR structure probe (validation 047) is terminally
 `LOCAL_CENTER_PRESERVING_STRUCTURE_NOT_VIABLE`: its 127-move catalog is
@@ -133,12 +133,36 @@ and a one-ULP B-likelihood false conflict from using a different sum order.
 The new analyzer independently rebuilds factor indices, preserves the frozen
 kernel sum order, and rejects a tampered engine identity.
 
-Validation 055 is currently **pre-measurement**.  Its final source must rerun
-the complete validation-054 portable/runtime preflight on all three Linux
-nodes and pass its own schedule-bound three-node preflight before any of the
-40 trajectories starts.  A local smoke or unit-test pass is not measurement
-authorization.  See `RANDOM_FULL_COLUMN_DIRECT_BLOCK_T1_CONTRACT.md` and
-`validation/055_q0_random_full_column_direct_block_t1_m8_20260724/`.
+Validation 055 is terminally **`RUNTIME_EXHAUSTED` at preflight** and produced
+zero measurement raw.  The first two schedule attempts failed before control
+creation because the schedule's fresh run root had already been created, first
+manually and then by a misplaced stage marker.  Both remain infrastructure
+audit only.  The corrected immutable third run
+`exp102_q0_direct_block_t1_m8_20260724_146ef55_r3` used source
+`146ef550591a72435641c47baa8794c338f7a27e`, schedule SHA
+`bbc2e268...ee731a`, and the frozen 40-task `P/U/M0/M1/S x8` ownership.
+
+On that final source, the complete validation-054 three-node preflight passed
+with exact consensus and replay-inclusive T1 projections
+`4216.16/4149.15/4549.57s`; aggregate SHA is `ae356c9e...b35ac`.  The separate
+055 runtime estimator, however, measured only `2+8` updates and linearly
+scaled total elapsed time, including fixed initialization/runner overhead, to
+10,240 updates before applying the safety factor.  It projected
+`9272.13/8779.07/13638.99s`, so its own unchanged 7200-second gate correctly
+stopped measurement with aggregate SHA `7fffcdda...f461`.  The independent
+audit verifies both facts, schedule failures, all hashes/arithmetic, and raw
+absence as
+`INDEPENDENT_AUDIT_PASS_PORTABLE_PASS_T1_RUNTIME_EXHAUSTED_CONFIRMED` (SHA
+`00622194...c665`).
+
+Thus 055 did not test the direct-block sampler or the m8 posterior at all.  It
+exposed a pre-registered runtime estimator that repeats fixed startup cost in
+its extrapolation; this cannot be relabeled PASS or sampler failure.  A fresh
+successor may use representative replay-inclusive probes (or a frozen
+intercept/slope design) while retaining T1, the 7200-second cap, all five
+adversarial initial families, full replay, and every statistical gate.  It must
+use fresh source/contract/schedule/seeds/raw.  No m6, HARD2, formal, held-out,
+`READY_FOR_FORMAL`, or production authority exists.
 
 **BP-SYSTEMATIC INDEPENDENCE-MH IS EXACT BUT STICKY ON ADVERSARIAL LOW-ENERGY
 STARTS -- NO HARD2 OR REMOTE LAUNCH**

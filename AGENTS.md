@@ -240,16 +240,23 @@ full/B D2、weight/likelihood、B bit/row/column/dense、logical、Rhat/ESS、bu
 basin 与 B-column/label-change 门。非零 syndrome 下物理零态不在支持集，shifted zero 已是 P；全部从
 P/零态开始只会掩盖慢混合。T1 未通过前不得运行 m6/HARD2 或 formal/held-out/production。
 
-fresh successor validation 055 已冻结为
-`exp102.q0_random_full_column_direct_block.t1_m8.v1`，目前仍是 **pre-measurement**。它保持 validation
-052 的 P/U/M0/M1/S 几何，但 fresh control 重抽全部 schedule seeds 与 logical/B characters；四类 seed
-与 052 overlap 均为 0，并 byte-bind validation 054 的两个 sampler 源文件与 portable artifact。pre-run
-red-team 用真实 miniature direct raw+full replay 找到并修复三个 dormant analyzer 坑：没有绑定 direct
-`version/conditional_engine`、漏 import `state_label`、以及 B-likelihood 使用不同求和顺序导致 1 ULP 假
-冲突；055 现独立重建 factor indices、复现冻结求和顺序并对篡改 engine fail closed。最终 source 必须先在
-三节点重新跑完整 054 portable/runtime preflight，再过 055 schedule-bound preflight，才可启动 40 条轨迹；
-本地测试不构成 measurement 权限。合同与 review 见
-`RANDOM_FULL_COLUMN_DIRECT_BLOCK_T1_CONTRACT.md`、`validation/055_*/PRE_RUN_RED_TEAM.md`。
+fresh successor validation 055
+`exp102.q0_random_full_column_direct_block.t1_m8.v1` 已终止为 **preflight
+`RUNTIME_EXHAUSTED`，measurement raw=0**。它保持 validation 052 的 P/U/M0/M1/S 几何，但 fresh control
+重抽全部 schedule seeds 与 logical/B characters；四类 seed 与 052 overlap 均为 0，并 byte-bind validation
+054 的两个 sampler 源文件与 portable artifact。pre-run red-team 用真实 miniature direct raw+full replay
+修复了 direct engine 身份、`state_label` import 和 B-likelihood sum-order 三个 dormant analyzer 坑。
+
+前两个 schedule attempt 都在 control 前因提前创建 fresh run root 而基础设施失败；第三个 immutable run
+`exp102_q0_direct_block_t1_m8_20260724_146ef55_r3` 才是权威证据。最终 source 的完整 054 portable/runtime
+preflight 三节点 exact consensus PASS，T1 投影 `4216.16/4149.15/4549.57s`；但 055 自己冻结的 probe 只测
+`2+8` updates，却把含固定初始化/runner 开销的总时间线性外推到 10240 updates 再乘 2，得到
+`9272.13/8779.07/13638.99s > 7200s`，所以 schedule 正确阻止 measurement。独立审计状态为
+`INDEPENDENT_AUDIT_PASS_PORTABLE_PASS_T1_RUNTIME_EXHAUSTED_CONFIRMED`（SHA
+`00622194dc370a66e08a0b94a7108b324aa49322de648fda7656f2c6ed5fc665`）。这不是 sampler/参数点失败，
+也不得事后解释成 PASS；后继须另立 fresh contract/source/schedule/seeds/raw，用代表 steady-state 且包含 full
+replay 的 probe 或冻结 intercept/slope 估计，同时不改 T1、7200s cap、五类初态和统计门。合同与证据见
+`RANDOM_FULL_COLUMN_DIRECT_BLOCK_T1_CONTRACT.md`、`validation/055_*/`。
 
 若要继续正式实验，须另立经审查的新算法/科学契约与 fresh tuning/held-out，不得把重复 T3、延长链、
 删困难 disorder、缩范围或改窗口包装成原 discovery 成功。

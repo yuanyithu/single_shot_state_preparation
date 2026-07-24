@@ -1,0 +1,14 @@
+Traceback (most recent call last):
+  File "<frozen runpy>", line 198, in _run_module_as_main
+  File "<frozen runpy>", line 88, in _run_code
+  File "/home/DATA1/users/yuany/.single_shot/repos/exp102_q0_direct_block_t1_m8_20260724_146ef55/source/data/expander_code/exp102/validation/055_q0_random_full_column_direct_block_t1_m8_20260724/workflow.py", line 194, in <module>
+    main()
+  File "/home/DATA1/users/yuany/.single_shot/repos/exp102_q0_direct_block_t1_m8_20260724_146ef55/source/data/expander_code/exp102/validation/055_q0_random_full_column_direct_block_t1_m8_20260724/workflow.py", line 190, in main
+    _legacy.main()
+  File "/home/DATA1/users/yuany/.single_shot/repos/exp102_q0_direct_block_t1_m8_20260724_146ef55/source/data/expander_code/exp102/validation/052_q0_random_full_column_t1_m8_20260724/workflow.py", line 666, in main
+    actions[args.action](args)
+  File "/home/DATA1/users/yuany/.single_shot/repos/exp102_q0_direct_block_t1_m8_20260724_146ef55/source/data/expander_code/exp102/validation/052_q0_random_full_column_t1_m8_20260724/workflow.py", line 331, in build_schedule
+    _require(not run_root.exists(), "run root must be fresh")
+  File "/home/DATA1/users/yuany/.single_shot/repos/exp102_q0_direct_block_t1_m8_20260724_146ef55/source/data/expander_code/exp102/validation/052_q0_random_full_column_t1_m8_20260724/workflow.py", line 87, in _require
+    raise T1ConflictError(message)
+data.expander_code.exp102.validation.052_q0_random_full_column_t1_m8_20260724.workflow.T1ConflictError: run root must be fresh
