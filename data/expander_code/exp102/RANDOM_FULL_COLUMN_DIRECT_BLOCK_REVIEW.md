@@ -83,6 +83,9 @@ weight or transition.
 - Numba is compiled in the parent before fork.  Four concurrent
   P/M0/S0/U0 probes each run 8 burn plus 128 measurement updates and complete
   replay; setup, sampling, observation, and replay are timed.
+- Runtime seeds bind to the frozen `runtime_seed_key`, not the config file
+  digest, so adding the pre-run local portable digest artifact cannot create a
+  circular seed/reference identity.
 - The local median direct-block conditional must be at least `1.25x` faster
   than validation 053's streaming CDF on the same state/column.
 - The worst projected replay-inclusive `2048+8192` trajectory, including an

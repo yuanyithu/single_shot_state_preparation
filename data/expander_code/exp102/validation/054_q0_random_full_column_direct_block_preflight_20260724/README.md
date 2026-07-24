@@ -9,3 +9,8 @@ The first phase is local only.  A local PASS may freeze portable subtotal and
 trajectory digests into a new clean source; it does not itself authorize a
 remote T1, posterior estimate, `q_top`, HARD2, formal, held-out, or production
 run.
+
+The first local report from source `f5f2976922ced2276f3bcb890bf24410cbc1db00`
+passed its frozen gates, but is superseded for remote authorization because its
+runtime seed identity still depended on the config digest.  It is retained as
+`superseded_local_preflight_f5f2976.json`; no remote work used it.

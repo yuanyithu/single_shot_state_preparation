@@ -143,6 +143,11 @@ def validate_config(config):
         ),
         "validation": "052_q0_random_full_column_t1_m8_20260724",
     }, "direct-block control identity changed")
+    require(
+        config["runtime_seed_key"]
+        == "679dde13a0e6ea3058d56435964013c63df520eb5da39f04ed2feab06da6eecc",
+        "direct-block runtime seed schedule changed",
+    )
     require(FULL_COLUMN_DIRECT_BLOCK_BITS == config["correctness"]["block_bits"],
             "direct-block source partition changed")
 
@@ -407,7 +412,7 @@ def runtime_worker(index):
         measurement_updates=resource["runtime_probe_measurement_updates"],
     )
     prefix = (
-        config["seed_namespace"], context["config_sha"], "runtime",
+        config["seed_namespace"], config["runtime_seed_key"], "runtime",
         state_name, int(index),
     )
     cache = build_full_column_direct_block_cache(
