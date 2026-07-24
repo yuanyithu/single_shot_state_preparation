@@ -15,8 +15,11 @@ from data.expander_code.exp102.exp102_pipeline.q0_hgp_full_column_gibbs import (
 )
 from data.expander_code.exp102.exp102_pipeline.q0_hgp_random_full_column import (
     RandomFullColumnConfig,
+    RandomFullColumnStreamingConfig,
     replay_random_full_column_trajectory,
+    replay_random_full_column_streaming_trajectory,
     run_random_full_column_trajectory,
+    run_random_full_column_streaming_trajectory,
 )
 from data.expander_code.exp102.exp102_pipeline.worker import build_model
 
@@ -118,6 +121,32 @@ def test_random_full_column_raw_replays_bit_exactly(H):
     assert int(raw["measurement__counters"][0]) == 8
     assert int(raw["measurement__counters"][3]) == 8
     assert raw["measurement__states_packed"].shape[0] == 8
+
+
+@pytest.mark.parametrize("H", SMALL_H)
+def test_streaming_random_full_column_matches_legacy_and_replays(H):
+    model, frame = build_model(H)
+    syndrome = _syndrome(model, True)
+    initial = model.logical_sector_section.apply(syndrome, strict=True)
+    legacy_config = RandomFullColumnConfig(
+        p=0.10, burn_updates=3, measurement_updates=8,
+    )
+    streaming_config = RandomFullColumnStreamingConfig(
+        p=0.10, burn_updates=3, measurement_updates=8,
+    )
+    legacy = run_random_full_column_trajectory(
+        model, frame, H, syndrome, legacy_config, initial, 11, 12, 13,
+    )
+    streaming = run_random_full_column_streaming_trajectory(
+        model, frame, H, syndrome, streaming_config, initial, 11, 12, 13,
+    )
+    for name in set(legacy) - {"seed_identity_sha256"}:
+        assert np.array_equal(legacy[name], streaming[name])
+    assert replay_random_full_column_streaming_trajectory(
+        model, frame, H, syndrome, streaming_config, initial, 11, 12, 13,
+        streaming,
+    )
+    assert str(streaming["conditional_engine"].item()) == "numba_streaming_cdf"
 
 
 def test_random_full_column_config_rejects_sweep_ambiguity():

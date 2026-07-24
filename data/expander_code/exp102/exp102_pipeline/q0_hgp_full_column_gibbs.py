@@ -13,6 +13,11 @@ import math
 
 import numpy as np
 
+try:
+    from numba import njit
+except ImportError:  # pragma: no cover - the optimized successor requires Numba.
+    njit = None
+
 from .exp101_bridge import load_exp101
 from .q0_global import GlobalConflictError, validate_observable_frame
 from .q0_hgp_collapsed import (
@@ -29,6 +34,8 @@ from .q0_hgp_collapsed import (
 FULL_COLUMN_GIBBS_VERSION = "exp102.q0_hgp_full_column_gibbs.v0"
 FULL_COLUMN_GIBBS_KERNEL = "exact_collapsed_full_B_column_heatbath.v1"
 FULL_COLUMN_GIBBS_METHOD_ID = "FCG-C24"
+FULL_COLUMN_STREAMING_VERSION = "exp102.q0_hgp_full_column_streaming.v1"
+FULL_COLUMN_STREAMING_KERNEL = "exact_collapsed_full_B_column_heatbath_streaming.v1"
 FULL_COLUMN_COUNTER_NAMES = (
     "column_updates",
     "column_changes",
@@ -79,6 +86,37 @@ class FullColumnWorkspace:
                 or self.log_weights.dtype != np.float64 or self.scratch.shape != expected
                 or self.scratch.dtype != np.float64):
             raise ValueError("full-column workspace has the wrong shape or dtype")
+
+
+@dataclass(frozen=True)
+class FullColumnStreamingCache:
+    """Small state-independent cache for the memory-streaming conditional."""
+
+    rows: int
+    p: float
+    log_odds: float
+    popcount16: np.ndarray
+
+    def __post_init__(self):
+        if not 1 <= int(self.rows) <= 24:
+            raise ValueError("streaming full-column Gibbs supports 1 <= rows <= 24")
+        if (not math.isfinite(float(self.p)) or not 0.0 < float(self.p) < 0.5
+                or not math.isfinite(float(self.log_odds))):
+            raise ValueError("streaming full-column cache has invalid probability data")
+        if (self.popcount16.shape != (1 << 16,)
+                or self.popcount16.dtype != np.uint8):
+            raise ValueError("streaming full-column popcount table is invalid")
+
+
+@dataclass
+class FullColumnStreamingWorkspace:
+    """One dense CDF, replacing the legacy six-array candidate workspace."""
+
+    cdf: np.ndarray
+
+    def __post_init__(self):
+        if self.cdf.ndim != 1 or self.cdf.dtype != np.float64:
+            raise ValueError("streaming full-column workspace is invalid")
 
 
 @dataclass(frozen=True)
@@ -174,6 +212,28 @@ def build_full_column_workspace(cache):
     )
 
 
+def build_full_column_streaming_cache(rows, p):
+    """Build the O(2**16) cache used by the streaming exact conditional."""
+    rows = int(rows)
+    p = float(p)
+    if not 1 <= rows <= 24 or not math.isfinite(p) or not 0.0 < p < 0.5:
+        raise ValueError("invalid streaming full-column cache parameters")
+    return FullColumnStreamingCache(
+        rows=rows,
+        p=p,
+        log_odds=math.log(p / (1.0 - p)),
+        popcount16=_popcount_table_16(),
+    )
+
+
+def build_full_column_streaming_workspace(cache):
+    if not isinstance(cache, FullColumnStreamingCache):
+        raise TypeError("streaming full-column workspace needs a streaming cache")
+    return FullColumnStreamingWorkspace(
+        cdf=np.empty(1 << cache.rows, dtype=np.float64),
+    )
+
+
 def collapsed_a_syndromes(H, syndrome, b_columns):
     """Rebuild packed A-column syndromes ``Y xor B H`` from a B state."""
     H = _as_binary_matrix(H)
@@ -234,6 +294,135 @@ def _column_log_weights_unchecked(H, b_columns, a_syndromes, column_index,
         np.take(log_mass, workspace.xor_indices, out=workspace.scratch)
         np.add(workspace.log_weights, workspace.scratch, out=workspace.log_weights)
     return neighbors
+
+
+def _streaming_cdf_reference(log_mass, bases, log_odds, popcount16, cdf):
+    """Reference arithmetic order for the exact streaming CDF."""
+    maximum = -math.inf
+    for candidate in range(cdf.size):
+        value = float(log_mass[candidate ^ int(bases[0])])
+        value += (
+            int(popcount16[candidate & 0xFFFF])
+            + int(popcount16[candidate >> 16])
+        ) * float(log_odds)
+        for factor in range(1, bases.size):
+            value += float(log_mass[candidate ^ int(bases[factor])])
+        cdf[candidate] = value
+        if value > maximum:
+            maximum = value
+    total = 0.0
+    for candidate in range(cdf.size):
+        total += math.exp(float(cdf[candidate]) - maximum)
+        cdf[candidate] = total
+    return total
+
+
+if njit is not None:
+    @njit(cache=True)
+    def _streaming_cdf_numba(log_mass, bases, log_odds, popcount16, cdf):
+        maximum = -math.inf
+        for candidate in range(cdf.size):
+            value = log_mass[candidate ^ int(bases[0])]
+            value += (
+                int(popcount16[candidate & 0xFFFF])
+                + int(popcount16[candidate >> 16])
+            ) * log_odds
+            for factor in range(1, bases.size):
+                value += log_mass[candidate ^ int(bases[factor])]
+            cdf[candidate] = value
+            if value > maximum:
+                maximum = value
+        total = 0.0
+        for candidate in range(cdf.size):
+            total += math.exp(cdf[candidate] - maximum)
+            cdf[candidate] = total
+        return total
+else:  # pragma: no cover - exercised by the explicit engine guard.
+    _streaming_cdf_numba = None
+
+
+def _column_streaming_cdf_unchecked(H, b_columns, a_syndromes, column_index,
+                                    log_mass, cache, workspace, *, engine):
+    rows, _ = H.shape
+    column_index = int(column_index)
+    if not 0 <= column_index < rows:
+        raise ValueError("streaming full-column index is invalid")
+    if (not isinstance(cache, FullColumnStreamingCache)
+            or not isinstance(workspace, FullColumnStreamingWorkspace)
+            or cache.rows != rows
+            or workspace.cdf.shape != (1 << rows,)):
+        raise FullColumnGibbsConflictError("streaming full-column cache mismatch")
+    log_mass = np.asarray(log_mass, dtype=np.float64)
+    if log_mass.shape != (1 << rows,):
+        raise ValueError("streaming full-column log mass table is invalid")
+    old = np.uint32(b_columns[column_index])
+    neighbors = np.flatnonzero(H[column_index]).astype(np.int32)
+    if neighbors.size == 0:
+        raise FullColumnGibbsConflictError(
+            "streaming full-column update has no likelihood factors",
+        )
+    bases = np.ascontiguousarray(a_syndromes[neighbors] ^ old, dtype=np.uint32)
+    if engine == "reference":
+        total = _streaming_cdf_reference(
+            log_mass, bases, cache.log_odds, cache.popcount16, workspace.cdf,
+        )
+    elif engine == "numba":
+        if _streaming_cdf_numba is None:
+            raise FullColumnGibbsConflictError("Numba streaming engine is unavailable")
+        total = _streaming_cdf_numba(
+            log_mass, bases, cache.log_odds, cache.popcount16, workspace.cdf,
+        )
+    else:
+        raise ValueError("streaming full-column engine must be reference or numba")
+    if not math.isfinite(float(total)) or not float(total) > 0.0:
+        raise FullColumnGibbsConflictError("streaming full-column weights vanished")
+    return neighbors, float(total)
+
+
+def full_column_streaming_conditional_probabilities(
+        H, syndrome, b_columns, a_syndromes, column_index, log_mass, *,
+        cache=None, workspace=None, engine="numba"):
+    """Return the streaming conditional for exact small-code comparisons."""
+    H = _validate_collapsed_state(H, syndrome, b_columns, a_syndromes)
+    if cache is None:
+        raise ValueError("streaming full-column conditional requires a p-bound cache")
+    workspace = (
+        build_full_column_streaming_workspace(cache)
+        if workspace is None else workspace
+    )
+    _, total = _column_streaming_cdf_unchecked(
+        H, b_columns, a_syndromes, column_index, log_mass, cache, workspace,
+        engine=engine,
+    )
+    probabilities = np.empty_like(workspace.cdf)
+    probabilities[0] = workspace.cdf[0]
+    np.subtract(workspace.cdf[1:], workspace.cdf[:-1], out=probabilities[1:])
+    probabilities /= total
+    return probabilities
+
+
+def full_column_streaming_gibbs_update(
+        b_columns, a_syndromes, H, syndrome, column_index, log_mass, cache,
+        workspace, rng, *, engine="numba"):
+    """Heatbath a full B column with one O(2**r) streaming CDF buffer."""
+    H = _validate_collapsed_state(H, syndrome, b_columns, a_syndromes)
+    neighbors, total = _column_streaming_cdf_unchecked(
+        H, b_columns, a_syndromes, column_index, log_mass, cache, workspace,
+        engine=engine,
+    )
+    threshold = float(rng.random()) * total
+    selected = int(np.searchsorted(workspace.cdf, threshold, side="right"))
+    if selected >= workspace.cdf.size:
+        selected = workspace.cdf.size - 1
+    column_index = int(column_index)
+    old = np.uint32(b_columns[column_index])
+    new = np.uint32(selected)
+    delta = old ^ new
+    b_columns[column_index] = new
+    if delta:
+        for factor in neighbors:
+            a_syndromes[int(factor)] ^= delta
+    return bool(delta), int(int(delta).bit_count())
 
 
 def full_column_conditional_probabilities(H, syndrome, b_columns, a_syndromes,

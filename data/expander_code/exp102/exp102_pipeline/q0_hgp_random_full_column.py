@@ -30,14 +30,22 @@ from .q0_hgp_collapsed import (
 from .q0_hgp_full_column_gibbs import (
     FullColumnGibbsConflictError,
     build_full_column_candidate_cache,
+    build_full_column_streaming_cache,
+    build_full_column_streaming_workspace,
     build_full_column_workspace,
     full_column_gibbs_update,
+    full_column_streaming_gibbs_update,
 )
 
 
 RANDOM_FULL_COLUMN_VERSION = "exp102.q0_hgp_random_full_column.v0"
 RANDOM_FULL_COLUMN_RAW_VERSION = "exp102.q0_hgp_random_full_column.raw.v0"
 RANDOM_FULL_COLUMN_METHOD_ID = "RFCG-C24"
+RANDOM_FULL_COLUMN_STREAMING_VERSION = "exp102.q0_hgp_random_full_column_streaming.v1"
+RANDOM_FULL_COLUMN_STREAMING_RAW_VERSION = (
+    "exp102.q0_hgp_random_full_column_streaming.raw.v1"
+)
+RANDOM_FULL_COLUMN_STREAMING_METHOD_ID = "RFCG-C24-S1"
 RANDOM_FULL_COLUMN_COUNTERS = (
     "column_updates", "column_changes", "column_changed_bits", "a_conditional_draws",
     "logical_label_changes",
@@ -88,6 +96,47 @@ class RandomFullColumnConfig:
         }
 
 
+@dataclass(frozen=True)
+class RandomFullColumnStreamingConfig:
+    """Fresh exact-clock config for the memory-streaming successor."""
+
+    p: float
+    burn_updates: int
+    measurement_updates: int
+    method_id: str = RANDOM_FULL_COLUMN_STREAMING_METHOD_ID
+    schedule: str = "portable_random_scan_one_full_B_column_per_clock"
+    conditional_engine: str = "numba_streaming_cdf"
+
+    def __post_init__(self):
+        p = float(self.p)
+        _require(math.isfinite(p) and 0.0 < p < 0.5,
+                 "streaming random full-column p must lie in (0,.5)")
+        object.__setattr__(self, "p", p)
+        for name in ("burn_updates", "measurement_updates"):
+            value = getattr(self, name)
+            _require(not isinstance(value, bool) and int(value) > 0,
+                     f"{name} must be a positive integer")
+            object.__setattr__(self, name, int(value))
+        _require(self.measurement_updates % 8 == 0,
+                 "streaming measurement updates must divide into eight blocks")
+        _require(self.method_id == RANDOM_FULL_COLUMN_STREAMING_METHOD_ID,
+                 "streaming random full-column method changed")
+        _require(self.schedule == "portable_random_scan_one_full_B_column_per_clock",
+                 "streaming random full-column schedule changed")
+        _require(self.conditional_engine == "numba_streaming_cdf",
+                 "streaming full-column conditional engine changed")
+
+    def as_dict(self):
+        return {
+            "burn_updates": self.burn_updates,
+            "conditional_engine": self.conditional_engine,
+            "measurement_updates": self.measurement_updates,
+            "method_id": self.method_id,
+            "p": self.p,
+            "schedule": self.schedule,
+        }
+
+
 def _new_rng(seed):
     load_exp101()
     from exp101_certified_src.prng import PortablePrng
@@ -101,7 +150,8 @@ def _b_weight(columns):
 
 def _run_stage(model, frame, matrix, syndrome_matrix, b_columns, a_syndromes,
                state, config, update_rng, observation_rng, updates, *, record,
-               log_mass, cache, workspace):
+               log_mass, cache, workspace, gibbs_update=full_column_gibbs_update,
+               gibbs_engine=None):
     rows, columns = matrix.shape
     counters = np.zeros(len(RANDOM_FULL_COLUMN_COUNTERS), dtype=np.int64)
     transcript = {
@@ -131,10 +181,16 @@ def _run_stage(model, frame, matrix, syndrome_matrix, b_columns, a_syndromes,
     for update in range(updates):
         selected = int(update_rng.randbelow(rows))
         old = np.uint32(b_columns[selected])
-        changed, changed_bits = full_column_gibbs_update(
-            b_columns, a_syndromes, matrix, syndrome_matrix, selected,
-            log_mass, cache, workspace, update_rng,
-        )
+        if gibbs_engine is None:
+            changed, changed_bits = gibbs_update(
+                b_columns, a_syndromes, matrix, syndrome_matrix, selected,
+                log_mass, cache, workspace, update_rng,
+            )
+        else:
+            changed, changed_bits = gibbs_update(
+                b_columns, a_syndromes, matrix, syndrome_matrix, selected,
+                log_mass, cache, workspace, update_rng, engine=gibbs_engine,
+            )
         counters[0] += 1
         if changed:
             counters[1] += 1
@@ -258,4 +314,107 @@ def replay_random_full_column_trajectory(model, frame, H, syndrome, config,
     for name, value in expected.items():
         _require(np.array_equal(np.asarray(value), np.asarray(raw[name]), equal_nan=False),
                  f"random full-column replay mismatch: {name}")
+    return True
+
+
+def run_random_full_column_streaming_trajectory(
+        model, frame, H, syndrome, config, initial_state, burn_update_seed,
+        measurement_update_seed, observation_seed, *, mass=None, cache=None,
+        workspace=None):
+    """Run the fresh memory-streaming implementation of the same exact kernel."""
+    _require(isinstance(config, RandomFullColumnStreamingConfig),
+             "streaming random full-column config has the wrong type")
+    matrix = np.ascontiguousarray(H, dtype=np.uint8)
+    validate_hgp_wiring(matrix, model)
+    try:
+        validate_observable_frame(model, frame)
+    except GlobalConflictError as exc:
+        raise RandomFullColumnError("streaming random full-column frame changed") from exc
+    y = np.asarray(syndrome, dtype=np.uint8)
+    initial = np.asarray(initial_state, dtype=np.uint8)
+    _require(y.shape == (model.num_checks,)
+             and initial.shape == (model.num_qubits,),
+             "streaming random full-column input dimensions changed")
+    residual = (
+        model.H_check.astype(np.int64) @ initial.astype(np.int64) % 2
+    ).astype(np.uint8)
+    _require(np.array_equal(residual, y),
+             "streaming random full-column initial state leaves the hard coset")
+    b_columns, a_syndromes, _ = _initial_collapsed_masks(initial, y, matrix)
+    if mass is None:
+        mass = build_classical_coset_mass(matrix, config.p, engine="numba")
+    mass = np.ascontiguousarray(mass, dtype=np.float64)
+    _require(mass.shape == (1 << matrix.shape[0],)
+             and np.all(np.isfinite(mass)) and np.all(mass > 0.0),
+             "streaming random full-column mass table is invalid")
+    log_mass = np.ascontiguousarray(np.log(mass), dtype=np.float64)
+    cache = (
+        build_full_column_streaming_cache(matrix.shape[0], config.p)
+        if cache is None else cache
+    )
+    workspace = (
+        build_full_column_streaming_workspace(cache)
+        if workspace is None else workspace
+    )
+    _require(cache.rows == matrix.shape[0] and cache.p == config.p,
+             "streaming random full-column cache changed")
+    syndrome_matrix = y.reshape(matrix.shape)
+    initial_b = b_columns.copy()
+    state, burn_counters, burn = _run_stage(
+        model, frame, matrix, syndrome_matrix, b_columns, a_syndromes,
+        initial.copy(), config, _new_rng(burn_update_seed),
+        _new_rng(observation_seed ^ 0x243F6A8885A308D3), config.burn_updates,
+        record=False, log_mass=log_mass, cache=cache, workspace=workspace,
+        gibbs_update=full_column_streaming_gibbs_update, gibbs_engine="numba",
+    )
+    burn_b = b_columns.copy()
+    state, measurement_counters, measurement = _run_stage(
+        model, frame, matrix, syndrome_matrix, b_columns, a_syndromes,
+        state, config, _new_rng(measurement_update_seed),
+        _new_rng(observation_seed), config.measurement_updates,
+        record=True, log_mass=log_mass, cache=cache, workspace=workspace,
+        gibbs_update=full_column_streaming_gibbs_update, gibbs_engine="numba",
+    )
+    identity = hashlib.sha256(
+        RANDOM_FULL_COLUMN_STREAMING_VERSION.encode("ascii") + b"\0"
+        + np.asarray(
+            [burn_update_seed, measurement_update_seed, observation_seed],
+            dtype=">u8",
+        ).tobytes()
+        + np.asarray(config.p, dtype=">f8").tobytes()
+        + np.asarray(
+            [config.burn_updates, config.measurement_updates], dtype=">u8",
+        ).tobytes()
+    ).hexdigest()
+    return {
+        "burn__counters": burn_counters,
+        "burn__final_b_columns": burn_b,
+        **{f"burn__{key}": value for key, value in burn.items()},
+        "conditional_engine": np.array(config.conditional_engine),
+        "final_b_columns": b_columns.copy(),
+        "final_state_packed": np.packbits(state, bitorder="little"),
+        "initial_b_columns": initial_b,
+        "initial_state_packed": np.packbits(initial, bitorder="little"),
+        "measurement__counters": measurement_counters,
+        **{f"measurement__{key}": value for key, value in measurement.items()},
+        "seed_identity_sha256": np.array(identity),
+        "version": np.array(RANDOM_FULL_COLUMN_STREAMING_VERSION),
+    }
+
+
+def replay_random_full_column_streaming_trajectory(
+        model, frame, H, syndrome, config, initial_state, burn_update_seed,
+        measurement_update_seed, observation_seed, raw, *, mass=None, cache=None,
+        workspace=None):
+    """Rerun the streaming implementation and require bit-exact raw."""
+    expected = run_random_full_column_streaming_trajectory(
+        model, frame, H, syndrome, config, initial_state, burn_update_seed,
+        measurement_update_seed, observation_seed, mass=mass, cache=cache,
+        workspace=workspace,
+    )
+    _require(set(expected) == set(raw),
+             "streaming random full-column raw schema changed")
+    for name, value in expected.items():
+        _require(np.array_equal(np.asarray(value), np.asarray(raw[name]), equal_nan=False),
+                 f"streaming random full-column replay mismatch: {name}")
     return True

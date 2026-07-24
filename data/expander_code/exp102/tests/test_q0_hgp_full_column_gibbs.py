@@ -13,10 +13,14 @@ from data.expander_code.exp102.exp102_pipeline.q0_hgp_collapsed import (
 from data.expander_code.exp102.exp102_pipeline.q0_hgp_full_column_gibbs import (
     FullColumnGibbsConfig,
     build_full_column_candidate_cache,
+    build_full_column_streaming_cache,
+    build_full_column_streaming_workspace,
     build_full_column_workspace,
     collapsed_a_syndromes,
     full_column_conditional_probabilities,
     full_column_gibbs_update,
+    full_column_streaming_conditional_probabilities,
+    full_column_streaming_gibbs_update,
     run_full_column_gibbs_trajectory,
 )
 from data.expander_code.exp102.exp102_pipeline.worker import build_model
@@ -100,6 +104,36 @@ def test_full_column_conditional_matches_direct_enumeration(H, p, nonzero_syndro
 @pytest.mark.parametrize("H", SMALL_H)
 @pytest.mark.parametrize("p", [0.04, 0.10, 0.25])
 @pytest.mark.parametrize("nonzero_syndrome", [False, True])
+def test_streaming_reference_and_numba_match_exact_conditional(
+        H, p, nonzero_syndrome):
+    model, _ = build_model(H)
+    epsilon, syndrome = _syndrome(model, nonzero_syndrome)
+    b_columns, a_syndromes, _ = _initial_collapsed_masks(epsilon, syndrome, H)
+    log_mass = np.log(build_classical_coset_mass(H, p, engine="reference"))
+    cache = build_full_column_streaming_cache(H.shape[0], p)
+    for column in range(H.shape[0]):
+        reference = full_column_streaming_conditional_probabilities(
+            H, syndrome.reshape(H.shape), b_columns, a_syndromes, column,
+            log_mass, cache=cache,
+            workspace=build_full_column_streaming_workspace(cache),
+            engine="reference",
+        )
+        accelerated = full_column_streaming_conditional_probabilities(
+            H, syndrome.reshape(H.shape), b_columns, a_syndromes, column,
+            log_mass, cache=cache,
+            workspace=build_full_column_streaming_workspace(cache),
+            engine="numba",
+        )
+        expected = _direct_column_probabilities(
+            H, b_columns, a_syndromes, column, log_mass, p,
+        )
+        assert np.array_equal(reference, accelerated)
+        assert np.max(np.abs(accelerated - expected)) <= 2e-13
+
+
+@pytest.mark.parametrize("H", SMALL_H)
+@pytest.mark.parametrize("p", [0.04, 0.10, 0.25])
+@pytest.mark.parametrize("nonzero_syndrome", [False, True])
 def test_single_column_detailed_balance_and_full_sweep_stationarity(H, p, nonzero_syndrome):
     model, _ = build_model(H)
     _, syndrome_flat = _syndrome(model, nonzero_syndrome)
@@ -153,6 +187,32 @@ def test_full_column_update_preserves_cached_syndromes():
         _DeterministicRng(0.5),
     )
     assert np.array_equal(a_syndromes, collapsed_a_syndromes(H, syndrome, b_columns))
+
+
+def test_streaming_update_matches_legacy_decision_and_preserves_syndromes():
+    H = SMALL_H[1]
+    p = 0.04
+    model, _ = build_model(H)
+    epsilon, syndrome_flat = _syndrome(model, True)
+    syndrome = syndrome_flat.reshape(H.shape)
+    first_b, first_a, _ = _initial_collapsed_masks(epsilon, syndrome_flat, H)
+    second_b, second_a = first_b.copy(), first_a.copy()
+    log_mass = np.log(build_classical_coset_mass(H, p, engine="reference"))
+    legacy_cache = build_full_column_candidate_cache(H.shape[0], p)
+    stream_cache = build_full_column_streaming_cache(H.shape[0], p)
+    legacy = full_column_gibbs_update(
+        first_b, first_a, H, syndrome, 0, log_mass, legacy_cache,
+        build_full_column_workspace(legacy_cache), _DeterministicRng(0.731),
+    )
+    streaming = full_column_streaming_gibbs_update(
+        second_b, second_a, H, syndrome, 0, log_mass, stream_cache,
+        build_full_column_streaming_workspace(stream_cache),
+        _DeterministicRng(0.731), engine="numba",
+    )
+    assert legacy == streaming
+    assert np.array_equal(first_b, second_b)
+    assert np.array_equal(first_a, second_a)
+    assert np.array_equal(second_a, collapsed_a_syndromes(H, syndrome, second_b))
 
 
 def test_full_column_trajectory_replays_exactly():
