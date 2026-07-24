@@ -279,6 +279,18 @@ changes，因此“链在动”不等于向目标输运。MAP bridge 双向全�
 failures，终态不受影响；后继须用 signed arithmetic 并加回归。详见
 `RANDOM_FULL_COLUMN_DIRECT_BLOCK_T1_V2_CONTRACT.md` 与 `validation/056_*/README.md`。
 
+validation 057 的 collapsed physical-p PT 后继也已在本地终止为
+**`LOCAL_T1_PAIR_UNRESOLVED`**，没有启动 nd-2/nd-3。CPPT 的 cold target、physical-p collapsed density、
+swap ratio、`p=.5` endpoint 和 `k=64` reference/Numba identity 均通过 exact oracle；共享 CPPT32 m8
+log-mass artifact 为 4 GiB、构造约 `10.38s`，所以失败不是基础设施或单表 runtime。冻结的一条 P 和一条
+exact-K0 U 完整 T1 仍给 plug-in q_top `.900885/.144627`、logical/B D2 `.346827/.093028`、likelihood
+per-factor 差 `2.50668`，两条均零 round trip，最小 swap rate `.00547/.03945`。raw-only audit 不调用
+sampler/runner/analyzer，状态 `INDEPENDENT_RAW_ONLY_AUDIT_PASS_LOCAL_T1_PAIR_UNRESOLVED`，SHA
+`1dd1260d...bf0`。`T1_PAIR_SUCCESS` 只表示 wrapper 正常写完 terminal report，不是算法 PASS。不得把该 raw
+补长、复制、接 HP64 warm start、统一为 P/零初态或部署远端；CPPT32 失败不是 CPPT64/replica exchange
+不可能，但 CPPT 与 HP64 同属 collapsed-B tempering，即使新后继通过也不能充当机制独立确认。后续优先做
+直接攻击 B 慢变量的正交 hard-coset kernel 或严格 oracle，而不是继续优化 ladder 密度/round-trip 表象。
+
 若要继续正式实验，须另立经审查的新算法/科学契约与 fresh tuning/held-out，不得把重复 T3、延长链、
 删困难 disorder、缩范围或改窗口包装成原 discovery 成功。
 PT/PA/global discovery raw 均不得进入正式 merge/freezer。48-code registry 已冻结，但正式新

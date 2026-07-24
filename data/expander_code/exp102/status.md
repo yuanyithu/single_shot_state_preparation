@@ -1,5 +1,44 @@
 # exp102 status
 
+**COLLAPSED PHYSICAL-P PT VALIDATION 057 TERMINAL --
+LOCAL T1 PAIR UNRESOLVED; NO REMOTE OR FORMAL AUTHORITY**
+
+Validation 057 first certified the CPPT target on exhaustive small HGPs: the
+physical-p collapsed density matches the full hard-coset posterior, the local
+and adjacent-swap kernels preserve the product target, the `p=.5` endpoint is
+uniform, and reference/Numba outputs agree through `k=64` bit 63.  A shared
+read-only m8 CPPT32 log-mass artifact occupies 4 GiB and builds locally in
+`10.38s`; a 40-round P/U smoke projected T1 below the two-hour cap.  The full
+exp102+exp101 regression was `1000 passed, 4 existing warnings`.
+
+The frozen next step was exactly one P and one exact-K0 U trajectory at
+`T1=(2048,8192)`, source `a90d3f01641f4ce1432f739d7a76cf6f9128885a`, with
+fresh seed identities and no HP warm start.  It terminates as
+`LOCAL_T1_PAIR_UNRESOLVED`: P/U plug-in q_top is `.900885/.144627`, normalized
+weight `.038890/.061817`, B weight `.040009/.059124`, collapsed likelihood per
+factor `-5.19372/-7.70041`, logical/B character D2 `.346827/.093028`.  Both
+trajectories have zero cold-hot-cold round trips; minimum swap rates are
+`.00547/.03945`, and cold-origin coverage is `.4375`.  Thus the temperature
+path neither transports all replicas nor removes the adversarial initialization
+memory.
+
+Primary report SHA is `287d62b5...e1c1`; P/U raw SHAs are
+`e771084a...6a27/dada68f8...7f`.  An independent raw-only auditor that does not
+call the CPPT sampler/runner/analyzer recomputes the support, B/state/label,
+weights, likelihood, characters, counters, gates and terminal status as
+`INDEPENDENT_RAW_ONLY_AUDIT_PASS_LOCAL_T1_PAIR_UNRESOLVED`, SHA
+`1dd1260d...bf0`.  The apparent `T1_PAIR_SUCCESS` marker means only that the
+wrapper completed and wrote an auditable terminal report; it is not a sampler
+PASS.
+
+No nd-2/nd-3 job was launched.  This frozen CPPT32 route may not be extended,
+replicated, pooled, warmed from HP64 or rescued by common P/zero starts.  It is
+not a physical q_top, `IMPOSSIBLE`, CPPT64 theorem, or parameter-point result.
+CPPT remains the same collapsed-B tempering family as HP64 and cannot supply
+the missing independent confirmation even if a fresh successor later worked;
+the next useful candidate must directly address B transport through an
+orthogonal hard-coset mechanism or a rigorous oracle.
+
 **DIRECT-BLOCK M8 T1 VALIDATION 056 TERMINAL --
 UNRESOLVED SAMPLER CONVERGENCE; NO PHYSICAL RESULT OR M6 AUTHORITY**
 
