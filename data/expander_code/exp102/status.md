@@ -1,7 +1,7 @@
 # exp102 status
 
-**RANDOM FULL-B-COLUMN STREAMING PREFLIGHT CONFLICT AND RUNTIME_EXHAUSTED --
-NO T1 OR MEASUREMENT RAW**
+**DIRECT-BLOCK RANDOM FULL-B-COLUMN PREFLIGHT PASS -- FRESH M8 T1 AUTHORIZED,
+BUT NO CONVERGENCE OR PHYSICAL RESULT YET**
 
 The direct dressed-logical-XOR structure probe (validation 047) is terminally
 `LOCAL_CENTER_PRESERVING_STRUCTURE_NOT_VIABLE`: its 127-move catalog is
@@ -88,6 +88,38 @@ sum, but it must first pass new exact small-HGP, underflow, portable replay,
 and three-node runtime gates.  This is an implementation hypothesis, not an
 authorization to reuse 053 evidence, remove adversarial starts, shorten T1,
 or claim convergence.
+
+Validation 054 implemented that successor as `RFCG-C24-DPB12-S1`.  It computes
+the same exact random-scan full-B-column conditional using direct positive
+weights, fixed `2^12` candidate blocks, 4096 block subtotals, and a second pass
+only through the selected block.  The target remains
+`pi(e|y) proportional to (.04/.96)^|e|` on `H_Ze=y`; the planted error is not
+used in the kernel.  Complete `2^24` comparisons certify that the direct
+weights remain normal, with worst scaled absolute error `2.020606e-14`, worst
+relative error `7.290711e-14`, worst total variation `4.148991e-15`, and
+log-weight lower bound `-221.658`.
+
+The immutable run `exp102_q0_direct_block_preflight_20260724_61d605a` from
+source `61d605a5e27db0970457736c72d1c45d72a12b10` passed on all three nodes.
+The 12 ordered block-subtotal digests and four P/M0/S0/U0 PortablePrng
+sampling/replay transcript digests agree exactly across macmini/nd-1/nd-2/nd-3.
+The replay-inclusive T1 projections were `4144.85/4139.52/5454.14s`, below the
+frozen `7200s` cap.  Aggregate status/SHA are `PASS` /
+`27f6d276...10612bc`.  The independent conda-12 audit confirms source,
+config/reference, all numeric/runtime gates, consensus, stages, and logs as
+`INDEPENDENT_AUDIT_PASS_DIRECT_BLOCK_PREFLIGHT_CONFIRMED`, audit SHA
+`9646c6f92070024680728bf377e802e647b48a2b66ca6210c89c436fbd70f539`.
+
+This only authorizes a **fresh m8 T1 diagnostic**.  It is not evidence of
+mixing or a posterior/q_top result.  The successor must retain 2048+8192
+updates, full replay, and eight independent chains in each of P, exact-K0 U,
+M0, M1, and truth-free low-energy S.  Starting all chains from physical zero
+is illegal for the nonzero syndrome; shifted zero is already P and would hide
+the central failure mode.  The full-label/B-character D2, weight/likelihood,
+B-bit/row/column/dense-character, logical-character, Rhat/ESS, burn-crossing,
+bidirectional MAP-basin, and B-column/label-change gates remain mandatory.
+No m6, HARD2, formal, held-out, `READY_FOR_FORMAL`, or production authority
+exists until the fresh T1 raw passes those gates.
 
 **BP-SYSTEMATIC INDEPENDENCE-MH IS EXACT BUT STICKY ON ADVERSARIAL LOW-ENERGY
 STARTS -- NO HARD2 OR REMOTE LAUNCH**

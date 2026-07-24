@@ -222,6 +222,24 @@ streaming CDF 的完整 SHA catalog 和四条 PortablePrng sampling/replay trans
 weight/fixed-block exact heatbath，必须 fresh source/contract 并重做 small exact、underflow、portable
 replay 与三节点 runtime；不得复用 053、删 P/U/MAP/S、缩短 T1 或先看 q_top。
 
+2026-07-24 的 direct-positive fixed-block 后继 validation 054 已通过。fresh immutable run
+`exp102_q0_direct_block_preflight_20260724_61d605a`（source
+`61d605a5e27db0970457736c72d1c45d72a12b10`、archive
+`61bb87e70320f7371504ea99c320e49baf1140b4ac9d3050fc9a3b742d5a7bec`）在 macmini/三 Linux 节点精确复现
+12 个 frozen block-subtotal SHA 与四条 P/M0/S0/U0 PortablePrng sampling+replay transcript；三节点
+replay-inclusive T1 投影为 `4144.85/4139.52/5454.14s < 7200s`，aggregate=`PASS`。完整 `2^24`
+权重检查的 worst scaled absolute/relative/TV 为 `2.020606e-14/7.290711e-14/4.148991e-15`，候选
+log-weight lower bound `-221.658`，没有接近 binary64 underflow。独立审计为
+`INDEPENDENT_AUDIT_PASS_DIRECT_BLOCK_PREFLIGHT_CONFIRMED`（SHA
+`9646c6f92070024680728bf377e802e647b48a2b66ca6210c89c436fbd70f539`）。
+
+该 PASS 只证明 `RFCG-C24-DPB12-S1` 的 exact conditional、portable replay 和资源可行，只授权 fresh m8
+T1 diagnostic；不是混合、q_top 或参数点认证。T1 必须另立 contract/source/seeds/raw，保持
+`2048+8192` fixed clocks、full replay 和 `P/U/M0/M1/S` 各 8 条独立轨迹，并保留 validation 052 的
+full/B D2、weight/likelihood、B bit/row/column/dense、logical、Rhat/ESS、burn crossing、双向 MAP
+basin 与 B-column/label-change 门。非零 syndrome 下物理零态不在支持集，shifted zero 已是 P；全部从
+P/零态开始只会掩盖慢混合。T1 未通过前不得运行 m6/HARD2 或 formal/held-out/production。
+
 若要继续正式实验，须另立经审查的新算法/科学契约与 fresh tuning/held-out，不得把重复 T3、延长链、
 删困难 disorder、缩范围或改窗口包装成原 discovery 成功。
 PT/PA/global discovery raw 均不得进入正式 merge/freezer。48-code registry 已冻结，但正式新
