@@ -1,0 +1,173 @@
+{
+  "authority": {
+    "formal_authorization": false,
+    "maximum_status": "CHARACTER_GATE_COMMON_OPERATING_POINT_CONFIRMED",
+    "mixing_certification": false,
+    "posterior_estimation": false,
+    "production_authorization": false,
+    "remote_authorization": false
+  },
+  "candidate_rule": {
+    "binomial_lower_confidence": 0.95,
+    "calibration_quantile": 0.999,
+    "empirical_coverage_min": 0.98,
+    "fail_power_min": 0.9,
+    "minimum_bad_margin": 0.02,
+    "null_pass_min": 0.9,
+    "required_categories": [
+      "exact_logical",
+      "exact_collapsed_B",
+      "synthetic_b_688",
+      "synthetic_logical_4160",
+      "synthetic_logical_511",
+      "synthetic_all_registered_sizes"
+    ],
+    "required_roles": [
+      "collapsed_B",
+      "logical"
+    ],
+    "states": [
+      "PASS",
+      "FAIL",
+      "INCONCLUSIVE"
+    ],
+    "tolerance": 0.04
+  },
+  "common_operating_grid": {
+    "points": [
+      {
+        "draws_per_trajectory": 8192,
+        "trajectory_count": 8
+      },
+      {
+        "draws_per_trajectory": 8192,
+        "trajectory_count": 16
+      },
+      {
+        "draws_per_trajectory": 16384,
+        "trajectory_count": 16
+      },
+      {
+        "draws_per_trajectory": 8192,
+        "trajectory_count": 32
+      },
+      {
+        "draws_per_trajectory": 16384,
+        "trajectory_count": 32
+      }
+    ]
+  },
+  "config_self_sha256": "b10f4c771826d9a59d1ef1adf6263d7424efe3e78e3403478999d1e5f6eec374",
+  "exact_hgp": {
+    "models": [
+      {
+        "H": [[1, 1, 1]],
+        "id": "hgp_n10_k4"
+      },
+      {
+        "H": [[1, 1, 0], [0, 1, 1]],
+        "id": "hgp_n13_k1"
+      }
+    ],
+    "p_values": [0.04, 0.1, 0.25],
+    "syndromes": [
+      "zero",
+      "nonzero"
+    ]
+  },
+  "historical_rule": {
+    "absolute_tolerance": 0.04,
+    "sigma_multiplier": 3.0,
+    "sigma_slack": 0.005,
+    "states": [
+      "PASS",
+      "FAIL"
+    ]
+  },
+  "injected_character_shifts": [
+    0.0,
+    0.02,
+    0.04,
+    0.06
+  ],
+  "replications": {
+    "calibration_trials": 1000,
+    "confirmation_trials": 400,
+    "selection_trials": 200
+  },
+  "seed_namespace": "exp102_q0_character_gate_calibration_20260728_v2",
+  "source_artifacts": {
+    "auditor": {
+      "path": "validation/062_q0_character_gate_calibration_20260728/audit_report.py",
+      "sha256": "890bb77aa925c3dd84ca4a29ee053d652bf60424090bdb97e1976460366fdd9f"
+    },
+    "readme": {
+      "path": "validation/062_q0_character_gate_calibration_20260728/README.md",
+      "sha256": "9762f78e50ca00c4f5c210e5f18b255d8047ca24477aedf3f25008b9a344d5bd"
+    },
+    "red_team": {
+      "path": "validation/062_q0_character_gate_calibration_20260728/PRE_RUN_RED_TEAM.md",
+      "sha256": "33e0f6f401950dafd2164e9a6237a039e96cf364f1327a5f390be8369aa1b067"
+    },
+    "runner": {
+      "path": "validation/062_q0_character_gate_calibration_20260728/run_calibration.py",
+      "sha256": "6123d66e6496db38f68c68633d03cc0505f9813d6794ea4a6457eacde053c3d1"
+    },
+    "tests": {
+      "path": "validation/062_q0_character_gate_calibration_20260728/test_calibration.py",
+      "sha256": "e7c5b0fb23209853ccfb29179871169637af4e46b15d3b1006581b25bd4d0cd2"
+    }
+  },
+  "synthetic_multiplicity_stress": {
+    "catalogs": [
+      {
+        "calibrate_multiplier": false,
+        "id": "synthetic_b_15",
+        "role": "collapsed_B",
+        "roles": ["synthetic_b_catalogs"],
+        "size": 15
+      },
+      {
+        "calibrate_multiplier": false,
+        "id": "synthetic_b_163",
+        "role": "collapsed_B",
+        "roles": ["synthetic_b_catalogs"],
+        "size": 163
+      },
+      {
+        "calibrate_multiplier": false,
+        "id": "synthetic_logical_511",
+        "role": "logical",
+        "roles": ["synthetic_logical_511", "synthetic_logical_catalogs"],
+        "size": 511
+      },
+      {
+        "calibrate_multiplier": true,
+        "id": "synthetic_b_688",
+        "role": "collapsed_B",
+        "roles": ["synthetic_b_688", "synthetic_b_catalogs"],
+        "size": 688
+      },
+      {
+        "calibrate_multiplier": true,
+        "id": "synthetic_logical_4160",
+        "role": "logical",
+        "roles": ["synthetic_logical_4160", "synthetic_logical_catalogs"],
+        "size": 4160
+      }
+    ],
+    "character_batch_size": 128,
+    "character_means": [
+      0.0,
+      0.8
+    ],
+    "distributed_character_shifts": [
+      0.04
+    ],
+    "single_character_shifts": [
+      0.0,
+      0.06
+    ]
+  },
+  "version": "exp102.q0_character_gate_calibration.v2"
+}

@@ -1,0 +1,147 @@
+{
+  "authority": {
+    "formal_authorization": false,
+    "maximum_status": "NISHIMORI_AUXILIARY_AUDIT_CALIBRATED_WITH_KNOWN_BLIND_CONTROLS",
+    "posterior_estimation": false,
+    "production_authorization": false,
+    "remote_authorization": false,
+    "sole_confirmer_authorization": false
+  },
+  "calibration_gate": {
+    "detected_effect_floor": 0.005,
+    "exact_tolerance": 1e-13,
+    "minimum_detection_rate": 0.8,
+    "minimum_equivalence_rate": 0.95,
+    "power_gate_ensemble_size": 2048
+  },
+  "controls": {
+    "chain_level": {
+      "common_planted_freeze": {
+        "classification": "KNOWN_BLIND_TRUTH_LEAKING_ALL_CHARACTERS"
+      },
+      "four_distinct_label_freeze": {
+        "classification": "KNOWN_BLIND_SCALAR_AND_OMNIBUS_BUT_DETECTED_BY_CHARACTER_MAX"
+      },
+      "two_label_equal_moment_counterexample": {
+        "classification": "KNOWN_BLIND_TRUTH_BLIND_ALL_CHARACTERS"
+      }
+    },
+    "exact": {
+      "correct_posterior": {
+        "classification": "GOLDEN_EQUIVALENT",
+        "expected_power_outcome": {
+          "basis_max": "equivalent",
+          "nonbasis_max": "equivalent",
+          "omnibus": "equivalent"
+        }
+      },
+      "label_permutation": {
+        "classification": "EXPECTED_DETECTED",
+        "expected_power_outcome": {
+          "basis_max": "detected",
+          "nonbasis_max": "detected",
+          "omnibus": "detected"
+        }
+      },
+      "truth_blind_map_delta": {
+        "classification": "EXPECTED_DETECTED",
+        "expected_power_outcome": {
+          "basis_max": "detected",
+          "nonbasis_max": "detected",
+          "omnibus": "detected"
+        }
+      },
+      "uniform_logical": {
+        "classification": "KNOWN_BLIND_TRUTH_BLIND_ALL_CHARACTERS",
+        "expected_power_outcome": {
+          "basis_max": "equivalent",
+          "nonbasis_max": "equivalent",
+          "omnibus": "equivalent"
+        }
+      },
+      "wrong_temperature": {
+        "classification": "EXPECTED_DETECTED",
+        "expected_power_outcome": {
+          "basis_max": "detected",
+          "nonbasis_max": "detected",
+          "omnibus": "detected"
+        }
+      }
+    }
+  },
+  "diagnostic_equivalence": {
+    "margin": 0.01,
+    "sigma_multiplier": 3.0,
+    "sigma_slack": 0.005
+  },
+  "exact_models": [
+    {
+      "H": [[1, 1, 1]],
+      "expected_k": 4,
+      "expected_n": 10,
+      "id": "hgp_n10_k4"
+    },
+    {
+      "H": [[1, 1, 0], [0, 1, 1]],
+      "expected_k": 1,
+      "expected_n": 13,
+      "id": "hgp_n13_k1"
+    }
+  ],
+  "implementation": {
+    "bound_files": {
+      "audit_runner": {
+        "path": "data/expander_code/exp102/validation/063_q0_nishimori_auxiliary_calibration_20260728/audit_report.py",
+        "sha256": "5ecce85fc5798226771a3bb693acd9b9abdaee176c6ec8c9608d4de4fdddba5f"
+      },
+      "independent_oracle": {
+        "path": "data/expander_code/exp102/validation/063_q0_nishimori_auxiliary_calibration_20260728/independent_oracle.py",
+        "sha256": "0b483eae202e30ea8e124197a3a38e2e950f03f6fecbd8505be98fa5205783db"
+      },
+      "pre_run_red_team": {
+        "path": "data/expander_code/exp102/validation/063_q0_nishimori_auxiliary_calibration_20260728/PRE_RUN_RED_TEAM.md",
+        "sha256": "85a15ed32df496eb695d2a924d5b326bfa7fc6085e79f4b8ae8a60f06363d2c8"
+      },
+      "readme": {
+        "path": "data/expander_code/exp102/validation/063_q0_nishimori_auxiliary_calibration_20260728/README.md",
+        "sha256": "b4a411b055ef903c8537cb230b6d9828df7d98048b42ed74f0a08b56cf72c19e"
+      },
+      "raw_schema": {
+        "path": "data/expander_code/exp102/validation/063_q0_nishimori_auxiliary_calibration_20260728/nishimori_raw_schema.v1.json",
+        "sha256": "a7cbf01bac31b5dadd1b1693f99220cd7aeccbf41086507dfc0d3382b9397b6e"
+      },
+      "raw_validator": {
+        "path": "data/expander_code/exp102/validation/063_q0_nishimori_auxiliary_calibration_20260728/validate_future_raw.py",
+        "sha256": "10dabfd46eb429ffc00cc3f1fe008e40b809ccbbdd0ab61a73545028490bb70d"
+      },
+      "runner": {
+        "path": "data/expander_code/exp102/validation/063_q0_nishimori_auxiliary_calibration_20260728/run_exact_calibration.py",
+        "sha256": "4a1c7ed6b1bf3f9ceb3aa1f7cbedeb26847958fb845cb5bda34b5efc08b35ce7"
+      },
+      "tests": {
+        "path": "data/expander_code/exp102/validation/063_q0_nishimori_auxiliary_calibration_20260728/test_exact_calibration.py",
+        "sha256": "7c8e97f92cf1295ec003bd6f070725b2a551890855a7a2be10425b93cb9eb602"
+      }
+    }
+  },
+  "p_values": [
+    0.04,
+    0.1,
+    0.25
+  ],
+  "power": {
+    "ensemble_sizes": [
+      128,
+      512,
+      2048
+    ],
+    "replications": 1000
+  },
+  "seed_namespace": "exp102_q0_nishimori_auxiliary_calibration_20260728_v2",
+  "version": "exp102.q0_nishimori_auxiliary_calibration.v2",
+  "wrong_temperature_map": {
+    "0.04": 0.1,
+    "0.1": 0.25,
+    "0.25": 0.1
+  }
+}

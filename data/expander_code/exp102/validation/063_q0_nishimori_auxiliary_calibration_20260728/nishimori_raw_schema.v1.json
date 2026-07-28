@@ -1,0 +1,105 @@
+{
+  "aggregation_rule": "ALL_PLANNED_FRESH_IID_DISORDERS_MUST_PASS_OR_AUDIT_NOT_COMPUTED",
+  "allow_pickle": false,
+  "array_contract": {
+    "basis_character_mask": {"dtype": "bool", "shape": ["character_count"]},
+    "character_masks_uint64": {"dtype": "uint64", "shape": ["character_count"]},
+    "collision_mass_u_statistic": {"dtype": "float64", "finite": true, "shape": []},
+    "finite_population_batch_means": {"dtype": "float64", "finite": true, "shape": ["finite_population_batch_count"]},
+    "m2_debiased_per_character": {"dtype": "float64", "finite": true, "shape": ["character_count"]},
+    "per_disorder_sampler_gate_failures_json": {"dtype": "U4096", "shape": []},
+    "per_disorder_sampler_gate_pass": {"dtype": "bool", "shape": []},
+    "planted_cross_moment_per_character": {"dtype": "float64", "finite": true, "shape": ["character_count"]},
+    "posterior_mass_on_planted_class_estimate": {"dtype": "float64", "finite": true, "shape": []},
+    "scoring_chain_character_means": {"dtype": "float64", "finite": true, "shape": ["truth_blind_scoring_chain_count", "character_count"]},
+    "scoring_chain_seed_ids": {"dtype": "uint64", "shape": ["truth_blind_scoring_chain_count"]},
+    "trajectory_jackknife_values": {"dtype": "float64", "finite": true, "shape": ["truth_blind_scoring_chain_count", "character_count"]},
+    "truth_blind_scoring_chain_mask": {"dtype": "bool", "shape": ["truth_blind_scoring_chain_count"]},
+    "truth_character_signs": {"dtype": "int8", "shape": ["character_count"], "values": [-1, 1]}
+  },
+  "character_weighting_rule": "[sum_basis+(2^k-1-k)*mean_sampled_nonbasis]/(2^k-1)",
+  "ensemble_preconditions": {
+    "failed_or_missing_planned_disorder_action": "DO_NOT_COMPUTE_ENSEMBLE_AUDIT",
+    "fresh_disorder_generation_contract": "fresh_iid_bernoulli_truth.v1",
+    "planned_manifest_required_before_raw": true,
+    "post_result_inclusion_or_replacement": false
+  },
+  "identity_requirements": {
+    "initialization": [
+      "scoring_chain_initialization_families",
+      "scoring_chain_initial_state_sha256",
+      "truth_blind_scoring_chain_mask"
+    ],
+    "model": [
+      "physics_contract_version=exp101.physics.v2",
+      "posterior_ensemble=true_posterior",
+      "sector=x_error",
+      "H_check_role=H_Z",
+      "q=0",
+      "model_fingerprint",
+      "H_check_sha256",
+      "logical_frame_fingerprint",
+      "section_fingerprint"
+    ],
+    "planned_disorders": [
+      "planned_manifest_sha256",
+      "generation_config_sha256",
+      "disorder_index",
+      "disorder_seed_identity"
+    ],
+    "provenance": [
+      "source_commit",
+      "source_tree_sha256",
+      "source_archive_sha256",
+      "analyzer_sha256",
+      "schema_sha256",
+      "config_sha256",
+      "registry_sha256",
+      "code_sha256",
+      "sampler_config_sha256",
+      "schedule_sha256",
+      "character_sha256",
+      "raw_self_sha256"
+    ],
+    "seeds": [
+      "scoring_chain_seed_identities",
+      "scoring_chain_seed_ids",
+      "disorder_seed_identity"
+    ]
+  },
+  "minimum_truth_blind_scoring_chains": 4,
+  "planned_manifest_version": "exp102.q0_nishimori_auxiliary.planned_disorders.v1",
+  "prohibited_inputs": [
+    "truth_in_sampler_energy",
+    "truth_in_proposal_density",
+    "truth_in_scoring_chain_initialization_selection",
+    "p_start_as_scoring_chain",
+    "failed_or_missing_planned_disorder_exclusion",
+    "post_result_disorder_replacement",
+    "old_pt_pa_global_raw_reuse"
+  ],
+  "raw_self_hash_rule": "sha256(canonical(identity_without_raw_self_sha256),sorted_array_name_dtype_shape_bytes)",
+  "raw_version": "exp102.q0_nishimori_auxiliary.raw.v1",
+  "required_sha256_identity_fields": [
+    "source_tree_sha256",
+    "source_archive_sha256",
+    "analyzer_sha256",
+    "schema_sha256",
+    "config_sha256",
+    "registry_sha256",
+    "code_sha256",
+    "generation_config_sha256",
+    "model_fingerprint",
+    "H_check_sha256",
+    "logical_frame_fingerprint",
+    "section_fingerprint",
+    "sampler_config_sha256",
+    "schedule_sha256",
+    "planned_manifest_sha256",
+    "character_sha256",
+    "raw_self_sha256"
+  ],
+  "truth_scoring_rule": "truth_used_only_after_sampling_for_character_signs_and_planted_cross_moments",
+  "validator": "validate_future_raw.py",
+  "version": "exp102.q0_nishimori_auxiliary.schema.v2"
+}

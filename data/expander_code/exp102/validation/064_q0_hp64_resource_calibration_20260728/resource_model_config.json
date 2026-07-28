@@ -1,0 +1,78 @@
+{
+  "analysis_proxy": {
+    "comparisons_per_evaluation": 1,
+    "families_per_evaluation": 2,
+    "two_t_scale_from_t3": 2.0
+  },
+  "authority": {
+    "contract_version": "exp102.q0_hp64.resource_calibration.local.v1",
+    "formal_authorization": false,
+    "implementation_files": {
+      "data/expander_code/exp102/validation/064_q0_hp64_resource_calibration_20260728/PRE_RUN_RED_TEAM.md": "b18a328a5cfd6183aebdd643052cfde46eb5807a20c2125d81c94bb0b1b764c6",
+      "data/expander_code/exp102/validation/064_q0_hp64_resource_calibration_20260728/README.md": "a416fe65b07adfbe319d37f966eb833ce70f5a5c2ad1a17ca47a0181727b9715",
+      "data/expander_code/exp102/validation/064_q0_hp64_resource_calibration_20260728/audit_resource_calibration.py": "714ec744ebe05cb68a9a028001d40c9eda698565ad34700b16975c5b25a77cfb",
+      "data/expander_code/exp102/validation/064_q0_hp64_resource_calibration_20260728/run_resource_calibration.py": "6f6cca0e6eb75a3f3e8fab65a662929e4a5e103c623a169dd8d8c2b0898f0b72",
+      "data/expander_code/exp102/validation/064_q0_hp64_resource_calibration_20260728/test_resource_calibration.py": "9fd0124051a13b86d7f178fe08d3c87d5361a141a66b9324b41236f3c417e670"
+    },
+    "independent_audit_status": "INDEPENDENT_PACKAGE_AUDIT_PASS",
+    "maximum_resource_status": "RESOURCE_SCENARIOS_ONLY_EMPIRICAL_COVERAGE_INCOMPLETE",
+    "production_authorization": false,
+    "receipt_status": "LOCAL_AUDIT_COMPLETE_NO_REMOTE_AUTHORITY",
+    "remote_launch_authorization": false,
+    "science_audit_authority": "HISTORICAL_DIAGNOSTIC_RECOMPUTATION_ONLY",
+    "science_audit_status": "PASS"
+  },
+  "calibration_p_values": [0.04, 0.07, 0.1],
+  "capacity_cores": {
+    "nd2_and_nd3_historical": 166,
+    "nd2_only_contingency": 75
+  },
+  "clock_options": {
+    "2T": {
+      "burn": 16384,
+      "generation_scale_from_t3": 2.0,
+      "measurement": 65536
+    },
+    "T1": {
+      "burn": 2048,
+      "generation_scale_from_t3": 0.25,
+      "measurement": 8192
+    },
+    "T2": {
+      "burn": 4096,
+      "generation_scale_from_t3": 0.5,
+      "measurement": 16384
+    },
+    "T3": {
+      "burn": 8192,
+      "generation_scale_from_t3": 1.0,
+      "measurement": 32768
+    }
+  },
+  "codes_per_m": 8,
+  "disorders_per_code": 128,
+  "formal_p_values": [0.04, 0.05, 0.06, 0.07, 0.08, 0.09, 0.1],
+  "m_values": [3, 4, 5, 6, 7, 8],
+  "replay_passes": 1,
+  "report_tolerance": 5e-14,
+  "safety_factor": 2.0,
+  "trajectory_options": [8, 16, 32],
+  "validation013_evidence": {
+    "input_file_sha256": {
+      "manifest": "361c8adced9e456143c6ad8b2f282d998c71f5e6cdd9fd3dcf6eb2768729ba8e",
+      "report": "7e3e9bc56d93b8cb2a361eb8bafd867b3f75ed14cf09688a230ca8553e729c2e",
+      "runtime_nd-1": "99033538fba7eb171378bc37bec0ec8a0d1ab0b352b56ba0fdc019dca7e4b801",
+      "runtime_nd-2": "ad33343401eedb5dfb1cbf2d9e4f62a46f2cdad90249131924bf5613550666db",
+      "runtime_nd-3": "f7c973efb70b5af48df78af58c033a00d6986c0d1338fd3ee5028341ae5768ff"
+    },
+    "manifest_self_sha256": "1d1fe8bfc5c6e336acde74237ff3c488af320dd0d37be3c5f25d435c7adf78f2",
+    "raw_count": 384,
+    "report_self_sha256": "bb2b8ef99dfbb1ba008bfddf1a64bc0ad9fccabc350bf2e0bd28b48d19dca062",
+    "resource_tier": "T3",
+    "run_name": "exp102_q0_hgp_screen_v2_20260722_4d134ee",
+    "validation013_archive_sha256": "ad72d2c7039192be721b87ce7c96c5da577af05acd37cacd9167e26a773d9027",
+    "validation013_source_commit": "4d134ee7ca25125d341eb11cbfa34d6856514101",
+    "validation013_source_manifest_sha256": "5bafae76b06ff46557ae8315bb281a42256e7e4e50ed2e9dae868695114b8ff8"
+  },
+  "version": "exp102.q0_hp64.resource_calibration.config.v1"
+}

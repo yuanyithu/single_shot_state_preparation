@@ -1,0 +1,47 @@
+{
+  "metadata": {
+    "baseline_head": "bacf25a53870d04dc538d1caaee3336c8fe1be7a",
+    "baseline_ref": "origin/main",
+    "canonical_head": "bacf25a53870d04dc538d1caaee3336c8fe1be7a",
+    "canonical_worktree": "/Users/jarvis/Desktop/sync/project D/data/expander_code/exp102/deployment_worktrees/next_stage_20260728_bacf25a",
+    "conda_environment": "12",
+    "deployment_subtree_excluded": "data/expander_code/exp102/deployment_worktrees",
+    "direct_block": "/Users/jarvis/Desktop/sync/project D/data/expander_code/exp102/deployment_worktrees/direct_block_335f808",
+    "direct_block_head": "bacf25a53870d04dc538d1caaee3336c8fe1be7a",
+    "dirty_record_count": 1472,
+    "dirty_root": "/Users/jarvis/Desktop/sync/project D",
+    "dirty_root_ahead": 0,
+    "dirty_root_behind": 17,
+    "dirty_root_branch": "main",
+    "dirty_root_head": "de68bbc06aa729063b24c1f40ba23cc404a44c9c",
+    "evidence_row_count": 63,
+    "generated_at_utc": "2026-07-28T12:38:22.419997+00:00",
+    "version": "exp102.stage0_governance.v1"
+  },
+  "outputs": {
+    "EVIDENCE_AUTHORITY_MATRIX.md": {
+      "sha256": "dde94923c3118224b28e80eeaa29f892640307d7227429604f5d3728ede3588e",
+      "size_bytes": 8854
+    },
+    "RECONCILIATION_REPORT.md": {
+      "sha256": "c5cef9a1288cd0b643e0de52dd3cfa56f76c82bc40ce2ce1b40022c736aa99a3",
+      "size_bytes": 4709
+    },
+    "dirty_root_inventory.csv": {
+      "sha256": "430e7c35a398fbcbfd0bc26d4b6ed42dbd57068562b9a739230fb4376c1ff13a",
+      "size_bytes": 432986
+    },
+    "dirty_root_inventory.json": {
+      "sha256": "422a9cf2ecc3c5d41ca2d1589186ee2268d4997171214515755f8c504db80538",
+      "size_bytes": 1209914
+    },
+    "evidence_authority_matrix.json": {
+      "sha256": "e277cec90519ec4ef6da945da7db113175767e0847c54b3dd9ed5ebf1c5464c4",
+      "size_bytes": 49456
+    },
+    "worktree_status.json": {
+      "sha256": "c69f55dcb4484570aff99cda8329fc3f2a15de30818fbb2e753d698829eec332",
+      "size_bytes": 15147
+    }
+  }
+}

@@ -314,4 +314,28 @@ Current status is pre-pilot, not scientific certification.
   21--25 rows during U burn and then only 1--3 in measurement, so the proposed U-collapse plus
   low-energy-column-transport division of labor is falsified. No remote/T1/q_top/formal authority
   exists.
+- `060_q0_multirow_joint_block_structure_20260724/`: pre-run, one-shot local structural screen for
+  MR2/MR3/MR4 and row-column-cross exact collapsed-B blocks. The committed-source preflight,
+  direct-perturbation scope reconstruction, independent bitset min-fill audit and focused tests
+  are implemented, but no width report exists yet. A survivor would be only an HP64 contingency
+  if Stage 3/4 fails; it cannot be the required orthogonal confirmer.
+- `061_q0_next_stage_governance_20260728/`: completed read-only Stage-0 reconciliation. It
+  inventories 1,472 dirty-root files without changing them, records 20 overlapping paths and
+  seven byte differences, and separates method-internal, cross-method, cell and formal authority
+  for validations 001--060. It creates governance evidence only, not sampler or remote authority.
+- `062_q0_character_gate_calibration_20260728/`: pre-run local exact-IID/synthetic operating-
+  characteristic calibration. It freezes a common trajectory/draw point with role-specific
+  simultaneous multipliers, covers 15/163/511/688/4160-character multiplicities, separates
+  selection from fresh confirmation, and records the `.04 -> .08` frozen-character purity-bound
+  limitation. No one-shot report or sampler authority exists yet.
+- `063_q0_nishimori_auxiliary_calibration_20260728/`: pre-run physics-v2 exact Nishimori and
+  negative-control calibration. It independently checks n=10/n=13 hard-coset posteriors, preserves
+  known blind controls, measures omnibus/basis/nonbasis power, and freezes a fail-closed future raw
+  schema requiring every planned fresh-IID disorder. It remains an auxiliary audit with no
+  universal q_top-bias bound or confirmer authority; no one-shot report exists yet.
+- `064_q0_hp64_resource_calibration_20260728/`: pre-run read-only validation-013 discrepancy and
+  resource calibration. The science path independently recomputes HP64/MAM character statistics;
+  the isolated resource path emits unselected timing scenarios and leaves strict full-grid totals
+  null because m7, most p values and multi-code/disorder timing coverage are absent. No generated
+  report selects a resource tier or authorizes remote/formal work yet.
 - Held-out and production evidence do not exist. Their absence is an active production blocker.
