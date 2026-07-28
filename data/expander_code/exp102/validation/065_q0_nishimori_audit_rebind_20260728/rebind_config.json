@@ -1,0 +1,62 @@
+{
+  "authority": {
+    "exact_report_rerun_authorization": false,
+    "formal_authorization": false,
+    "held_out_authorization": false,
+    "posterior_estimation": false,
+    "production_authorization": false,
+    "remote_authorization": false,
+    "sampler_authorization": false,
+    "sole_confirmer_authorization": false
+  },
+  "implementation": {
+    "bound_files": {
+      "audit_rebind": {
+        "path": "data/expander_code/exp102/validation/065_q0_nishimori_audit_rebind_20260728/audit_rebind.py",
+        "sha256": "e502fa39f6116e5e46a028ac22f07d8705795616fcd363129ab17703d77ea73d"
+      },
+      "pre_run_red_team": {
+        "path": "data/expander_code/exp102/validation/065_q0_nishimori_audit_rebind_20260728/PRE_RUN_RED_TEAM.md",
+        "sha256": "6f4b238eee6674c777356460155ba4759db81ee607de85e156dd18ee4d1fd429"
+      },
+      "readme": {
+        "path": "data/expander_code/exp102/validation/065_q0_nishimori_audit_rebind_20260728/README.md",
+        "sha256": "3fff51c940186c445567c404ff37ad5dc8c930c9f85be91e54965ba9bc4a2900"
+      },
+      "tests": {
+        "path": "data/expander_code/exp102/validation/065_q0_nishimori_audit_rebind_20260728/test_audit_rebind.py",
+        "sha256": "4ab753c783ad117feff90a4914ebdb5f76e8e7ed1e75d7ae61d861d7a2a9f2fd"
+      },
+      "verifier": {
+        "path": "data/expander_code/exp102/validation/065_q0_nishimori_audit_rebind_20260728/verify_audit_rebind.py",
+        "sha256": "02739ba50ebcb54a81502b9ab9a366d18837245ca00bd6d5119ef90edc1e4af9"
+      }
+    }
+  },
+  "input_063": {
+    "conflict_evidence_file_sha256": "fe560efe18a8e0a6b9b54f1451f2bf5cdaa0e0a3ae14c4859de3e52723ef0ee5",
+    "conflict_evidence_path": "data/expander_code/exp102/validation/063_q0_nishimori_auxiliary_calibration_20260728/independent_audit_conflict.json",
+    "config_path": "data/expander_code/exp102/validation/063_q0_nishimori_auxiliary_calibration_20260728/nishimori_config.json",
+    "config_sha256": "79760463b5a968374f65f1319963558de3aa22e2eea35b0865ae5f15bf1562f1",
+    "expected_calibration_failure_count": 14,
+    "expected_full_payload_mismatch_count": 11,
+    "expected_map_tie_case_count": 3,
+    "expected_maximum_absolute_mismatch": 0.0340070400000001,
+    "expected_rebind_status": "CONFLICT_INDEPENDENT_NUMERICAL_RECOMPUTATION_MAP_TIE_SEMANTICS",
+    "expected_scientific_status": "NISHIMORI_AUXILIARY_CALIBRATION_INSUFFICIENT",
+    "independent_oracle_path": "data/expander_code/exp102/validation/063_q0_nishimori_auxiliary_calibration_20260728/independent_oracle.py",
+    "independent_oracle_sha256": "0b483eae202e30ea8e124197a3a38e2e950f03f6fecbd8505be98fa5205783db",
+    "report_file_sha256": "5edb51aa5ffd63dabc8cfd11afbb7699542668170e513f727385473d90ec6c33",
+    "report_path": "data/expander_code/exp102/validation/063_q0_nishimori_auxiliary_calibration_20260728/exact_calibration_report.json",
+    "report_self_sha256": "134228b993a7b856c143d5410de7940f51657f0d1b7c38bcad1fd6cd917af441",
+    "schema_sha256": "a7cbf01bac31b5dadd1b1693f99220cd7aeccbf41086507dfc0d3382b9397b6e",
+    "source_commit": "26bed0bce1fac040919be8a79103b3e25550bdd1",
+    "source_tree_sha256": "d72d4da62d8447539a699710968794fa0e80a1d5dfbe010d8f20fb914b0cafe0"
+  },
+  "legacy_failure_aliases": {
+    "equivalence gate failed": "EXACT_CONTROL_GATE",
+    "equivalence power failed": "EXACT_CONTROL_GATE"
+  },
+  "numeric_comparison_tolerance": 2e-13,
+  "version": "exp102.q0_nishimori_audit_rebind.config.v1"
+}
