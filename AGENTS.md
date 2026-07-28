@@ -318,6 +318,25 @@ audit 不调用 sampler/kernel/analyzer，逐 clock 重建 B/cache/state/label/w
 下一候选必须协调多行/多列或以别的机制跨过 collapsed-B basin barrier，而不是继续排列两个单 block exact
 kernel。
 
+2026-07-28 的 validation 062 character-gate 校准在五个冻结 operating points 上全部失败，终态为
+`CHARACTER_GATE_REDESIGN_REQUIRED`。更重要的长期规则是：`max_u |delta m_u|<=.04` 对完整冻结 catalog
+最多只给 `.08` 的 mean-square/purity 差界；只有 catalog 包含全部非零 logical characters 时，该量才直接是
+`q_top`，有限 sampled large-k characters 对未观测 tail 没有任何覆盖。后续 gate 应以直接 `q_top`
+equivalence 为 primary，并独立保留 full-label `D2`/分布门；character maximum 只作慢模态诊断，不能冒充
+交付量或 tail certificate，也不能因最大校准点的 Wilson lower `.9779026<.98` 就只追加 trials。
+
+validation 063/065 的 Nishimori 辅助校准仍为 `NISHIMORI_AUXILIARY_CALIBRATION_INSUFFICIENT`；065 又发现
+三个 hard coset 的 logical-sector weight enumerator 存在数学 MAP ties，浮点 `argmax` 的不同合法选项造成
+11 个 payload 字段不一致。凡 MAP-derived control 必须在浮点 posterior 比较前预冻结基于精确数学对象的
+canonical tie 语义，并让 runner/oracle 审计同一语义；`terminal_gate_invariant=true` 只能说明最终失败判定
+未变，不能写成 `full_payload_match` 或 audit PASS，更不能升级为 `q_top` bound。
+
+validation 064 的 timing 只覆盖少量单 code/单 disorder，strict full-grid totals 全为 `null`；所有 scenario
+arithmetic 都是 planning proxy，不是 confidence bound、campaign total 或远端启动权限。validation 060 的
+唯一结构 survivor `MR2` induced width=`25`、单表下界 `512 MiB`，只是在 HP64 后续 Stage 3/4 真正失败后
+才可考虑的一次同族 contingency，不能充当 large-k orthogonal confirmer。060--065 均未运行远端
+measurement；当前停止是 estimator/审计/资源覆盖等科学门禁失败，不是在等待服务器。
+
 若要继续正式实验，须另立经审查的新算法/科学契约与 fresh tuning/held-out，不得把重复 T3、延长链、
 删困难 disorder、缩范围或改窗口包装成原 discovery 成功。
 PT/PA/global discovery raw 均不得进入正式 merge/freezer。48-code registry 已冻结，但正式新

@@ -1,5 +1,71 @@
 # exp102 status
 
+**2026-07-28 NEXT-STAGE STAGES 1--2 TERMINAL -- CHARACTER-GATE REDESIGN
+REQUIRED; NO REMOTE OR FORMAL AUTHORITY**
+
+The local-only Stage-0--2 work in validations 060--065 is complete.  It is not
+waiting on a server: no new remote measurement was launched.  Stage 1 stops
+fail-closed at validation 062, whose five pre-registered common operating
+points all fail.  At the largest point (32 trajectories, 16384 draws each),
+the exact logical and collapsed-B catalogs and the 511-character logical
+stress pass, but the 688-character B and 4160-character logical stresses miss
+simultaneous coverage: the minimum one-sided Wilson lower bound is
+`.9779025636 < .98`.  The independent audit reproduces terminal status
+`CHARACTER_GATE_REDESIGN_REQUIRED`.
+
+This is the primary blocker.  A maximum observed-character difference of
+`.04` supplies at most a `.08` bound on the frozen catalog's mean squared
+characters, and it says nothing about unobserved characters.  It is therefore
+not a general `.04` bound on the delivered `q_top`.  The successor gate must
+make direct `q_top` equivalence primary, retain full-label distribution/D2
+checks independently, and use maximum-character checks as slow-mode
+diagnostics rather than claimed coverage of an unobserved large-k tail.
+Adding trials merely to move `.9779` above `.98` would not repair this mismatch.
+
+Validation 063 independently enumerates 30 exact controls and remains
+`NISHIMORI_AUXILIARY_CALIBRATION_INSUFFICIENT`: 14 correct-posterior groups at
+`N=2048` miss the frozen `.01` simultaneous-equivalence precision target.  Its
+original v2 auditor failed first on the legacy English-prefix mismatch
+`equivalence gate failed` versus `equivalence power failed`; that fail-fast
+result did not establish complete numerical agreement.  Validation 065 then
+recomputed the complete immutable payload and found 11 discrepancies above
+`2e-13` (maximum `.03400704`), all caused by floating `argmax` choices among
+mathematically tied MAP sectors:
+
+- `p=.04`, syndrome `05`: report label `0`, oracle label `15`;
+- `p=.04`, syndrome `06`: report label `0`, oracle label `5`;
+- `p=.10`, syndrome `03`: report label `10`, oracle label `0`.
+
+The required interpretation is exactly `full_payload_match=false` and
+`terminal_gate_invariant=true`: all 14 structured terminal failures remain
+identical, but invariant terminal status is not an audit pass.  Validation 065
+therefore persists
+`CONFLICT_INDEPENDENT_NUMERICAL_RECOMPUTATION_MAP_TIE_SEMANTICS` (audit SHA
+`5d49532e...13ab`), and its separate verifier passes only the recording of that
+conflict as `INDEPENDENT_VERIFICATION_PASS_OF_RECORDED_MAP_TIE_CONFLICT`
+(verification SHA `03cb4d1e...c5cc`).  Nishimori remains an auxiliary
+diagnostic without a universal `q_top`-error or confirmation guarantee.
+
+Validation 064 independently replays the old HP64 evidence and confirms that
+m8 `.91317/.99273` compares HP64 with MAM, not HP64 P with U; the m6 P-family
+HP64/MAM difference is `.0165964`, or `30.5903` paired SE.  Its 72-row resource
+matrix remains scenario arithmetic only: empirical coverage lacks m7, most p
+values and cross-code/disorder timing, so strict totals and resource selection
+are `null`.  Validation 060 closes Stage 2 with MR2 as the sole structural
+survivor (width 25, 512 MiB single-table lower bound).  MR2 is only a suspended
+same-family contingency after a genuine HP64 Stage-3/4 failure; it cannot be
+the missing large-k orthogonal confirmer.
+
+Consequently Stage-3 m3 anchors, the easy 128-disorder block, m6/m8/HARD2 and
+all formal tuning, held-out and production work remain unauthorized.  There is
+still no certified cell or `(m,p)`, `READY_FOR_FORMAL`,
+`FROZEN_HELD_OUT_PASS`, or production result.  Before any remote launch, a
+fresh delivery-aligned gate contract, complete resource coverage and a
+pre-frozen portfolio of no more than two large-k orthogonal-confirmer concepts
+are required.  Old raw may
+not be extended or reused, adversarial P/U starts may not be replaced by a
+common P/physical-zero start, and no threshold may be relaxed post hoc.
+
 **HYBRID ROW-COLUMN VALIDATION 059 TERMINAL -- LOCAL B-TRANSPORT NECESSARY
 GATES FAIL; NO REMOTE OR FORMAL AUTHORITY**
 

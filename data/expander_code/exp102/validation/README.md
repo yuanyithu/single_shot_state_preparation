@@ -1,6 +1,8 @@
 # exp102 validation index
 
-Current status is pre-pilot, not scientific certification.
+Current status is pre-pilot, not scientific certification.  The 2026-07-28
+Stage-1/2 sequence stops locally at `CHARACTER_GATE_REDESIGN_REQUIRED`; no new
+remote measurement or formal stage is authorized.
 
 - `001_local_implementation_20260719/`: registry cardinality/dimensions, task-plan identity,
   exp102 unit tests, and selected exp101 regression tests (83 combined PASS after the Numba update).
@@ -332,7 +334,8 @@ Current status is pre-pilot, not scientific certification.
   688/4160-character simultaneous-coverage Wilson lower bound is `.97790 < .98`; no point reaches
   fresh confirmation. The report also records that a `.04` observed-character tolerance permits
   a `.08` frozen-estimator purity difference and gives no unobserved-character coverage. This is
-  a gate-design failure, not sampler evidence or remote/formal authority.
+  the primary next-stage blocker: a gate-design failure, not sampler evidence or remote/formal
+  authority.
 - `063_q0_nishimori_auxiliary_calibration_20260728/`: the one-shot physics-v2 exact calibration
   persists 30 exact control rows and terminates as
   `NISHIMORI_AUXILIARY_CALIBRATION_INSUFFICIENT`. Fourteen correct-posterior equivalence gates at
@@ -340,9 +343,11 @@ Current status is pre-pilot, not scientific certification.
   wrong-temperature, label-permutation and MAP-delta detection controls do not fail. The v2
   independent auditor then stops on the first English-prefix taxonomy mismatch
   (`equivalence gate failed` versus `equivalence power failed`), recorded fail-closed as
-  `CONFLICT_INDEPENDENT_AUDIT_MESSAGE_TAXONOMY_MISMATCH`; no audit-pass file exists. The immutable
-  report is not changed or upgraded, and the identity remains an auxiliary diagnostic with no
-  universal q_top-bias bound, sampler, remote, formal, held-out, production or confirmer authority.
+  `CONFLICT_INDEPENDENT_AUDIT_MESSAGE_TAXONOMY_MISMATCH`; no audit-pass file exists. Validation 065
+  subsequently shows that this fail-fast mismatch also hid a complete numerical-audit conflict:
+  11 MAP-delta payload fields differ by more than `2e-13`. The immutable report is not changed or
+  upgraded, and the identity remains an auxiliary diagnostic with no universal q_top-bias bound,
+  sampler, remote, formal, held-out, production or confirmer authority.
 - `064_q0_hp64_resource_calibration_20260728/`: completed read-only validation-013 discrepancy and
   resource calibration from source `b8ec174`. The four-worker path independently replays the
   frozen character estimator and confirms that m8 `.91317/.99273` is HP64 versus MAM, while m6 P
@@ -351,4 +356,15 @@ Current status is pre-pilot, not scientific certification.
   totals `null`: m7, most p values, and multi-code/disorder timing distributions remain absent.
   Independent package audit `ee349e4f...a9c4` passes. Scenario arithmetic is not a confidence
   bound and grants no sampler, remote, formal, held-out or production authority.
+- `065_q0_nishimori_audit_rebind_20260728/`: complete independent numerical rebind of the immutable
+  validation-063 report. It finds 11 mismatches (maximum `.03400704`), all in the truth-blind
+  MAP-delta control, because three exact weight-enumerator ties receive different floating
+  `argmax` labels: p/syndrome `.04/05` uses report/oracle `0/15`, `.04/06` uses `0/5`, and
+  `.10/03` uses `10/0`. The mandatory record is `full_payload_match=false` with
+  `terminal_gate_invariant=true`: all 14 structured `EQUIVALENCE_RATE_BELOW_MINIMUM` failures are
+  unchanged, but that does not turn the audit into a pass. Terminal status is
+  `CONFLICT_INDEPENDENT_NUMERICAL_RECOMPUTATION_MAP_TIE_SEMANTICS`, audit SHA
+  `5d49532e...13ab`; the separate `INDEPENDENT_VERIFICATION_PASS_OF_RECORDED_MAP_TIE_CONFLICT`
+  (SHA `03cb4d1e...c5cc`) verifies the conflict record only. It grants no sampler, remote, formal,
+  held-out, production, posterior-estimation or confirmer authority.
 - Held-out and production evidence do not exist. Their absence is an active production blocker.
