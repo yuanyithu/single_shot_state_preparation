@@ -331,11 +331,16 @@ Current status is pre-pilot, not scientific certification.
   fresh confirmation. The report also records that a `.04` observed-character tolerance permits
   a `.08` frozen-estimator purity difference and gives no unobserved-character coverage. This is
   a gate-design failure, not sampler evidence or remote/formal authority.
-- `063_q0_nishimori_auxiliary_calibration_20260728/`: pre-run physics-v2 exact Nishimori and
-  negative-control calibration. It independently checks n=10/n=13 hard-coset posteriors, preserves
-  known blind controls, measures omnibus/basis/nonbasis power, and freezes a fail-closed future raw
-  schema requiring every planned fresh-IID disorder. It remains an auxiliary audit with no
-  universal q_top-bias bound or confirmer authority; no one-shot report exists yet.
+- `063_q0_nishimori_auxiliary_calibration_20260728/`: the one-shot physics-v2 exact calibration
+  persists 30 exact control rows and terminates as
+  `NISHIMORI_AUXILIARY_CALIBRATION_INSUFFICIENT`. Fourteen correct-posterior equivalence gates at
+  `N=2048` miss the frozen `.01` simultaneous precision target; the pre-registered
+  wrong-temperature, label-permutation and MAP-delta detection controls do not fail. The v2
+  independent auditor then stops on the first English-prefix taxonomy mismatch
+  (`equivalence gate failed` versus `equivalence power failed`), recorded fail-closed as
+  `CONFLICT_INDEPENDENT_AUDIT_MESSAGE_TAXONOMY_MISMATCH`; no audit-pass file exists. The immutable
+  report is not changed or upgraded, and the identity remains an auxiliary diagnostic with no
+  universal q_top-bias bound, sampler, remote, formal, held-out, production or confirmer authority.
 - `064_q0_hp64_resource_calibration_20260728/`: pre-run read-only validation-013 discrepancy and
   resource calibration. The science path independently recomputes HP64/MAM character statistics;
   the isolated resource path emits unselected timing scenarios and leaves strict full-grid totals
