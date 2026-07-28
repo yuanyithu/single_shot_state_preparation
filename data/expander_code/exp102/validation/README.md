@@ -323,11 +323,14 @@ Current status is pre-pilot, not scientific certification.
   inventories 1,472 dirty-root files without changing them, records 20 overlapping paths and
   seven byte differences, and separates method-internal, cross-method, cell and formal authority
   for validations 001--060. It creates governance evidence only, not sampler or remote authority.
-- `062_q0_character_gate_calibration_20260728/`: pre-run local exact-IID/synthetic operating-
-  characteristic calibration. It freezes a common trajectory/draw point with role-specific
-  simultaneous multipliers, covers 15/163/511/688/4160-character multiplicities, separates
-  selection from fresh confirmation, and records the `.04 -> .08` frozen-character purity-bound
-  limitation. No one-shot report or sampler authority exists yet.
+- `062_q0_character_gate_calibration_20260728/`: completed local exact-IID/synthetic operating-
+  characteristic calibration from source `c8642a0`. All five pre-registered common resource
+  points fail, so terminal status is `CHARACTER_GATE_REDESIGN_REQUIRED` with independent audit
+  PASS. The largest point passes both exact catalogs and the 511-character stress, but its
+  688/4160-character simultaneous-coverage Wilson lower bound is `.97790 < .98`; no point reaches
+  fresh confirmation. The report also records that a `.04` observed-character tolerance permits
+  a `.08` frozen-estimator purity difference and gives no unobserved-character coverage. This is
+  a gate-design failure, not sampler evidence or remote/formal authority.
 - `063_q0_nishimori_auxiliary_calibration_20260728/`: pre-run physics-v2 exact Nishimori and
   negative-control calibration. It independently checks n=10/n=13 hard-coset posteriors, preserves
   known blind controls, measures omnibus/basis/nonbasis power, and freezes a fail-closed future raw
