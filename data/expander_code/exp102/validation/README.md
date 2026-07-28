@@ -314,11 +314,13 @@ Current status is pre-pilot, not scientific certification.
   21--25 rows during U burn and then only 1--3 in measurement, so the proposed U-collapse plus
   low-energy-column-transport division of labor is falsified. No remote/T1/q_top/formal authority
   exists.
-- `060_q0_multirow_joint_block_structure_20260724/`: pre-run, one-shot local structural screen for
-  MR2/MR3/MR4 and row-column-cross exact collapsed-B blocks. The committed-source preflight,
-  direct-perturbation scope reconstruction, independent bitset min-fill audit and focused tests
-  are implemented, but no width report exists yet. A survivor would be only an HP64 contingency
-  if Stage 3/4 fails; it cannot be the required orthogonal confirmer.
+- `060_q0_multirow_joint_block_structure_20260724/`: completed one-shot local structural screen
+  from source `f5a47f8`. MR2 is the sole survivor, with induced width 25 and a 512 MiB single-table
+  lower bound; MR3/MR4 reach widths 38/51 and RC1 reaches 29--31, so all three fail the frozen
+  width/memory gates. Terminal `LOCAL_JOINT_BLOCK_STRUCTURE_CANDIDATE_FOUND` is reproduced by
+  independent bitset min-fill audit `719191b1...0fb`. MR2 receives only one possible exact
+  implementation slot if HP64 later fails Stage 3/4; it is the same collapsed-B mechanism, cannot
+  fill the large-k orthogonal-confirmer gap, and grants no sampler, remote or formal authority.
 - `061_q0_next_stage_governance_20260728/`: completed read-only Stage-0 reconciliation. It
   inventories 1,472 dirty-root files without changing them, records 20 overlapping paths and
   seven byte differences, and separates method-internal, cross-method, cell and formal authority
