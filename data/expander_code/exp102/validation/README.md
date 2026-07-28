@@ -341,9 +341,12 @@ Current status is pre-pilot, not scientific certification.
   `CONFLICT_INDEPENDENT_AUDIT_MESSAGE_TAXONOMY_MISMATCH`; no audit-pass file exists. The immutable
   report is not changed or upgraded, and the identity remains an auxiliary diagnostic with no
   universal q_top-bias bound, sampler, remote, formal, held-out, production or confirmer authority.
-- `064_q0_hp64_resource_calibration_20260728/`: pre-run read-only validation-013 discrepancy and
-  resource calibration. The science path independently recomputes HP64/MAM character statistics;
-  the isolated resource path emits unselected timing scenarios and leaves strict full-grid totals
-  null because m7, most p values and multi-code/disorder timing coverage are absent. No generated
-  report selects a resource tier or authorizes remote/formal work yet.
+- `064_q0_hp64_resource_calibration_20260728/`: completed read-only validation-013 discrepancy and
+  resource calibration from source `b8ec174`. The four-worker path independently replays the
+  frozen character estimator and confirms that m8 `.91317/.99273` is HP64 versus MAM, while m6 P
+  differs by `.0165964`, or `30.5903` paired SE. The separately built 72-row resource matrix has
+  terminal `RESOURCE_SCENARIOS_ONLY_EMPIRICAL_COVERAGE_INCOMPLETE`, selection `null`, and strict
+  totals `null`: m7, most p values, and multi-code/disorder timing distributions remain absent.
+  Independent package audit `ee349e4f...a9c4` passes. Scenario arithmetic is not a confidence
+  bound and grants no sampler, remote, formal, held-out or production authority.
 - Held-out and production evidence do not exist. Their absence is an active production blocker.
