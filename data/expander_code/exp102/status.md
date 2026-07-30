@@ -1,5 +1,56 @@
 # exp102 status
 
+**2026-07-30 VALIDATION 066 TERMINAL -- LOCAL DELIVERY GATE CONFIRMED;
+PROJECT STILL BLOCKED BEFORE REMOTE**
+
+Fresh local-only validation 066 completes from clean source
+`bc47ae26dd26203f2b9c902feca2a10ea797c798`.  Its five frozen selection
+points have the validity/outcome sequence `INVALID / FAIL / FAIL /
+INCONCLUSIVE / PASS`; the first point is recorded as `INCONCLUSIVE` with
+`NO_FINITE_CALIBRATED_MULTIPLIER`.  The selected common point is 32 IID
+multinomial trajectory groups x 16384 independent draws per group with calibrated multiplier
+`4.809673164164152`; these are not MCMC chains, clocks or ESS.  A fresh
+seed namespace then confirms that same point as `PASS`.  The terminal status
+is `LOCAL_DELIVERY_GATE_COMMON_OPERATING_POINT_CONFIRMED`.  The report JSON
+self-SHA is `d255c67ee0a91985e933ccea8a9616c63e832e37c19cd16dc7eb5e35f05e5a0a`;
+its complete file SHA is
+`f11a3eb137793ce2bbe43734db82240cde45bafbdd57a2a1e6f97d520dad6ed8`.
+
+The independent auditor regenerates the multinomial histograms, full-label
+collision `q_top`, `D2_norm`, delete-one arrays, group-wise uncertainties,
+calibration multiplier, decisions, Wilson bounds, selection and confirmation
+from frozen seeds.  It passes as
+`INDEPENDENT_AUDIT_PASS_LOCAL_DELIVERY_GATE_COMMON_OPERATING_POINT_CONFIRMED`,
+audit JSON self-SHA
+`485b789c3a86893662241ab0e529358fedde18b695c3514233adc492236261b3`;
+its complete file SHA is
+`3975de5eb1d9cebcc467efdd67d956dcfa4b98e4c3b205011a549d6cf8d7822c`.
+The compact 4,372,205-byte report stores SHA receipts rather than persistent
+trial raw.  Replay is bit-exact only in the frozen same-environment contract
+(NumPy 2.4.1, `default_rng`, PCG64); it makes no cross-version portable-RNG
+claim.
+The post-run conda-12 exp101+exp102+066 regression is `1090 passed, 4
+warnings`; all four warnings are pre-existing deprecated-alias or macOS fork
+warnings.
+
+This result confirms only the operating characteristics of the local
+full-label `q_top`/`D2_norm` comparison gate.  Both deliberately common-wrong
+`EXPECTED_KNOWN_BLIND` controls have true `D2_norm=.0625` yet candidate PASS
+rate `1.0`, as preregistered.  This is an empirical common-wrong blind spot,
+not only a theoretical warning.  Therefore 066
+does not prove MCMC mixing, transport, target-basin or unvisited-tail coverage,
+or correctness of any posterior estimate.  Legal adversarial initializations,
+transport/Rhat/ESS/burn-crossing vetoes and an orthogonal confirmation method
+remain mandatory.
+
+The independent project state is `BLOCKED_BEFORE_REMOTE`.  Four blockers
+remain exactly: `LARGE_K_ORTHOGONAL_CONFIRMER_PORTFOLIO_UNFROZEN`,
+`FUTURE_SCHEMA_RUNTIME_COVERAGE_INCOMPLETE`, `CAMPAIGN_BUDGET_UNAPPROVED`, and
+`STAGE3_MULTI_COMPARISON_MULTIPLICITY_UNFROZEN`.  Validation 066 does not
+authorize m3 anchors, any remote sampler run, formal tuning, held-out work or
+production.  There is still no certified cell or `(m,p)`, `READY_FOR_FORMAL`
+or `FROZEN_HELD_OUT_PASS`.
+
 **2026-07-28 NEXT-STAGE STAGES 1--2 TERMINAL -- CHARACTER-GATE REDESIGN
 REQUIRED; NO REMOTE OR FORMAL AUTHORITY**
 

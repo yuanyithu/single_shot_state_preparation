@@ -25,6 +25,30 @@ publication/FSS。014 中的 scan v2 聚合只作历史审计；旧 259 tests �
 `C192-2/B96-1/B192-1/B96-2` 又在两个 hard cells 上因 genealogy 塌缩全部失败；PA 零通过分支同样
 `EXHAUSTED`，禁止 B384-2 rescue。
 
+2026-07-30，fresh local-only validation 066 已从 clean source
+`bc47ae26dd26203f2b9c902feca2a10ea797c798` 完成 delivery-aligned gate calibration。五个冻结 selection
+points 的 validity/outcome 依次为 `INVALID/FAIL/FAIL/INCONCLUSIVE/PASS`（首点在 report 中记录为
+`INCONCLUSIVE + NO_FINITE_CALIBRATED_MULTIPLIER`），选中 32 IID multinomial trajectory groups x
+16384 independent draws（不是 MCMC chains/clocks 或 ESS）、
+multiplier `4.809673164164152`，fresh confirmation 为 PASS；终态为
+**`LOCAL_DELIVERY_GATE_COMMON_OPERATING_POINT_CONFIRMED`**。4,372,205-byte report self-SHA/file SHA 为
+`d255c67ee0a91985e933ccea8a9616c63e832e37c19cd16dc7eb5e35f05e5a0a` /
+`f11a3eb137793ce2bbe43734db82240cde45bafbdd57a2a1e6f97d520dad6ed8`；独立 auditor 从 seeds 在冻结的
+NumPy 2.4.1 + `default_rng` + PCG64 同环境逐位重建 histograms、full-label `q_top`/`D2_norm`、
+delete-one、calibration、Wilson、selection 与 confirmation，audit self-SHA/file SHA 为
+`485b789c3a86893662241ab0e529358fedde18b695c3514233adc492236261b3` /
+`3975de5eb1d9cebcc467efdd67d956dcfa4b98e4c3b205011a549d6cf8d7822c`。receipt 不是 persistent trial raw，
+也不提供跨 NumPy 版本 portable RNG 保证。两个 common-wrong `EXPECTED_KNOWN_BLIND` controls 的真实
+`D2_norm=.0625` 而 candidate PASS rate=`1.0`，实证了共同错误收敛盲区，
+所以该 PASS 只认证本地 scalar gate 的 operating characteristics，**不证明 mixing、transport、target-basin
+或 unvisited-tail coverage**。项目状态保持 **`BLOCKED_BEFORE_REMOTE`**；large-k orthogonal confirmer
+`LARGE_K_ORTHOGONAL_CONFIRMER_PORTFOLIO_UNFROZEN`、`FUTURE_SCHEMA_RUNTIME_COVERAGE_INCOMPLETE`、
+`CAMPAIGN_BUDGET_UNAPPROVED`、`STAGE3_MULTI_COMPARISON_MULTIPLICITY_UNFROZEN` 四项仍未解决。不得据此
+启动 m3、remote、formal、held-out 或 production；P/U 对抗初态和 transport/
+Rhat/ESS/burn-crossing/独立确认门仍必须保留。接手先读 `validation/066_q0_delivery_gate_redesign_20260728/`
+的 README、report、independent audit 与 `status.md`。post-run conda-12 完整回归为
+`1090 passed, 4 existing warnings`。
+
 `exp102.q0_global.discovery.v1` 已实现 logical catalog、hard-coset cluster/joint heatbath、独立
 defect trace、m3 full-sector TI、三节点 digest/runtime、72h schedule 与 control freeze。其第三个且
 终止性的 immutable run `exp102_q0_global_20260721_204b37d`（source

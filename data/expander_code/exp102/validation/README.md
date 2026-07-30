@@ -1,8 +1,9 @@
 # exp102 validation index
 
-Current status is pre-pilot, not scientific certification.  The 2026-07-28
-Stage-1/2 sequence stops locally at `CHARACTER_GATE_REDESIGN_REQUIRED`; no new
-remote measurement or formal stage is authorized.
+Current status is pre-pilot, not scientific certification.  Validation 066
+locally confirms one delivery-aligned `q_top`/`D2_norm` gate operating point,
+but the independent project status remains `BLOCKED_BEFORE_REMOTE`; no new
+remote measurement, m3 anchor or formal stage is authorized.
 
 - `001_local_implementation_20260719/`: registry cardinality/dimensions, task-plan identity,
   exp102 unit tests, and selected exp101 regression tests (83 combined PASS after the Numba update).
@@ -367,4 +368,28 @@ remote measurement or formal stage is authorized.
   `5d49532e...13ab`; the separate `INDEPENDENT_VERIFICATION_PASS_OF_RECORDED_MAP_TIE_CONFLICT`
   (SHA `03cb4d1e...c5cc`) verifies the conflict record only. It grants no sampler, remote, formal,
   held-out, production, posterior-estimation or confirmer authority.
+- `066_q0_delivery_gate_redesign_20260728/`: completed fresh local-only delivery-gate calibration
+  from clean source `bc47ae26dd26203f2b9c902feca2a10ea797c798`. The five frozen selection
+  points have validity/outcomes `INVALID / FAIL / FAIL / INCONCLUSIVE / PASS`; the invalid first
+  point is recorded as `INCONCLUSIVE` with `NO_FINITE_CALIBRATED_MULTIPLIER`. The selected common
+  point is 32 IID multinomial trajectory groups x 16384 independent draws with multiplier
+  `4.809673164164152`, and its fresh confirmation
+  is `PASS`. Terminal report status/SHA are
+  `LOCAL_DELIVERY_GATE_COMMON_OPERATING_POINT_CONFIRMED` / report self-SHA
+  `d255c67ee0a91985e933ccea8a9616c63e832e37c19cd16dc7eb5e35f05e5a0a`. The independent
+  same-environment seed replay regenerates histograms, scalar estimates, delete-one uncertainty,
+  calibration, decisions and Wilson bounds and passes with audit self-SHA
+  `485b789c3a86893662241ab0e529358fedde18b695c3514233adc492236261b3`. Complete report/audit
+  file SHAs are `f11a3eb137793ce2bbe43734db82240cde45bafbdd57a2a1e6f97d520dad6ed8` /
+  `3975de5eb1d9cebcc467efdd67d956dcfa4b98e4c3b205011a549d6cf8d7822c`. The 4,372,205-byte
+  report contains replay receipts, not persistent trial raw, and makes no cross-NumPy portable-RNG
+  claim; post-run conda-12 regression is `1090 passed, 4 existing warnings`. The IID draws are not
+  MCMC chains, clocks or ESS. Both `EXPECTED_KNOWN_BLIND`
+  common-wrong controls have true `D2_norm=.0625` but candidate PASS rate `1.0`, an empirical
+  blind spot, so this result certifies
+  neither mixing nor target-basin/unvisited-tail coverage. Project status remains
+  `BLOCKED_BEFORE_REMOTE` because `LARGE_K_ORTHOGONAL_CONFIRMER_PORTFOLIO_UNFROZEN`,
+  `FUTURE_SCHEMA_RUNTIME_COVERAGE_INCOMPLETE`, `CAMPAIGN_BUDGET_UNAPPROVED`, and
+  `STAGE3_MULTI_COMPARISON_MULTIPLICITY_UNFROZEN` remain unresolved. It grants no m3, remote,
+  formal, held-out or production authority.
 - Held-out and production evidence do not exist. Their absence is an active production blocker.
