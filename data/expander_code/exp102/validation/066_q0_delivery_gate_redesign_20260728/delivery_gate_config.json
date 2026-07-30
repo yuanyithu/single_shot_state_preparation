@@ -1,0 +1,127 @@
+{
+  "authority": {
+    "cell_certification": false,
+    "formal_authorization": false,
+    "maximum_status": "LOCAL_DELIVERY_GATE_COMMON_OPERATING_POINT_CONFIRMED",
+    "mixing_certification": false,
+    "production_authorization": false,
+    "remote_authorization": false,
+    "target_basin_mass_certification": false
+  },
+  "bound_validation_062": {
+    "audit": {
+      "audit_sha256": "6dbf301d8e376a0bda2318ea219206ba622b86c7dd60738c0355e675ad64b687",
+      "file_sha256": "18fc10b057926fdfb1962a6ff7fd5ae433c60ea99093dbf287766e1de051475d",
+      "path": "validation/062_q0_character_gate_calibration_20260728/independent_audit.json",
+      "required_status": "INDEPENDENT_AUDIT_PASS_CHARACTER_GATE_REDESIGN_REQUIRED"
+    },
+    "report": {
+      "file_sha256": "d7da7fa5dc4ccc5283881378b9dd1629bb30cdf768203d25816c165475621585",
+      "path": "validation/062_q0_character_gate_calibration_20260728/calibration_report.json",
+      "report_sha256": "8a36cf41397e6332e9a9c789e5217cfd8d2274e68f85a4b4b591ede5e13d488a",
+      "required_source_commit": "c8642a0814b15a669c2ce6ced23bf78f14e7aa74",
+      "required_status": "CHARACTER_GATE_REDESIGN_REQUIRED"
+    },
+    "source_row_filter": {
+      "catalog": "logical",
+      "draws_per_trajectory": 8192,
+      "requested_shift": 0.0,
+      "source": "exact_hgp_iid",
+      "stage": "selection",
+      "trajectory_count": 8
+    },
+    "unique_distribution_count": 12
+  },
+  "character_diagnostic": {
+    "include_all_nonzero_when_k_at_most": 4,
+    "nonbasis_mask_count": 64,
+    "participates_in_coverage": false,
+    "participates_in_decision": false
+  },
+  "common_operating_grid": {
+    "points": [
+      {"draws_per_trajectory": 2048, "trajectory_count": 8},
+      {"draws_per_trajectory": 2048, "trajectory_count": 16},
+      {"draws_per_trajectory": 8192, "trajectory_count": 16},
+      {"draws_per_trajectory": 8192, "trajectory_count": 32},
+      {"draws_per_trajectory": 16384, "trajectory_count": 32}
+    ]
+  },
+  "config_self_sha256": "4a1d71b880fc686a595a4076b09e0c164103ddbc6686cc9880f1eefaeca61005",
+  "decision_rule": {
+    "bad_d2_minimum": 0.06,
+    "bad_false_pass_maximum": 0.02,
+    "bad_q_top_delta_minimum": 0.06,
+    "binomial_lower_confidence": 0.95,
+    "fail_familywise_confidence": 0.95,
+    "fail_multiplicity_scope": "all_grid_selection_and_potential_confirmation_fail_hypotheses",
+    "d2_upper_tolerance": 0.04,
+    "fail_power_minimum": 0.95,
+    "good_alternative_pass_minimum": 0.95,
+    "interval_coverage_minimum": 0.98,
+    "known_blind_pass_minimum": 0.95,
+    "null_pass_minimum": 0.95,
+    "q_top_delta_tolerance": 0.04,
+    "states": ["PASS", "FAIL", "INCONCLUSIVE"]
+  },
+  "fail_multiplicity_contract": {
+    "expected_hypotheses_per_stage_point": 139,
+    "expected_total_hypothesis_count": 1390,
+    "strict_familywise_guarantee": false,
+    "wilson_role": "OPERATIONAL_ONLY"
+  },
+  "replications": {
+    "calibration_trials": 600,
+    "confirmation_trials": 300,
+    "selection_trials": 300
+  },
+  "report_contract": {
+    "maximum_bytes": 10485760,
+    "persistent_per_trial_arrays": false
+  },
+  "rng_replay_contract": {
+    "bit_generator": "PCG64",
+    "generator_constructor": "numpy.random.default_rng",
+    "numpy_version": "2.4.1",
+    "scope": "same_environment_bit_replay"
+  },
+  "seed_namespace": "exp102_q0_delivery_gate_redesign_20260728_v1",
+  "source_artifacts": {
+    "auditor": {
+      "path": "validation/066_q0_delivery_gate_redesign_20260728/audit_delivery_gate.py",
+      "sha256": "686fcea927462ed63646f2aa03442171c8c4c9c16c7f54556c016e9fe3ce1458"
+    },
+    "readme": {
+      "path": "validation/066_q0_delivery_gate_redesign_20260728/README.md",
+      "sha256": "8200fb5691f722093587b989874dd0dc9019e280ef49bff022af93572b22f3c1"
+    },
+    "red_team": {
+      "path": "validation/066_q0_delivery_gate_redesign_20260728/PRE_RUN_RED_TEAM.md",
+      "sha256": "820526d7515d198f9a4ad82fb888da83aac805754cdc2ab6bbc5d961c2484e9b"
+    },
+    "runner": {
+      "path": "validation/066_q0_delivery_gate_redesign_20260728/run_delivery_gate.py",
+      "sha256": "3a29702546e1bb02f75a5fd512817e1443ed6b0936324bf549875607307c2ab4"
+    },
+    "tests": {
+      "path": "validation/066_q0_delivery_gate_redesign_20260728/test_delivery_gate.py",
+      "sha256": "49ec97ff1da0e66793b63567d15aca6c185764c6f11bbe2764711d74bcf2c090"
+    }
+  },
+  "sparse_label_stress": {
+    "common_freeze_label": "0x0000000000000000",
+    "dimensions": [9, 16, 36, 64],
+    "distinct_freeze_label_rule": "trajectory_index_with_last_two_uint64_boundaries",
+    "d2_deltas": [0.0, 0.02, 0.04, 0.06],
+    "q_top_bases": [0.05, 0.15, 0.55, 0.9],
+    "q_top_deltas": [0.0, 0.02, 0.04, 0.06],
+    "same_purity_disjoint_support_size": 32,
+    "sparse_q_top_support_size": 256
+  },
+  "uncertainty_calibration": {
+    "higher_quantile": 0.995,
+    "joint_scalar_estimands": ["signed_q_top_delta", "d2_norm"],
+    "multiplier_shared_across_scenarios": true
+  },
+  "version": "exp102.q0_delivery_gate_calibration.v1"
+}
