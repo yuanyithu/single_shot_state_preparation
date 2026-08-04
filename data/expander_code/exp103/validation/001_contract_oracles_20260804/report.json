@@ -1,0 +1,58 @@
+{
+  "all_tests_passed": true,
+  "authority": "IMPLEMENTATION_AND_LOCAL_RESOURCE_PREFLIGHT_ONLY",
+  "bplsd_binary_sha256": "180dfe755fcd5cb3dbc37e3291a8e05a3e488fcb6bfceea283f8c6392450a592",
+  "config_sha256": "535c9a8a65d6bf5ff6e598ca68d6e38cbb1b20c83f8b470752a5ee5ba29d4c48",
+  "distance_two_codes": [
+    "m04_c01",
+    "m04_c06",
+    "m04_c07",
+    "m05_c01",
+    "m05_c06",
+    "m06_c00",
+    "m06_c06",
+    "m08_c04"
+  ],
+  "environment": {
+    "conda_environment": "12",
+    "conda_prefix_matches_python": true,
+    "device_name": "macmini",
+    "hostname": "ymini.local",
+    "ldpc": "2.4.1",
+    "numpy": "2.4.1",
+    "python": "3.12.12",
+    "scipy": "1.17.0"
+  },
+  "exp102_status_unchanged": true,
+  "oracle_checks": {
+    "analytic_p0": true,
+    "analytic_p_half_k2": true,
+    "contract_source_commit_binding": true,
+    "crossing_synthetic_terminals": true,
+    "decoder_identity_and_no_fallback": true,
+    "fail_closed_raw_aggregate_loader": true,
+    "formal_host_conda_attestation": true,
+    "independent_pairing_rowspace_scorers": true,
+    "registry_retains_all_48_codes": true,
+    "residual_golden_cases": true,
+    "seed_namespace_and_worker_reproducibility": true,
+    "tiny_css_exact_enumeration": true
+  },
+  "registry_sha256": "883730e0ba548f6b358187d8f123fdd4d8aeb116f4bacda363c35c16d01ae40b",
+  "schema_version": "exp103.validation001.v1",
+  "source_commit": "6ab3558402c24571f4580da11d13b22d0888d5d9",
+  "source_tree_sha256": "65bd2b869430fe9b72160f9cc06cfbb1ca5fb2a0a661240dc210fb28f1647d9b",
+  "status": "PASS",
+  "test_commands": [
+    "conda run -n 12 --no-capture-output python -m pytest -q data/expander_code/exp103/tests",
+    "conda run -n 12 --no-capture-output python -m pytest -q data/expander_code/exp101/tests/test_gf2.py data/expander_code/exp101/tests/test_hgp.py data/expander_code/exp101/tests/test_logicals.py",
+    "conda run -n 12 --no-capture-output python -m pytest -q data/expander_code/exp102/tests/test_core.py data/expander_code/exp102/tests/test_scan_results_strict.py data/expander_code/exp102/tests/test_source_identity.py"
+  ],
+  "test_counts": {
+    "exp101_passed": 58,
+    "exp102_passed": 17,
+    "exp103_passed": 105,
+    "failed": 0,
+    "total_passed": 180
+  }
+}
