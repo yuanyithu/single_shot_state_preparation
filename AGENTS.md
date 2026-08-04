@@ -4,7 +4,8 @@
 
 ## 接手与权限
 
-- 当前主线是 quantum expander code。先读 `data/expander_code/exp102/status.md`，再读 `data/expander_code/exp102/validation/INDEX.md`；只按其中指针打开所需契约和证据。
+- 当前主线是 exp103 BpLSD decoder-MC crossing。先读 `data/expander_code/exp103/status.md`，再读 `data/expander_code/exp103/validation/INDEX.md`；只按其中指针打开所需契约和证据。
+- exp103 只研究 `q=0` code-capacity 下 BpLSD 的逻辑块失败率；不估计 `q_top`、MLD 或 preparation channel，且任何结果都不解除 exp102 blocker。
 - exp102 当前为 `BLOCKED_BEFORE_REMOTE`；在 `status.md` 明确解除 blocker 且用户授权前，不启动 remote、formal、held-out 或 production，也不把诊断值写成物理结果。
 - exp101 的物理与聚合权威分别是 `data/expander_code/exp101/PHYSICS_CONTRACT.md` 和该目录的 `AGENTS.md`、`status.md`、`validation/README.md`。
 - 旧 3D toric 工作与 expander code 不混用；仅在明确处理 legacy 3D 时，按任务读取 `data/3d_toric_code/with_measurement_noise/README.md` 或 `data/3d_toric_code/without_measurement_noise/README.md`。
