@@ -1,8 +1,10 @@
 import hashlib
 import importlib
 import importlib.metadata
+import json
 import os
 import platform
+import re
 import socket
 import subprocess
 import sys
@@ -11,11 +13,20 @@ from pathlib import Path
 import numpy as np
 import scipy
 
-from .config import ensure_config
+from data.expander_code.exp102.exp102_pipeline.io import verify_source_identity
+
+from .config import REMOTE_CONFIG_SCHEMA, REMOTE_EXECUTION_PROFILE, ensure_config
 from .io import sha256_file
 
 
-DEVICE_BY_HOSTNAME = {"ymini.local": "macmini"}
+DEVICE_BY_HOSTNAME = {"ymini.local": "macmini", "nd-3": "nd-3"}
+REMOTE_DEPLOYMENT_SCHEMA = "exp103.remote_deployment.v1"
+REMOTE_DEPLOYMENT_FIELDS = {
+    "schema_version", "experiment_id", "execution_profile_id",
+    "source_commit", "frozen_source_commit", "source_tree_sha256",
+    "config_sha256", "registry_sha256", "archive_sha256",
+    "source_manifest_sha256",
+}
 
 
 def source_manifest(package_dir=None):
@@ -172,3 +183,82 @@ def require_tracked_clean_evidence(path, repo_root=None):
     if dirty:
         raise ValueError(f"evidence is not clean in Git: {relative}")
     return relative
+
+
+def verify_remote_deployment(
+    config, deployment_root, expected_manifest_sha256, *, _source_root=None,
+):
+    """Verify an archive deployment before any remote experiment code runs."""
+    config = ensure_config(config)
+    if config["schema_version"] != REMOTE_CONFIG_SCHEMA:
+        raise ValueError("remote deployment requires the remote config schema")
+    if re.fullmatch(r"[0-9a-f]{64}", str(expected_manifest_sha256)) is None:
+        raise ValueError("remote deployment manifest SHA256 is invalid")
+    deployment_root = Path(deployment_root).expanduser().resolve()
+    source_root = deployment_root / "source"
+    manifest_path = deployment_root / "DEPLOYMENT_MANIFEST.json"
+    if not source_root.is_dir() or not manifest_path.is_file():
+        raise ValueError("remote deployment bundle is incomplete")
+    if sha256_file(manifest_path) != expected_manifest_sha256:
+        raise ValueError("remote deployment manifest SHA256 mismatch")
+    try:
+        manifest = json.loads(manifest_path.read_text(encoding="ascii"))
+    except (UnicodeDecodeError, json.JSONDecodeError) as error:
+        raise ValueError("remote deployment manifest is not canonical JSON") from error
+    if set(manifest) != REMOTE_DEPLOYMENT_FIELDS:
+        raise ValueError("remote deployment manifest fields mismatch")
+    for field, expected in (
+        ("schema_version", REMOTE_DEPLOYMENT_SCHEMA),
+        ("experiment_id", config["experiment_id"]),
+        ("execution_profile_id", REMOTE_EXECUTION_PROFILE),
+        ("frozen_source_commit", config["source_commit"]),
+        ("source_tree_sha256", config["source_tree_sha256"]),
+        ("config_sha256", config["config_sha256"]),
+        ("registry_sha256", config["registry_sha256"]),
+    ):
+        if manifest[field] != expected:
+            raise ValueError(f"remote deployment identity mismatch for {field}")
+    for field in ("source_commit", "frozen_source_commit"):
+        if re.fullmatch(r"[0-9a-f]{40}", str(manifest[field])) is None:
+            raise ValueError(f"remote deployment contains an invalid {field}")
+    for field in (
+        "source_tree_sha256", "config_sha256", "registry_sha256",
+        "archive_sha256", "source_manifest_sha256",
+    ):
+        if re.fullmatch(r"[0-9a-f]{64}", str(manifest[field])) is None:
+            raise ValueError(f"remote deployment contains an invalid {field}")
+
+    marker = deployment_root / "SOURCE_COMMIT"
+    if not marker.is_file() or marker.read_text(encoding="ascii").strip() != manifest["source_commit"]:
+        raise ValueError("remote deployment source commit marker mismatch")
+    source_identity = verify_source_identity(source_root, manifest["source_commit"])
+    if source_identity.get("mode") != "archive":
+        raise ValueError("remote deployment must use a verified archive source")
+    if (
+        source_identity.get("archive_sha256") != manifest["archive_sha256"]
+        or source_identity.get("manifest_sha256") != manifest["source_manifest_sha256"]
+    ):
+        raise ValueError("remote deployment archive identity mismatch")
+
+    active_root = Path(_source_root).resolve() if _source_root is not None else Path(__file__).resolve().parents[4]
+    if active_root != source_root.resolve():
+        raise ValueError("remote command is not running from the verified source tree")
+    package_dir = source_root / "data" / "expander_code" / "exp103" / "exp103_pipeline"
+    if source_tree_sha256(package_dir) != config["source_tree_sha256"]:
+        raise ValueError("remote deployment package differs from the frozen source tree")
+    config_path = source_root / "data" / "expander_code" / "exp103" / "config" / "decoder_mc.remote.v1.json"
+    if not config_path.is_file():
+        raise ValueError("remote deployment does not contain its canonical config")
+    deployed_config = json.loads(config_path.read_text(encoding="ascii"))
+    deployed_resolved = ensure_config(deployed_config)
+    if deployed_resolved["config_sha256"] != config["config_sha256"]:
+        raise ValueError("remote deployment config differs from the active config")
+    return {
+        "schema_version": REMOTE_DEPLOYMENT_SCHEMA,
+        "deployment_manifest_sha256": expected_manifest_sha256,
+        "source_commit": manifest["source_commit"],
+        "archive_sha256": manifest["archive_sha256"],
+        "source_manifest_sha256": manifest["source_manifest_sha256"],
+        "source_tree_sha256": manifest["source_tree_sha256"],
+        "config_sha256": manifest["config_sha256"],
+    }

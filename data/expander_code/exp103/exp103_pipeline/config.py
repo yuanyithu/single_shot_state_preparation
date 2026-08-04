@@ -40,6 +40,16 @@ TOP_LEVEL_FIELDS = {
     "bplsd_binary", "namespaces", "bootstrap", "preflight",
     "stage_m_values", "preregistered_point_masks", "crossing",
 }
+REMOTE_CONFIG_SCHEMA = "exp103.config.remote.v1"
+REMOTE_CONFIG_PATH = "data/expander_code/exp103/config/decoder_mc.remote.v1.json"
+REMOTE_EXECUTION_PROFILE = "exp103.remote_execution.v1"
+REMOTE_TOP_LEVEL_FIELDS = TOP_LEVEL_FIELDS | {"execution_profile"}
+REMOTE_EXECUTION_FIELDS = {
+    "profile_id", "entry_host", "compute_host", "conda_environment",
+    "num_workers", "omp_thread_count", "run_root", "log_root",
+    "reserve_multiplier", "stage_core_hour_cap", "stage_wall_hour_cap",
+    "peak_rss_gib_cap",
+}
 
 
 def normalize_p_token(value):
@@ -59,10 +69,43 @@ def normalize_p_token(value):
     return token
 
 
+def _validate_remote_execution(config):
+    profile = config["execution_profile"]
+    if not isinstance(profile, dict) or set(profile) != REMOTE_EXECUTION_FIELDS:
+        raise ValueError("unexpected exp103 remote execution profile fields")
+    expected_fixed = {
+        "profile_id": REMOTE_EXECUTION_PROFILE,
+        "entry_host": "yuany",
+        "compute_host": "nd-3",
+        "num_workers": 64,
+        "omp_thread_count": 1,
+        "run_root": "~/.single_shot/runs",
+        "log_root": "~/.single_shot/logs",
+        "reserve_multiplier": 2.0,
+        "stage_core_hour_cap": 1200.0,
+        "stage_wall_hour_cap": 24.0,
+        "peak_rss_gib_cap": 128.0,
+    }
+    for field, expected in expected_fixed.items():
+        if profile[field] != expected:
+            raise ValueError(f"remote execution profile mismatch for {field}")
+    if (
+        not isinstance(profile["conda_environment"], str)
+        or not profile["conda_environment"]
+        or profile["conda_environment"] != config["environment"]["conda_environment"]
+    ):
+        raise ValueError("remote execution conda environment is not frozen consistently")
+    if profile["omp_thread_count"] != config["decoder"]["omp_thread_count"]:
+        raise ValueError("remote execution OpenMP setting differs from the decoder")
+
+
 def _validate(config):
-    if set(config) != TOP_LEVEL_FIELDS:
+    schema = config.get("schema_version")
+    remote = schema == REMOTE_CONFIG_SCHEMA
+    expected_fields = REMOTE_TOP_LEVEL_FIELDS if remote else TOP_LEVEL_FIELDS
+    if set(config) != expected_fields:
         raise ValueError("unexpected exp103 config fields")
-    if config["schema_version"] != CONFIG_SCHEMA or config["experiment_id"] != EXPERIMENT_ID:
+    if schema not in {CONFIG_SCHEMA, REMOTE_CONFIG_SCHEMA} or config["experiment_id"] != EXPERIMENT_ID:
         raise ValueError("exp103 config identity mismatch")
     if config["objective"] != "bplsd_block_logical_failure_crossing_q0":
         raise ValueError("unexpected exp103 objective")
@@ -76,6 +119,8 @@ def _validate(config):
         raise ValueError("each code-p must contain four 2500-trial shards")
     if config["decoder"] != DECODER:
         raise ValueError("decoder parameters differ from the frozen BpLSD identity")
+    if remote:
+        _validate_remote_execution(config)
     if config["namespaces"] != NAMESPACES or len(set(NAMESPACES.values())) != 4:
         raise ValueError("seed namespaces must be frozen and disjoint")
     if config["stage_m_values"] != {"stage1": [3, 4, 5], "stage2": [6, 7, 8]}:
@@ -90,7 +135,17 @@ def _validate(config):
     if not re.fullmatch(r"[0-9a-f]{40}", config["source_commit"]):
         raise ValueError("source_commit must be a full lowercase Git SHA")
     env = config["environment"]
-    if env != {
+    if remote:
+        expected_remote_environment = {
+            "device_name": "nd-3",
+            "hostname": "nd-3",
+            "conda_environment": config["execution_profile"]["conda_environment"],
+            "conda_prefix_matches_python": True,
+            "python": "3.12.12", "numpy": "2.4.1", "scipy": "1.17.0", "ldpc": "2.4.1",
+        }
+        if env != expected_remote_environment:
+            raise ValueError("remote environment identity differs from the frozen contract")
+    elif env != {
         "device_name": "macmini",
         "hostname": "ymini.local",
         "conda_environment": "12",
@@ -105,7 +160,14 @@ def _validate(config):
         raise ValueError("unexpected BpLSD binary identity fields")
     if binary["module"] != "ldpc.bplsd_decoder._bplsd_decoder":
         raise ValueError("BpLSD extension module mismatch")
-    if binary["sha256"] != BPLSD_BINARY_SHA256 or binary["filename_suffix"] != BPLSD_BINARY_SUFFIX:
+    if remote:
+        if (
+            not re.fullmatch(r"[0-9a-f]{64}", str(binary["sha256"]))
+            or binary["sha256"] == "0" * 64
+            or binary["filename_suffix"] != ".cpython-312-x86_64-linux-gnu.so"
+        ):
+            raise ValueError("remote BpLSD extension binary is not fully frozen")
+    elif binary["sha256"] != BPLSD_BINARY_SHA256 or binary["filename_suffix"] != BPLSD_BINARY_SUFFIX:
         raise ValueError("BpLSD extension binary differs from the frozen backend")
     bootstrap = config["bootstrap"]
     if bootstrap != {
@@ -137,14 +199,25 @@ def _validate(config):
         "linear_interpolation": "plot_only",
     }:
         raise ValueError("crossing decision family is not frozen")
+    if remote and (
+        config["source_commit"] == "0" * 40
+        or config["source_tree_sha256"] == "0" * 64
+    ):
+        raise ValueError("remote source identity contains an unresolved placeholder")
 
 
 def load_config(path):
     path = Path(path)
-    canonical_path = Path(__file__).resolve().parents[1] / "config" / "decoder_mc.v1.json"
+    raw = json.loads(path.read_text(encoding="ascii"))
+    filename = (
+        "decoder_mc.remote.v1.json"
+        if raw.get("schema_version") == REMOTE_CONFIG_SCHEMA
+        else "decoder_mc.v1.json"
+    )
+    canonical_path = Path(__file__).resolve().parents[1] / "config" / filename
     if path.resolve() != canonical_path.resolve():
         raise ValueError("formal exp103 config must be the canonical config artifact")
-    config = json.loads(path.read_text(encoding="ascii"))
+    config = raw
     _validate(config)
     resolved = dict(config)
     resolved["config_sha256"] = sha256_json(config)

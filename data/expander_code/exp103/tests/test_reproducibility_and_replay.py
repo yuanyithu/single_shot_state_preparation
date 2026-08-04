@@ -237,9 +237,9 @@ def test_replay_report_covers_manifest_and_closes_on_post_replay_raw_change(
     report = replay.build_replay_report(tmp_path, [result], frozen_config)
     assert report["scope"] == "stage1"
     assert report["status"] == "PASS"
-    assert report["device_name"] == "macmini"
-    assert report["hostname"] == "ymini.local"
-    assert report["conda_environment"] == "12"
+    assert report["device_name"] == frozen_config["environment"]["device_name"]
+    assert report["hostname"] == frozen_config["environment"]["hostname"]
+    assert report["conda_environment"] == frozen_config["environment"]["conda_environment"]
     assert report["conda_prefix_matches_python"] is True
     assert replay.validate_replay_report(
         report, tmp_path, frozen_config, required_scope="stage1",

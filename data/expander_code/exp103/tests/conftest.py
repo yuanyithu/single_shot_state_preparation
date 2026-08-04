@@ -1,5 +1,6 @@
 import copy
 import hashlib
+import os
 import sys
 from pathlib import Path
 from types import SimpleNamespace
@@ -34,12 +35,23 @@ from data.expander_code.exp103.exp103_pipeline.seeds import derive_seed
 from data.expander_code.exp103.exp103_pipeline.worker import RAW_FIELDS
 
 
-CONFIG_PATH = REPO_ROOT / "data/expander_code/exp103/config/decoder_mc.v1.json"
+CONFIG_PATH = Path(os.environ.get(
+    "EXP103_TEST_CONFIG_PATH",
+    REPO_ROOT / "data/expander_code/exp103/config/decoder_mc.v1.json",
+))
+REMOTE_CONFIG_PATH = (
+    REPO_ROOT / "data/expander_code/exp103/config/decoder_mc.remote.v1.json"
+)
 
 
 @pytest.fixture(scope="session")
 def frozen_config():
     return load_config(CONFIG_PATH)
+
+
+@pytest.fixture(scope="session")
+def publication_config():
+    return load_config(REMOTE_CONFIG_PATH)
 
 
 @pytest.fixture(scope="session")
@@ -184,7 +196,7 @@ def raw_factory(frozen_config, registry_rows):
 
 
 @pytest.fixture(scope="session")
-def complete_aggregate_factory(frozen_config, registry_rows):
+def complete_aggregate_factory(publication_config, registry_rows):
     aggregate = _blank_arrays(registry_rows)
     trials = 10_000
     for m_index in range(6):
@@ -222,10 +234,10 @@ def complete_aggregate_factory(frozen_config, registry_rows):
     failures_3d = aggregate["failure_counts"].reshape(6, 8, 13)
     trials_3d = aggregate["trial_counts"].reshape(6, 8, 13)
     stage1 = simultaneous_bootstrap(
-        failures_3d, trials_3d, (0, 1, 2), frozen_config, "stage1_m3_m5",
+        failures_3d, trials_3d, (0, 1, 2), publication_config, "stage1_m3_m5",
     )
     final = simultaneous_bootstrap(
-        failures_3d, trials_3d, tuple(range(6)), frozen_config, "final_m3_m8",
+        failures_3d, trials_3d, tuple(range(6)), publication_config, "final_m3_m8",
     )
     aggregate["stage1_primary_band_low"] = stage1["point_low"]
     aggregate["stage1_primary_band_high"] = stage1["point_high"]
@@ -264,8 +276,8 @@ def complete_aggregate_factory(frozen_config, registry_rows):
         for m in m_values:
             for code_index in range(8):
                 code_id = f"m{m:02d}_c{code_index:02d}"
-                for p_token in frozen_config["p_tokens"]:
-                    for shard_index in range(frozen_config["shards_per_code_p"]):
+                for p_token in publication_config["p_tokens"]:
+                    for shard_index in range(publication_config["shards_per_code_p"]):
                         tag = f"{code_id}:{p_token}:{shard_index}".encode("ascii")
                         replay_results.append({
                             "status": "PASS",
@@ -273,9 +285,9 @@ def complete_aggregate_factory(frozen_config, registry_rows):
                             "code_id": code_id,
                             "p_token": p_token,
                             "shard_index": shard_index,
-                            "trials": frozen_config["trials_per_shard"],
+                            "trials": publication_config["trials_per_shard"],
                             "replay_control_seed": derive_seed(
-                                frozen_config, "replay", code_id, p_token, shard_index,
+                                publication_config, "replay", code_id, p_token, shard_index,
                             ),
                             "raw_sha256": hashlib.sha256(b"raw:" + tag).hexdigest(),
                             "error_stream_sha256": hashlib.sha256(b"error:" + tag).hexdigest(),
@@ -296,14 +308,14 @@ def complete_aggregate_factory(frozen_config, registry_rows):
         ))
         return {
             "schema_version": "exp103.replay.v1",
-            "config_sha256": frozen_config["config_sha256"],
-            "registry_sha256": frozen_config["registry_sha256"],
-            "source_commit": frozen_config["source_commit"],
-            "source_tree_sha256": frozen_config["source_tree_sha256"],
-            "bplsd_binary_sha256": frozen_config["bplsd_binary"]["sha256"],
-            "device_name": frozen_config["environment"]["device_name"],
-            "hostname": frozen_config["environment"]["hostname"],
-            "conda_environment": frozen_config["environment"]["conda_environment"],
+            "config_sha256": publication_config["config_sha256"],
+            "registry_sha256": publication_config["registry_sha256"],
+            "source_commit": publication_config["source_commit"],
+            "source_tree_sha256": publication_config["source_tree_sha256"],
+            "bplsd_binary_sha256": publication_config["bplsd_binary"]["sha256"],
+            "device_name": publication_config["environment"]["device_name"],
+            "hostname": publication_config["environment"]["hostname"],
+            "conda_environment": publication_config["environment"]["conda_environment"],
             "conda_prefix_matches_python": True,
             "scope": scope,
             "expected_shards": len(replay_results),
@@ -337,11 +349,11 @@ def complete_aggregate_factory(frozen_config, registry_rows):
     aggregate.update({
             "schema_version": "exp103.aggregate.v1",
             "experiment_id": "exp103.decoder_mc.v1",
-            "config_sha256": frozen_config["config_sha256"],
-            "registry_sha256": frozen_config["registry_sha256"],
-            "source_commit": frozen_config["source_commit"],
-            "source_tree_sha256": frozen_config["source_tree_sha256"],
-            "bplsd_binary_sha256": frozen_config["bplsd_binary"]["sha256"],
+            "config_sha256": publication_config["config_sha256"],
+            "registry_sha256": publication_config["registry_sha256"],
+            "source_commit": publication_config["source_commit"],
+            "source_tree_sha256": publication_config["source_tree_sha256"],
+            "bplsd_binary_sha256": publication_config["bplsd_binary"]["sha256"],
             "overall_status": "COMPLETE",
             "terminal_status": final_decision["status"],
             "crossing_bracket_low": final_decision["bracket"][0],

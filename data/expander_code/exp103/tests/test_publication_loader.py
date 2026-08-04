@@ -181,6 +181,16 @@ def test_loader_refuses_exp101_exp102_or_foreign_schema(
         load_exp103_crossing(path)
 
 
+def test_loader_rejects_the_blocked_local_execution_config(tmp_path, frozen_config):
+    raw_root = tmp_path / "empty_local_raw"
+    raw_root.mkdir()
+    aggregate = aggregate_decoder_scan(raw_root, frozen_config)
+    path = tmp_path / "blocked_local_config.npz"
+    save_aggregate(path, aggregate)
+    with pytest.raises(ValueError, match="config_sha256"):
+        load_exp103_crossing(path)
+
+
 def test_payload_hash_and_axis_tampering_are_rejected(
     tmp_path, complete_aggregate_factory, rehash_aggregate,
 ):
@@ -239,11 +249,11 @@ def test_loader_rejects_tampered_compatible_triple(
 
 
 def test_nonreportable_counts_and_valid_only_primary_cannot_leak(
-    tmp_path, frozen_config, rehash_aggregate,
+    tmp_path, publication_config, rehash_aggregate,
 ):
     raw_root = tmp_path / "empty_raw"
     raw_root.mkdir()
-    base = aggregate_decoder_scan(raw_root, frozen_config)
+    base = aggregate_decoder_scan(raw_root, publication_config)
     clean_path = tmp_path / "incomplete_clean.npz"
     save_aggregate(clean_path, base)
     assert load_exp103_crossing(clean_path)["terminal_status"] == "EXP103_INCOMPLETE"

@@ -36,7 +36,11 @@ def _validate(aggregate):
         raise ValueError("refusing non-exp103 aggregate schema")
     if aggregate["experiment_id"] != EXPERIMENT_ID:
         raise ValueError("exp103 aggregate experiment identity mismatch")
-    config_path = Path(__file__).resolve().parents[1] / "config" / "decoder_mc.v1.json"
+    config_path = (
+        Path(__file__).resolve().parents[1]
+        / "config"
+        / "decoder_mc.remote.v1.json"
+    )
     config = load_config(config_path)
     for field, expected in (
         ("config_sha256", config["config_sha256"]),

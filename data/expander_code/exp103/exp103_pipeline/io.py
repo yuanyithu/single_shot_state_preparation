@@ -39,10 +39,17 @@ def atomic_json(path, value):
 def atomic_npz(path, values):
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
-    fd, temporary = tempfile.mkstemp(prefix=path.name + ".", suffix=".npz", dir=path.parent)
-    os.close(fd)
+    fd, temporary = tempfile.mkstemp(
+        prefix="." + path.name + ".", suffix=".partial", dir=path.parent,
+    )
     try:
-        np.savez_compressed(temporary, **values)
+        # Passing the open handle prevents NumPy from appending ".npz". A
+        # process killed before replace therefore leaves an ignored partial,
+        # never a file that raw discovery can mistake for formal evidence.
+        with os.fdopen(fd, "wb") as handle:
+            np.savez_compressed(handle, **values)
+            handle.flush()
+            os.fsync(handle.fileno())
         os.replace(temporary, path)
     finally:
         if os.path.exists(temporary):

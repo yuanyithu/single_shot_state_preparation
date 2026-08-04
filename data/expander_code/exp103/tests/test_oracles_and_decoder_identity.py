@@ -292,9 +292,9 @@ def test_bp_nonconvergence_with_legal_correction_remains_valid(
     assert raw["completed_trials"] == frozen_config["trials_per_shard"]
     assert not raw["bp_converged"].any()
     assert np.all(raw["bp_iterations"] == 1)
-    assert raw["device_name"] == "macmini"
-    assert raw["hostname"] == "ymini.local"
-    assert raw["conda_environment"] == "12"
+    assert raw["device_name"] == frozen_config["environment"]["device_name"]
+    assert raw["hostname"] == frozen_config["environment"]["hostname"]
+    assert raw["conda_environment"] == frozen_config["environment"]["conda_environment"]
     assert raw["conda_prefix_matches_python"] is True
 
 
@@ -311,24 +311,32 @@ def test_runtime_identity_rejects_wrong_host_or_noncanonical_conda(
     monkeypatch.setattr(
         identity, "sha256_file", lambda _path: frozen_config["bplsd_binary"]["sha256"],
     )
-    monkeypatch.setattr(identity.socket, "gethostname", lambda: "ymini.local")
-    monkeypatch.setenv("CONDA_DEFAULT_ENV", "12")
+    expected_environment = frozen_config["environment"]
+    monkeypatch.setattr(
+        identity.socket, "gethostname", lambda: expected_environment["hostname"],
+    )
+    monkeypatch.setenv("CONDA_DEFAULT_ENV", expected_environment["conda_environment"])
     monkeypatch.setenv("CONDA_PREFIX", str(Path(identity.sys.prefix).resolve()))
     actual = identity.runtime_identity(frozen_config)
-    assert actual["device_name"] == "macmini"
+    assert actual["device_name"] == expected_environment["device_name"]
     assert actual["conda_prefix_matches_python"] is True
 
     monkeypatch.setattr(identity.socket, "gethostname", lambda: "other.local")
     with pytest.raises(ValueError, match="device_name|hostname"):
         identity.runtime_identity(frozen_config)
 
-    monkeypatch.setattr(identity.socket, "gethostname", lambda: "ymini.local")
-    monkeypatch.setenv("CONDA_DEFAULT_ENV", "not-12")
+    monkeypatch.setattr(
+        identity.socket, "gethostname", lambda: expected_environment["hostname"],
+    )
+    monkeypatch.setenv("CONDA_DEFAULT_ENV", "not-" + expected_environment["conda_environment"])
     with pytest.raises(ValueError, match="conda_environment"):
         identity.runtime_identity(frozen_config)
 
-    monkeypatch.setenv("CONDA_DEFAULT_ENV", "12")
-    monkeypatch.setenv("CONDA_PREFIX", "/tmp/not-the-running-python/envs/12")
+    monkeypatch.setenv("CONDA_DEFAULT_ENV", expected_environment["conda_environment"])
+    monkeypatch.setenv(
+        "CONDA_PREFIX",
+        "/tmp/not-the-running-python/envs/" + expected_environment["conda_environment"],
+    )
     with pytest.raises(ValueError, match="conda_prefix_matches_python"):
         identity.runtime_identity(frozen_config)
 
@@ -369,8 +377,15 @@ def test_contract_byte_binding_rejects_later_committed_or_worktree_edits(tmp_pat
 def test_frozen_runtime_and_bplsd_binary_identity(frozen_config):
     assert frozen_config["source_commit"] != "0" * 40
     assert frozen_config["source_tree_sha256"] != "0" * 64
-    actual = identity.runtime_identity(frozen_config)
-    assert actual["source_tree_sha256"] == identity.source_tree_sha256()
+    if frozen_config["schema_version"] == "exp103.config.remote.v1":
+        actual = identity.runtime_identity(frozen_config)
+        assert actual["source_tree_sha256"] == identity.source_tree_sha256()
+    else:
+        # The local v1 source snapshot is immutable historical evidence. The
+        # remote amendment deliberately evolves the package and must close the
+        # old local runtime gate instead of silently reclassifying it.
+        with pytest.raises(ValueError, match="source_tree_sha256"):
+            identity.runtime_identity(frozen_config)
     assert identity.bplsd_binary_path().name.endswith(
         frozen_config["bplsd_binary"]["filename_suffix"],
     )
