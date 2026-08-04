@@ -2,18 +2,20 @@
 
 ## Current state
 
-**`VALIDATION_001_PASS`**
+**`BLOCKED_LOCAL_RESOURCE_PREFLIGHT`**
 
 exp103 is a fresh BpLSD decoder-MC line for `q=0` block logical failure. No formal
 measurement raw, crossing bracket, asymptotic threshold, or physical result exists
-yet. Validation 001 passed on the frozen source/config and authorizes only the
-local resource preflight. exp102 remains `BLOCKED_BEFORE_REMOTE`; exp103 cannot
-change that authority.
+yet. Validation 001 passed on the frozen source/config, but Validation 002 blocks
+both three-size stages under the preregistered local resource gates. No formal
+raw was launched. exp102 remains `BLOCKED_BEFORE_REMOTE`; exp103 cannot change
+that authority.
 
 ## Current gates
 
-1. Validation 002 must pass the separate local resource gate for each three-size stage.
-2. Formal raw requires committed and pushed source/config plus exactly eight workers.
+1. Stage 1 fails only the core-hour gate: `104.0546 > 100` reserved core-hours.
+2. Stage 2 fails core-hour and wall gates: `1020.9320 > 100` and `64.6832 > 12` hours.
+3. The contract forbids automatic remote transfer or a formal scan after either failure.
 
 If a stage fails its resource gate, record `BLOCKED_LOCAL_RESOURCE_PREFLIGHT` and
 do not move it to remote. A no-crossing or inconclusive complete result is valid
@@ -29,5 +31,6 @@ science and must not trigger code selection, resampling or a changed grid.
 
 ## Latest evidence
 
+- Validation 002: `BLOCKED_LOCAL_RESOURCE_PREFLIGHT`; both stages are closed.
 - Validation 001: `PASS`; 105 exp103 and 75 focused exp101/exp102 regressions passed.
-- No formal raw or decoder crossing result exists.
+- No formal raw, decoder crossing bracket or physical result exists.
