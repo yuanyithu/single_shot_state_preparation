@@ -7,6 +7,7 @@ from data.expander_code.exp103.exp103_pipeline.aggregate import (
     aggregate_decoder_scan,
     save_aggregate,
 )
+from data.expander_code.exp103.exp103_pipeline.config import load_config
 from data.expander_code.exp103.exp103_pipeline.io import canonical_json, sha256_json
 from data.expander_code.exp103.exp103_pipeline.loader import load_exp103_crossing
 
@@ -181,7 +182,10 @@ def test_loader_refuses_exp101_exp102_or_foreign_schema(
         load_exp103_crossing(path)
 
 
-def test_loader_rejects_the_blocked_local_execution_config(tmp_path, frozen_config):
+def test_loader_rejects_the_blocked_local_execution_config(tmp_path):
+    frozen_config = load_config(
+        "data/expander_code/exp103/config/decoder_mc.v1.json",
+    )
     raw_root = tmp_path / "empty_local_raw"
     raw_root.mkdir()
     aggregate = aggregate_decoder_scan(raw_root, frozen_config)

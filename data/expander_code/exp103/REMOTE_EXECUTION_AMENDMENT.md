@@ -43,32 +43,44 @@ the original frozen config.
 | Per-stage reserved core-hour cap | `1200` core-hours |
 | Per-stage predicted wall cap | `24` hours |
 | Projected peak RSS cap | `128` GiB |
-| Remote Python environment | isolated `exp103_remote_v1_env`; exact prefix and packages pending Validation 003 |
+| Remote Python environment | isolated prefix `/home/DATA1/users/yuany/.single_shot/cache/exp103_remote_v1_env` |
 | Persistent root | `~/.single_shot/runs/` and `~/.single_shot/logs/` only |
 
 No shard may be generated or replayed on another node. A failed remote gate does
 not authorize moving the task to another host, changing the worker count, or
 weakening a cap. Formal jobs run in `screen` with an explicit worker count.
 
-## Identity placeholders and qualification gate
+## Environment identity and qualification gate
 
-The following identities are intentionally **not yet frozen** and must be
-replaced by measured, immutable values before any measurement-namespace trial:
+The build audit fixes the following remote environment identity before any
+measurement-namespace trial:
 
-| Identity | Current placeholder |
+| Identity | Frozen value |
 |---|---|
-| `nd-3` runtime hostname | `TO_BE_FROZEN_BEFORE_FORMAL` |
-| Python version and executable prefix | `TO_BE_FROZEN_BEFORE_FORMAL` |
-| NumPy version | `TO_BE_FROZEN_BEFORE_FORMAL` |
-| SciPy version | `TO_BE_FROZEN_BEFORE_FORMAL` |
-| ldpc version | `TO_BE_VERIFIED_AS_2.4.1_BEFORE_FORMAL` |
-| Linux BpLSD extension filename and SHA256 | `TO_BE_FROZEN_BEFORE_FORMAL` |
-| remote config SHA256 | `TO_BE_FROZEN_BEFORE_FORMAL` |
-| exp103 source commit and source-tree SHA256 | `TO_BE_FROZEN_BEFORE_FORMAL` |
-| deployment manifest/archive SHA256 | `TO_BE_FROZEN_BEFORE_FORMAL` |
+| Runtime hostname / architecture | `nd-3` / `x86_64-linux-gnu` |
+| Python executable | `/home/DATA1/users/yuany/.single_shot/cache/exp103_remote_v1_env/bin/python` |
+| Python / NumPy / SciPy | `3.12.12` / `2.4.1` / `1.17.0` |
+| ldpc | `2.4.1` |
+| Official ldpc source commit | `d3429964cd4ffe1abfc041c6ec8b8425cb174f40` |
+| Official source archive SHA256 | `76af0f01446ee7cbed33a47d6b597c10d8d12b2f10d508911b3d0763844d467e` |
+| Linux BpLSD extension | `_bplsd_decoder.cpython-312-x86_64-linux-gnu.so` |
+| Linux BpLSD SHA256 | `db3eb33b3afa4887994c9b949cdc7ae280614eab0fe4245a63226060740140e6` |
 
-The shared conda `11` environment and its `ldpc` 2.3.7 are explicitly
-ineligible. `ldpc` 2.3.7, a missing compiled backend, a different decoder implementation,
+The PyPI 2.4.1 sdist omits `src_cpp/rng.hpp`; the isolated Linux extension was
+built with no dependency resolution from the exact official GitHub release
+commit above. The source archive, its `rng.hpp` SHA256, package versions and
+direct BpLSD sanity decode are rechecked by the qualification gate. The shared
+conda `11` environment and its `ldpc` 2.3.7 remain explicitly ineligible.
+The frozen Linux solve could not provide the initially probed Numba 0.65.1;
+`mamba` instead resolved Numba 0.66.0 with llvmlite 0.48.0, and those exact
+support-package versions are bound by the canonical remote config and gate.
+
+The canonical remote config binds these values together with the exp103 source
+commit and package-tree SHA. Validation 003 subsequently records the config,
+qualification, deployment manifest/archive and resource-preflight SHA values;
+those evidence objects cannot be self-referential constants in this amendment.
+
+`ldpc` 2.3.7, a missing compiled backend, a different decoder implementation,
 or any unrecorded environment drift closes the gate. Qualification must run the
 decoder identity/no-fallback tests and the contract/oracle regression suite in
 the exact remote environment. Placeholder identity values can never authorize a

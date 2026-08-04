@@ -183,7 +183,7 @@ def test_preflight_stage_arithmetic_uses_formal_overheads_and_stage_rss_anchors(
             "m": m,
             "measurement_seconds_per_trial": 0.0,
             "replay_seconds_per_trial": 0.0,
-            "model_seconds": 0.0,
+            "model_seconds": 1.0,
             "measurement_identity_seconds": float(m),
             "decoder_setup_seconds": float(m),
             "raw_serialization_seconds": float(m),
@@ -199,6 +199,7 @@ def test_preflight_stage_arithmetic_uses_formal_overheads_and_stage_rss_anchors(
     stage1 = preflight._stage_estimate("stage1", [3, 4, 5], tasks, config)
     stage2 = preflight._stage_estimate("stage2", [6, 7, 8], tasks, config)
     shards_per_m = 8 * len(config["p_tokens"]) * config["shards_per_code_p"]
+    code_p_tasks_per_m = 8 * len(config["p_tokens"])
 
     assert stage1["generation_per_shard_seconds_upper_by_m"] == {
         "3": 9.0, "4": 15.0, "5": 15.0,
@@ -207,11 +208,18 @@ def test_preflight_stage_arithmetic_uses_formal_overheads_and_stage_rss_anchors(
         "3": 15.0, "4": 25.0, "5": 25.0,
     }
     assert stage1["measurement_generation_core_hours"] == pytest.approx(
-        shards_per_m * (9.0 + 15.0 + 15.0) / 3600.0,
+        (shards_per_m * (9.0 + 15.0 + 15.0) + 3 * code_p_tasks_per_m)
+        / 3600.0,
     )
     assert stage1["full_replay_core_hours"] == pytest.approx(
-        shards_per_m * (15.0 + 25.0 + 25.0) / 3600.0,
+        (shards_per_m * (15.0 + 25.0 + 25.0) + 3 * code_p_tasks_per_m)
+        / 3600.0,
     )
+    assert stage1["model_loads_upper_by_m"] == {
+        "3": code_p_tasks_per_m,
+        "4": code_p_tasks_per_m,
+        "5": code_p_tasks_per_m,
+    }
     assert stage1["rss_anchor_m_values"] == [3, 5]
     assert stage1["projected_peak_rss_gib"] == 2.0 * 8 * 3.0
     assert stage2["rss_anchor_m_values"] == [8]

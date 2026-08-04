@@ -39,8 +39,14 @@ case "$stage" in
       python -B -m data.expander_code.exp103.exp103_pipeline.remote_cli \
         stage1-technical "${common[@]}" --preflight-report "$preflight"
     fi
+    python -B -m data.expander_code.exp103.exp103_pipeline.remote_cli \
+      verify-stage "${common[@]}" --stage stage1 --preflight-report "$preflight"
     ;;
   stage2)
+    if [[ ! -f $run_root/final_results/stage1_preliminary/report.json ]]; then
+      python -B -m data.expander_code.exp103.exp103_pipeline.remote_cli \
+        stage1-preliminary "${common[@]}" --preflight-report "$preflight"
+    fi
     if [[ ! -f $run_root/control/SCAN_STAGE2.json ]]; then
       python -B -m data.expander_code.exp103.exp103_pipeline.remote_cli scan \
         "${common[@]}" --stage stage2 --preflight-report "$preflight" \
@@ -55,6 +61,12 @@ case "$stage" in
       python -B -m data.expander_code.exp103.exp103_pipeline.remote_cli aggregate \
         "${common[@]}" --scope final --preflight-report "$preflight"
     fi
+    if [[ ! -f $run_root/final_results/publication/report.json ]]; then
+      python -B -m data.expander_code.exp103.exp103_pipeline.remote_cli publication \
+        "${common[@]}" --preflight-report "$preflight"
+    fi
+    python -B -m data.expander_code.exp103.exp103_pipeline.remote_cli \
+      verify-stage "${common[@]}" --stage stage2 --preflight-report "$preflight"
     ;;
   *)
     echo "stage must be stage1 or stage2" >&2

@@ -43,12 +43,41 @@ TOP_LEVEL_FIELDS = {
 REMOTE_CONFIG_SCHEMA = "exp103.config.remote.v1"
 REMOTE_CONFIG_PATH = "data/expander_code/exp103/config/decoder_mc.remote.v1.json"
 REMOTE_EXECUTION_PROFILE = "exp103.remote_execution.v1"
-REMOTE_TOP_LEVEL_FIELDS = TOP_LEVEL_FIELDS | {"execution_profile"}
+REMOTE_CONDA_PREFIX = "/home/DATA1/users/yuany/.single_shot/cache/exp103_remote_v1_env"
+REMOTE_BPLSD_BINARY_SHA256 = "db3eb33b3afa4887994c9b949cdc7ae280614eab0fe4245a63226060740140e6"
+REMOTE_BPLSD_BINARY_SUFFIX = ".cpython-312-x86_64-linux-gnu.so"
+REMOTE_TOP_LEVEL_FIELDS = TOP_LEVEL_FIELDS | {
+    "execution_profile", "ldpc_source", "support_packages",
+}
 REMOTE_EXECUTION_FIELDS = {
     "profile_id", "entry_host", "compute_host", "conda_environment",
     "num_workers", "omp_thread_count", "run_root", "log_root",
     "reserve_multiplier", "stage_core_hour_cap", "stage_wall_hour_cap",
     "peak_rss_gib_cap",
+}
+REMOTE_LDPC_SOURCE = {
+    "repository": "https://github.com/quantumgizmos/ldpc.git",
+    "commit": "d3429964cd4ffe1abfc041c6ec8b8425cb174f40",
+    "archive_url": (
+        "https://github.com/quantumgizmos/ldpc/archive/"
+        "d3429964cd4ffe1abfc041c6ec8b8425cb174f40.tar.gz"
+    ),
+    "archive_path": (
+        "/home/DATA1/users/yuany/.single_shot/cache/ldpc-d3429964.tar.gz"
+    ),
+    "archive_sha256": "76af0f01446ee7cbed33a47d6b597c10d8d12b2f10d508911b3d0763844d467e",
+    "rng_hpp_sha256": "300281477f91ed5ab3ba300a5e379797349db4048d8e37a21082fc5d5e15ba7c",
+}
+REMOTE_SUPPORT_PACKAGES = {
+    "numba": "0.66.0",
+    "llvmlite": "0.48.0",
+    "pytest": "9.1.1",
+    "matplotlib": "3.11.1",
+    "stim": "1.15.0",
+    "sinter": "1.15.0",
+    "pymatching": "2.2.2",
+    "networkx": "3.6.1",
+    "tqdm": "4.70.0",
 }
 
 
@@ -91,7 +120,7 @@ def _validate_remote_execution(config):
             raise ValueError(f"remote execution profile mismatch for {field}")
     if (
         not isinstance(profile["conda_environment"], str)
-        or not profile["conda_environment"]
+        or profile["conda_environment"] != REMOTE_CONDA_PREFIX
         or profile["conda_environment"] != config["environment"]["conda_environment"]
     ):
         raise ValueError("remote execution conda environment is not frozen consistently")
@@ -121,6 +150,10 @@ def _validate(config):
         raise ValueError("decoder parameters differ from the frozen BpLSD identity")
     if remote:
         _validate_remote_execution(config)
+        if config["ldpc_source"] != REMOTE_LDPC_SOURCE:
+            raise ValueError("remote ldpc source provenance differs from the frozen release")
+        if config["support_packages"] != REMOTE_SUPPORT_PACKAGES:
+            raise ValueError("remote support package identity differs from the frozen environment")
     if config["namespaces"] != NAMESPACES or len(set(NAMESPACES.values())) != 4:
         raise ValueError("seed namespaces must be frozen and disjoint")
     if config["stage_m_values"] != {"stage1": [3, 4, 5], "stage2": [6, 7, 8]}:
@@ -162,9 +195,8 @@ def _validate(config):
         raise ValueError("BpLSD extension module mismatch")
     if remote:
         if (
-            not re.fullmatch(r"[0-9a-f]{64}", str(binary["sha256"]))
-            or binary["sha256"] == "0" * 64
-            or binary["filename_suffix"] != ".cpython-312-x86_64-linux-gnu.so"
+            binary["sha256"] != REMOTE_BPLSD_BINARY_SHA256
+            or binary["filename_suffix"] != REMOTE_BPLSD_BINARY_SUFFIX
         ):
             raise ValueError("remote BpLSD extension binary is not fully frozen")
     elif binary["sha256"] != BPLSD_BINARY_SHA256 or binary["filename_suffix"] != BPLSD_BINARY_SUFFIX:

@@ -9,7 +9,13 @@ import numpy as np
 import pytest
 
 from data.expander_code.exp103.exp103_pipeline import identity, io, remote_cli
-from data.expander_code.exp103.exp103_pipeline.config import ensure_config
+from data.expander_code.exp103.deployment.build_remote_deployment import (
+    FROZEN_EXECUTION_PATHS, SOURCE_PATHS,
+)
+from data.expander_code.exp103.exp103_pipeline.config import (
+    REMOTE_BPLSD_BINARY_SHA256, REMOTE_CONDA_PREFIX, REMOTE_LDPC_SOURCE,
+    REMOTE_SUPPORT_PACKAGES, ensure_config,
+)
 from data.expander_code.exp103.exp103_pipeline.io import atomic_json, sha256_file
 from data.expander_code.exp103.exp103_pipeline.seeds import derive_seed
 
@@ -23,10 +29,11 @@ def remote_config_from(local_config, *, source_tree_sha256="2" * 64):
     config["schema_version"] = "exp103.config.remote.v1"
     config["source_commit"] = "1" * 40
     config["source_tree_sha256"] = source_tree_sha256
+    remote_prefix = REMOTE_CONDA_PREFIX
     config["environment"] = {
         "device_name": "nd-3",
         "hostname": "nd-3",
-        "conda_environment": "exp103_remote_v1_env",
+        "conda_environment": remote_prefix,
         "conda_prefix_matches_python": True,
         "python": "3.12.12",
         "numpy": "2.4.1",
@@ -36,13 +43,13 @@ def remote_config_from(local_config, *, source_tree_sha256="2" * 64):
     config["bplsd_binary"] = {
         "module": "ldpc.bplsd_decoder._bplsd_decoder",
         "filename_suffix": ".cpython-312-x86_64-linux-gnu.so",
-        "sha256": "3" * 64,
+        "sha256": REMOTE_BPLSD_BINARY_SHA256,
     }
     config["execution_profile"] = {
         "profile_id": "exp103.remote_execution.v1",
         "entry_host": "yuany",
         "compute_host": "nd-3",
-        "conda_environment": "exp103_remote_v1_env",
+        "conda_environment": remote_prefix,
         "num_workers": 64,
         "omp_thread_count": 1,
         "run_root": "~/.single_shot/runs",
@@ -52,6 +59,8 @@ def remote_config_from(local_config, *, source_tree_sha256="2" * 64):
         "stage_wall_hour_cap": 24.0,
         "peak_rss_gib_cap": 128.0,
     }
+    config["ldpc_source"] = dict(REMOTE_LDPC_SOURCE)
+    config["support_packages"] = dict(REMOTE_SUPPORT_PACKAGES)
     return ensure_config(config)
 
 
@@ -89,6 +98,279 @@ def test_remote_schema_preserves_every_measurement_seed(remote_config, frozen_co
                     )
 
 
+def test_prefix_style_conda_identity_is_verified_without_rewriting_environment(
+    monkeypatch, remote_config,
+):
+    prefix = REMOTE_CONDA_PREFIX
+    config = remote_config
+    monkeypatch.setattr(identity.sys, "prefix", prefix)
+    monkeypatch.setattr(identity.socket, "gethostname", lambda: "nd-3")
+    monkeypatch.setattr(
+        identity, "source_tree_sha256", lambda: config["source_tree_sha256"],
+    )
+    monkeypatch.setattr(
+        identity, "bplsd_binary_path",
+        lambda: Path("backend" + config["bplsd_binary"]["filename_suffix"]),
+    )
+    monkeypatch.setattr(
+        identity, "sha256_file", lambda _path: config["bplsd_binary"]["sha256"],
+    )
+    actual_version = identity.importlib.metadata.version
+    monkeypatch.setattr(
+        identity.importlib.metadata, "version",
+        lambda name: config["support_packages"].get(name, actual_version(name)),
+    )
+    monkeypatch.setenv("CONDA_DEFAULT_ENV", prefix)
+    monkeypatch.setenv("CONDA_PREFIX", prefix)
+
+    actual = identity.runtime_identity(config)
+
+    assert actual["conda_environment"] == prefix
+    assert actual["conda_prefix_matches_python"] is True
+
+
+def test_selective_deployment_contains_every_qualification_dependency():
+    required = {
+        "src/build_toric_code_examples.py",
+        "data/expander_code/exp102/config/production.v1.json",
+        "data/expander_code/exp102/validation/002_numba_smoke_20260719/orchestrate_ladder.py",
+        "data/expander_code/exp102/validation/002_numba_smoke_20260719/run_stage_wrapper.sh",
+        "data/expander_code/exp102/validation/002_numba_smoke_20260719/run_verified_source.sh",
+        "data/expander_code/exp103/deployment/bootstrap_verified_archive.sh",
+    }
+    assert required <= set(SOURCE_PATHS)
+    assert required - {"data/expander_code/exp103/deployment/bootstrap_verified_archive.sh"} <= set(
+        FROZEN_EXECUTION_PATHS
+    )
+
+    bootstrap = Path(
+        "data/expander_code/exp103/deployment/bootstrap_verified_archive.sh"
+    ).read_text(encoding="ascii")
+    wrapper = Path(
+        "data/expander_code/exp103/deployment/run_verified_source.sh"
+    ).read_text(encoding="ascii")
+    assert bootstrap.index("sha256sum -c") < bootstrap.index("tar -xOf")
+    assert "NUMBA_CACHE_DIR" in wrapper and "NUMBA_NUM_THREADS=1" in wrapper
+    assert 'deployment.get("archive_sha256") != archive_sha' in wrapper
+    assert 'deployment.get("source_manifest_sha256") != source_sha' in wrapper
+    assert 'source.get("source_commit") != source_commit' in wrapper
+
+
+def test_remote_publication_runs_all_gates_and_is_atomic(
+    monkeypatch, tmp_path, remote_config,
+):
+    run_root = tmp_path / "run"
+    aggregate = run_root / "final_results/decoder_crossing.npz"
+    aggregate.parent.mkdir(parents=True)
+    aggregate.write_bytes(b"aggregate")
+    calls = []
+    monkeypatch.setattr(remote_cli, "load_config", lambda _path: remote_config)
+    monkeypatch.setattr(
+        remote_cli, "resolve_remote_run_root", lambda path, _config: Path(path),
+    )
+    monkeypatch.setattr(
+        remote_cli, "_verify_remote_runtime",
+        lambda *_args: calls.append("runtime") or ({}, {}),
+    )
+    monkeypatch.setattr(
+        remote_cli, "_require_preflight",
+        lambda _path, _root, _config, stage, _deployment: calls.append(stage),
+    )
+    monkeypatch.setattr(
+        remote_cli, "_require_stage1_technical",
+        lambda *_args: calls.append("technical"),
+    )
+    monkeypatch.setattr(
+        remote_cli, "_require_live_aggregate_matches",
+        lambda *_args: calls.append("live_aggregate"),
+    )
+
+    def report(_aggregate, output):
+        calls.append("loader_report")
+        Path(output, "report.json").write_text("{}", encoding="ascii")
+        return {
+            "terminal_status": "EXP103_DECODER_CROSSING_INCONCLUSIVE",
+            "num_code_p": 624,
+            "total_trials": 6_240_000,
+        }
+
+    monkeypatch.setattr(remote_cli, "generate_final_report", report)
+    result = remote_cli.run_remote_publication(
+        "config.json", run_root, "preflight.json", "deployment", "a" * 64,
+    )
+
+    assert result["total_trials"] == 6_240_000
+    assert calls == [
+        "runtime", "stage1", "stage2", "technical", "live_aggregate",
+        "loader_report",
+    ]
+    assert (run_root / "final_results/publication/report.json").is_file()
+    assert not list((run_root / "final_results").glob(".publication.partial-*"))
+    with pytest.raises(FileExistsError, match="immutable"):
+        remote_cli.run_remote_publication(
+            "config.json", run_root, "preflight.json", "deployment", "a" * 64,
+        )
+
+
+def test_stage1_preliminary_is_published_only_after_committed_technical_gate(
+    monkeypatch, tmp_path, remote_config,
+):
+    run_root = tmp_path / "run"
+    aggregate = run_root / "final_results/stage1_aggregate.npz"
+    aggregate.parent.mkdir(parents=True)
+    aggregate.write_bytes(b"stage1")
+    calls = []
+    monkeypatch.setattr(remote_cli, "load_config", lambda _path: remote_config)
+    monkeypatch.setattr(
+        remote_cli, "resolve_remote_run_root", lambda path, _config: Path(path),
+    )
+    monkeypatch.setattr(
+        remote_cli, "_verify_remote_runtime",
+        lambda *_args: calls.append("runtime") or ({}, {}),
+    )
+    monkeypatch.setattr(
+        remote_cli, "_require_preflight",
+        lambda *_args: calls.append("stage1_preflight"),
+    )
+    monkeypatch.setattr(
+        remote_cli, "_require_stage1_technical",
+        lambda *_args: calls.append("committed_technical"),
+    )
+
+    def report(_aggregate, output):
+        calls.append("preliminary_report")
+        Path(output, "report.json").write_text("{}", encoding="ascii")
+        return {
+            "stage1_status": "STAGE1_RESTRICTED_DECODER_CROSSING_INCONCLUSIVE",
+            "reportable_code_p": 312,
+            "total_trials": 3_120_000,
+            "stage2_decision_uses_curves": False,
+        }
+
+    monkeypatch.setattr(remote_cli, "generate_stage1_preliminary_report", report)
+    result = remote_cli.run_remote_stage1_preliminary(
+        "config.json", run_root, "preflight.json", "deployment", "a" * 64,
+    )
+
+    assert result["stage2_decision_uses_curves"] is False
+    assert calls == [
+        "runtime", "stage1_preflight", "committed_technical", "preliminary_report",
+    ]
+    assert (run_root / "final_results/stage1_preliminary/report.json").is_file()
+
+
+def test_publication_rejects_a_saved_aggregate_stale_against_live_raw(
+    monkeypatch, tmp_path,
+):
+    stored = {"array": np.asarray([1.0]), "state": "same"}
+    live = {"array": np.asarray([2.0]), "state": "same"}
+    monkeypatch.setattr(remote_cli, "ARRAY_FIELDS", ("array",))
+    monkeypatch.setattr(remote_cli, "SCALAR_FIELDS", ("state",))
+    monkeypatch.setattr(remote_cli, "_load_aggregate", lambda _path: stored)
+    monkeypatch.setattr(remote_cli, "aggregate_decoder_scan", lambda *_args: live)
+    monkeypatch.setattr(
+        remote_cli, "_require_scope_reportable", lambda aggregate, _scope: aggregate,
+    )
+
+    with pytest.raises(ValueError, match="stale for live field array"):
+        remote_cli._require_live_aggregate_matches(
+            tmp_path / "aggregate.npz", tmp_path / "raw", {}, "final",
+        )
+
+    stored = {"array": np.asarray([1.0]), "state": float("nan")}
+    live = {"array": np.asarray([1.0]), "state": float("nan")}
+    monkeypatch.setattr(remote_cli, "_load_aggregate", lambda _path: stored)
+    monkeypatch.setattr(remote_cli, "aggregate_decoder_scan", lambda *_args: live)
+    assert remote_cli._require_live_aggregate_matches(
+        tmp_path / "aggregate.npz", tmp_path / "raw", {}, "stage1",
+    ) is stored
+
+
+def test_invalid_remote_aggregate_is_saved_as_evidence_but_exits_nonzero(
+    monkeypatch, tmp_path, remote_config,
+):
+    result = {"replay_scope": "final_combined", "terminal_status": "EXP103_INVALID"}
+    calls = []
+    monkeypatch.setattr(remote_cli, "load_config", lambda _path: remote_config)
+    monkeypatch.setattr(
+        remote_cli, "resolve_remote_run_root", lambda path, _config: Path(path),
+    )
+    monkeypatch.setattr(remote_cli, "_verify_remote_runtime", lambda *_args: ({}, {}))
+    monkeypatch.setattr(remote_cli, "_require_preflight", lambda *_args: None)
+    monkeypatch.setattr(remote_cli, "_require_stage1_technical", lambda *_args: None)
+    monkeypatch.setattr(remote_cli, "aggregate_decoder_scan", lambda *_args: result)
+    monkeypatch.setattr(
+        remote_cli, "save_aggregate",
+        lambda path, aggregate: calls.append((Path(path), aggregate)),
+    )
+
+    def reject(aggregate, scope):
+        assert calls and aggregate is result and scope == "final"
+        raise ValueError("not formally reportable")
+
+    monkeypatch.setattr(remote_cli, "_require_scope_reportable", reject)
+    with pytest.raises(ValueError, match="not formally reportable"):
+        remote_cli.run_remote_aggregate(
+            "config.json", "final", tmp_path / "run", "preflight.json",
+            tmp_path / "deployment", "a" * 64,
+        )
+    assert calls[0][0].name == "decoder_crossing.npz"
+
+
+def test_remote_stage_driver_always_revalidates_completed_artifacts():
+    driver = Path(
+        "data/expander_code/exp103/deployment/run_remote_stage.sh"
+    ).read_text(encoding="ascii")
+    assert driver.count("verify-stage") == 2
+    assert "--stage stage1" in driver
+    assert "--stage stage2" in driver
+
+
+def test_completed_report_manifest_rejects_tampered_output(tmp_path):
+    report_dir = tmp_path / "publication"
+    report_dir.mkdir()
+    artifact = report_dir / "curve.csv"
+    artifact.write_bytes(b"frozen curve\n")
+    report = {
+        "schema_version": "test.report.v1",
+        "files": ["curve.csv"],
+        "file_sha256": {"curve.csv": sha256_file(artifact)},
+    }
+    atomic_json(report_dir / "report.json", report)
+
+    def build_reference(_result_path, output_dir):
+        output_dir = Path(output_dir)
+        reference_artifact = output_dir / "curve.csv"
+        reference_artifact.write_bytes(b"frozen curve\n")
+        atomic_json(output_dir / "report.json", {
+            "schema_version": "test.report.v1",
+            "files": ["curve.csv"],
+            "file_sha256": {"curve.csv": sha256_file(reference_artifact)},
+        })
+
+    assert remote_cli._require_hashed_report(
+        report_dir, ("curve.csv", "report.json"),
+        {"schema_version": "test.report.v1"},
+        tmp_path / "aggregate.npz", build_reference,
+    ) == report
+
+    artifact.write_bytes(b"tampered curve\n")
+    with pytest.raises(ValueError, match="file hash mismatch"):
+        remote_cli._require_hashed_report(
+            report_dir, ("curve.csv", "report.json"),
+            {"schema_version": "test.report.v1"},
+        )
+
+    report["file_sha256"]["curve.csv"] = sha256_file(artifact)
+    atomic_json(report_dir / "report.json", report)
+    with pytest.raises(ValueError, match="differs from the live aggregate"):
+        remote_cli._require_hashed_report(
+            report_dir, ("curve.csv", "report.json"),
+            {"schema_version": "test.report.v1"},
+            tmp_path / "aggregate.npz", build_reference,
+        )
+
+
 def test_remote_config_is_strictly_separate_from_local_v1(remote_config, frozen_config):
     local_with_profile = _plain_config(_canonical_local_config())
     local_with_profile["execution_profile"] = remote_config["execution_profile"]
@@ -104,6 +386,27 @@ def test_remote_config_is_strictly_separate_from_local_v1(remote_config, frozen_
     placeholder["bplsd_binary"]["sha256"] = "0" * 64
     with pytest.raises(ValueError, match="not fully frozen"):
         ensure_config(placeholder)
+
+    wrong_binary = _plain_config(remote_config)
+    wrong_binary["bplsd_binary"]["sha256"] = "3" * 64
+    with pytest.raises(ValueError, match="not fully frozen"):
+        ensure_config(wrong_binary)
+
+    wrong_prefix = _plain_config(remote_config)
+    wrong_prefix["environment"]["conda_environment"] = "/tmp/alternate-prefix"
+    wrong_prefix["execution_profile"]["conda_environment"] = "/tmp/alternate-prefix"
+    with pytest.raises(ValueError, match="conda environment"):
+        ensure_config(wrong_prefix)
+
+    wrong_ldpc_source = _plain_config(remote_config)
+    wrong_ldpc_source["ldpc_source"]["commit"] = "f" * 40
+    with pytest.raises(ValueError, match="source provenance"):
+        ensure_config(wrong_ldpc_source)
+
+    wrong_support = _plain_config(remote_config)
+    wrong_support["support_packages"]["numba"] = "0.65.1"
+    with pytest.raises(ValueError, match="support package"):
+        ensure_config(wrong_support)
 
 
 def test_external_run_root_is_one_safe_direct_child(monkeypatch, tmp_path, remote_config):
@@ -126,6 +429,12 @@ def test_external_run_root_is_one_safe_direct_child(monkeypatch, tmp_path, remot
     symlink.symlink_to(outside, target_is_directory=True)
     with pytest.raises(ValueError, match="outside|symlink"):
         remote_cli.resolve_remote_run_root(symlink, remote_config)
+
+    run_root.mkdir()
+    internal = run_root / "raw"
+    internal.symlink_to(outside, target_is_directory=True)
+    with pytest.raises(ValueError, match="contain symlinks"):
+        remote_cli.resolve_remote_run_root(run_root, remote_config)
 
 
 def _build_deployment(tmp_path, frozen_config):
@@ -268,7 +577,12 @@ def _qualification_report(remote_config):
             "argv": list(argv),
             "exit_code": 0,
             "status": "PASS",
-            "passed_count": index + 1,
+            "passed_count": remote_cli.QUALIFICATION_EXPECTED_PASSES[name],
+            "expected_passed_count": remote_cli.QUALIFICATION_EXPECTED_PASSES[name],
+            "skipped_count": 0,
+            "xfailed_count": 0,
+            "xpassed_count": 0,
+            "deselected_count": 0,
             "stdout_sha256": "8" * 64,
             "stderr_sha256": "9" * 64,
         }
@@ -287,13 +601,42 @@ def _qualification_report(remote_config):
         "device_name": "nd-3",
         "hostname": "nd-3",
         "conda_environment": remote_config["environment"]["conda_environment"],
+        "conda_prefix": str(Path(sys.prefix).resolve()),
         "python_executable": str(Path(sys.executable).resolve()),
+        "python_prefix": str(Path(sys.prefix).resolve()),
+        "python_version": remote_config["environment"]["python"],
+        "numpy_version": remote_config["environment"]["numpy"],
+        "scipy_version": remote_config["environment"]["scipy"],
+        "ldpc_version": remote_config["environment"]["ldpc"],
+        "support_packages": remote_config["support_packages"],
+        "bplsd_binary_path": str(remote_cli.bplsd_binary_path()),
+        "bplsd_binary_filename": remote_cli.bplsd_binary_path().name,
         "python_no_bytecode_flag": True,
         "pythondontwritebytecode": True,
         "pytest_cache_disabled": True,
         "bytecode_clean_before": True,
         "bytecode_clean_after": True,
         "deployment": deployment,
+        "ldpc_source_provenance": {
+            **remote_config["ldpc_source"], "project_version": "2.4.1",
+        },
+        "host_resources": {
+            "platform_system": "Linux",
+            "platform_release": "6.8.0-test",
+            "platform_machine": "x86_64",
+            "libc_name": "glibc",
+            "libc_version": "2.39",
+            "logical_cpu_count": 96,
+            "physical_core_count": 48,
+            "cpu_socket_count": 4,
+            "memory_total_bytes": 256 * 1024 ** 3,
+            "memory_available_bytes": 128 * 1024 ** 3,
+            "run_disk_path": str(Path(
+                remote_config["execution_profile"]["run_root"]
+            ).expanduser().resolve()),
+            "run_disk_total_bytes": 1024 ** 5,
+            "run_disk_free_bytes": 1024 ** 4,
+        },
         "groups": groups,
         "total_passed": sum(group["passed_count"] for group in groups),
     }
@@ -323,14 +666,36 @@ def test_qualification_runs_three_frozen_python_no_bytecode_groups(
 
     def completed(argv, cwd, env, capture_output):
         calls.append((argv, cwd, env, capture_output))
-        count = len(calls) + 10
+        name = ("exp103", "exp101", "exp102")[len(calls) - 1]
+        count = remote_cli.QUALIFICATION_EXPECTED_PASSES[name]
         return SimpleNamespace(
             returncode=0,
             stdout=f"{count} passed in 0.01s\n".encode("ascii"),
             stderr=b"",
         )
 
+    fake_binary = (
+        Path(sys.prefix).resolve()
+        / ("backend" + remote_config["bplsd_binary"]["filename_suffix"])
+    )
     monkeypatch.setattr(remote_cli.subprocess, "run", completed)
+    monkeypatch.setattr(
+        remote_cli, "runtime_identity",
+        lambda _config: {
+            "python_version": remote_config["environment"]["python"],
+            "numpy_version": remote_config["environment"]["numpy"],
+            "scipy_version": remote_config["environment"]["scipy"],
+            "ldpc_version": remote_config["environment"]["ldpc"],
+            "support_packages": remote_config["support_packages"],
+        },
+    )
+    monkeypatch.setattr(remote_cli, "bplsd_binary_path", lambda: fake_binary)
+    monkeypatch.setattr(
+        remote_cli, "_ldpc_source_provenance",
+        lambda _config: {**remote_config["ldpc_source"], "project_version": "2.4.1"},
+    )
+    resources = _qualification_report(remote_config)["host_resources"]
+    monkeypatch.setattr(remote_cli, "_host_resources", lambda _config: resources)
     report = remote_cli.run_environment_qualification(
         remote_config, _qualification_report(remote_config)["deployment"], tmp_path,
     )
@@ -341,10 +706,16 @@ def test_qualification_runs_three_frozen_python_no_bytecode_groups(
     assert all(call[0][1:5] == ("-B", "-m", "pytest", "-q") for call in calls)
     assert all(call[2]["PYTHONDONTWRITEBYTECODE"] == "1" for call in calls)
     assert all(call[2]["PYTEST_ADDOPTS"] == "-p no:cacheprovider" for call in calls)
+    assert all(group["skipped_count"] == 0 for group in report["groups"])
     assert remote_cli.validate_environment_qualification(report, remote_config) == report
 
     report["groups"][1]["exit_code"] = 1
     with pytest.raises(ValueError, match="failed for exp101"):
+        remote_cli.validate_environment_qualification(report, remote_config)
+
+    report = _qualification_report(remote_config)
+    report["groups"][0]["skipped_count"] = 1
+    with pytest.raises(ValueError, match="failed for exp103"):
         remote_cli.validate_environment_qualification(report, remote_config)
 
 def test_formal_preflight_gate_requires_the_copy_in_current_deployment(

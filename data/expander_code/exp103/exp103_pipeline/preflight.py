@@ -298,10 +298,11 @@ def _stage_estimate(name, m_values, tasks, config):
         for field in anchor_fields:
             upper_by_m[field][m] = upper_by_anchor[field][anchor]
     shards_per_m = 8 * len(config["p_tokens"]) * config["shards_per_code_p"]
+    code_p_tasks_per_m = 8 * len(config["p_tokens"])
     trials_per_m = shards_per_m * config["trials_per_shard"]
     measurement_core_hours = sum(
         upper_by_m["measurement_seconds_per_trial"][m] * trials_per_m
-        + upper_by_m["model_seconds"][m] * 8
+        + upper_by_m["model_seconds"][m] * code_p_tasks_per_m
         + (
             upper_by_m["measurement_identity_seconds"][m]
             + upper_by_m["decoder_setup_seconds"][m]
@@ -311,7 +312,7 @@ def _stage_estimate(name, m_values, tasks, config):
     ) / 3600.0
     replay_core_hours = sum(
         upper_by_m["replay_seconds_per_trial"][m] * trials_per_m
-        + upper_by_m["model_seconds"][m] * 8
+        + upper_by_m["model_seconds"][m] * code_p_tasks_per_m
         + (
             upper_by_m["replay_identity_seconds"][m]
             + upper_by_m["replay_setup_seconds"][m]
@@ -352,6 +353,9 @@ def _stage_estimate(name, m_values, tasks, config):
         "predicted_wall_hours": predicted_wall_hours,
         "projected_peak_rss_gib": peak_rss_gib,
         "rss_anchor_m_values": sorted(rss_anchor_m_values),
+        "model_loads_upper_by_m": {
+            str(m): code_p_tasks_per_m for m in m_values
+        },
         "checks": checks,
         "measurement_seconds_per_trial_upper_by_m": {
             str(key): value

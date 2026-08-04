@@ -45,6 +45,33 @@ archive_sha256=$(tr -d '\r\n' <"$archive_marker")
   exit 66
 }
 printf '%s  %s\n' "$archive_sha256" "$archive" | sha256sum -c - >/dev/null
+source_manifest_sha256=$(sha256sum "$source_manifest" | awk '{print $1}')
+source_commit=$(tr -d '\r\n' <"$commit_marker")
+
+python3 - "$deployment_manifest" "$source_manifest" \
+  "$archive_sha256" "$source_manifest_sha256" "$source_commit" <<'PY'
+import json
+import re
+import sys
+
+deployment_path, source_path, archive_sha, source_sha, source_commit = sys.argv[1:]
+with open(deployment_path, encoding="ascii") as handle:
+    deployment = json.load(handle)
+with open(source_path, encoding="ascii") as handle:
+    source = json.load(handle)
+if deployment.get("archive_sha256") != archive_sha:
+    raise SystemExit("deployment manifest is not bound to the source archive")
+if deployment.get("source_manifest_sha256") != source_sha:
+    raise SystemExit("deployment manifest is not bound to the source manifest")
+if deployment.get("source_commit") != source_commit:
+    raise SystemExit("deployment manifest is not bound to the source commit marker")
+if source.get("archive_sha256") != archive_sha:
+    raise SystemExit("source manifest is not bound to the source archive")
+if source.get("source_commit") != source_commit:
+    raise SystemExit("source manifest is not bound to the source commit marker")
+if re.fullmatch(r"[0-9a-f]{40}", source_commit) is None:
+    raise SystemExit("source commit marker is invalid")
+PY
 
 verify_tree() {
   local archive_files source_files archive_tree
@@ -82,10 +109,13 @@ cd "$source_dir"
 export PYTHONPATH=.
 export PYTHONDONTWRITEBYTECODE=1
 export PYTEST_ADDOPTS="-p no:cacheprovider"
+export NUMBA_CACHE_DIR="$deployment_root/runtime-cache/numba"
+export NUMBA_NUM_THREADS=1
 export OMP_NUM_THREADS=1
 export MKL_NUM_THREADS=1
 export OPENBLAS_NUM_THREADS=1
 unset PYTHONOPTIMIZE
+mkdir -p "$NUMBA_CACHE_DIR"
 
 set +e
 "$@"

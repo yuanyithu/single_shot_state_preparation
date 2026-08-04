@@ -26,20 +26,26 @@ from data.expander_code.exp103.exp103_pipeline.io import (
 
 SOURCE_PATHS = (
     "AGENTS.md",
+    "src/build_toric_code_examples.py",
     "data/expander_code/exp101/AGENTS.md",
     "data/expander_code/exp101/PHYSICS_CONTRACT.md",
     "data/expander_code/exp101/src",
     "data/expander_code/exp101/tests",
     "data/expander_code/exp102/exp102_pipeline",
+    "data/expander_code/exp102/config/production.v1.json",
     "data/expander_code/exp102/registry",
     "data/expander_code/exp102/tests/conftest.py",
     "data/expander_code/exp102/tests/test_core.py",
     "data/expander_code/exp102/tests/test_scan_results_strict.py",
     "data/expander_code/exp102/tests/test_source_identity.py",
+    "data/expander_code/exp102/validation/002_numba_smoke_20260719/orchestrate_ladder.py",
+    "data/expander_code/exp102/validation/002_numba_smoke_20260719/run_stage_wrapper.sh",
+    "data/expander_code/exp102/validation/002_numba_smoke_20260719/run_verified_source.sh",
     "data/expander_code/exp103/EXPERIMENT_CONTRACT.md",
     "data/expander_code/exp103/REMOTE_EXECUTION_AMENDMENT.md",
     "data/expander_code/exp103/config",
     "data/expander_code/exp103/deployment/build_remote_deployment.py",
+    "data/expander_code/exp103/deployment/bootstrap_verified_archive.sh",
     "data/expander_code/exp103/deployment/run_remote_stage.sh",
     "data/expander_code/exp103/deployment/run_verified_source.sh",
     "data/expander_code/exp103/exp103_pipeline",
@@ -48,6 +54,30 @@ SOURCE_PATHS = (
     "data/expander_code/exp103/status.md",
     "data/expander_code/exp103/tests",
     "data/expander_code/exp103/validation",
+)
+
+FROZEN_EXECUTION_PATHS = (
+    "src/build_toric_code_examples.py",
+    "data/expander_code/exp101/PHYSICS_CONTRACT.md",
+    "data/expander_code/exp101/src",
+    "data/expander_code/exp101/tests/test_gf2.py",
+    "data/expander_code/exp101/tests/test_hgp.py",
+    "data/expander_code/exp101/tests/test_logicals.py",
+    "data/expander_code/exp102/config/production.v1.json",
+    "data/expander_code/exp102/exp102_pipeline",
+    "data/expander_code/exp102/registry",
+    "data/expander_code/exp102/tests/conftest.py",
+    "data/expander_code/exp102/tests/test_core.py",
+    "data/expander_code/exp102/tests/test_scan_results_strict.py",
+    "data/expander_code/exp102/tests/test_source_identity.py",
+    "data/expander_code/exp102/validation/002_numba_smoke_20260719/orchestrate_ladder.py",
+    "data/expander_code/exp102/validation/002_numba_smoke_20260719/run_stage_wrapper.sh",
+    "data/expander_code/exp102/validation/002_numba_smoke_20260719/run_verified_source.sh",
+    "data/expander_code/exp103/EXPERIMENT_CONTRACT.md",
+    "data/expander_code/exp103/REMOTE_EXECUTION_AMENDMENT.md",
+    "data/expander_code/exp103/deployment",
+    "data/expander_code/exp103/exp103_pipeline",
+    "data/expander_code/exp103/tests",
 )
 
 
@@ -111,10 +141,10 @@ def build_remote_deployment(repo_root, output_dir, commit, config_path):
         raise ValueError("checked-out exp103 package differs from the frozen source tree")
     source_diff = _git(
         root, "diff", "--quiet", config["source_commit"], commit, "--",
-        "data/expander_code/exp103/exp103_pipeline", check=False,
+        *FROZEN_EXECUTION_PATHS, check=False,
     )
     if source_diff.returncode:
-        raise ValueError("exp103 package changed after its frozen source commit")
+        raise ValueError("frozen remote execution dependencies changed after source freeze")
 
     output.mkdir(parents=True)
     archive_path = output / "SOURCE.tar"

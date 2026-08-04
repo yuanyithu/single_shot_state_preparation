@@ -53,9 +53,17 @@ def runtime_identity(config, verify_source=False, repo_root=None):
     hostname = socket.gethostname()
     conda_environment = os.environ.get("CONDA_DEFAULT_ENV", "")
     conda_prefix = os.environ.get("CONDA_PREFIX", "")
+    resolved_prefix = Path(conda_prefix).resolve() if conda_prefix else None
+    environment_matches_prefix = bool(resolved_prefix) and (
+        conda_environment == resolved_prefix.name
+        or (
+            Path(conda_environment).is_absolute()
+            and Path(conda_environment).resolve() == resolved_prefix
+        )
+    )
     conda_prefix_matches_python = bool(conda_prefix) and (
-        Path(conda_prefix).resolve() == Path(sys.prefix).resolve()
-        and Path(conda_prefix).name == conda_environment
+        resolved_prefix == Path(sys.prefix).resolve()
+        and environment_matches_prefix
     )
     actual = {
         "device_name": DEVICE_BY_HOSTNAME.get(hostname, ""),
@@ -70,6 +78,11 @@ def runtime_identity(config, verify_source=False, repo_root=None):
         "source_tree_sha256": source_tree_sha256(),
         "source_commit": config["source_commit"],
     }
+    if config["schema_version"] == REMOTE_CONFIG_SCHEMA:
+        actual["support_packages"] = {
+            name: importlib.metadata.version(name)
+            for name in sorted(config["support_packages"])
+        }
     expected_env = config["environment"]
     for key, expected in (
         ("device_name", expected_env["device_name"]),
@@ -85,6 +98,11 @@ def runtime_identity(config, verify_source=False, repo_root=None):
     ):
         if actual[key] != expected:
             raise ValueError(f"runtime identity mismatch for {key}")
+    if (
+        config["schema_version"] == REMOTE_CONFIG_SCHEMA
+        and actual["support_packages"] != config["support_packages"]
+    ):
+        raise ValueError("runtime identity mismatch for support_packages")
     if not bplsd_binary_path().name.endswith(config["bplsd_binary"]["filename_suffix"]):
         raise ValueError("runtime identity mismatch for BpLSD binary filename")
     if verify_source:

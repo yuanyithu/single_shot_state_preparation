@@ -50,6 +50,7 @@ data/**/.gitignore
 !data/expander_code/exp102/validation/**/*.json
 !data/expander_code/exp102/validation/**/*.sh
 !data/expander_code/exp103/config/*.json
+!data/expander_code/exp103/deployment/bootstrap_verified_archive.sh
 !data/expander_code/exp103/validation/**/*.json
 !data/expander_code/exp103/final_results/*.json
 !data/expander_code/exp103/final_results/*.csv
