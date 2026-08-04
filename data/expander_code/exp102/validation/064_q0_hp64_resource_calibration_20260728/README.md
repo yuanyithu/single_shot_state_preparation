@@ -3,7 +3,7 @@
 Status: `IMPLEMENTATION COMPLETE / CALIBRATION NOT EXECUTED / NO GENERATED REPORTS / NO REMOTE AUTHORITY`.
 
 This validation implements the Stage 1 evidence/resource slice requested by
-`EXP102_NEXT_STEP_PLAN_20260727.md`.  It keeps two questions separate:
+`reviews/EXP102_NEXT_STEP_PLAN_20260727.md`.  It keeps two questions separate:
 
 - `discrepancy_audit.json` independently recomputes the validation 013 HP64/MAM
   headline values from raw logical labels and frozen character masks;

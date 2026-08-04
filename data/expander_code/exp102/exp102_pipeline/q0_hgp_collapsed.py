@@ -18,6 +18,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import hashlib
+import math
 
 import numpy as np
 
@@ -1340,5 +1341,843 @@ def run_collapsed_power_pt_trajectory(model, frame, H, syndrome, config,
         "lambda_sha256": ladder_digest,
         "mass_sha256": mass_digest,
         "round_trip_definition": "cold_hot_cold_after_established_cold_visit",
+        "engine": engine,
+    }
+
+
+# This kernel is intentionally separate from replica exchange.  A tempered
+# transition has one exact iid draw at lambda=0 and a path-level Hastings
+# correction, so a successful proposal is a real global B move rather than a
+# replica-origin diagnostic.
+COLLAPSED_TT_VERSION = "exp102.q0_hgp_collapsed_tt.v1"
+COLLAPSED_TT_RAW_VERSION = "exp102.q0_hgp_collapsed_tt.raw.v1"
+COLLAPSED_TT_KERNEL = "reversible_random_block_tempered_transition.v1"
+COLLAPSED_TT_COUNTER_NAMES = (
+    "tt_attempts",
+    "tt_accepts",
+    "tt_accepted_b_changes",
+    "tt_prior_refresh_bit_changes",
+    "tt_reversible_block_updates",
+    "tt_reversible_block_changes",
+)
+
+
+def _ctt_strict_sha256(value, name):
+    value = str(value)
+    if len(value) != 64 or any(char not in "0123456789abcdef" for char in value):
+        raise ValueError(f"{name} must be a lowercase SHA256")
+    return value
+
+
+def _ctt_strict_commit(value):
+    value = str(value)
+    if len(value) != 40 or any(char not in "0123456789abcdef" for char in value):
+        raise ValueError("source_commit must be a lowercase full Git SHA")
+    return value
+
+
+@dataclass(frozen=True)
+class CollapsedTemperedTransitionConfig:
+    """Frozen parameters for a collapsed-HGP tempered-transition kernel.
+
+    ``reversible_sweeps_per_level`` means powers of a random-scan block
+    heatbath, not a deterministic sweep.  This distinction is required: each
+    intermediate transition in the tempered-transition proof must itself be
+    reversible with respect to its own tempered marginal.
+    """
+
+    p: float
+    burn_steps: int
+    measurement_steps: int
+    num_levels: int = 64
+    reversible_sweeps_per_level: int = 1
+    block_size: int = 8
+    method_id: str = ""
+
+    def __post_init__(self):
+        p = float(self.p)
+        if not math.isfinite(p) or not 0.0 < p < 0.5:
+            raise ValueError("collapsed tempered-transition p must lie in (0, 0.5)")
+        object.__setattr__(self, "p", p)
+        for name in (
+                "burn_steps", "measurement_steps", "num_levels",
+                "reversible_sweeps_per_level", "block_size"):
+            value = getattr(self, name)
+            if isinstance(value, bool) or not isinstance(value, (int, np.integer)):
+                raise ValueError(f"{name} must be an integer")
+            object.__setattr__(self, name, int(value))
+        if self.burn_steps <= 0 or self.measurement_steps <= 0:
+            raise ValueError("collapsed tempered-transition clocks must be positive")
+        if self.measurement_steps % 8:
+            raise ValueError("collapsed tempered-transition measurement must divide into eight blocks")
+        if not 2 <= self.num_levels <= 128:
+            raise ValueError("collapsed tempered-transition num_levels must lie in [2, 128]")
+        if not 1 <= self.reversible_sweeps_per_level <= 16:
+            raise ValueError("collapsed tempered-transition reversible sweeps must lie in [1, 16]")
+        if self.block_size != 8:
+            raise ValueError("collapsed tempered-transition freezes eight-bit B blocks")
+        expected = f"CTT{self.num_levels:02d}-S{self.reversible_sweeps_per_level}"
+        if self.method_id and self.method_id != expected:
+            raise ValueError("collapsed tempered-transition method ID does not match its frozen schedule")
+        object.__setattr__(self, "method_id", expected)
+
+    @property
+    def lambda_values(self):
+        denominator = self.num_levels - 1
+        values = np.asarray(
+            [((denominator - index) ** 2) / (denominator ** 2)
+             for index in range(self.num_levels)],
+            dtype=np.float64,
+        )
+        values[0], values[-1] = 1.0, 0.0
+        return values
+
+    def as_dict(self):
+        return {
+            "method_id": self.method_id,
+            "p": self.p,
+            "burn_steps": self.burn_steps,
+            "measurement_steps": self.measurement_steps,
+            "num_levels": self.num_levels,
+            "reversible_sweeps_per_level": self.reversible_sweeps_per_level,
+            "block_size": self.block_size,
+            "lambda_values": self.lambda_values.tolist(),
+            "kernel": COLLAPSED_TT_KERNEL,
+            "prior_endpoint": "exact_iid_bernoulli_B",
+        }
+
+
+@dataclass(frozen=True)
+class CollapsedTemperedTransitionSeedIdentity:
+    """Disjoint seed identity for the CTT viability route.
+
+    CTT needs a legal signature-antithetic ``L`` family in addition to P/U;
+    it therefore cannot reuse the old global-discovery seed identity.
+    """
+
+    source_commit: str
+    config_sha256: str
+    registry_sha256: str
+    cell_fingerprint: str
+    method_id: str
+    resource_tier: str
+    init_family: str
+    trajectory_index: int
+    trajectory_namespace: str
+
+    def __post_init__(self):
+        object.__setattr__(self, "source_commit", _ctt_strict_commit(self.source_commit))
+        for name in ("config_sha256", "registry_sha256", "cell_fingerprint"):
+            object.__setattr__(self, name, _ctt_strict_sha256(getattr(self, name), name))
+        if not isinstance(self.method_id, str) or not self.method_id.startswith("CTT"):
+            raise ValueError("collapsed tempered-transition method ID is invalid")
+        if self.init_family not in ("P", "U", "L"):
+            raise ValueError("collapsed tempered-transition initial family must be P, U, or L")
+        if isinstance(self.trajectory_index, bool) or int(self.trajectory_index) < 0:
+            raise ValueError("collapsed tempered-transition trajectory index is invalid")
+        object.__setattr__(self, "trajectory_index", int(self.trajectory_index))
+        if not isinstance(self.resource_tier, str) or not self.resource_tier:
+            raise ValueError("collapsed tempered-transition resource tier is empty")
+        if not isinstance(self.trajectory_namespace, str) or not self.trajectory_namespace:
+            raise ValueError("collapsed tempered-transition trajectory namespace is empty")
+
+    def seed(self, stage, role="stream", index=0):
+        from .seeds import derive_seed
+
+        return derive_seed(
+            COLLAPSED_TT_VERSION, self.trajectory_namespace,
+            self.source_commit, self.config_sha256, self.registry_sha256,
+            self.cell_fingerprint, self.method_id, self.resource_tier,
+            self.init_family, self.trajectory_index, str(stage), str(role), int(index),
+        )
+
+    def as_dict(self):
+        return {
+            "source_commit": self.source_commit,
+            "config_sha256": self.config_sha256,
+            "registry_sha256": self.registry_sha256,
+            "cell_fingerprint": self.cell_fingerprint,
+            "method_id": self.method_id,
+            "resource_tier": self.resource_tier,
+            "init_family": self.init_family,
+            "trajectory_index": self.trajectory_index,
+            "trajectory_namespace": self.trajectory_namespace,
+        }
+
+
+def _ctt_y_columns(syndrome, H):
+    r, n = H.shape
+    matrix = np.asarray(syndrome, dtype=np.uint8).reshape(r, n)
+    return np.asarray([_bits_to_mask(matrix[:, column]) for column in range(n)], dtype=np.uint32)
+
+
+def _ctt_recompute_a_syndromes(y_columns, b_columns, neighbors, neighbor_counts):
+    result = np.asarray(y_columns, dtype=np.uint32).copy()
+    for b_column, value in enumerate(np.asarray(b_columns, dtype=np.uint32)):
+        for slot in range(int(neighbor_counts[b_column])):
+            result[int(neighbors[b_column, slot])] ^= value
+    return result
+
+
+def _ctt_log_likelihood(a_syndromes, log_mass):
+    # Do not use Python 3.12's compensated builtin sum here: the Numba kernel
+    # intentionally uses this same ordered IEEE-754 accumulation for replay.
+    result = 0.0
+    for value in a_syndromes:
+        result += float(log_mass[int(value)])
+    return result
+
+
+def _ctt_block_layout(r, block_size):
+    blocks_per_column = (int(r) + int(block_size) - 1) // int(block_size)
+    return blocks_per_column, int(r) * blocks_per_column
+
+
+def _ctt_reference_random_block_update(b_columns, a_syndromes, rng, block_size,
+                                       power, neighbors, neighbor_counts,
+                                       log_mass, log_odds):
+    """Apply one member of a uniform reversible block-heatbath mixture."""
+    r = int(b_columns.size)
+    blocks_per_column, total_blocks = _ctt_block_layout(r, block_size)
+    slot = int(rng.randbelow(total_blocks))
+    b_column, block = divmod(slot, blocks_per_column)
+    start = block * int(block_size)
+    stop = min(start + int(block_size), r)
+    width = stop - start
+    selected_positions = np.uint32(((1 << width) - 1) << start)
+    old_selected = b_columns[b_column] & selected_positions
+    weights = np.empty(1 << width, dtype=np.float64)
+    maximum = -np.inf
+    for category in range(weights.size):
+        candidate = np.uint32(category << start)
+        value = float(category.bit_count()) * float(log_odds)
+        if power != 0.0:
+            likelihood = 0.0
+            for neighbor_slot in range(int(neighbor_counts[b_column])):
+                factor = int(neighbors[b_column, neighbor_slot])
+                likelihood += float(log_mass[int(a_syndromes[factor] ^ old_selected ^ candidate)])
+            value += float(power) * likelihood
+        weights[category] = value
+        if value > maximum:
+            maximum = value
+    weights[:] = np.exp(weights - maximum)
+    selected = _reference_categorical_draw(weights, rng)
+    delta = old_selected ^ np.uint32(selected << start)
+    if delta:
+        b_columns[b_column] ^= delta
+        for neighbor_slot in range(int(neighbor_counts[b_column])):
+            factor = int(neighbors[b_column, neighbor_slot])
+            a_syndromes[factor] ^= delta
+        return 1
+    return 0
+
+
+def _ctt_reference_reversible_transition(b_columns, a_syndromes, rng, config,
+                                         power, neighbors, neighbor_counts,
+                                         log_mass, log_odds):
+    _, total_blocks = _ctt_block_layout(b_columns.size, config.block_size)
+    attempts = total_blocks * config.reversible_sweeps_per_level
+    changes = 0
+    for _ in range(attempts):
+        changes += _ctt_reference_random_block_update(
+            b_columns, a_syndromes, rng, config.block_size, power, neighbors,
+            neighbor_counts, log_mass, log_odds,
+        )
+    return attempts, changes
+
+
+def _ctt_reference_prior_refresh(b_columns, a_syndromes, y_columns, rng, p,
+                                 neighbors, neighbor_counts):
+    changed_bits = 0
+    r = int(b_columns.size)
+    for column in range(r):
+        old = b_columns[column]
+        value = np.uint32(0)
+        for row in range(r):
+            if rng.random() < p:
+                value |= np.uint32(1) << np.uint32(row)
+        b_columns[column] = value
+        changed_bits += int(old ^ value).bit_count()
+    a_syndromes[:] = _ctt_recompute_a_syndromes(
+        y_columns, b_columns, neighbors, neighbor_counts,
+    )
+    return changed_bits
+
+
+def tempered_transition_log_acceptance(lambda_values, forward_likelihoods,
+                                       reverse_likelihoods):
+    """Return Neal's path-level log Hastings factor for a CTT proposal.
+
+    ``forward_likelihoods[i]`` is ``L(x_i)`` and
+    ``reverse_likelihoods[i]`` is ``L(x'_(i+1))`` in the standard
+    down-and-back construction.  The candidate ``x'_0`` cancels against the
+    cold target density and must not be substituted into the second array.
+    """
+    lambda_values = np.asarray(lambda_values, dtype=np.float64)
+    forward_likelihoods = np.asarray(forward_likelihoods, dtype=np.float64)
+    reverse_likelihoods = np.asarray(reverse_likelihoods, dtype=np.float64)
+    if (lambda_values.ndim != 1 or lambda_values.size < 2
+            or forward_likelihoods.shape != (lambda_values.size - 1,)
+            or reverse_likelihoods.shape != (lambda_values.size - 1,)):
+        raise ValueError("tempered-transition path arrays have incompatible shapes")
+    if (not np.all(np.isfinite(lambda_values))
+            or not np.all(np.isfinite(forward_likelihoods))
+            or not np.all(np.isfinite(reverse_likelihoods))):
+        raise ValueError("tempered-transition path contains a non-finite value")
+    # Keep this scalar loop in the same order as the Numba kernel.  A BLAS
+    # dot product can fuse or reorder the two-term calculation and change a
+    # later portable acceptance decision by one ULP.
+    result = 0.0
+    for index in range(lambda_values.size - 1):
+        result += ((float(lambda_values[index + 1]) - float(lambda_values[index]))
+                   * (float(forward_likelihoods[index])
+                      - float(reverse_likelihoods[index])))
+    return result
+
+
+def _ctt_reference_step(b_columns, a_syndromes, y_columns, rng, config,
+                        lambdas, neighbors, neighbor_counts, log_mass, log_odds):
+    candidate_b = b_columns.copy()
+    candidate_syndromes = a_syndromes.copy()
+    forward = np.empty(lambdas.size - 1, dtype=np.float64)
+    reverse = np.empty(lambdas.size - 1, dtype=np.float64)
+    forward[0] = _ctt_log_likelihood(candidate_syndromes, log_mass)
+    attempts = 0
+    changes = 0
+    prior_changes = 0
+    endpoint_likelihood = 0.0
+    for level in range(1, lambdas.size):
+        if level + 1 == lambdas.size:
+            prior_changes = _ctt_reference_prior_refresh(
+                candidate_b, candidate_syndromes, y_columns, rng, config.p,
+                neighbors, neighbor_counts,
+            )
+            endpoint_likelihood = _ctt_log_likelihood(candidate_syndromes, log_mass)
+        else:
+            step_attempts, step_changes = _ctt_reference_reversible_transition(
+                candidate_b, candidate_syndromes, rng, config, lambdas[level],
+                neighbors, neighbor_counts, log_mass, log_odds,
+            )
+            attempts += step_attempts
+            changes += step_changes
+            forward[level] = _ctt_log_likelihood(candidate_syndromes, log_mass)
+    reverse[-1] = endpoint_likelihood
+    # Stop at lambda_1.  The path T_1,...,T_n,...,T_1 is palindromic;
+    # adding a final T_0 would make the reverse proposal use a different
+    # schedule and invalidates the simple tempered-transition Hastings ratio.
+    for level in range(lambdas.size - 2, 0, -1):
+        step_attempts, step_changes = _ctt_reference_reversible_transition(
+            candidate_b, candidate_syndromes, rng, config, lambdas[level],
+            neighbors, neighbor_counts, log_mass, log_odds,
+        )
+        attempts += step_attempts
+        changes += step_changes
+        reverse[level - 1] = _ctt_log_likelihood(candidate_syndromes, log_mass)
+    log_acceptance = tempered_transition_log_acceptance(lambdas, forward, reverse)
+    accepted = bool(log_acceptance >= 0.0 or rng.random() < math.exp(log_acceptance))
+    b_changed = 0
+    if accepted:
+        for before, after in zip(b_columns, candidate_b):
+            b_changed += int(before ^ after).bit_count()
+        return (candidate_b, candidate_syndromes, accepted, b_changed,
+                prior_changes, attempts, changes, log_acceptance)
+    return (b_columns, a_syndromes, accepted, b_changed, prior_changes,
+            attempts, changes, log_acceptance)
+
+
+def _run_ctt_reference_core(initial_state, initial_b, initial_syndromes,
+                            y_columns, burn_transition_rng,
+                            measurement_transition_rng, burn_observation_rng,
+                            measurement_observation_rng,
+                            config, lambdas, n, r, section_masks,
+                            kernel_combinations, neighbors, neighbor_counts,
+                            log_mass, log_odds, odds_powers,
+                            qubit_signatures):
+    total_steps = config.burn_steps + config.measurement_steps
+    b_columns = initial_b.copy()
+    a_syndromes = initial_syndromes.copy()
+    state = initial_state.copy()
+    burn_endpoint = initial_state.copy()
+    labels = np.empty(config.measurement_steps, dtype=np.uint64)
+    weights = np.empty(config.measurement_steps, dtype=np.int32)
+    packed = np.empty(
+        (config.measurement_steps, (initial_state.size + 7) // 8), dtype=np.uint8,
+    )
+    burn_labels = np.empty(config.burn_steps, dtype=np.uint64)
+    burn_accepts = np.empty(config.burn_steps, dtype=np.uint8)
+    measurement_accepts = np.empty(config.measurement_steps, dtype=np.uint8)
+    burn_log_acceptance = np.empty(config.burn_steps, dtype=np.float64)
+    measurement_log_acceptance = np.empty(config.measurement_steps, dtype=np.float64)
+    burn_b_changes = np.empty(config.burn_steps, dtype=np.int32)
+    measurement_b_changes = np.empty(config.measurement_steps, dtype=np.int32)
+    burn_prior_changes = np.empty(config.burn_steps, dtype=np.int32)
+    measurement_prior_changes = np.empty(config.measurement_steps, dtype=np.int32)
+    burn_counters = np.zeros(len(COLLAPSED_TT_COUNTER_NAMES), dtype=np.int64)
+    measurement_counters = np.zeros(len(COLLAPSED_TT_COUNTER_NAMES), dtype=np.int64)
+    previous_state = initial_state.copy()
+    for step in range(total_steps):
+        transition_rng = (
+            burn_transition_rng if step < config.burn_steps
+            else measurement_transition_rng
+        )
+        observation_rng = (
+            burn_observation_rng if step < config.burn_steps
+            else measurement_observation_rng
+        )
+        (b_columns, a_syndromes, accepted, b_changed, prior_changes,
+         block_attempts, block_changes, log_acceptance) = _ctt_reference_step(
+             b_columns, a_syndromes, y_columns, transition_rng, config,
+             lambdas, neighbors, neighbor_counts, log_mass, log_odds,
+         )
+        counters = burn_counters if step < config.burn_steps else measurement_counters
+        counters[0] += 1
+        counters[1] += int(accepted)
+        counters[2] += int(accepted and b_changed > 0)
+        counters[3] += prior_changes
+        counters[4] += block_attempts
+        counters[5] += block_changes
+        previous_state[:] = state
+        state, label, weight = _reference_sample_full_state(
+            previous_state, b_columns, a_syndromes, observation_rng, n, r,
+            section_masks, kernel_combinations, odds_powers, qubit_signatures,
+        )
+        if step < config.burn_steps:
+            burn_labels[step] = label
+            burn_accepts[step] = np.uint8(accepted)
+            burn_log_acceptance[step] = log_acceptance
+            burn_b_changes[step] = b_changed
+            burn_prior_changes[step] = prior_changes
+            if step + 1 == config.burn_steps:
+                burn_endpoint = state.copy()
+        else:
+            measurement = step - config.burn_steps
+            labels[measurement] = label
+            weights[measurement] = weight
+            packed[measurement] = _pack_state(state)
+            measurement_accepts[measurement] = np.uint8(accepted)
+            measurement_log_acceptance[measurement] = log_acceptance
+            measurement_b_changes[measurement] = b_changed
+            measurement_prior_changes[measurement] = prior_changes
+    return (
+        state, burn_endpoint, packed, burn_labels, labels, weights,
+        burn_counters, measurement_counters,
+        burn_accepts, measurement_accepts, burn_log_acceptance,
+        measurement_log_acceptance, burn_b_changes, measurement_b_changes,
+        burn_prior_changes, measurement_prior_changes, True,
+    )
+
+
+if njit is not None:
+    @njit(cache=True)
+    def _ctt_nb_log_likelihood(a_syndromes, log_mass):
+        result = 0.0
+        for index in range(a_syndromes.size):
+            result += log_mass[int(a_syndromes[index])]
+        return result
+
+
+    @njit(cache=True)
+    def _ctt_nb_recompute_a_syndromes(a_syndromes, y_columns, b_columns,
+                                      neighbors, neighbor_counts):
+        for factor in range(a_syndromes.size):
+            a_syndromes[factor] = y_columns[factor]
+        for b_column in range(b_columns.size):
+            value = b_columns[b_column]
+            for slot in range(neighbor_counts[b_column]):
+                a_syndromes[neighbors[b_column, slot]] ^= value
+
+
+    @njit(cache=True)
+    def _ctt_nb_random_block_update(b_columns, a_syndromes, rng_state,
+                                    block_size, power, neighbors,
+                                    neighbor_counts, log_mass, log_odds,
+                                    candidate_weights):
+        r = b_columns.size
+        blocks_per_column = (r + block_size - 1) // block_size
+        slot = _hc_randbelow(rng_state, r * blocks_per_column)
+        b_column = slot // blocks_per_column
+        block = slot % blocks_per_column
+        start = block * block_size
+        stop = min(start + block_size, r)
+        width = stop - start
+        selected_positions = np.uint32(((1 << width) - 1) << start)
+        old_selected = b_columns[b_column] & selected_positions
+        categories = 1 << width
+        maximum = -np.inf
+        for category in range(categories):
+            candidate = np.uint32(category << start)
+            value = float(_hc_popcount(candidate)) * log_odds
+            if power != 0.0:
+                likelihood = 0.0
+                for neighbor_slot in range(neighbor_counts[b_column]):
+                    factor = neighbors[b_column, neighbor_slot]
+                    likelihood += log_mass[int(a_syndromes[factor] ^ old_selected ^ candidate)]
+                value += power * likelihood
+            candidate_weights[category] = value
+            if value > maximum:
+                maximum = value
+        total = 0.0
+        for category in range(categories):
+            probability = np.exp(candidate_weights[category] - maximum)
+            candidate_weights[category] = probability
+            total += probability
+        if not total > 0.0:
+            return -1
+        threshold = _hc_random(rng_state) * total
+        cumulative = 0.0
+        selected = categories - 1
+        for category in range(categories):
+            cumulative += candidate_weights[category]
+            if threshold < cumulative:
+                selected = category
+                break
+        delta = old_selected ^ np.uint32(selected << start)
+        if delta:
+            b_columns[b_column] ^= delta
+            for neighbor_slot in range(neighbor_counts[b_column]):
+                factor = neighbors[b_column, neighbor_slot]
+                a_syndromes[factor] ^= delta
+            return 1
+        return 0
+
+
+    @njit(cache=True)
+    def _ctt_nb_reversible_transition(b_columns, a_syndromes, rng_state,
+                                      block_size, sweeps, power, neighbors,
+                                      neighbor_counts, log_mass, log_odds,
+                                      candidate_weights):
+        r = b_columns.size
+        blocks_per_column = (r + block_size - 1) // block_size
+        attempts = r * blocks_per_column * sweeps
+        changes = 0
+        for _ in range(attempts):
+            changed = _ctt_nb_random_block_update(
+                b_columns, a_syndromes, rng_state, block_size, power,
+                neighbors, neighbor_counts, log_mass, log_odds,
+                candidate_weights,
+            )
+            if changed < 0:
+                return -1, changes
+            changes += changed
+        return attempts, changes
+
+
+    @njit(cache=True)
+    def _ctt_nb_prior_refresh(b_columns, a_syndromes, y_columns, rng_state,
+                              p, neighbors, neighbor_counts):
+        changed_bits = 0
+        r = b_columns.size
+        for column in range(r):
+            old = b_columns[column]
+            value = np.uint32(0)
+            for row in range(r):
+                if _hc_random(rng_state) < p:
+                    value |= np.uint32(1) << np.uint32(row)
+            b_columns[column] = value
+            changed_bits += _hc_popcount(old ^ value)
+        _ctt_nb_recompute_a_syndromes(
+            a_syndromes, y_columns, b_columns, neighbors, neighbor_counts,
+        )
+        return changed_bits
+
+
+    @njit(cache=True)
+    def _ctt_nb_step(b_columns, a_syndromes, y_columns, rng_state, lambdas,
+                     block_size, sweeps, p, neighbors, neighbor_counts,
+                     log_mass, log_odds, candidate_weights, forward, reverse):
+        candidate_b = b_columns.copy()
+        candidate_syndromes = a_syndromes.copy()
+        forward[0] = _ctt_nb_log_likelihood(candidate_syndromes, log_mass)
+        attempts = 0
+        changes = 0
+        prior_changes = 0
+        endpoint_likelihood = 0.0
+        for level in range(1, lambdas.size):
+            if level + 1 == lambdas.size:
+                prior_changes = _ctt_nb_prior_refresh(
+                    candidate_b, candidate_syndromes, y_columns, rng_state,
+                    p, neighbors, neighbor_counts,
+                )
+                endpoint_likelihood = _ctt_nb_log_likelihood(candidate_syndromes, log_mass)
+            else:
+                step_attempts, step_changes = _ctt_nb_reversible_transition(
+                    candidate_b, candidate_syndromes, rng_state, block_size,
+                    sweeps, lambdas[level], neighbors, neighbor_counts,
+                    log_mass, log_odds, candidate_weights,
+                )
+                if step_attempts < 0:
+                    return False, 0, prior_changes, -1, changes, 0.0
+                attempts += step_attempts
+                changes += step_changes
+                forward[level] = _ctt_nb_log_likelihood(candidate_syndromes, log_mass)
+        reverse[lambdas.size - 2] = endpoint_likelihood
+        for level in range(lambdas.size - 2, 0, -1):
+            step_attempts, step_changes = _ctt_nb_reversible_transition(
+                candidate_b, candidate_syndromes, rng_state, block_size,
+                sweeps, lambdas[level], neighbors, neighbor_counts, log_mass,
+                log_odds, candidate_weights,
+            )
+            if step_attempts < 0:
+                return False, 0, prior_changes, -1, changes, 0.0
+            attempts += step_attempts
+            changes += step_changes
+            reverse[level - 1] = _ctt_nb_log_likelihood(candidate_syndromes, log_mass)
+        log_acceptance = 0.0
+        for level in range(lambdas.size - 1):
+            log_acceptance += ((lambdas[level + 1] - lambdas[level])
+                               * (forward[level] - reverse[level]))
+        accepted = log_acceptance >= 0.0
+        if not accepted:
+            accepted = _hc_random(rng_state) < np.exp(log_acceptance)
+        b_changed = 0
+        if accepted:
+            for index in range(b_columns.size):
+                b_changed += _hc_popcount(b_columns[index] ^ candidate_b[index])
+                b_columns[index] = candidate_b[index]
+            for index in range(a_syndromes.size):
+                a_syndromes[index] = candidate_syndromes[index]
+        return accepted, b_changed, prior_changes, attempts, changes, log_acceptance
+
+
+    @njit(cache=True)
+    def _run_ctt_numba_core(initial_state, initial_b, initial_syndromes,
+                           y_columns, burn_transition_rng_state,
+                           measurement_transition_rng_state,
+                           burn_observation_rng_state,
+                           measurement_observation_rng_state, lambdas, burn_steps,
+                           measurement_steps, block_size, sweeps, p, n, r,
+                           section_masks, kernel_combinations, neighbors,
+                           neighbor_counts, log_mass, log_odds, odds_powers,
+                           qubit_signatures):
+        total_steps = burn_steps + measurement_steps
+        b_columns = initial_b.copy()
+        a_syndromes = initial_syndromes.copy()
+        state = initial_state.copy()
+        burn_endpoint = initial_state.copy()
+        packed = np.empty(
+            (measurement_steps, (initial_state.size + 7) // 8), dtype=np.uint8,
+        )
+        burn_labels = np.empty(burn_steps, dtype=np.uint64)
+        labels = np.empty(measurement_steps, dtype=np.uint64)
+        weights = np.empty(measurement_steps, dtype=np.int32)
+        burn_accepts = np.empty(burn_steps, dtype=np.uint8)
+        measurement_accepts = np.empty(measurement_steps, dtype=np.uint8)
+        burn_log_acceptance = np.empty(burn_steps, dtype=np.float64)
+        measurement_log_acceptance = np.empty(measurement_steps, dtype=np.float64)
+        burn_b_changes = np.empty(burn_steps, dtype=np.int32)
+        measurement_b_changes = np.empty(measurement_steps, dtype=np.int32)
+        burn_prior_changes = np.empty(burn_steps, dtype=np.int32)
+        measurement_prior_changes = np.empty(measurement_steps, dtype=np.int32)
+        burn_counters = np.zeros(6, dtype=np.int64)
+        measurement_counters = np.zeros(6, dtype=np.int64)
+        previous_state = initial_state.copy()
+        candidate_weights = np.empty(
+            max(1 << block_size, kernel_combinations.size), dtype=np.float64,
+        )
+        forward = np.empty(lambdas.size - 1, dtype=np.float64)
+        reverse = np.empty(lambdas.size - 1, dtype=np.float64)
+        sampling_counters = np.zeros(5, dtype=np.int64)
+        for step in range(total_steps):
+            if step < burn_steps:
+                (accepted, b_changed, prior_changes, block_attempts,
+                 block_changes, log_acceptance) = _ctt_nb_step(
+                     b_columns, a_syndromes, y_columns, burn_transition_rng_state,
+                     lambdas, block_size, sweeps, p, neighbors, neighbor_counts,
+                     log_mass, log_odds, candidate_weights, forward, reverse,
+                 )
+            else:
+                (accepted, b_changed, prior_changes, block_attempts,
+                 block_changes, log_acceptance) = _ctt_nb_step(
+                     b_columns, a_syndromes, y_columns, measurement_transition_rng_state,
+                     lambdas, block_size, sweeps, p, neighbors, neighbor_counts,
+                     log_mass, log_odds, candidate_weights, forward, reverse,
+                 )
+            if block_attempts < 0:
+                return (state, burn_endpoint, packed, burn_labels, labels,
+                        weights, burn_counters, measurement_counters,
+                        burn_accepts, measurement_accepts,
+                        burn_log_acceptance, measurement_log_acceptance,
+                        burn_b_changes, measurement_b_changes,
+                        burn_prior_changes, measurement_prior_changes, False)
+            if step < burn_steps:
+                counters = burn_counters
+            else:
+                counters = measurement_counters
+            counters[0] += 1
+            counters[1] += int(accepted)
+            if accepted and b_changed > 0:
+                counters[2] += 1
+            counters[3] += prior_changes
+            counters[4] += block_attempts
+            counters[5] += block_changes
+            previous_state[:] = state
+            if step < burn_steps:
+                label, weight = _hc_sample_full_state(
+                    state, previous_state, b_columns, a_syndromes,
+                    burn_observation_rng_state, n, r, section_masks,
+                    kernel_combinations, odds_powers, qubit_signatures,
+                    candidate_weights, sampling_counters,
+                )
+            else:
+                label, weight = _hc_sample_full_state(
+                    state, previous_state, b_columns, a_syndromes,
+                    measurement_observation_rng_state, n, r, section_masks,
+                    kernel_combinations, odds_powers, qubit_signatures,
+                    candidate_weights, sampling_counters,
+                )
+            if step < burn_steps:
+                burn_labels[step] = label
+                burn_accepts[step] = np.uint8(accepted)
+                burn_log_acceptance[step] = log_acceptance
+                burn_b_changes[step] = b_changed
+                burn_prior_changes[step] = prior_changes
+                if step + 1 == burn_steps:
+                    burn_endpoint[:] = state
+            else:
+                measurement = step - burn_steps
+                labels[measurement] = label
+                weights[measurement] = weight
+                _hc_pack(state, packed[measurement])
+                measurement_accepts[measurement] = np.uint8(accepted)
+                measurement_log_acceptance[measurement] = log_acceptance
+                measurement_b_changes[measurement] = b_changed
+                measurement_prior_changes[measurement] = prior_changes
+        return (state, burn_endpoint, packed, burn_labels, labels, weights,
+                burn_counters, measurement_counters,
+                burn_accepts, measurement_accepts,
+                burn_log_acceptance, measurement_log_acceptance,
+                burn_b_changes, measurement_b_changes, burn_prior_changes,
+                measurement_prior_changes, True)
+else:  # pragma: no cover
+    _run_ctt_numba_core = None
+
+
+def run_collapsed_tempered_transition_trajectory(model, frame, H, syndrome,
+                                                 config, seed_identity,
+                                                 initial_state, *,
+                                                 engine="numba", mass=None):
+    """Run an exact collapsed tempered transition and redraw ``A|B``.
+
+    The endpoint lambda=0 is an exact Bernoulli prior draw on every B bit.  The
+    return path's full Neal acceptance ratio corrects the non-equilibrium path,
+    so the cold B marginal remains the collapsed q=0 posterior.
+    """
+    if not isinstance(config, CollapsedTemperedTransitionConfig):
+        raise TypeError("collapsed tempered-transition config has the wrong type")
+    if engine not in ("reference", "numba"):
+        raise ValueError("collapsed tempered-transition engine must be reference or numba")
+    if engine == "numba" and _run_ctt_numba_core is None:
+        raise RuntimeError("Numba is required for accelerated collapsed tempered transitions")
+    if getattr(seed_identity, "method_id", None) != config.method_id:
+        raise CollapsedConflictError("collapsed tempered-transition config/seed method mismatch")
+    validate_hgp_wiring(H, model)
+    try:
+        validate_observable_frame(model, frame)
+    except GlobalConflictError as exc:
+        raise CollapsedConflictError("collapsed tempered-transition observable frame mismatch") from exc
+    H = np.ascontiguousarray(H, dtype=np.uint8)
+    syndrome = np.ascontiguousarray(syndrome, dtype=np.uint8)
+    state = np.ascontiguousarray(initial_state, dtype=np.uint8).copy()
+    if syndrome.shape != (model.num_checks,):
+        raise ValueError("collapsed tempered-transition syndrome shape mismatch")
+    b_columns, a_syndromes, _ = _initial_collapsed_masks(state, syndrome, H)
+    y_columns = _ctt_y_columns(syndrome, H)
+    section_masks, kernel_combinations = _section_and_kernel_masks(H)
+    neighbors, neighbor_counts = _classical_row_neighbors(H)
+    mass_engine = "numba" if _build_coset_mass_numba is not None else "reference"
+    expected_mass = build_classical_coset_mass(H, config.p, engine=mass_engine)
+    mass = expected_mass if mass is None else np.asarray(mass, dtype=np.float64)
+    if (mass.shape != (1 << H.shape[0],) or not np.all(np.isfinite(mass))
+            or np.any(mass <= 0.0)):
+        raise CollapsedConflictError("collapsed tempered-transition supplied mass table is invalid")
+    if not np.array_equal(mass, expected_mass):
+        raise CollapsedConflictError("collapsed tempered-transition supplied mass table does not match H and p")
+    log_mass = np.ascontiguousarray(np.log(mass))
+    odds = float(config.p) / (1.0 - float(config.p))
+    odds_powers = np.ones(max(H.shape) + 1, dtype=np.float64)
+    for value in range(1, odds_powers.size):
+        odds_powers[value] = odds_powers[value - 1] * odds
+    lambdas = np.ascontiguousarray(config.lambda_values)
+    load_exp101()
+    from exp101_certified_src.prng import PortablePrng
+
+    if engine == "reference":
+        result = _run_ctt_reference_core(
+            state, b_columns, a_syndromes, y_columns,
+            PortablePrng(seed_identity.seed("burn", "transition")),
+            PortablePrng(seed_identity.seed("measurement", "transition")),
+            PortablePrng(seed_identity.seed("burn", "observation")),
+            PortablePrng(seed_identity.seed("measurement", "observation")),
+            config, lambdas, int(H.shape[1]), int(H.shape[0]), section_masks,
+            kernel_combinations, neighbors, neighbor_counts, log_mass,
+            float(math.log(odds)), odds_powers, _qubit_signatures(frame),
+        )
+    else:
+        result = _run_ctt_numba_core(
+            state, b_columns, a_syndromes, y_columns,
+            PortablePrng(seed_identity.seed("burn", "transition")).state_array(),
+            PortablePrng(seed_identity.seed("measurement", "transition")).state_array(),
+            PortablePrng(seed_identity.seed("burn", "observation")).state_array(),
+            PortablePrng(seed_identity.seed("measurement", "observation")).state_array(),
+            lambdas, config.burn_steps, config.measurement_steps,
+            config.block_size, config.reversible_sweeps_per_level, config.p,
+            int(H.shape[1]), int(H.shape[0]), section_masks,
+            kernel_combinations, neighbors, neighbor_counts, log_mass,
+            float(math.log(odds)), odds_powers, _qubit_signatures(frame),
+        )
+    if not result[-1]:
+        raise CollapsedConflictError("collapsed tempered-transition categorical weights vanished")
+    final_state, burn_endpoint, packed = result[0], result[1], result[2]
+    burn_labels, labels, weights = result[3], result[4], result[5]
+    unpacked = np.unpackbits(
+        packed, axis=1, count=model.num_qubits, bitorder="little",
+    ).astype(np.uint8, copy=False)
+    residuals = (
+        model.H_check.astype(np.int64) @ unpacked.T.astype(np.int64) % 2
+    ).T.astype(np.uint8) ^ syndrome[None, :]
+    replay_labels = np.asarray(
+        [_state_label(frame, row) for row in unpacked], dtype=np.uint64,
+    )
+    if (residuals.any() or not np.array_equal(labels, replay_labels)
+            or not np.array_equal(weights, unpacked.sum(axis=1))):
+        raise CollapsedConflictError("collapsed tempered-transition raw replay failed")
+    mass_digest = hashlib.sha256(np.asarray(mass, dtype=">f8").tobytes()).hexdigest()
+    lambda_digest = hashlib.sha256(np.asarray(lambdas, dtype=">f8").tobytes()).hexdigest()
+    return {
+        "raw_version": COLLAPSED_TT_RAW_VERSION,
+        "method_id": config.method_id,
+        "sampler_config_json": canonical_json(config.as_dict()),
+        "sampler_config_sha256": sha256_json(config.as_dict()),
+        "seed_identity_json": canonical_json(seed_identity.as_dict()),
+        "initial_state_packed": _pack_state(state),
+        "burn_state_packed": _pack_state(burn_endpoint),
+        "final_state_packed": _pack_state(final_state),
+        "measurement_states_packed": packed,
+        "burn_labels": burn_labels,
+        "measurement_labels": labels,
+        "measurement_weights": weights,
+        "measurement_residual_weights": residuals.sum(axis=1).astype(np.int32),
+        "measurement_block": np.repeat(
+            np.arange(8, dtype=np.int8), config.measurement_steps // 8,
+        ),
+        "burn_basis_seen": _basis_seen(burn_labels, model.k),
+        "initial_label": _state_label(frame, state),
+        "burn_label": _state_label(frame, burn_endpoint),
+        "final_label": _state_label(frame, final_state),
+        "burn_tt_counters": result[6],
+        "measurement_tt_counters": result[7],
+        "burn_tt_accepts": result[8],
+        "measurement_tt_accepts": result[9],
+        "burn_tt_log_acceptance": result[10],
+        "measurement_tt_log_acceptance": result[11],
+        "burn_tt_accepted_b_bit_changes": result[12],
+        "measurement_tt_accepted_b_bit_changes": result[13],
+        "burn_tt_prior_refresh_bit_changes": result[14],
+        "measurement_tt_prior_refresh_bit_changes": result[15],
+        "lambda_values": lambdas,
+        "lambda_sha256": lambda_digest,
+        "mass_sha256": mass_digest,
+        "transition_kernel": COLLAPSED_TT_KERNEL,
+        "counter_names": np.asarray(COLLAPSED_TT_COUNTER_NAMES),
         "engine": engine,
     }

@@ -1,0 +1,1 @@
+{"attempt": 1, "check_elapsed_seconds": 0.012, "checker_error": null, "elapsed_seconds": 0.013, "label": "exp102_dtc_v0_main_monitor", "reasons": ["no stop criterion matched"], "result": "waiting", "returncode": 0, "stderr_tail": "", "stdout_tail": "WAITING\n", "success_count": 0, "timestamp": "2026-07-23T14:32:26.091177+00:00"}

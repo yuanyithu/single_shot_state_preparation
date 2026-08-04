@@ -261,4 +261,4 @@ python -c "json.load(open('exp102/config/q0_global.discovery.v1.json'))['resourc
 
 评估者：Claude（外部只读）
 日期：2026-07-28
-评估对象：`data/expander_code/EXP102_NEXT_STEP_PLAN_20260727.md`
+评估对象：`data/expander_code/exp102/reviews/EXP102_NEXT_STEP_PLAN_20260727.md`

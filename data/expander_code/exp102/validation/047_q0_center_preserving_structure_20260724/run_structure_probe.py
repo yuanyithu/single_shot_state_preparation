@@ -121,7 +121,7 @@ def _source_identity(config_path):
         "config": Path(config_path).resolve(),
         "module": EXP102_ROOT / "exp102_pipeline/q0_center_preserving.py",
         "runner": Path(__file__).resolve(),
-        "review": EXP102_ROOT / "CENTER_PRESERVING_REVIEW.md",
+        "review": EXP102_ROOT / "reviews/CENTER_PRESERVING_REVIEW.md",
         "registry": REGISTRY_PATH,
     }
     core = {

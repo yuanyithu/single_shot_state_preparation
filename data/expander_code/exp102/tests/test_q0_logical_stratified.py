@@ -204,6 +204,11 @@ def test_stratified_proposal_normalization_detailed_balance_and_stationarity(
     q = np.exp(np.asarray([
         proposal.log_probability_coordinates(row) for row in coordinates
     ]))
+    assert np.allclose(
+        np.asarray([proposal.log_probability_state(row) for row in enumerated]),
+        np.asarray([proposal.log_probability_coordinates(row) for row in coordinates]),
+        atol=1e-14, rtol=0.0,
+    )
     assert np.all(q > 0.0)
     assert float(q.sum()) == pytest.approx(1.0, abs=3e-14)
     target = (p / (1.0 - p)) ** enumerated.sum(axis=1)

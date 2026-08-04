@@ -1,0 +1,68 @@
+{
+  "cell": {
+    "code_id": "m08_c06",
+    "disorder_index": 0,
+    "disorder_source": "attempt022",
+    "p": 0.04
+  },
+  "config_version": "exp102.q0_hgp_aux_stabilizer_pt.v0.config.v1",
+  "contract_version": "exp102.q0_hgp_aux_stabilizer_pt.v0",
+  "gates": {
+    "max_abs_B_mask_mean_delta": 0.12,
+    "max_abs_complete_score_delta_per_factor": 0.12,
+    "max_abs_logical_character_mean_delta": 0.12,
+    "max_abs_normalized_B_weight_delta": 0.08,
+    "max_abs_normalized_weight_delta": 0.08,
+    "max_negligible_support_upper_bound": 0.001,
+    "minimum_effective_trajectory_count": 4,
+    "sigma_multiplier": 3.0,
+    "sigma_slack": 0.01
+  },
+  "init_families": [
+    "P",
+    "U",
+    "L"
+  ],
+  "l_start_rule": "planted_xor_minimum_energy_reduced_logical_1to3.v1",
+  "methods": [
+    {
+      "cold_auxiliary_rows_per_round": 1,
+      "id": "UASRE32-R1-A1",
+      "num_replicas": 32,
+      "positive_row_updates_per_round": 1
+    },
+    {
+      "cold_auxiliary_rows_per_round": 1,
+      "id": "UASRE64-R1-A1",
+      "num_replicas": 64,
+      "positive_row_updates_per_round": 1
+    }
+  ],
+  "raw_version": "exp102.q0_hgp_aux_stabilizer_pt.local.raw.v0",
+  "registry_sha256": "883730e0ba548f6b358187d8f123fdd4d8aeb116f4bacda363c35c16d01ae40b",
+  "resource": {
+    "burn_rounds": 256,
+    "measurement_rounds": 2048,
+    "name": "V0"
+  },
+  "runtime_selection": {
+    "basis": "runtime_only",
+    "max_predicted_trajectory_seconds": 1200.0,
+    "probe_report_sha256": "545e4b4f483858b57416157a3ebef6857514e911003b6b6e6d18e320f9963376",
+    "safety_factor": 2.0
+  },
+  "scope": {
+    "formal_authorization": false,
+    "posterior_estimation": false,
+    "purpose": "local_adversarial_convergence_preflight_only",
+    "remote_authorization": false
+  },
+  "selection": {
+    "both_pass": "select_UASRE32_R1_A1",
+    "one_pass": "select_the_only_passing_method",
+    "selection_observable": "predeclared_convergence_gates_only_no_q_top",
+    "zero_pass": "LOCAL_AUXILIARY_STABILIZER_TRANSPORT_UNRESOLVED"
+  },
+  "trajectories_per_family": 8,
+  "trajectory_namespace": "exp102.q0_hgp_aux_stabilizer_pt.v0.local"
+}

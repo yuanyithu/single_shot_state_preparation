@@ -5,7 +5,7 @@ This directory evaluates the immutable local-only contract
 and has no authority to estimate `q_top` or launch HARD2.
 
 The review and frozen rule are in
-[`CENTER_PRESERVING_REVIEW.md`](../../CENTER_PRESERVING_REVIEW.md) and
+[`CENTER_PRESERVING_REVIEW.md`](../../reviews/CENTER_PRESERVING_REVIEW.md) and
 [`q0_center_preserving.structure.v0.json`](../../config/q0_center_preserving.structure.v0.json).
 
 Run locally with:

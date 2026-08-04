@@ -1,0 +1,44 @@
+{
+  "cell": {
+    "code_id": "m08_c06",
+    "disorder_index": 0,
+    "disorder_source": "attempt022",
+    "p": 0.04
+  },
+  "config_version": "exp102.q0_hgp_full_row_gibbs.v0.config.v1",
+  "contract_version": "exp102.q0_hgp_full_row_gibbs.v0",
+  "gates": {
+    "minimum_chains_with_four_measurement_label_changes_per_family": 4,
+    "minimum_measurement_label_changes_per_family": 64,
+    "minimum_measurement_label_delta_rank_per_family": 64,
+    "require_all_basis_character_leave_returns": true
+  },
+  "init_families": ["P", "U", "L"],
+  "l_start_rule": "planted_xor_minimum_energy_reduced_logical_1to3.v1",
+  "method": {
+    "id": "FRG-VE1",
+    "kernel": "exact_collapsed_full_row_variable_elimination.v1",
+    "row_schedule": "ascending"
+  },
+  "raw_version": "exp102.q0_hgp_full_row_gibbs.local.raw.v0",
+  "registry_sha256": "883730e0ba548f6b358187d8f123fdd4d8aeb116f4bacda363c35c16d01ae40b",
+  "resource": {
+    "burn_sweeps": 64,
+    "measurement_sweeps": 512,
+    "name": "V0"
+  },
+  "runtime_selection": {
+    "basis": "runtime_only",
+    "probe_report_sha256": "7116c2d56b4d2845c71f5edff863922f73b3379ef76577c87a253e613db6e4a1",
+    "safety_factor": 2.0,
+    "trajectory_wall_seconds_upper_bound": 42.536033724821536
+  },
+  "scope": {
+    "formal_authorization": false,
+    "posterior_estimation": false,
+    "purpose": "local_adversarial_transport_preflight_only",
+    "remote_authorization": false
+  },
+  "trajectory_namespace": "q0_hgp_full_row_gibbs.v0.20260724",
+  "trajectories_per_family": 8
+}

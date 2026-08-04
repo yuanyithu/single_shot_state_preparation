@@ -4,7 +4,7 @@ Terminal status: **`PASS`; this authorizes only a fresh direct-block m8 T1
 diagnostic, not a convergence or physical claim.**
 
 This outcome-blind implementation/runtime preflight is governed by
-`RANDOM_FULL_COLUMN_DIRECT_BLOCK_REVIEW.md`.  It evaluates the same exact
+`reviews/RANDOM_FULL_COLUMN_DIRECT_BLOCK_REVIEW.md`.  It evaluates the same exact
 random-scan full-B-column heatbath as validations 052/053, using fixed direct
 positive-weight subtotal blocks after an explicit normal-range certificate.
 

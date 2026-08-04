@@ -1,0 +1,1 @@
+{"attempt": 1, "check_elapsed_seconds": 0.017, "checker_error": null, "elapsed_seconds": 0.017, "label": "exp102-uare-frozen-v1-replay-end", "reasons": ["success_regex"], "result": "success", "returncode": 0, "stderr_tail": "", "stdout_tail": "ENDED\n", "success_count": 1, "timestamp": "2026-07-23T19:36:04.792329+00:00"}

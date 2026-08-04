@@ -86,6 +86,44 @@ environment `11`, and be launched in `screen`.  Do not run Python directly in
    and run local portable analysis with `--portable`.  No extra trajectory,
    longer chain, alternate start, or weaker gate is legal after seeing data.
 
+## Terminal V0d result
+
+The fresh deployment `exp102_q0_lsi_v0d_20260723_9f0c473` completed the full
+frozen sequence.  Its source is
+`9f0c47370bac65059ed50507c95582f594d66df3`, archive SHA256 is
+`edc677d396b5a89588dba526e4f38ce1fbb0480a52f476fc3498630f6b232d48`, and
+source-manifest SHA256 is
+`6557c30e888ef59cd5ca61fdd7bb0fb305019f90dae5b934b5bb9be179554e0b`.
+All 48 raw files are present.  The pre-registered nd-3 analysis and the
+independent macmini conda-12 replay both completed successfully and emitted
+byte-identical reports (file SHA256
+`89e5d6c4aaf0792e35050a2dacff1e205e490d3a5250ed1c2f3734c46b3729c4`,
+internal report SHA256
+`64a05c06d07d0af4c0b27daded97687e5f830f227f03886c92d7f117aadd65a2`).
+
+The terminal status is `UNRESOLVED_LSI_IMH_V0_TRANSPORT`; both formal and
+production authorization are false.  No `(tau, initial-family)` group passes:
+
+| tau | family | changes | >=8 chains | sources | rank | basis LR | nonbasis LR |
+|---:|:---|---:|---:|---:|---:|---:|---:|
+| .5 | P | 0 | 0 | 0 | 0 | 0/64 | 0/64 |
+| .5 | U | 57 | 3 | 4 | 3 | 10/64 | 54/64 |
+| .5 | L | 0 | 0 | 0 | 0 | 0/64 | 0/64 |
+| 1.0 | P | 0 | 0 | 0 | 0 | 0/64 | 0/64 |
+| 1.0 | U | 44 | 3 | 4 | 3 | 10/64 | 54/64 |
+| 1.0 | L | 0 | 0 | 0 | 0 | 0/64 | 0/64 |
+
+The required values are at least 128 changes, 6/8 chains, 16 sources, rank
+64, and 64/64 leave-returns for both character sets.  Thus the frozen
+low-weight anchor proposal can occasionally move from high-energy uniform
+starts into a small label subgroup, but it has no accepted cross-label route
+out of either low-energy P or L basin.  Full catalog rank and aggregate
+acceptance therefore do not demonstrate posterior overlap.  The result is
+negative transport evidence for this fixed algorithm/budget, not a `q_top`
+estimate, an `IMPOSSIBLE` statement, or authorization to lengthen/restart the
+chain, merge the raw, weaken the gate, or replace the legal red-team starts by
+a physical all-zero state.
+
 The `audit` command prints canonical JSON but creates no raw data.  The stage
 wrapper stores its exact log hash in its immutable `SUCCESS` marker.  It
 accepts only the V0v2 module/action pair and chains each stage to the required

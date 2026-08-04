@@ -64,8 +64,8 @@ MAM:  P = .9922880183, U = .9931659402
 ```
 
 因此更长的 013 中 HP 的 P/U 差反而更小。`.91317/.99273` 是 HP64 与 MAM 的方法间
-结果，见 [`013 README`](exp102/validation/013_q0_hgp_global_screen_20260722/README.md)
-及 terminal [`hgp_report.json`](exp102/validation/013_q0_hgp_global_screen_20260722/remote_run/exp102_q0_hgp_screen_v2_20260722_4d134ee/control/hgp_report.json)。
+结果，见 [`013 README`](../validation/013_q0_hgp_global_screen_20260722/README.md)
+及本地冻结 raw `validation/013_q0_hgp_global_screen_20260722/remote_run/exp102_q0_hgp_screen_v2_20260722_4d134ee/control/hgp_report.json`（不纳入 Git）。
 不为这个不存在的矛盾另开实验；012 继续只作 provisional design evidence。
 
 ### 2.2 HP64 的准确权限

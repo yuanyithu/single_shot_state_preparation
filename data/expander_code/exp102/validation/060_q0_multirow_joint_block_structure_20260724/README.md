@@ -63,7 +63,7 @@ If no family passes, this frozen exact local joint-block family closes within
 the stated factorization/order/memory boundary.  If a family passes, the report
 names one outcome-blind preferred contingency candidate by block variables,
 worst width, worst single-table bytes and frozen candidate order.  Per
-`EXP102_PLAN_ASSESSMENT_20260728.md`, implementation remains suspended unless
+`reviews/EXP102_PLAN_ASSESSMENT_20260728.md`, implementation remains suspended unless
 fresh HP64 Stage 3 or Stage 4 fails.  Even then it receives at most one fresh
 exact implementation successor and cannot serve as the required large-k
 orthogonal confirmer.

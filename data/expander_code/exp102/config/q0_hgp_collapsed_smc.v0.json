@@ -1,0 +1,68 @@
+{
+  "cell": {
+    "code_id": "m08_c06",
+    "disorder_index": 0,
+    "disorder_source": "attempt022",
+    "p": 0.04
+  },
+  "config_version": "exp102.q0_hgp_collapsed_smc.v0.config.v1",
+  "contract_version": "exp102.q0_hgp_collapsed_smc.v0",
+  "gates": {
+    "max_stage_normalized_weight": 0.1,
+    "min_final_distinct_roots": 32,
+    "min_final_root_family_ess": 16.0,
+    "min_stage_conditional_ess_fraction": 0.5,
+    "require_all_populations_to_pass": true,
+    "max_final_root_fraction": 0.2
+  },
+  "method": {
+    "block_size": 8,
+    "id": "CSMC64-B8-S1-N128",
+    "kernel": "systematic_resample_exact_collapsed_block_heatbath.v1",
+    "lambda_generation": "hp64_quadratic_index_v1",
+    "lambda_sha256": "9aa5269ce0eee77473f7d0375ea9d007aa31cf6daf1e47d0cb4af23224be45c0",
+    "lambda_values": [
+      0.0, 0.0002519526329050139, 0.0010078105316200555,
+      0.0022675736961451248, 0.004031242126480222, 0.0062988158226253465,
+      0.009070294784580499, 0.012345679012345678, 0.01612496850592089,
+      0.02040816326530612, 0.025195263290501386, 0.030486268581506677,
+      0.036281179138321996, 0.04257999496094734, 0.04938271604938271,
+      0.05668934240362812, 0.06449987402368355, 0.072814310909549,
+      0.08163265306122448, 0.09095490047871001, 0.10078105316200554,
+      0.1111111111111111, 0.1219450743260267, 0.13328294280675232,
+      0.14512471655328799, 0.15747039556563366, 0.17031997984378935,
+      0.1836734693877551, 0.19753086419753085, 0.21189216427311666,
+      0.22675736961451248, 0.24212648022171832, 0.2579994960947342,
+      0.2743764172335601, 0.291257243638196, 0.30864197530864196,
+      0.32653061224489793, 0.344923154446964, 0.36381960191484003,
+      0.3832199546485261, 0.4031242126480222, 0.4235323759133283,
+      0.4444444444444444, 0.46586041824137064, 0.4877802973041068,
+      0.5102040816326531, 0.5331317712270093, 0.5565633660871756,
+      0.5804988662131519, 0.6049382716049383, 0.6298815822625347,
+      0.655328798185941, 0.6812799193751574, 0.7077349458301839,
+      0.7346938775510204, 0.7621567145376669, 0.7901234567901234,
+      0.81859410430839, 0.8475686570924666, 0.8770471151423532,
+      0.9070294784580499, 0.9375157470395565, 0.9685059208868733, 1.0
+    ],
+    "mutation_sweeps": 1,
+    "prior_endpoint": "exact_iid_bernoulli_B",
+    "resampling": "systematic_every_nonzero_lambda_stage"
+  },
+  "population": {
+    "base_families": [
+      "column_major",
+      "row_major"
+    ],
+    "num_particles": 128,
+    "populations_per_base_family": 4
+  },
+  "raw_version": "exp102.q0_hgp_collapsed_smc.raw.v0",
+  "registry_sha256": "883730e0ba548f6b358187d8f123fdd4d8aeb116f4bacda363c35c16d01ae40b",
+  "scope": {
+    "formal_authorization": false,
+    "posterior_estimation": false,
+    "purpose": "local_collapsed_smc_weight_and_genealogy_feasibility_only",
+    "remote_authorization": false
+  },
+  "trajectory_namespace": "exp102.q0_hgp_collapsed_smc.v0.20260723"
+}

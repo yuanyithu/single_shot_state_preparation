@@ -53,6 +53,12 @@ data/**/.gitignore
 !data/expander_code/exp102/validation/011_q0_global_screen_diagnostic_20260721/failed_run_evidence/remote_evidence/**/SUCCESS
 !data/expander_code/exp102/validation/011_q0_global_screen_diagnostic_20260721/failed_run_evidence/remote_evidence/**/stage.lock
 data/expander_code/exp102/validation/**/local_development_smoke/
+data/expander_code/exp102/validation/**/numba-cache*/
+data/expander_code/exp102/validation/**/run_numba_cache/
+data/expander_code/exp102/validation/**/test_numba_cache/
+data/expander_code/exp102/validation/**/deployment_*/
+*.nbc
+*.nbi
 data/3d_toric_code/with_measurement_noise/prod_*/
 data/3d_toric_code/with_measurement_noise/profile_*/
 data/3d_toric_code/with_measurement_noise/profile/

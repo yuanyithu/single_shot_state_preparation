@@ -57,7 +57,7 @@ REPORT_VERSION = "exp102.q0_random_full_column_streaming.preflight.report.v1"
 ROOT = Path(__file__).resolve().parent
 EXP102_ROOT = ROOT.parents[1]
 CONFIG_PATH = EXP102_ROOT / "config/q0_random_full_column_streaming.preflight.v1.json"
-REVIEW_PATH = EXP102_ROOT / "RANDOM_FULL_COLUMN_STREAMING_REVIEW.md"
+REVIEW_PATH = EXP102_ROOT / "reviews/RANDOM_FULL_COLUMN_STREAMING_REVIEW.md"
 CONTROL_ROOT = EXP102_ROOT / "validation/052_q0_random_full_column_t1_m8_20260724"
 WORKFLOW_052 = import_module(
     "data.expander_code.exp102.validation."

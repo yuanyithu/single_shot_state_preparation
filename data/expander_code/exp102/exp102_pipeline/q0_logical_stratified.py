@@ -1421,6 +1421,12 @@ class LogicalStratifiedProposal:
             raise LogicalStratifiedConflictError("proposal log density is non-finite")
         return result
 
+    def log_probability_state(self, state):
+        """Evaluate this proposal in physical coordinates for MIS auditing."""
+        return self.log_probability_coordinates(
+            self.coordinates.coordinates_of_state(state),
+        )
+
     @staticmethod
     def _categorical(rng, probabilities):
         threshold = rng.random()

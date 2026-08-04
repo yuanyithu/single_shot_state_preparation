@@ -1,0 +1,26 @@
+{
+  "block_seconds": 1.8701279158703983,
+  "catalog_attempts": 0,
+  "catalog_changes": 0,
+  "catalog_sha256": "16d1b30d9c8f428cf78e991ca2a39ab0058fab4eb314eb5860cf21016c0ce3a1",
+  "code_id": "m08_c06",
+  "contract": "exp102.q0_multilogical_blocks.runtime_diagnostic.v1",
+  "empty_catalog_seconds": 1.5036972498055547,
+  "hard_coset_residual_zero": true,
+  "joint_attempts": 512,
+  "joint_sha256": "2305ccfba3399a2f00cd9ecc9f1388904f5025f44441dce23b70b6287c53612a",
+  "measurement_count": 512,
+  "p": 0.04,
+  "projected_t1_seconds": 70.83176739927795,
+  "projected_t3_seconds": 283.3270695971118,
+  "purpose": "runtime_only_not_sampling_evidence",
+  "seconds_per_sweep": 0.006917164785085738,
+  "trace_seconds_median": 3.984286916209385,
+  "trace_seconds_per_repeat": [
+    3.984286916209385,
+    3.9804221659433097,
+    3.991416208911687
+  ],
+  "trace_sweeps": 576,
+  "warm_sweeps": 9
+}

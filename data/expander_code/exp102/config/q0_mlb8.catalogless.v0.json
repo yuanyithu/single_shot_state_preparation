@@ -1,0 +1,47 @@
+{
+  "character_seed_namespace": "exp102.q0_mlb8.catalogless.v0.20260723",
+  "cell": {
+    "code_id": "m08_c06",
+    "disorder_index": 0,
+    "disorder_source": "attempt022",
+    "p": 0.04
+  },
+  "config_version": "exp102.q0_mlb8.catalogless.v0.config.v1",
+  "contract_version": "exp102.q0_mlb8.catalogless.v0",
+  "gates": {
+    "minimum_basis_character_leave_return_chains_per_family": 1,
+    "minimum_chains_with_eight_measurement_cross_label_changes_per_family": 6,
+    "minimum_measurement_accepted_cross_label_changes_per_family": 128,
+    "minimum_measurement_label_delta_rank_per_family": 64,
+    "minimum_nonbasis_character_leave_return_chains_per_family": 1
+  },
+  "init_families": [
+    "P",
+    "U",
+    "L"
+  ],
+  "l_start_rule": "planted_xor_all_reduced_logical_directions.v1",
+  "method": {
+    "block_size": 16,
+    "id": "MLB8-J16",
+    "kernel_mode": "stabilizer_heatbath_plus_multilogical_block.v1",
+    "logical_catalog_mode": "none",
+    "logicals_per_block": 8
+  },
+  "num_nonbasis_characters": 64,
+  "raw_version": "exp102.q0_mlb8.catalogless.v0.raw.v1",
+  "registry_sha256": "883730e0ba548f6b358187d8f123fdd4d8aeb116f4bacda363c35c16d01ae40b",
+  "resource": {
+    "burn_sweeps": 512,
+    "measurement_sweeps": 4096,
+    "name": "V0"
+  },
+  "scope": {
+    "formal_authorization": false,
+    "posterior_estimation": false,
+    "purpose": "local_transport_preflight_only",
+    "remote_authorization": false
+  },
+  "trajectories_per_family": 8,
+  "trajectory_namespace": "exp102.q0_mlb8.catalogless.v0.20260723"
+}
