@@ -2,52 +2,54 @@
 
 ## Current state
 
-**`BLOCKED_REMOTE_RESOURCE_PREFLIGHT`**
+**`REMOTE_GATE_V2_PASSED; STAGE1_MEASUREMENT_OPEN`**
 
-exp103 remains a BpLSD decoder-MC line for `q=0` block logical failure. The
-exact `nd-3` environment and deployment passed qualification, but the frozen
-outcome-blind remote resource gate failed for Stage 2. Because Validation 003
-requires both stage gates to pass before any measurement-namespace trial,
-Validations 004--006 remain closed. No formal shard, crossing bracket,
-asymptotic threshold, or physical result exists. exp102 remains
-`BLOCKED_BEFORE_REMOTE`; exp103 has cleared none of its blockers.
+exp103 remains a BpLSD decoder-MC line for `q=0` block logical failure with
+scientific protocol `exp103.decoder_mc.v1` unchanged. After the v1 remote
+resource gate blocked Stage 2 (Validation 003), the user authorized
+amendment `exp103.remote_execution.v2` on 2026-08-05: caps re-derived from
+the frozen 003 measurement (per-stage reserved 10000 core-hours, wall 96
+hours, RSS 128 GiB), all other execution and scientific clauses inherited
+verbatim. Validation 004 requalified nd-3 (203/203) and passed both stage
+gates on a fresh outcome-blind run of the same frozen benchmark. Formal
+measurement proceeds as Validation 005 (m3-m5), then 006 (m6-m8,
+unconditional on Stage 1 curves), then 007 (crossing + checkpoint). At this
+commit no measurement shard exists yet; Stage 1 launch follows immediately.
+exp102 remains `BLOCKED_BEFORE_REMOTE`; exp103 clears none of its blockers.
 
 ## Current gates
 
-1. Validation 001 remains `PASS`; Validation 002 remains the immutable
-   `BLOCKED_LOCAL_RESOURCE_PREFLIGHT` result.
-2. Remote qualification passed on exactly `nd-3`: Python 3.12.12, NumPy 2.4.1,
-   SciPy 1.17.0, ldpc 2.4.1, and all `203/203` frozen tests passed with no skip,
-   xfail, xpass, or deselection.
-3. The Linux BpLSD extension SHA256 is
-   `db3eb33b3afa4887994c9b949cdc7ae280614eab0fe4245a63226060740140e6`;
-   canonical remote config payload SHA256 is
-   `3897c83d2ff33044f9d433889ef4b8dd54b007551e385871f1a8bf653c34e378`.
-4. Remote Stage 1 passed its caps: `1027.3980 <= 1200` reserved core-hours,
-   `9.0109 <= 24` wall-hours, and `19.5095 <= 128` GiB peak RSS.
-5. Remote Stage 2 failed two caps: `9520.3885 > 1200` reserved core-hours and
-   `75.3624 > 24` wall-hours; projected RSS `25.5681 <= 128` GiB passed.
-
-The remote amendment forbids using the Stage 1 PASS alone, changing host or
-worker count, weakening a cap, dropping codes, changing the p grid, or starting
-a partial formal scan. A new experiment contract and explicit user authority
-would be required to pursue a materially different execution design.
+1. Validations 001/002/003 remain immutable evidence with their original
+   terminal states; nothing is reclassified.
+2. Validation 004: `PASS` both stages. Stage 1 reserve `1026.2918 <= 10000`
+   core-hours, wall `9.0023 <= 96`, RSS `19.4312 <= 128`; Stage 2 reserve
+   `9521.8178 <= 10000`, wall `75.3736 <= 96`, RSS `25.6985 <= 128`.
+   Reproduces 003 within 0.11%.
+3. v2 identity: config `decoder_mc.remote.v2.json` SHA
+   `497b9299db065c2b55668a11c2bf40cecbc8a226b13eb924f563f571e4d9794e`,
+   source commit `e6a0881552d6b8da42442bbfcb3b674cb9e56c27`, package tree
+   `912dea91e7f72b0d20cc5782c0c5f49ae5330e670317f9f89f5530168102210f`,
+   host nd-3 with 64 workers, run root
+   `~/.single_shot/runs/exp103_remote_v2_001`.
+4. Stage 2 launches only after Stage 1 is technically complete with a
+   passing full replay and the committed technical report; the decision is
+   unconditional on all Stage 1 curves.
 
 ## Evidence map
 
 - `EXPERIMENT_CONTRACT.md`: frozen scientific and statistical contract.
-- `REMOTE_EXECUTION_AMENDMENT.md`: authorized single-node profile and gates.
-- `config/decoder_mc.v1.json`: original scientific seed/grid/panel identity.
-- `config/decoder_mc.remote.v1.json`: exact qualified remote identity.
-- `validation/003_remote_resource_preflight_20260804/`: qualification and
-  outcome-blind remote resource evidence.
+- `REMOTE_EXECUTION_AMENDMENT.md`: v1 profile (superseded caps; historical).
+- `REMOTE_EXECUTION_AMENDMENT_V2.md`: authorized v2 caps and gate mechanics.
+- `config/decoder_mc.remote.v2.json`: exact qualified v2 remote identity.
+- `validation/004_remote_gate_v2_20260805/`: v2 qualification + gate PASS.
 - `validation/INDEX.md`: numbered evidence ledger.
-- `raw/`: contains no formal exp103 shard.
+- `raw/`: no formal exp103 shard at this commit; Stage 1 raw arrives under
+  `raw/stage1/` after retrieval and SHA verification.
 
 ## Latest evidence
 
-- Validation 003: `BLOCKED_REMOTE_RESOURCE_PREFLIGHT`; Stage 1 PASS, Stage 2
-  core-hour and wall-time checks FAIL; no logical outcomes were saved.
-- Environment qualification: `PASS`, exact counts `128 + 58 + 17 = 203`.
-- Validation 002: `BLOCKED_LOCAL_RESOURCE_PREFLIGHT`; its original evidence is
-  unchanged.
+- Validation 004: qualification SHA256 `1e71fb84...ff31fc5` (203/203);
+  preflight SHA256 `fb208777...404c11`, `PASS_ALL_STAGES`, outcome-blind.
+- Validation 003: `BLOCKED_REMOTE_RESOURCE_PREFLIGHT` under v1 caps;
+  unchanged immutable evidence.
+- Validation 002: `BLOCKED_LOCAL_RESOURCE_PREFLIGHT`; unchanged.
