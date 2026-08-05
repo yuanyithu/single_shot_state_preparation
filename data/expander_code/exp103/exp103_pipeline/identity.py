@@ -264,7 +264,7 @@ def verify_remote_deployment(
     package_dir = source_root / "data" / "expander_code" / "exp103" / "exp103_pipeline"
     if source_tree_sha256(package_dir) != config["source_tree_sha256"]:
         raise ValueError("remote deployment package differs from the frozen source tree")
-    config_path = source_root / "data" / "expander_code" / "exp103" / "config" / "decoder_mc.remote.v1.json"
+    config_path = source_root / "data" / "expander_code" / "exp103" / "config" / "decoder_mc.remote.v2.json"
     if not config_path.is_file():
         raise ValueError("remote deployment does not contain its canonical config")
     deployed_config = json.loads(config_path.read_text(encoding="ascii"))

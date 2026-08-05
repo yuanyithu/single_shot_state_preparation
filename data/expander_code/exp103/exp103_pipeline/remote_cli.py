@@ -48,15 +48,15 @@ REMOTE_PREFLIGHT_RELATIVE = Path("validation/remote_resource_preflight.json")
 REMOTE_TECHNICAL_RELATIVE = Path("validation/stage1_technical_report.json")
 COMMITTED_PREFLIGHT_RELATIVE = Path(
     "data/expander_code/exp103/validation/"
-    "003_remote_resource_preflight_20260804/remote_resource_preflight.json"
+    "004_remote_gate_v2_20260805/remote_resource_preflight.json"
 )
 COMMITTED_QUALIFICATION_RELATIVE = Path(
     "data/expander_code/exp103/validation/"
-    "003_remote_resource_preflight_20260804/environment_qualification.json"
+    "004_remote_gate_v2_20260805/environment_qualification.json"
 )
 COMMITTED_TECHNICAL_RELATIVE = Path(
     "data/expander_code/exp103/validation/"
-    "004_remote_m3_m5_scan_20260804/technical_report.json"
+    "005_remote_m3_m5_scan_20260805/technical_report.json"
 )
 QUALIFICATION_GROUPS = (
     ("exp103", ("data/expander_code/exp103/tests",)),
@@ -81,7 +81,7 @@ QUALIFICATION_EXPECTED_PASSES = {
 def _require_remote_config(config):
     config = ensure_config(config)
     if config["schema_version"] != REMOTE_CONFIG_SCHEMA:
-        raise ValueError("remote execution requires exp103.config.remote.v1")
+        raise ValueError("remote execution requires exp103.config.remote.v2")
     return config
 
 
@@ -393,7 +393,7 @@ def run_environment_qualification(config, deployment, source_root):
         "PYTEST_ADDOPTS": "-p no:cacheprovider",
         "PYTHONPATH": str(source_root),
         "EXP103_TEST_CONFIG_PATH": str(
-            source_root / "data/expander_code/exp103/config/decoder_mc.remote.v1.json"
+            source_root / "data/expander_code/exp103/config/decoder_mc.remote.v2.json"
         ),
     })
     environment.pop("PYTHONOPTIMIZE", None)

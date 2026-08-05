@@ -40,9 +40,9 @@ TOP_LEVEL_FIELDS = {
     "bplsd_binary", "namespaces", "bootstrap", "preflight",
     "stage_m_values", "preregistered_point_masks", "crossing",
 }
-REMOTE_CONFIG_SCHEMA = "exp103.config.remote.v1"
-REMOTE_CONFIG_PATH = "data/expander_code/exp103/config/decoder_mc.remote.v1.json"
-REMOTE_EXECUTION_PROFILE = "exp103.remote_execution.v1"
+REMOTE_CONFIG_SCHEMA = "exp103.config.remote.v2"
+REMOTE_CONFIG_PATH = "data/expander_code/exp103/config/decoder_mc.remote.v2.json"
+REMOTE_EXECUTION_PROFILE = "exp103.remote_execution.v2"
 REMOTE_CONDA_PREFIX = "/home/DATA1/users/yuany/.single_shot/cache/exp103_remote_v1_env"
 REMOTE_BPLSD_BINARY_SHA256 = "db3eb33b3afa4887994c9b949cdc7ae280614eab0fe4245a63226060740140e6"
 REMOTE_BPLSD_BINARY_SUFFIX = ".cpython-312-x86_64-linux-gnu.so"
@@ -111,8 +111,8 @@ def _validate_remote_execution(config):
         "run_root": "~/.single_shot/runs",
         "log_root": "~/.single_shot/logs",
         "reserve_multiplier": 2.0,
-        "stage_core_hour_cap": 1200.0,
-        "stage_wall_hour_cap": 24.0,
+        "stage_core_hour_cap": 10000.0,
+        "stage_wall_hour_cap": 96.0,
         "peak_rss_gib_cap": 128.0,
     }
     for field, expected in expected_fixed.items():
@@ -242,7 +242,7 @@ def load_config(path):
     path = Path(path)
     raw = json.loads(path.read_text(encoding="ascii"))
     filename = (
-        "decoder_mc.remote.v1.json"
+        "decoder_mc.remote.v2.json"
         if raw.get("schema_version") == REMOTE_CONFIG_SCHEMA
         else "decoder_mc.v1.json"
     )

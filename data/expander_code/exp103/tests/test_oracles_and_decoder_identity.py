@@ -385,7 +385,7 @@ def test_contract_byte_binding_rejects_later_committed_or_worktree_edits(tmp_pat
 def test_frozen_runtime_and_bplsd_binary_identity(frozen_config):
     assert frozen_config["source_commit"] != "0" * 40
     assert frozen_config["source_tree_sha256"] != "0" * 64
-    if frozen_config["schema_version"] == "exp103.config.remote.v1":
+    if frozen_config["schema_version"] == "exp103.config.remote.v2":
         actual = identity.runtime_identity(frozen_config)
         assert actual["source_tree_sha256"] == identity.source_tree_sha256()
     else:

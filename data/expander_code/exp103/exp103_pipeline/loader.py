@@ -39,7 +39,7 @@ def _validate(aggregate):
     config_path = (
         Path(__file__).resolve().parents[1]
         / "config"
-        / "decoder_mc.remote.v1.json"
+        / "decoder_mc.remote.v2.json"
     )
     config = load_config(config_path)
     for field, expected in (

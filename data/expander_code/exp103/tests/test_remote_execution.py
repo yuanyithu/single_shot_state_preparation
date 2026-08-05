@@ -26,7 +26,7 @@ def remote_config_from(local_config, *, source_tree_sha256="2" * 64):
         if key not in {"config_sha256", "config_path"}
     }
     config = json.loads(json.dumps(config))
-    config["schema_version"] = "exp103.config.remote.v1"
+    config["schema_version"] = "exp103.config.remote.v2"
     config["source_commit"] = "1" * 40
     config["source_tree_sha256"] = source_tree_sha256
     remote_prefix = REMOTE_CONDA_PREFIX
@@ -46,7 +46,7 @@ def remote_config_from(local_config, *, source_tree_sha256="2" * 64):
         "sha256": REMOTE_BPLSD_BINARY_SHA256,
     }
     config["execution_profile"] = {
-        "profile_id": "exp103.remote_execution.v1",
+        "profile_id": "exp103.remote_execution.v2",
         "entry_host": "yuany",
         "compute_host": "nd-3",
         "conda_environment": remote_prefix,
@@ -55,8 +55,8 @@ def remote_config_from(local_config, *, source_tree_sha256="2" * 64):
         "run_root": "~/.single_shot/runs",
         "log_root": "~/.single_shot/logs",
         "reserve_multiplier": 2.0,
-        "stage_core_hour_cap": 1200.0,
-        "stage_wall_hour_cap": 24.0,
+        "stage_core_hour_cap": 10000.0,
+        "stage_wall_hour_cap": 96.0,
         "peak_rss_gib_cap": 128.0,
     }
     config["ldpc_source"] = dict(REMOTE_LDPC_SOURCE)
@@ -445,7 +445,7 @@ def _build_deployment(tmp_path, frozen_config):
     (package / "__init__.py").write_text("VALUE = 1\n", encoding="ascii")
     tree_sha = identity.source_tree_sha256(package)
     config = remote_config_from(frozen_config, source_tree_sha256=tree_sha)
-    config_path = source / "data/expander_code/exp103/config/decoder_mc.remote.v1.json"
+    config_path = source / "data/expander_code/exp103/config/decoder_mc.remote.v2.json"
     atomic_json(config_path, _plain_config(config))
 
     archive = deployment / "SOURCE.tar"

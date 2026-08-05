@@ -10,7 +10,7 @@ stage=$1
 deployment_root=$2
 deployment_manifest_sha256=$3
 run_root=$4
-config=data/expander_code/exp103/config/decoder_mc.remote.v1.json
+config=data/expander_code/exp103/config/decoder_mc.remote.v2.json
 preflight=$run_root/validation/remote_resource_preflight.json
 common=(
   --config "$config"

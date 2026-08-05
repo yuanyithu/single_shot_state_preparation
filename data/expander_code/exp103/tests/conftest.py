@@ -40,7 +40,7 @@ CONFIG_PATH = Path(os.environ.get(
     REPO_ROOT / "data/expander_code/exp103/config/decoder_mc.v1.json",
 ))
 REMOTE_CONFIG_PATH = (
-    REPO_ROOT / "data/expander_code/exp103/config/decoder_mc.remote.v1.json"
+    REPO_ROOT / "data/expander_code/exp103/config/decoder_mc.remote.v2.json"
 )
 
 
