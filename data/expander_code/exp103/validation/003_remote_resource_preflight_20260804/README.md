@@ -1,65 +1,72 @@
 # Validation 003: nd-3 environment and remote resource preflight
 
-Status: `NOT_STARTED`.
+Status: `BLOCKED_REMOTE_RESOURCE_PREFLIGHT`.
 
-This validation is the sole qualification and resource gate for the authorized
-`exp103.remote_execution.v1` profile. It does not inherit PASS from Validation
-001 and does not rewrite the blocked local result in Validation 002. No formal
-measurement-namespace trial may run until this directory contains complete,
-immutable PASS evidence committed and pushed from the active source tree.
+The exact remote environment passed qualification, and the frozen benchmark
+was outcome-blind and infrastructure-valid. Stage 1 passed all three resource
+checks, but Stage 2 exceeded both the reserved core-hour and predicted wall-time
+caps. The remote amendment requires both stages to pass before any formal
+measurement, so no measurement-namespace shard was launched.
 
-## Frozen task and limits
+## Frozen execution identity
 
-- Compute on exactly one node: `nd-3`.
-- Use exactly 64 process workers and `omp_thread_count=1`.
-- Apply reserve multiplier 2 to generation, full replay, analysis and fixed
-  overhead together.
-- Require each stage to use at most 1200 reserved core-hours, at most 24
-  predicted wall-hours and at most 128 GiB projected peak RSS.
-- Benchmark only the frozen nine `(m3,m5,m8) x (.02,.08,.14)` tasks with the
-  benchmark seed namespace. Do not retain or inspect logical outcomes.
-- Keep the scientific protocol, panel, seeds, p grid, decoder, replay, statistics
-  and crossing decision unchanged.
+- Host: `nd-3`; one process pool with 64 workers and one decoder thread.
+- Prefix: `/home/DATA1/users/yuany/.single_shot/cache/exp103_remote_v1_env`.
+- Core packages: Python 3.12.12, NumPy 2.4.1, SciPy 1.17.0, ldpc 2.4.1.
+- Linux BpLSD SHA256:
+  `db3eb33b3afa4887994c9b949cdc7ae280614eab0fe4245a63226060740140e6`.
+- Frozen source commit: `ff20f045399f86c4bbbe87fa14e261ac8517773c`.
+- Source-tree SHA256:
+  `b7b4692defb487a21bb63de1a11817894d9c90c2a9b4559880961e41a7287b54`.
+- Canonical remote config payload SHA256:
+  `3897c83d2ff33044f9d433889ef4b8dd54b007551e385871f1a8bf653c34e378`.
+- Registry SHA256:
+  `883730e0ba548f6b358187d8f123fdd4d8aeb116f4bacda363c35c16d01ae40b`.
 
-## Required evidence before PASS
+Qualification ran from deployment commit
+`d76433d9fd10346eb71197f6f508be3e3e864b7a`, manifest SHA256
+`7424357823fe7f28d5a72fa4ce8d15e9a3c3870c77f5f8811d5d588ab3debe26`,
+and archive SHA256
+`6f9fe86c27633aadc2e02ca8bdaa5f087cf834148eab9ae40b6d3673e5594d71`.
+The committed qualification was then included byte-for-byte in the preflight
+deployment at commit `1fa9b4c729b11bf2656e789fff9ec3db60464e59`, manifest
+SHA256 `1d3df0c610ee147f07acb94a265bf0dc5e5409a1bd74b04d02d242723a67ec19`,
+and archive SHA256
+`e3e2bdce0771ca33580481c480fe55970d6be1a0eb932a0948a49a84d6aed87c`.
 
-1. Freeze the actual `nd-3` hostname, isolated conda environment
-   `exp103_remote_v1_env` executable prefix, Python, NumPy, SciPy and ldpc
-   versions, OS/architecture and available cores/RAM/disk. The shared conda
-   `11` environment is ineligible.
-2. Verify `ldpc==2.4.1`, direct `ldpc.BpLsdDecoder`, the exact Linux extension
-   filename and SHA256, all frozen kwargs and absence of every fallback.
-3. Run the exp103 contract/oracle, decoder identity, seed reproducibility,
-   fail-closed and publication-loader regressions in that exact environment.
-4. Prove all planned measurement seeds equal those from the original frozen
-   config despite the change from 8 to 64 process workers.
-5. Bind the pushed source commit, source-tree SHA, original contract, remote
-   amendment, remote config, registry and deployment archive/file manifest.
-6. Run the outcome-blind timing/RSS benchmark and evaluate Stage 1 and Stage 2
-   separately against every frozen cap.
-7. Verify the clean-source wrapper, `python -B`,
-   `PYTHONDONTWRITEBYTECODE=1`, pre/post bytecode scan and exit-67 behavior.
+## Qualification result
 
-## Unfrozen placeholders
+`environment_qualification.json` has SHA256
+`9502027567f59e2ad537d0aeb19c52ef2d8c28f11cf130e8406d1b465f070eef`.
+The exact remote environment passed `128` exp103, `58` exp101, and `17`
+exp102 tests (`203/203` total), with zero skipped, xfailed, xpassed, or
+deselected tests. The report also revalidated the official ldpc source archive,
+compiled extension, package versions, clean-source wrapper, host architecture,
+cores, RAM, and disk identity.
 
-The following values are unknown and are not evidence of readiness:
+## Outcome-blind resource result
 
-- runtime hostname: `TO_BE_FROZEN_BEFORE_FORMAL`;
-- Python/NumPy/SciPy versions and Python prefix:
-  `TO_BE_FROZEN_BEFORE_FORMAL`;
-- ldpc identity: `TO_BE_VERIFIED_AS_2.4.1_BEFORE_FORMAL`;
-- Linux BpLSD extension filename/SHA256:
-  `TO_BE_FROZEN_BEFORE_FORMAL`;
-- remote config SHA256, source commit/source-tree SHA256 and deployment
-  manifest/archive SHA256: `TO_BE_FROZEN_BEFORE_FORMAL`.
+`remote_resource_preflight.json` has SHA256
+`0c5bca7d1ee599021b7e93389a23e18075508ae8f2c34186f3622340cc4734c7`.
+It contains only timing, RSS, identity, and resource arithmetic from the frozen
+nine `(m3,m5,m8) x (.02,.08,.14)` benchmark tasks. It records
+`outcome_blind=true`, `logical_outcomes_saved=false`, and the benchmark seed
+namespace; no logical result was retained or inspected.
 
-Planned compact artifacts are an environment identity report, deployment
-manifest and remote resource-preflight report. Their filenames and hashes must
-be frozen before this README can record PASS. Missing evidence, an identity
-mismatch, an invalid benchmark or any failed stage cap closes the formal gate;
-it must not be repaired by changing node, worker count, code panel, seed, grid or
-decoder.
+| Stage | Reserved core-hours | Predicted wall-hours | Peak RSS GiB | Result |
+|---|---:|---:|---:|---|
+| Stage 1, m3-m5 | 1027.3979769 / 1200 | 9.0109217 / 24 | 19.5095215 / 128 | `PASS` |
+| Stage 2, m6-m8 | 9520.3885108 / 1200 | 75.3624102 / 24 | 25.5681152 / 128 | `BLOCKED_REMOTE_RESOURCE_PREFLIGHT` |
 
-Authority after PASS is limited to exp103 Validations 004 through 006 under the
-remote amendment. It does not alter exp102 status or authorize any exp102
-remote, formal, held-out, restricted or production work.
+The Stage 2 estimate includes 2378.6501703 core-hours for generation and
+2380.5440851 core-hours for full replay before the frozen reserve multiplier.
+Its high-p m8 anchors measured about 2.00--2.74 seconds per trial for both
+generation and replay, which drives the failed totals.
+
+## Authority
+
+This validation grants no formal measurement authority. Stage 1 cannot use its
+isolated PASS because the preregistered gate required both stages to pass before
+launch. The failure does not authorize a host change, worker-count change, code
+or p-point deletion, resampling, relaxed caps, or a partial curve. Validations
+004--006 remain `NOT_STARTED`; exp102 remains `BLOCKED_BEFORE_REMOTE`.
