@@ -40,7 +40,7 @@ code that does not import the worker scorer, and compared field by field along
 with all three stream hashes. The comparison that failed on 53 shards under the
 randomized decoder now succeeds on every shard.
 
-`stage1_technical_report.json` (SHA256
+`technical_report.json`, the run-root `stage1_technical_report.json` verbatim (SHA256
 `d1cc26b4c77558409bb41c4cbda6f9c414abda5abc36a46537cc261a292f88bc`):
 `TECHNICAL_PASS`, `reportable_code_p = 312`, `measurement_shards = 1248`,
 `replay_status = PASS`, `outcome_blind_stage2_authorization = true`, bound to
