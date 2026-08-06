@@ -1,0 +1,148 @@
+{
+  "schema_version": "exp103.config.v2",
+  "experiment_id": "exp103.decoder_mc.v2",
+  "objective": "bposd_block_logical_failure_crossing_q0",
+  "registry_path": "data/expander_code/exp102/registry/registry.json",
+  "registry_sha256": "883730e0ba548f6b358187d8f123fdd4d8aeb116f4bacda363c35c16d01ae40b",
+  "source_commit": "4d65b4247c812ec6f05f9989023c0b70c13891e4",
+  "source_tree_sha256": "5583e1e964ecc8036a805873d765fa645d29a394df03eca00da8d8646d69c722",
+  "master_seed_hex": "08e1c6bd6607989e9ffc4506d73a687d9776672c9191d24414f54503153c9cb7",
+  "m_values": [
+    3,
+    4,
+    5,
+    6,
+    7,
+    8
+  ],
+  "codes_per_m": 8,
+  "p_tokens": [
+    "0.02",
+    "0.03",
+    "0.04",
+    "0.05",
+    "0.06",
+    "0.07",
+    "0.08",
+    "0.09",
+    "0.10",
+    "0.11",
+    "0.12",
+    "0.13",
+    "0.14"
+  ],
+  "shards_per_code_p": 4,
+  "trials_per_shard": 2500,
+  "decoder": {
+    "bp_method": "product_sum",
+    "max_iter": "n",
+    "schedule": "serial",
+    "serial_schedule_order": "natural",
+    "osd_method": "osd_0",
+    "osd_order": 0,
+    "omp_thread_count": 1
+  },
+  "environment": {
+    "device_name": "macmini",
+    "hostname": "ymini.local",
+    "conda_environment": "12",
+    "conda_prefix_matches_python": true,
+    "python": "3.12.12",
+    "numpy": "2.4.1",
+    "scipy": "1.17.0",
+    "ldpc": "2.4.1"
+  },
+  "namespaces": {
+    "benchmark": "exp103.decoder_mc.benchmark.v1",
+    "measurement": "exp103.decoder_mc.measurement.v1",
+    "replay": "exp103.decoder_mc.replay.v1",
+    "bootstrap": "exp103.decoder_mc.bootstrap.v1"
+  },
+  "bootstrap": {
+    "replicates": 20000,
+    "confidence": 0.95,
+    "method": "grouped_code_curve_plus_parametric_binomial_max_abs"
+  },
+  "preflight": {
+    "code_ids": [
+      "m03_c00",
+      "m05_c00",
+      "m08_c00"
+    ],
+    "p_tokens": [
+      "0.02",
+      "0.08",
+      "0.14"
+    ],
+    "trials_per_task": 20,
+    "num_workers": 8,
+    "reserve_multiplier": 2.0,
+    "stage_core_hour_cap": 100.0,
+    "stage_wall_hour_cap": 12.0,
+    "peak_rss_gib_cap": 12.0,
+    "analysis_core_hours": 0.5,
+    "fixed_overhead_core_hours": 0.5
+  },
+  "stage_m_values": {
+    "stage1": [
+      3,
+      4,
+      5
+    ],
+    "stage2": [
+      6,
+      7,
+      8
+    ]
+  },
+  "preregistered_point_masks": {
+    "full": [
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true
+    ]
+  },
+  "crossing": {
+    "primary_contrast": "m08_minus_m03",
+    "direction": "negative_at_lower_p_positive_at_higher_p",
+    "bracket_requires_adjacent_grid_points": true,
+    "triple_groups": [
+      [
+        3,
+        4,
+        5
+      ],
+      [
+        4,
+        5,
+        6
+      ],
+      [
+        5,
+        6,
+        7
+      ],
+      [
+        6,
+        7,
+        8
+      ]
+    ],
+    "linear_interpolation": "plot_only"
+  },
+  "decoder_binary": {
+    "module": "ldpc.bposd_decoder._bposd_decoder",
+    "filename_suffix": ".cpython-312-darwin.so",
+    "sha256": "944a96a657a89fbd04c127edb2eba1033f56de0161ddcd2ba7e57dee76777ccc"
+  }
+}
