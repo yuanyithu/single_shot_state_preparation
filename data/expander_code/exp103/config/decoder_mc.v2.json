@@ -4,7 +4,7 @@
   "objective": "bposd_block_logical_failure_crossing_q0",
   "registry_path": "data/expander_code/exp102/registry/registry.json",
   "registry_sha256": "883730e0ba548f6b358187d8f123fdd4d8aeb116f4bacda363c35c16d01ae40b",
-  "source_commit": "4d65b4247c812ec6f05f9989023c0b70c13891e4",
+  "source_commit": "6baee24bf59f8486966842dd6699a58fafecf33d",
   "source_tree_sha256": "5583e1e964ecc8036a805873d765fa645d29a394df03eca00da8d8646d69c722",
   "master_seed_hex": "08e1c6bd6607989e9ffc4506d73a687d9776672c9191d24414f54503153c9cb7",
   "m_values": [
