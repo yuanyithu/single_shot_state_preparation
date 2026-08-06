@@ -1,0 +1,26 @@
+{
+  "host": "nd-3",
+  "method": "two freshly constructed decoders over an identical syndrome sequence",
+  "osd_binary_sha256": "3a5a7dc2c1ed015eb137ef5823d7e2d13c2d851fe895788adc3bded4e4d0c079",
+  "records": [
+    {
+      "bp_nonconvergence_rate": 0.9975,
+      "code_id": "m04_c01",
+      "lsd_correction_differences": 1,
+      "n": 400,
+      "osd_correction_differences": 0,
+      "p_token": "0.11",
+      "trials": 1200
+    },
+    {
+      "bp_nonconvergence_rate": 1.0,
+      "code_id": "m05_c01",
+      "lsd_correction_differences": 0,
+      "n": 625,
+      "osd_correction_differences": 0,
+      "p_token": "0.12",
+      "trials": 800
+    }
+  ],
+  "schema": "exp103.linux_decoder_determinism_contrast.v1"
+}
