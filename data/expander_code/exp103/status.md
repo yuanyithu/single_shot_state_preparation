@@ -2,54 +2,62 @@
 
 ## Current state
 
-**`REMOTE_GATE_V2_PASSED; STAGE1_MEASUREMENT_OPEN`**
+**`BLOCKED_REPLAY_NONDETERMINISM`**
 
-exp103 remains a BpLSD decoder-MC line for `q=0` block logical failure with
-scientific protocol `exp103.decoder_mc.v1` unchanged. After the v1 remote
-resource gate blocked Stage 2 (Validation 003), the user authorized
-amendment `exp103.remote_execution.v2` on 2026-08-05: caps re-derived from
-the frozen 003 measurement (per-stage reserved 10000 core-hours, wall 96
-hours, RSS 128 GiB), all other execution and scientific clauses inherited
-verbatim. Validation 004 requalified nd-3 (203/203) and passed both stage
-gates on a fresh outcome-blind run of the same frozen benchmark. Formal
-measurement proceeds as Validation 005 (m3-m5), then 006 (m6-m8,
-unconditional on Stage 1 curves), then 007 (crossing + checkpoint). At this
-commit no measurement shard exists yet; Stage 1 launch follows immediately.
-exp102 remains `BLOCKED_BEFORE_REMOTE`; exp103 clears none of its blockers.
+Stage 1 (`m=3,4,5`) generated all 312 code-p tasks and 1248 `VALID` shards on
+`nd-3` under the user-authorized `exp103.remote_execution.v2` caps, but the
+frozen bit-exact full replay returned `INVALID` on 53 shards. The cause is a
+property of the frozen decoder, not of the code, node, or budget: the `ldpc`
+2.4.1 `BpLsdDecoder` LSD stage is randomized, so an identical syndrome can
+return a different legal correction in a different logical class. Belief
+propagation itself is exactly deterministic. The affected region is `m>=4`
+with `p>=0.06`, where BP stops converging and LSD runs on nearly every trial;
+`m=3` reproduced perfectly.
+
+No aggregate, curve, contrast, crossing or `p_c` exists, and none may be
+quoted from the Stage 1 raw. Validations 006 and 007 stay closed. exp102
+remains `BLOCKED_BEFORE_REMOTE`; exp103 has cleared none of its blockers.
+
+**Awaiting user decision.** Resuming requires an amendment that either
+redefines replay for a randomized decoder or replaces the decoder identity
+with a demonstrably deterministic one. Neither may be adopted without explicit
+authority, and a failed gate never authorizes weakening itself.
 
 ## Current gates
 
-1. Validations 001/002/003 remain immutable evidence with their original
-   terminal states; nothing is reclassified.
-2. Validation 004: `PASS` both stages. Stage 1 reserve `1026.2918 <= 10000`
-   core-hours, wall `9.0023 <= 96`, RSS `19.4312 <= 128`; Stage 2 reserve
-   `9521.8178 <= 10000`, wall `75.3736 <= 96`, RSS `25.6985 <= 128`.
-   Reproduces 003 within 0.11%.
-3. v2 identity: config `decoder_mc.remote.v2.json` SHA
-   `497b9299db065c2b55668a11c2bf40cecbc8a226b13eb924f563f571e4d9794e`,
-   source commit `e6a0881552d6b8da42442bbfcb3b674cb9e56c27`, package tree
-   `912dea91e7f72b0d20cc5782c0c5f49ae5330e670317f9f89f5530168102210f`,
-   host nd-3 with 64 workers, run root
-   `~/.single_shot/runs/exp103_remote_v2_001`.
-4. Stage 2 launches only after Stage 1 is technically complete with a
-   passing full replay and the committed technical report; the decision is
-   unconditional on all Stage 1 curves.
+1. Validations 001-004 keep their original terminal states; nothing is
+   reclassified. Validation 004 (`PASS`) remains the valid v2 resource gate.
+2. Validation 005 is `BLOCKED_REPLAY_NONDETERMINISM`: scan `PASS`
+   (1248/1248 `VALID`, none resumed), replay `INVALID` (1195 exact, 53 not).
+3. The contract's assumption that the decoder is a deterministic function is
+   false. `omp_thread_count` is `NotImplemented` upstream, and pinning
+   `OMP_NUM_THREADS`/`MKL`/`OPENBLAS` to 1 does not remove the effect, so no
+   frozen knob can restore bit-exactness.
+4. Measured across 21,000 paired trials on both platforms, the physical
+   failure flag never disagreed (95% bound `1.4e-4` per trial), including at
+   `p=0.04` where `P_fail = 0.52`. Only the correction and logical-label
+   streams disagree. This is evidence about the estimand, not authority to
+   report any number.
+5. Stage 1 raw stays immutable on the server under
+   `~/.single_shot/runs/exp103_remote_v2_001`; it is neither deleted, reused
+   as a formal result, nor re-run in place.
 
 ## Evidence map
 
 - `EXPERIMENT_CONTRACT.md`: frozen scientific and statistical contract.
-- `REMOTE_EXECUTION_AMENDMENT.md`: v1 profile (superseded caps; historical).
-- `REMOTE_EXECUTION_AMENDMENT_V2.md`: authorized v2 caps and gate mechanics.
+- `REMOTE_EXECUTION_AMENDMENT.md` / `_V2.md`: v1 profile and authorized v2 caps.
 - `config/decoder_mc.remote.v2.json`: exact qualified v2 remote identity.
-- `validation/004_remote_gate_v2_20260805/`: v2 qualification + gate PASS.
+- `validation/004_remote_gate_v2_20260805/`: v2 qualification and gate `PASS`.
+- `validation/005_stage1_replay_nondeterminism_20260806/`: scan and replay
+  evidence, failing shard list, nd-3 and macmini determinism diagnostics, and
+  the reproducible local probe.
 - `validation/INDEX.md`: numbered evidence ledger.
-- `raw/`: no formal exp103 shard at this commit; Stage 1 raw arrives under
-  `raw/stage1/` after retrieval and SHA verification.
 
 ## Latest evidence
 
-- Validation 004: qualification SHA256 `1e71fb84...ff31fc5` (203/203);
-  preflight SHA256 `fb208777...404c11`, `PASS_ALL_STAGES`, outcome-blind.
-- Validation 003: `BLOCKED_REMOTE_RESOURCE_PREFLIGHT` under v1 caps;
-  unchanged immutable evidence.
-- Validation 002: `BLOCKED_LOCAL_RESOURCE_PREFLIGHT`; unchanged.
+- Validation 005: scan SHA256 `c8a8c529...6835c` `PASS`; replay SHA256
+  `fb09b75a...345507` `INVALID`; 53 failing shards, all `m=4`/`m=5`, all
+  `p>=0.06`.
+- Validation 004: qualification `1e71fb84...ff31fc5` (203/203); preflight
+  `fb208777...404c11` `PASS_ALL_STAGES`.
+- Validation 003: `BLOCKED_REMOTE_RESOURCE_PREFLIGHT` under v1 caps; unchanged.
