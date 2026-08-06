@@ -84,6 +84,44 @@ disagreements in 21,000 paired trials bounds the failure-flag disagreement
 rate at `1.4e-4` per trial (95%, rule of three), and for a randomized
 decoder such disagreement is part of the estimand rather than an error in it.
 
+### Complete check on the failing set
+
+`failure_flag_reproducibility.json`, produced by
+`diagnose_failure_flag_reproducibility.py`, re-decodes **all 53 failing shards**
+(132,500 trials) and compares every field against the saved raw. It reports
+disagreement counts only, never a rate or an aggregate, so it stays
+outcome-blind:
+
+| Compared field | Disagreements over 132,500 trials |
+|---|---:|
+| `failure_flags` (the primary observable) | **0** |
+| `syndrome_match` | 0 |
+| `bp_converged` | 0 |
+| `bp_iterations` | 0 |
+| `error_stream_sha256` exact, per shard | 53 of 53 exact |
+| every re-decoded correction reproduces its syndrome | all legal |
+| `logical_labels` (degenerate class representative) | 37, in 27 shards |
+
+Across this check and the probes above, 153,500 paired trials produced zero
+failure-flag disagreements, a 95% bound of `2.0e-5` per trial. Over the full
+6,240,000-trial experiment that bounds any induced shift in a primary rate at
+about `2e-5`, two orders of magnitude below the `~5e-3` binomial Monte Carlo
+error at 10,000 trials per code-p. The seed derivation, RNG stream, code
+construction, BP dynamics and scoring are all exactly reproducible; only the
+LSD tie-break is not.
+
+### A deterministic alternative exists at no extra cost
+
+`probe_bposd_determinism.py` and `probe_decoder_cost.py` record that
+`ldpc.BpOsdDecoder` (module `ldpc.bposd_decoder._bposd_decoder`) is exactly
+deterministic at the same operating points where BpLSD is not: 0 differing
+corrections and 0 differing logical classes in 7,000 decodes across
+`m04_c01` at p=0.11 and `m05_c01` at p=0.12, for both `osd_0` order 0 and
+`osd_cs` order 4, at BP non-convergence rates of 0.997 and 1.000. Per-trial
+cost is `0.92`, `0.93` and `0.99` times BpLSD at n=225, 625 and 1600. A
+decoder switch would therefore restore bit-exact replay without a material
+change to the approved resource ledger.
+
 So the exp103 primary observable appears well defined and reproducible, while
 the contract's bit-exact stream comparison is unsatisfiable for `m>=4` at
 `p>=0.06`. The contract assumed a deterministic decoder; that assumption is

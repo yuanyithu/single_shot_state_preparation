@@ -33,12 +33,16 @@ authority, and a failed gate never authorizes weakening itself.
    false. `omp_thread_count` is `NotImplemented` upstream, and pinning
    `OMP_NUM_THREADS`/`MKL`/`OPENBLAS` to 1 does not remove the effect, so no
    frozen knob can restore bit-exactness.
-4. Measured across 21,000 paired trials on both platforms, the physical
-   failure flag never disagreed (95% bound `1.4e-4` per trial), including at
-   `p=0.04` where `P_fail = 0.52`. Only the correction and logical-label
-   streams disagree. This is evidence about the estimand, not authority to
-   report any number.
-5. Stage 1 raw stays immutable on the server under
+4. Measured across 153,500 paired trials, including a complete re-decode of
+   all 53 failing shards, the physical failure flag never disagreed (95% bound
+   `2.0e-5` per trial), nor did `syndrome_match`, `bp_converged`,
+   `bp_iterations`, or any per-shard error-stream hash. Only the degenerate
+   logical-label representative disagrees (37 in 132,500). This is evidence
+   about the estimand, not authority to report any number.
+5. `ldpc.BpOsdDecoder` is exactly deterministic at the same operating points
+   (0 differences in 7,000 decodes) and costs `0.92`-`0.99` times BpLSD per
+   trial, so a deterministic decoder is available within the approved ledger.
+6. Stage 1 raw stays immutable on the server under
    `~/.single_shot/runs/exp103_remote_v2_001`; it is neither deleted, reused
    as a formal result, nor re-run in place.
 
