@@ -9,6 +9,6 @@
 | [005](./005_stage1_replay_nondeterminism_20260806/) | Frozen m3-m5 remote scan and bit-exact full replay | `BLOCKED_REPLAY_NONDETERMINISM` | MEASUREMENT_GATE | Scan PASS (1248 VALID shards); replay INVALID on 53. BpLSD's LSD stage is randomized, so bit-exact replay is unsatisfiable for m>=4 at p>=0.06. No aggregate, no physical result |
 | [006](../DECODER_AMENDMENT_V3.md) | Freeze the deterministic BP+OSD-0 decoder identity and pass the local suite | `PASS` | IMPLEMENTATION_GATE | `exp103.decoder_mc.v2`; 131 local tests including the new determinism gate; amendment recorded in `DECODER_AMENDMENT_V3.md` |
 | [007](./007_remote_gate_v3_20260806/) | nd-3 requalification and remote resource gate under the v3 decoder identity | `PASS` | REMOTE_RESOURCE_GATE | 206/206 including the determinism gate on the Linux build; both stages pass; opens formal measurement |
-| 008 | Frozen m3-m5 remote scan and bit-exact full replay | `IN_PROGRESS` | PRELIMINARY_MEASUREMENT | Opened by Validation 007 |
+| [008](./008_remote_m3_m5_scan_20260806/) | Frozen m3-m5 remote scan and bit-exact full replay | `TECHNICAL_PASS` | PRELIMINARY_MEASUREMENT | Scan PASS (1248 fresh VALID); replay PASS 1248/1248 with zero exceptions; authorizes Validation 009 with no dependence on Stage 1 curves |
 | 009 | Unconditional m6-m8 remote extension after technical PASS | `NOT_STARTED` | MEASUREMENT | Awaits Validation 008 technical PASS + replay |
 | 010 | Full loader-verified crossing and checkpoint | `NOT_STARTED` | FINAL_ANALYSIS | Awaits Validation 009; no exp102 authority |
