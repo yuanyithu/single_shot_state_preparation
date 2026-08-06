@@ -29,7 +29,7 @@ ARRAY_FIELDS = (
 )
 SCALAR_FIELDS = (
     "schema_version", "experiment_id", "config_sha256", "registry_sha256",
-    "source_commit", "source_tree_sha256", "bplsd_binary_sha256", "overall_status",
+    "source_commit", "source_tree_sha256", "decoder_binary_sha256", "overall_status",
     "terminal_status", "crossing_bracket_low", "crossing_bracket_high",
     "compatible_triple_json", "stage1_status", "stage1_bracket_low",
     "stage1_bracket_high", "bootstrap_half_width", "stage1_bootstrap_half_width",
@@ -72,7 +72,7 @@ def _validate_raw(raw, config, row, code_id, p_token, shard_index):
         "registry_sha256": config["registry_sha256"],
         "source_commit": config["source_commit"],
         "source_tree_sha256": config["source_tree_sha256"],
-        "bplsd_binary_sha256": config["bplsd_binary"]["sha256"],
+        "decoder_binary_sha256": config["decoder_binary"]["sha256"],
         "python_version": config["environment"]["python"],
         "numpy_version": config["environment"]["numpy"],
         "scipy_version": config["environment"]["scipy"],
@@ -311,7 +311,7 @@ def aggregate_decoder_scan(raw_root, config):
         "registry_sha256": config["registry_sha256"],
         "source_commit": config["source_commit"],
         "source_tree_sha256": config["source_tree_sha256"],
-        "bplsd_binary_sha256": config["bplsd_binary"]["sha256"],
+        "decoder_binary_sha256": config["decoder_binary"]["sha256"],
         "overall_status": overall,
         "terminal_status": "EXP103_INVALID" if overall == "INVALID" else "EXP103_INCOMPLETE",
         "crossing_bracket_low": np.nan,

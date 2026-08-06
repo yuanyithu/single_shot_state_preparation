@@ -150,7 +150,7 @@ def test_loader_accepts_only_the_preregistered_full_point_mask(
         "registry_sha256",
         "source_commit",
         "source_tree_sha256",
-        "bplsd_binary_sha256",
+        "decoder_binary_sha256",
     ],
 )
 def test_loader_rejects_frozen_scalar_identity_drift(
@@ -184,7 +184,7 @@ def test_loader_refuses_exp101_exp102_or_foreign_schema(
 
 def test_loader_rejects_the_blocked_local_execution_config(tmp_path):
     frozen_config = load_config(
-        "data/expander_code/exp103/config/decoder_mc.v1.json",
+        "data/expander_code/exp103/config/decoder_mc.v2.json",
     )
     raw_root = tmp_path / "empty_local_raw"
     raw_root.mkdir()

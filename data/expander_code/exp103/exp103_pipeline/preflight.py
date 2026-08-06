@@ -6,7 +6,7 @@ import time
 from pathlib import Path
 
 import numpy as np
-from ldpc import BpLsdDecoder
+from ldpc import BpOsdDecoder
 
 from .config import ensure_config
 from .identity import runtime_identity
@@ -28,12 +28,11 @@ def _rss_gib():
 
 
 def _make_decoder(model, p_token, spec):
-    return BpLsdDecoder(
+    return BpOsdDecoder(
         model.H_Z_sparse, error_rate=float(p_token), bp_method=spec["bp_method"],
         max_iter=model.n, schedule=spec["schedule"],
-        serial_schedule_order=list(range(model.n)), lsd_method=spec["lsd_method"],
-        lsd_order=spec["lsd_order"], bits_per_step=spec["bits_per_step"],
-        always_run_lsd=spec["always_run_lsd"], omp_thread_count=spec["omp_thread_count"],
+        serial_schedule_order=list(range(model.n)), osd_method=spec["osd_method"],
+        osd_order=spec["osd_order"], omp_thread_count=spec["omp_thread_count"],
     )
 
 
@@ -119,12 +118,12 @@ def _synthetic_raw_payload(model, code_id, p_token, seed, config, identity):
     )
     tag = f"{code_id}:{p_token}:{seed}".encode("ascii")
     return {
-        "schema_version": "exp103.raw.v1",
+        "schema_version": "exp103.raw.v2",
         "status": "VALID",
         "invalid_reason": "",
         "exception_type": "",
         "exception_message": "",
-        "experiment_id": "exp103.decoder_mc.v1",
+        "experiment_id": "exp103.decoder_mc.v2",
         "code_id": code_id,
         "m": model.m,
         "p_token": p_token,
@@ -138,7 +137,7 @@ def _synthetic_raw_payload(model, code_id, p_token, seed, config, identity):
         "registry_sha256": config["registry_sha256"],
         "source_commit": config["source_commit"],
         "source_tree_sha256": identity["source_tree_sha256"],
-        "bplsd_binary_sha256": identity["bplsd_binary_sha256"],
+        "decoder_binary_sha256": identity["decoder_binary_sha256"],
         "python_version": identity["python_version"],
         "numpy_version": identity["numpy_version"],
         "scipy_version": identity["scipy_version"],
@@ -403,7 +402,7 @@ def run_resource_preflight(config):
         "registry_sha256": config["registry_sha256"],
         "source_commit": config["source_commit"],
         "source_tree_sha256": identity["source_tree_sha256"],
-        "bplsd_binary_sha256": identity["bplsd_binary_sha256"],
+        "decoder_binary_sha256": identity["decoder_binary_sha256"],
         "device_name": identity["device_name"],
         "hostname": identity["hostname"],
         "conda_environment": identity["conda_environment"],
@@ -420,7 +419,7 @@ def validate_resource_preflight_report(report, config):
     config = ensure_config(config)
     required = {
         "schema_version", "config_sha256", "registry_sha256", "source_commit",
-        "source_tree_sha256", "bplsd_binary_sha256", "device_name", "hostname",
+        "source_tree_sha256", "decoder_binary_sha256", "device_name", "hostname",
         "conda_environment", "conda_prefix_matches_python", "outcome_blind",
         "logical_outcomes_saved", "tasks", "stages", "status",
     }
@@ -437,7 +436,7 @@ def validate_resource_preflight_report(report, config):
         ("registry_sha256", config["registry_sha256"]),
         ("source_commit", config["source_commit"]),
         ("source_tree_sha256", config["source_tree_sha256"]),
-        ("bplsd_binary_sha256", config["bplsd_binary"]["sha256"]),
+        ("decoder_binary_sha256", config["decoder_binary"]["sha256"]),
         ("device_name", config["environment"]["device_name"]),
         ("hostname", config["environment"]["hostname"]),
         ("conda_environment", config["environment"]["conda_environment"]),

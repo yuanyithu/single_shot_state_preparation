@@ -3,7 +3,7 @@ import traceback
 from numbers import Integral
 
 import numpy as np
-from ldpc import BpLsdDecoder
+from ldpc import BpOsdDecoder
 
 from . import EXPERIMENT_ID, RAW_SCHEMA
 from .config import ensure_config, normalize_p_token
@@ -17,7 +17,7 @@ RAW_FIELDS = {
     "exception_message", "experiment_id", "code_id", "m", "p_token", "p",
     "shard_index", "planned_trials", "completed_trials", "seed",
     "seed_namespace", "config_sha256", "registry_sha256", "source_commit",
-    "source_tree_sha256", "bplsd_binary_sha256", "python_version",
+    "source_tree_sha256", "decoder_binary_sha256", "python_version",
     "numpy_version", "scipy_version", "ldpc_version", "device_name",
     "hostname", "conda_environment", "conda_prefix_matches_python", "n", "k",
     "classical_distance", "error_stream_sha256", "correction_stream_sha256",
@@ -28,17 +28,15 @@ RAW_FIELDS = {
 
 def make_decoder(model, p, config):
     decoder = config["decoder"]
-    return BpLsdDecoder(
+    return BpOsdDecoder(
         model.H_Z_sparse,
         error_rate=float(p),
         bp_method=decoder["bp_method"],
         max_iter=model.n,
         schedule=decoder["schedule"],
         serial_schedule_order=list(range(model.n)),
-        lsd_method=decoder["lsd_method"],
-        lsd_order=decoder["lsd_order"],
-        bits_per_step=decoder["bits_per_step"],
-        always_run_lsd=decoder["always_run_lsd"],
+        osd_method=decoder["osd_method"],
+        osd_order=decoder["osd_order"],
         omp_thread_count=decoder["omp_thread_count"],
     )
 
@@ -72,7 +70,7 @@ def _base_raw(code_id, token, shard_index, config, identity, seed):
         "registry_sha256": config["registry_sha256"],
         "source_commit": config["source_commit"],
         "source_tree_sha256": identity.get("source_tree_sha256", config["source_tree_sha256"]),
-        "bplsd_binary_sha256": identity.get("bplsd_binary_sha256", config["bplsd_binary"]["sha256"]),
+        "decoder_binary_sha256": identity.get("decoder_binary_sha256", config["decoder_binary"]["sha256"]),
         "python_version": identity.get("python_version", ""),
         "numpy_version": identity.get("numpy_version", ""),
         "scipy_version": identity.get("scipy_version", ""),

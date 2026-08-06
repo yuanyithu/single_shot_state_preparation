@@ -43,8 +43,8 @@ def source_tree_sha256(package_dir=None):
     return digest.hexdigest()
 
 
-def bplsd_binary_path():
-    module = importlib.import_module("ldpc.bplsd_decoder._bplsd_decoder")
+def decoder_binary_path():
+    module = importlib.import_module("ldpc.bposd_decoder._bposd_decoder")
     return Path(module.__file__).resolve()
 
 
@@ -74,7 +74,7 @@ def runtime_identity(config, verify_source=False, repo_root=None):
         "numpy_version": np.__version__,
         "scipy_version": scipy.__version__,
         "ldpc_version": importlib.metadata.version("ldpc"),
-        "bplsd_binary_sha256": sha256_file(bplsd_binary_path()),
+        "decoder_binary_sha256": sha256_file(decoder_binary_path()),
         "source_tree_sha256": source_tree_sha256(),
         "source_commit": config["source_commit"],
     }
@@ -93,7 +93,7 @@ def runtime_identity(config, verify_source=False, repo_root=None):
         ("numpy_version", expected_env["numpy"]),
         ("scipy_version", expected_env["scipy"]),
         ("ldpc_version", expected_env["ldpc"]),
-        ("bplsd_binary_sha256", config["bplsd_binary"]["sha256"]),
+        ("decoder_binary_sha256", config["decoder_binary"]["sha256"]),
         ("source_tree_sha256", config["source_tree_sha256"]),
     ):
         if actual[key] != expected:
@@ -103,7 +103,7 @@ def runtime_identity(config, verify_source=False, repo_root=None):
         and actual["support_packages"] != config["support_packages"]
     ):
         raise ValueError("runtime identity mismatch for support_packages")
-    if not bplsd_binary_path().name.endswith(config["bplsd_binary"]["filename_suffix"]):
+    if not decoder_binary_path().name.endswith(config["decoder_binary"]["filename_suffix"]):
         raise ValueError("runtime identity mismatch for BpLSD binary filename")
     if verify_source:
         root = Path(repo_root or Path(__file__).resolve().parents[4]).resolve()
@@ -264,7 +264,7 @@ def verify_remote_deployment(
     package_dir = source_root / "data" / "expander_code" / "exp103" / "exp103_pipeline"
     if source_tree_sha256(package_dir) != config["source_tree_sha256"]:
         raise ValueError("remote deployment package differs from the frozen source tree")
-    config_path = source_root / "data" / "expander_code" / "exp103" / "config" / "decoder_mc.remote.v2.json"
+    config_path = source_root / "data" / "expander_code" / "exp103" / "config" / "decoder_mc.remote.v3.json"
     if not config_path.is_file():
         raise ValueError("remote deployment does not contain its canonical config")
     deployed_config = json.loads(config_path.read_text(encoding="ascii"))

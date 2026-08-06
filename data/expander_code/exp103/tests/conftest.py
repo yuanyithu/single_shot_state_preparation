@@ -37,10 +37,10 @@ from data.expander_code.exp103.exp103_pipeline.worker import RAW_FIELDS
 
 CONFIG_PATH = Path(os.environ.get(
     "EXP103_TEST_CONFIG_PATH",
-    REPO_ROOT / "data/expander_code/exp103/config/decoder_mc.v1.json",
+    REPO_ROOT / "data/expander_code/exp103/config/decoder_mc.v2.json",
 ))
 REMOTE_CONFIG_PATH = (
-    REPO_ROOT / "data/expander_code/exp103/config/decoder_mc.remote.v2.json"
+    REPO_ROOT / "data/expander_code/exp103/config/decoder_mc.remote.v3.json"
 )
 
 
@@ -105,7 +105,7 @@ def runtime_identity_for(config):
         "numpy_version": config["environment"]["numpy"],
         "scipy_version": config["environment"]["scipy"],
         "ldpc_version": config["environment"]["ldpc"],
-        "bplsd_binary_sha256": config["bplsd_binary"]["sha256"],
+        "decoder_binary_sha256": config["decoder_binary"]["sha256"],
         "source_tree_sha256": config["source_tree_sha256"],
         "source_commit": config["source_commit"],
     }
@@ -116,8 +116,8 @@ def install_tiny_runtime(monkeypatch, tiny_css_model):
     from data.expander_code.exp103.exp103_pipeline import replay, worker
 
     def install(decoder_class=TinySyndromeDecoder):
-        monkeypatch.setattr(worker, "BpLsdDecoder", decoder_class)
-        monkeypatch.setattr(replay, "BpLsdDecoder", decoder_class)
+        monkeypatch.setattr(worker, "BpOsdDecoder", decoder_class)
+        monkeypatch.setattr(replay, "BpOsdDecoder", decoder_class)
         monkeypatch.setattr(worker, "load_model", lambda _config, _code_id: tiny_css_model)
         monkeypatch.setattr(replay, "load_model", lambda _config, _code_id: tiny_css_model)
         monkeypatch.setattr(
@@ -149,12 +149,12 @@ def raw_factory(frozen_config, registry_rows):
         )
         stream_tag = f"{code_id}:{p_token}:{shard_index}".encode("ascii")
         raw = {
-            "schema_version": "exp103.raw.v1",
+            "schema_version": "exp103.raw.v2",
             "status": "VALID",
             "invalid_reason": "",
             "exception_type": "",
             "exception_message": "",
-            "experiment_id": "exp103.decoder_mc.v1",
+            "experiment_id": "exp103.decoder_mc.v2",
             "code_id": code_id,
             "m": row["m"],
             "p_token": p_token,
@@ -168,7 +168,7 @@ def raw_factory(frozen_config, registry_rows):
             "registry_sha256": frozen_config["registry_sha256"],
             "source_commit": frozen_config["source_commit"],
             "source_tree_sha256": frozen_config["source_tree_sha256"],
-            "bplsd_binary_sha256": frozen_config["bplsd_binary"]["sha256"],
+            "decoder_binary_sha256": frozen_config["decoder_binary"]["sha256"],
             "python_version": frozen_config["environment"]["python"],
             "numpy_version": frozen_config["environment"]["numpy"],
             "scipy_version": frozen_config["environment"]["scipy"],
@@ -312,7 +312,7 @@ def complete_aggregate_factory(publication_config, registry_rows):
             "registry_sha256": publication_config["registry_sha256"],
             "source_commit": publication_config["source_commit"],
             "source_tree_sha256": publication_config["source_tree_sha256"],
-            "bplsd_binary_sha256": publication_config["bplsd_binary"]["sha256"],
+            "decoder_binary_sha256": publication_config["decoder_binary"]["sha256"],
             "device_name": publication_config["environment"]["device_name"],
             "hostname": publication_config["environment"]["hostname"],
             "conda_environment": publication_config["environment"]["conda_environment"],
@@ -347,13 +347,13 @@ def complete_aggregate_factory(publication_config, registry_rows):
     ).hexdigest()
     replay_report["raw_manifest_sha256"] = raw_manifest_sha256
     aggregate.update({
-            "schema_version": "exp103.aggregate.v1",
-            "experiment_id": "exp103.decoder_mc.v1",
+            "schema_version": "exp103.aggregate.v2",
+            "experiment_id": "exp103.decoder_mc.v2",
             "config_sha256": publication_config["config_sha256"],
             "registry_sha256": publication_config["registry_sha256"],
             "source_commit": publication_config["source_commit"],
             "source_tree_sha256": publication_config["source_tree_sha256"],
-            "bplsd_binary_sha256": publication_config["bplsd_binary"]["sha256"],
+            "decoder_binary_sha256": publication_config["decoder_binary"]["sha256"],
             "overall_status": "COMPLETE",
             "terminal_status": final_decision["status"],
             "crossing_bracket_low": final_decision["bracket"][0],

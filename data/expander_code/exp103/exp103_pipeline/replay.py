@@ -2,7 +2,7 @@ import hashlib
 from pathlib import Path
 
 import numpy as np
-from ldpc import BpLsdDecoder
+from ldpc import BpOsdDecoder
 
 from .audit_scorer import pairing_score
 from .config import ensure_config, normalize_p_token
@@ -15,17 +15,15 @@ from .seeds import derive_seed
 
 def _decoder(model, p, config):
     spec = config["decoder"]
-    return BpLsdDecoder(
+    return BpOsdDecoder(
         model.H_Z_sparse,
         error_rate=float(p),
         bp_method="product_sum",
         max_iter=model.n,
         schedule="serial",
         serial_schedule_order=list(range(model.n)),
-        lsd_method="LSD_CS",
-        lsd_order=0,
-        bits_per_step=1,
-        always_run_lsd=False,
+        osd_method="osd_0",
+        osd_order=0,
         omp_thread_count=1,
     )
 
@@ -40,13 +38,13 @@ def replay_decoder_shard(raw_or_path, config):
         config, "measurement", raw["code_id"], token, int(raw["shard_index"]),
     )
     identity_fields = {
-        "schema_version": "exp103.raw.v1",
-        "experiment_id": "exp103.decoder_mc.v1",
+        "schema_version": "exp103.raw.v2",
+        "experiment_id": "exp103.decoder_mc.v2",
         "config_sha256": config["config_sha256"],
         "registry_sha256": config["registry_sha256"],
         "source_commit": config["source_commit"],
         "source_tree_sha256": identity["source_tree_sha256"],
-        "bplsd_binary_sha256": identity["bplsd_binary_sha256"],
+        "decoder_binary_sha256": identity["decoder_binary_sha256"],
         "seed": expected_seed,
         "seed_namespace": config["namespaces"]["measurement"],
         "device_name": identity["device_name"],
@@ -210,7 +208,7 @@ def build_replay_report(raw_root, results, config):
         "registry_sha256": config["registry_sha256"],
         "source_commit": config["source_commit"],
         "source_tree_sha256": config["source_tree_sha256"],
-        "bplsd_binary_sha256": config["bplsd_binary"]["sha256"],
+        "decoder_binary_sha256": config["decoder_binary"]["sha256"],
         "device_name": identity["device_name"],
         "hostname": identity["hostname"],
         "conda_environment": identity["conda_environment"],
@@ -259,7 +257,7 @@ def validate_replay_report_payload(report, config, required_scope=None):
     config = ensure_config(config)
     if set(report) != {
         "schema_version", "config_sha256", "registry_sha256", "source_commit",
-        "source_tree_sha256", "bplsd_binary_sha256", "device_name", "hostname",
+        "source_tree_sha256", "decoder_binary_sha256", "device_name", "hostname",
         "conda_environment", "conda_prefix_matches_python", "scope",
         "expected_shards", "shards", "raw_manifest_sha256", "status", "results",
     } or report["schema_version"] != "exp103.replay.v1":
@@ -271,7 +269,7 @@ def validate_replay_report_payload(report, config, required_scope=None):
         ("registry_sha256", config["registry_sha256"]),
         ("source_commit", config["source_commit"]),
         ("source_tree_sha256", config["source_tree_sha256"]),
-        ("bplsd_binary_sha256", config["bplsd_binary"]["sha256"]),
+        ("decoder_binary_sha256", config["decoder_binary"]["sha256"]),
         ("device_name", config["environment"]["device_name"]),
         ("hostname", config["environment"]["hostname"]),
         ("conda_environment", config["environment"]["conda_environment"]),

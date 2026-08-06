@@ -333,7 +333,7 @@ def generate_final_report(result_path, output_dir):
         "num_code_p": 624,
         "trials_per_code_p": 10000,
         "total_trials": int(data["trial_counts"].sum()),
-        "authority": "finite_grid_bplsd_decoder_crossing_only",
+        "authority": "finite_grid_bposd_decoder_crossing_only",
         "exp102_blockers_cleared": [],
         "files": [
             "primary_curves.csv", "crossing_contrasts.csv", "code_diagnostics.csv",

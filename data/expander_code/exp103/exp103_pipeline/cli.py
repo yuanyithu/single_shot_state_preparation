@@ -122,7 +122,7 @@ def _require_validation001(config):
     report = json.loads(path.read_text(encoding="ascii"))
     if set(report) != {
         "schema_version", "status", "config_sha256", "registry_sha256",
-        "source_commit", "source_tree_sha256", "bplsd_binary_sha256",
+        "source_commit", "source_tree_sha256", "decoder_binary_sha256",
         "environment", "test_commands", "test_counts", "oracle_checks",
         "distance_two_codes", "all_tests_passed", "authority",
         "exp102_status_unchanged",
@@ -135,7 +135,7 @@ def _require_validation001(config):
         if report.get(field) != expected:
             raise ValueError(f"Validation 001 identity mismatch for {field}")
     if (
-        report["bplsd_binary_sha256"] != config["bplsd_binary"]["sha256"]
+        report["decoder_binary_sha256"] != config["decoder_binary"]["sha256"]
         or report["environment"] != config["environment"]
         or report["all_tests_passed"] is not True
         or report["authority"] != "IMPLEMENTATION_AND_LOCAL_RESOURCE_PREFLIGHT_ONLY"

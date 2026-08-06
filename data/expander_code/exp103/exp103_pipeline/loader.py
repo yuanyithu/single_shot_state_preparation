@@ -39,7 +39,7 @@ def _validate(aggregate):
     config_path = (
         Path(__file__).resolve().parents[1]
         / "config"
-        / "decoder_mc.remote.v2.json"
+        / "decoder_mc.remote.v3.json"
     )
     config = load_config(config_path)
     for field, expected in (
@@ -47,7 +47,7 @@ def _validate(aggregate):
         ("registry_sha256", config["registry_sha256"]),
         ("source_commit", config["source_commit"]),
         ("source_tree_sha256", config["source_tree_sha256"]),
-        ("bplsd_binary_sha256", config["bplsd_binary"]["sha256"]),
+        ("decoder_binary_sha256", config["decoder_binary"]["sha256"]),
     ):
         if aggregate[field] != expected:
             raise ValueError(f"aggregate identity mismatch for {field}")

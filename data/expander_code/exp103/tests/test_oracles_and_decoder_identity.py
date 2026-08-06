@@ -81,10 +81,8 @@ def _expected_decoder_kwargs(model, p):
         "max_iter": model.n,
         "schedule": "serial",
         "serial_schedule_order": list(range(model.n)),
-        "lsd_method": "LSD_CS",
-        "lsd_order": 0,
-        "bits_per_step": 1,
-        "always_run_lsd": False,
+        "osd_method": "osd_0",
+        "osd_order": 0,
         "omp_thread_count": 1,
     }
 
@@ -103,7 +101,7 @@ def test_worker_and_replay_bind_every_decoder_parameter(
         def __init__(self, *args, **kwargs):
             calls.append((args, kwargs))
 
-    monkeypatch.setattr(factory_module, "BpLsdDecoder", Recorder)
+    monkeypatch.setattr(factory_module, "BpOsdDecoder", Recorder)
     getattr(factory_module, factory_name)(tiny_css_model, p, frozen_config)
     assert len(calls) == 1
     args, kwargs = calls[0]
@@ -127,7 +125,7 @@ def test_preflight_uses_same_decoder_identity_and_benchmark_namespace(
             correction[0] = np.asarray(syndrome, dtype=np.uint8)[0]
             return correction
 
-    monkeypatch.setattr(preflight, "BpLsdDecoder", Recorder)
+    monkeypatch.setattr(preflight, "BpOsdDecoder", Recorder)
     monkeypatch.setattr(preflight, "load_model", lambda _config, _code_id: tiny_css_model)
     monkeypatch.setattr(preflight, "clear_model_cache", lambda: None)
     identity_calls = []
@@ -143,7 +141,7 @@ def test_preflight_uses_same_decoder_identity_and_benchmark_namespace(
             "numpy_version": config["environment"]["numpy"],
             "scipy_version": config["environment"]["scipy"],
             "ldpc_version": config["environment"]["ldpc"],
-            "bplsd_binary_sha256": config["bplsd_binary"]["sha256"],
+            "decoder_binary_sha256": config["decoder_binary"]["sha256"],
             "source_tree_sha256": config["source_tree_sha256"],
             "source_commit": config["source_commit"],
         }
@@ -313,11 +311,11 @@ def test_runtime_identity_rejects_wrong_host_or_noncanonical_conda(
         identity, "source_tree_sha256", lambda: frozen_config["source_tree_sha256"],
     )
     monkeypatch.setattr(
-        identity, "bplsd_binary_path",
-        lambda: Path("backend" + frozen_config["bplsd_binary"]["filename_suffix"]),
+        identity, "decoder_binary_path",
+        lambda: Path("backend" + frozen_config["decoder_binary"]["filename_suffix"]),
     )
     monkeypatch.setattr(
-        identity, "sha256_file", lambda _path: frozen_config["bplsd_binary"]["sha256"],
+        identity, "sha256_file", lambda _path: frozen_config["decoder_binary"]["sha256"],
     )
     expected_environment = frozen_config["environment"]
     monkeypatch.setattr(
@@ -382,18 +380,14 @@ def test_contract_byte_binding_rejects_later_committed_or_worktree_edits(tmp_pat
         identity._require_file_matches_commit(repo, contract, commit)
 
 
-def test_frozen_runtime_and_bplsd_binary_identity(frozen_config):
+def test_frozen_runtime_and_decoder_binary_identity(frozen_config):
     assert frozen_config["source_commit"] != "0" * 40
     assert frozen_config["source_tree_sha256"] != "0" * 64
-    if frozen_config["schema_version"] == "exp103.config.remote.v2":
-        actual = identity.runtime_identity(frozen_config)
-        assert actual["source_tree_sha256"] == identity.source_tree_sha256()
-    else:
-        # The local v1 source snapshot is immutable historical evidence. The
-        # remote amendment deliberately evolves the package and must close the
-        # old local runtime gate instead of silently reclassifying it.
-        with pytest.raises(ValueError, match="source_tree_sha256"):
-            identity.runtime_identity(frozen_config)
-    assert identity.bplsd_binary_path().name.endswith(
-        frozen_config["bplsd_binary"]["filename_suffix"],
+    # Both canonical configs are frozen at the same v2 decoder source, so each
+    # must match the machine that runs the formal suite in its own environment.
+    actual = identity.runtime_identity(frozen_config)
+    assert actual["source_tree_sha256"] == identity.source_tree_sha256()
+    assert actual["decoder_binary_sha256"] == frozen_config["decoder_binary"]["sha256"]
+    assert identity.decoder_binary_path().name.endswith(
+        frozen_config["decoder_binary"]["filename_suffix"],
     )

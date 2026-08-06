@@ -1,9 +1,9 @@
 """Fail-closed BpLSD decoder Monte Carlo pipeline for exp103."""
 
-CONFIG_SCHEMA = "exp103.config.v1"
-RAW_SCHEMA = "exp103.raw.v1"
-AGGREGATE_SCHEMA = "exp103.aggregate.v1"
-EXPERIMENT_ID = "exp103.decoder_mc.v1"
+CONFIG_SCHEMA = "exp103.config.v2"
+RAW_SCHEMA = "exp103.raw.v2"
+AGGREGATE_SCHEMA = "exp103.aggregate.v2"
+EXPERIMENT_ID = "exp103.decoder_mc.v2"
 
 from .aggregate import aggregate_decoder_scan
 from .loader import load_exp103_crossing

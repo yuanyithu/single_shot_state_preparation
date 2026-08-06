@@ -13,7 +13,7 @@ from data.expander_code.exp103.deployment.build_remote_deployment import (
     FROZEN_EXECUTION_PATHS, SOURCE_PATHS,
 )
 from data.expander_code.exp103.exp103_pipeline.config import (
-    REMOTE_BPLSD_BINARY_SHA256, REMOTE_CONDA_PREFIX, REMOTE_LDPC_SOURCE,
+    REMOTE_DECODER_BINARY_SHA256, REMOTE_CONDA_PREFIX, REMOTE_LDPC_SOURCE,
     REMOTE_SUPPORT_PACKAGES, ensure_config,
 )
 from data.expander_code.exp103.exp103_pipeline.io import atomic_json, sha256_file
@@ -26,7 +26,7 @@ def remote_config_from(local_config, *, source_tree_sha256="2" * 64):
         if key not in {"config_sha256", "config_path"}
     }
     config = json.loads(json.dumps(config))
-    config["schema_version"] = "exp103.config.remote.v2"
+    config["schema_version"] = "exp103.config.remote.v3"
     config["source_commit"] = "1" * 40
     config["source_tree_sha256"] = source_tree_sha256
     remote_prefix = REMOTE_CONDA_PREFIX
@@ -40,13 +40,13 @@ def remote_config_from(local_config, *, source_tree_sha256="2" * 64):
         "scipy": "1.17.0",
         "ldpc": "2.4.1",
     }
-    config["bplsd_binary"] = {
-        "module": "ldpc.bplsd_decoder._bplsd_decoder",
+    config["decoder_binary"] = {
+        "module": "ldpc.bposd_decoder._bposd_decoder",
         "filename_suffix": ".cpython-312-x86_64-linux-gnu.so",
-        "sha256": REMOTE_BPLSD_BINARY_SHA256,
+        "sha256": REMOTE_DECODER_BINARY_SHA256,
     }
     config["execution_profile"] = {
-        "profile_id": "exp103.remote_execution.v2",
+        "profile_id": "exp103.remote_execution.v3",
         "entry_host": "yuany",
         "compute_host": "nd-3",
         "conda_environment": remote_prefix,
@@ -77,7 +77,7 @@ def _plain_config(config):
 
 
 def _canonical_local_config():
-    path = Path("data/expander_code/exp103/config/decoder_mc.v1.json")
+    path = Path("data/expander_code/exp103/config/decoder_mc.v2.json")
     return ensure_config(json.loads(path.read_text(encoding="ascii")))
 
 
@@ -109,11 +109,11 @@ def test_prefix_style_conda_identity_is_verified_without_rewriting_environment(
         identity, "source_tree_sha256", lambda: config["source_tree_sha256"],
     )
     monkeypatch.setattr(
-        identity, "bplsd_binary_path",
-        lambda: Path("backend" + config["bplsd_binary"]["filename_suffix"]),
+        identity, "decoder_binary_path",
+        lambda: Path("backend" + config["decoder_binary"]["filename_suffix"]),
     )
     monkeypatch.setattr(
-        identity, "sha256_file", lambda _path: config["bplsd_binary"]["sha256"],
+        identity, "sha256_file", lambda _path: config["decoder_binary"]["sha256"],
     )
     actual_version = identity.importlib.metadata.version
     monkeypatch.setattr(
@@ -383,12 +383,12 @@ def test_remote_config_is_strictly_separate_from_local_v1(remote_config, frozen_
         ensure_config(remote_without_profile)
 
     placeholder = _plain_config(remote_config)
-    placeholder["bplsd_binary"]["sha256"] = "0" * 64
+    placeholder["decoder_binary"]["sha256"] = "0" * 64
     with pytest.raises(ValueError, match="not fully frozen"):
         ensure_config(placeholder)
 
     wrong_binary = _plain_config(remote_config)
-    wrong_binary["bplsd_binary"]["sha256"] = "3" * 64
+    wrong_binary["decoder_binary"]["sha256"] = "3" * 64
     with pytest.raises(ValueError, match="not fully frozen"):
         ensure_config(wrong_binary)
 
@@ -445,7 +445,7 @@ def _build_deployment(tmp_path, frozen_config):
     (package / "__init__.py").write_text("VALUE = 1\n", encoding="ascii")
     tree_sha = identity.source_tree_sha256(package)
     config = remote_config_from(frozen_config, source_tree_sha256=tree_sha)
-    config_path = source / "data/expander_code/exp103/config/decoder_mc.remote.v2.json"
+    config_path = source / "data/expander_code/exp103/config/decoder_mc.remote.v3.json"
     atomic_json(config_path, _plain_config(config))
 
     archive = deployment / "SOURCE.tar"
@@ -537,7 +537,7 @@ def _remote_report_from_local_timings(remote_config):
         "registry_sha256": remote_config["registry_sha256"],
         "source_commit": remote_config["source_commit"],
         "source_tree_sha256": remote_config["source_tree_sha256"],
-        "bplsd_binary_sha256": remote_config["bplsd_binary"]["sha256"],
+        "decoder_binary_sha256": remote_config["decoder_binary"]["sha256"],
         "device_name": "nd-3",
         "hostname": "nd-3",
         "conda_environment": remote_config["environment"]["conda_environment"],
@@ -597,7 +597,7 @@ def _qualification_report(remote_config):
         "registry_sha256": remote_config["registry_sha256"],
         "source_commit": remote_config["source_commit"],
         "source_tree_sha256": remote_config["source_tree_sha256"],
-        "bplsd_binary_sha256": remote_config["bplsd_binary"]["sha256"],
+        "decoder_binary_sha256": remote_config["decoder_binary"]["sha256"],
         "device_name": "nd-3",
         "hostname": "nd-3",
         "conda_environment": remote_config["environment"]["conda_environment"],
@@ -609,8 +609,8 @@ def _qualification_report(remote_config):
         "scipy_version": remote_config["environment"]["scipy"],
         "ldpc_version": remote_config["environment"]["ldpc"],
         "support_packages": remote_config["support_packages"],
-        "bplsd_binary_path": str(remote_cli.bplsd_binary_path()),
-        "bplsd_binary_filename": remote_cli.bplsd_binary_path().name,
+        "decoder_binary_path": str(remote_cli.decoder_binary_path()),
+        "decoder_binary_filename": remote_cli.decoder_binary_path().name,
         "python_no_bytecode_flag": True,
         "pythondontwritebytecode": True,
         "pytest_cache_disabled": True,
@@ -676,7 +676,7 @@ def test_qualification_runs_three_frozen_python_no_bytecode_groups(
 
     fake_binary = (
         Path(sys.prefix).resolve()
-        / ("backend" + remote_config["bplsd_binary"]["filename_suffix"])
+        / ("backend" + remote_config["decoder_binary"]["filename_suffix"])
     )
     monkeypatch.setattr(remote_cli.subprocess, "run", completed)
     monkeypatch.setattr(
@@ -689,7 +689,7 @@ def test_qualification_runs_three_frozen_python_no_bytecode_groups(
             "support_packages": remote_config["support_packages"],
         },
     )
-    monkeypatch.setattr(remote_cli, "bplsd_binary_path", lambda: fake_binary)
+    monkeypatch.setattr(remote_cli, "decoder_binary_path", lambda: fake_binary)
     monkeypatch.setattr(
         remote_cli, "_ldpc_source_provenance",
         lambda _config: {**remote_config["ldpc_source"], "project_version": "2.4.1"},

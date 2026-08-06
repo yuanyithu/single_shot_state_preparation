@@ -13,17 +13,18 @@ CODE_IDS = [f"m{m:02d}_c{code:02d}" for m in M_VALUES for code in range(8)]
 REGISTRY_PATH = "data/expander_code/exp102/registry/registry.json"
 REGISTRY_SHA256 = "883730e0ba548f6b358187d8f123fdd4d8aeb116f4bacda363c35c16d01ae40b"
 MASTER_SEED_HEX = "08e1c6bd6607989e9ffc4506d73a687d9776672c9191d24414f54503153c9cb7"
-BPLSD_BINARY_SHA256 = "180dfe755fcd5cb3dbc37e3291a8e05a3e488fcb6bfceea283f8c6392450a592"
-BPLSD_BINARY_SUFFIX = ".cpython-312-darwin.so"
+DECODER_BINARY_SHA256 = "944a96a657a89fbd04c127edb2eba1033f56de0161ddcd2ba7e57dee76777ccc"
+DECODER_BINARY_SUFFIX = ".cpython-312-darwin.so"
+# Ordered statistics decoding replaces localised statistics decoding because the
+# LSD tie-break is randomized and cannot satisfy a bit-exact replay gate. See
+# validation/005 and DECODER_AMENDMENT_V3.md.
 DECODER = {
     "bp_method": "product_sum",
     "max_iter": "n",
     "schedule": "serial",
     "serial_schedule_order": "natural",
-    "lsd_method": "LSD_CS",
-    "lsd_order": 0,
-    "bits_per_step": 1,
-    "always_run_lsd": False,
+    "osd_method": "osd_0",
+    "osd_order": 0,
     "omp_thread_count": 1,
 }
 NAMESPACES = {
@@ -37,15 +38,15 @@ TOP_LEVEL_FIELDS = {
     "registry_sha256", "source_commit", "source_tree_sha256",
     "master_seed_hex", "m_values", "codes_per_m", "p_tokens",
     "shards_per_code_p", "trials_per_shard", "decoder", "environment",
-    "bplsd_binary", "namespaces", "bootstrap", "preflight",
+    "decoder_binary", "namespaces", "bootstrap", "preflight",
     "stage_m_values", "preregistered_point_masks", "crossing",
 }
-REMOTE_CONFIG_SCHEMA = "exp103.config.remote.v2"
-REMOTE_CONFIG_PATH = "data/expander_code/exp103/config/decoder_mc.remote.v2.json"
-REMOTE_EXECUTION_PROFILE = "exp103.remote_execution.v2"
+REMOTE_CONFIG_SCHEMA = "exp103.config.remote.v3"
+REMOTE_CONFIG_PATH = "data/expander_code/exp103/config/decoder_mc.remote.v3.json"
+REMOTE_EXECUTION_PROFILE = "exp103.remote_execution.v3"
 REMOTE_CONDA_PREFIX = "/home/DATA1/users/yuany/.single_shot/cache/exp103_remote_v1_env"
-REMOTE_BPLSD_BINARY_SHA256 = "db3eb33b3afa4887994c9b949cdc7ae280614eab0fe4245a63226060740140e6"
-REMOTE_BPLSD_BINARY_SUFFIX = ".cpython-312-x86_64-linux-gnu.so"
+REMOTE_DECODER_BINARY_SHA256 = "3a5a7dc2c1ed015eb137ef5823d7e2d13c2d851fe895788adc3bded4e4d0c079"
+REMOTE_DECODER_BINARY_SUFFIX = ".cpython-312-x86_64-linux-gnu.so"
 REMOTE_TOP_LEVEL_FIELDS = TOP_LEVEL_FIELDS | {
     "execution_profile", "ldpc_source", "support_packages",
 }
@@ -136,7 +137,7 @@ def _validate(config):
         raise ValueError("unexpected exp103 config fields")
     if schema not in {CONFIG_SCHEMA, REMOTE_CONFIG_SCHEMA} or config["experiment_id"] != EXPERIMENT_ID:
         raise ValueError("exp103 config identity mismatch")
-    if config["objective"] != "bplsd_block_logical_failure_crossing_q0":
+    if config["objective"] != "bposd_block_logical_failure_crossing_q0":
         raise ValueError("unexpected exp103 objective")
     if config["registry_path"] != REGISTRY_PATH or config["registry_sha256"] != REGISTRY_SHA256:
         raise ValueError("exp103 must use the canonical frozen 48-code registry")
@@ -188,18 +189,18 @@ def _validate(config):
         raise ValueError("canonical environment identity differs from the frozen contract")
     if type(env["conda_prefix_matches_python"]) is not bool:
         raise ValueError("conda prefix attestation must be a boolean")
-    binary = config["bplsd_binary"]
+    binary = config["decoder_binary"]
     if set(binary) != {"module", "filename_suffix", "sha256"}:
         raise ValueError("unexpected BpLSD binary identity fields")
-    if binary["module"] != "ldpc.bplsd_decoder._bplsd_decoder":
+    if binary["module"] != "ldpc.bposd_decoder._bposd_decoder":
         raise ValueError("BpLSD extension module mismatch")
     if remote:
         if (
-            binary["sha256"] != REMOTE_BPLSD_BINARY_SHA256
-            or binary["filename_suffix"] != REMOTE_BPLSD_BINARY_SUFFIX
+            binary["sha256"] != REMOTE_DECODER_BINARY_SHA256
+            or binary["filename_suffix"] != REMOTE_DECODER_BINARY_SUFFIX
         ):
             raise ValueError("remote BpLSD extension binary is not fully frozen")
-    elif binary["sha256"] != BPLSD_BINARY_SHA256 or binary["filename_suffix"] != BPLSD_BINARY_SUFFIX:
+    elif binary["sha256"] != DECODER_BINARY_SHA256 or binary["filename_suffix"] != DECODER_BINARY_SUFFIX:
         raise ValueError("BpLSD extension binary differs from the frozen backend")
     bootstrap = config["bootstrap"]
     if bootstrap != {
@@ -242,9 +243,9 @@ def load_config(path):
     path = Path(path)
     raw = json.loads(path.read_text(encoding="ascii"))
     filename = (
-        "decoder_mc.remote.v2.json"
+        "decoder_mc.remote.v3.json"
         if raw.get("schema_version") == REMOTE_CONFIG_SCHEMA
-        else "decoder_mc.v1.json"
+        else "decoder_mc.v2.json"
     )
     canonical_path = Path(__file__).resolve().parents[1] / "config" / filename
     if path.resolve() != canonical_path.resolve():

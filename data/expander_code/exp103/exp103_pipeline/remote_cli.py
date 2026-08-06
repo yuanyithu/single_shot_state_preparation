@@ -24,7 +24,7 @@ from .aggregate import (
     aggregate_decoder_scan, save_aggregate,
 )
 from .config import REMOTE_CONFIG_SCHEMA, ensure_config, load_config
-from .identity import bplsd_binary_path, runtime_identity, verify_remote_deployment
+from .identity import decoder_binary_path, runtime_identity, verify_remote_deployment
 from .io import arrays_sha256, atomic_json, canonical_json, sha256_file, sha256_json
 from .preflight import _stage_estimate, benchmark_task
 from .raw import load_raw, raw_filename, save_raw
@@ -48,15 +48,15 @@ REMOTE_PREFLIGHT_RELATIVE = Path("validation/remote_resource_preflight.json")
 REMOTE_TECHNICAL_RELATIVE = Path("validation/stage1_technical_report.json")
 COMMITTED_PREFLIGHT_RELATIVE = Path(
     "data/expander_code/exp103/validation/"
-    "004_remote_gate_v2_20260805/remote_resource_preflight.json"
+    "007_remote_gate_v3_20260806/remote_resource_preflight.json"
 )
 COMMITTED_QUALIFICATION_RELATIVE = Path(
     "data/expander_code/exp103/validation/"
-    "004_remote_gate_v2_20260805/environment_qualification.json"
+    "007_remote_gate_v3_20260806/environment_qualification.json"
 )
 COMMITTED_TECHNICAL_RELATIVE = Path(
     "data/expander_code/exp103/validation/"
-    "005_remote_m3_m5_scan_20260805/technical_report.json"
+    "008_remote_m3_m5_scan_20260806/technical_report.json"
 )
 QUALIFICATION_GROUPS = (
     ("exp103", ("data/expander_code/exp103/tests",)),
@@ -72,7 +72,7 @@ QUALIFICATION_GROUPS = (
     )),
 )
 QUALIFICATION_EXPECTED_PASSES = {
-    "exp103": 128,
+    "exp103": 131,
     "exp101": 58,
     "exp102": 17,
 }
@@ -81,7 +81,7 @@ QUALIFICATION_EXPECTED_PASSES = {
 def _require_remote_config(config):
     config = ensure_config(config)
     if config["schema_version"] != REMOTE_CONFIG_SCHEMA:
-        raise ValueError("remote execution requires exp103.config.remote.v2")
+        raise ValueError("remote execution requires exp103.config.remote.v3")
     return config
 
 
@@ -393,7 +393,7 @@ def run_environment_qualification(config, deployment, source_root):
         "PYTEST_ADDOPTS": "-p no:cacheprovider",
         "PYTHONPATH": str(source_root),
         "EXP103_TEST_CONFIG_PATH": str(
-            source_root / "data/expander_code/exp103/config/decoder_mc.remote.v2.json"
+            source_root / "data/expander_code/exp103/config/decoder_mc.remote.v3.json"
         ),
     })
     environment.pop("PYTHONOPTIMIZE", None)
@@ -435,7 +435,7 @@ def run_environment_qualification(config, deployment, source_root):
         result["status"] == "PASS" for result in results
     )
     identity = runtime_identity(config)
-    binary_path = bplsd_binary_path()
+    binary_path = decoder_binary_path()
     resolved_prefix = Path(sys.prefix).resolve()
     if resolved_prefix not in binary_path.parents:
         raise ValueError("BpLSD binary is outside the frozen Python prefix")
@@ -448,7 +448,7 @@ def run_environment_qualification(config, deployment, source_root):
         "registry_sha256": config["registry_sha256"],
         "source_commit": config["source_commit"],
         "source_tree_sha256": config["source_tree_sha256"],
-        "bplsd_binary_sha256": config["bplsd_binary"]["sha256"],
+        "decoder_binary_sha256": config["decoder_binary"]["sha256"],
         "device_name": config["environment"]["device_name"],
         "hostname": config["environment"]["hostname"],
         "conda_environment": config["environment"]["conda_environment"],
@@ -460,8 +460,8 @@ def run_environment_qualification(config, deployment, source_root):
         "scipy_version": identity["scipy_version"],
         "ldpc_version": identity["ldpc_version"],
         "support_packages": identity["support_packages"],
-        "bplsd_binary_path": str(binary_path),
-        "bplsd_binary_filename": binary_path.name,
+        "decoder_binary_path": str(binary_path),
+        "decoder_binary_filename": binary_path.name,
         "python_no_bytecode_flag": True,
         "pythondontwritebytecode": True,
         "pytest_cache_disabled": True,
@@ -480,11 +480,11 @@ def validate_environment_qualification(report, config):
     required = {
         "schema_version", "status", "experiment_id", "execution_profile_id",
         "config_sha256", "registry_sha256", "source_commit",
-        "source_tree_sha256", "bplsd_binary_sha256", "device_name", "hostname",
+        "source_tree_sha256", "decoder_binary_sha256", "device_name", "hostname",
         "conda_environment", "conda_prefix", "python_executable", "python_prefix",
         "python_version", "numpy_version", "scipy_version", "ldpc_version",
         "support_packages",
-        "bplsd_binary_path", "bplsd_binary_filename", "python_no_bytecode_flag",
+        "decoder_binary_path", "decoder_binary_filename", "python_no_bytecode_flag",
         "pythondontwritebytecode", "pytest_cache_disabled",
         "bytecode_clean_before", "bytecode_clean_after", "deployment",
         "ldpc_source_provenance", "host_resources", "groups", "total_passed",
@@ -498,7 +498,7 @@ def validate_environment_qualification(report, config):
         ("registry_sha256", config["registry_sha256"]),
         ("source_commit", config["source_commit"]),
         ("source_tree_sha256", config["source_tree_sha256"]),
-        ("bplsd_binary_sha256", config["bplsd_binary"]["sha256"]),
+        ("decoder_binary_sha256", config["decoder_binary"]["sha256"]),
         ("device_name", config["environment"]["device_name"]),
         ("hostname", config["environment"]["hostname"]),
         ("conda_environment", config["environment"]["conda_environment"]),
@@ -510,8 +510,8 @@ def validate_environment_qualification(report, config):
         ("scipy_version", config["environment"]["scipy"]),
         ("ldpc_version", config["environment"]["ldpc"]),
         ("support_packages", config["support_packages"]),
-        ("bplsd_binary_path", str(bplsd_binary_path())),
-        ("bplsd_binary_filename", bplsd_binary_path().name),
+        ("decoder_binary_path", str(decoder_binary_path())),
+        ("decoder_binary_filename", decoder_binary_path().name),
         ("python_no_bytecode_flag", True),
         ("pythondontwritebytecode", True),
         ("pytest_cache_disabled", True),
@@ -653,7 +653,7 @@ def run_remote_resource_preflight(config, deployment, qualification_report_sha25
         "registry_sha256": config["registry_sha256"],
         "source_commit": config["source_commit"],
         "source_tree_sha256": identity["source_tree_sha256"],
-        "bplsd_binary_sha256": identity["bplsd_binary_sha256"],
+        "decoder_binary_sha256": identity["decoder_binary_sha256"],
         "device_name": identity["device_name"],
         "hostname": identity["hostname"],
         "conda_environment": identity["conda_environment"],
@@ -674,7 +674,7 @@ def validate_remote_resource_preflight(report, config):
     required = {
         "schema_version", "status", "experiment_id", "execution_profile_id",
         "config_sha256", "registry_sha256", "source_commit",
-        "source_tree_sha256", "bplsd_binary_sha256", "device_name", "hostname",
+        "source_tree_sha256", "decoder_binary_sha256", "device_name", "hostname",
         "conda_environment", "conda_prefix_matches_python", "num_workers",
         "omp_thread_count", "outcome_blind", "logical_outcomes_saved",
         "qualification_report_sha256", "deployment", "tasks", "stages",
@@ -688,7 +688,7 @@ def validate_remote_resource_preflight(report, config):
         "registry_sha256": config["registry_sha256"],
         "source_commit": config["source_commit"],
         "source_tree_sha256": config["source_tree_sha256"],
-        "bplsd_binary_sha256": config["bplsd_binary"]["sha256"],
+        "decoder_binary_sha256": config["decoder_binary"]["sha256"],
         "device_name": config["environment"]["device_name"],
         "hostname": config["environment"]["hostname"],
         "conda_environment": config["environment"]["conda_environment"],
@@ -925,7 +925,7 @@ def run_remote_scan(
         "stage": stage,
         "config_sha256": config["config_sha256"],
         "source_tree_sha256": config["source_tree_sha256"],
-        "bplsd_binary_sha256": config["bplsd_binary"]["sha256"],
+        "decoder_binary_sha256": config["decoder_binary"]["sha256"],
         "hostname": identity["hostname"],
         "num_workers": num_workers,
         "scheduled_code_p": len(tasks),
@@ -1110,13 +1110,13 @@ def build_remote_stage1_technical(run_root, config):
     if aggregate["payload_sha256"] != arrays_sha256(aggregate, ARRAY_FIELDS):
         raise ValueError("remote Stage 1 aggregate payload hash mismatch")
     for field, expected in (
-        ("schema_version", "exp103.aggregate.v1"),
+        ("schema_version", "exp103.aggregate.v2"),
         ("experiment_id", config["experiment_id"]),
         ("config_sha256", config["config_sha256"]),
         ("registry_sha256", config["registry_sha256"]),
         ("source_commit", config["source_commit"]),
         ("source_tree_sha256", config["source_tree_sha256"]),
-        ("bplsd_binary_sha256", config["bplsd_binary"]["sha256"]),
+        ("decoder_binary_sha256", config["decoder_binary"]["sha256"]),
         ("overall_status", "INCOMPLETE"),
         ("terminal_status", "EXP103_INCOMPLETE"),
         ("replay_status", "PASS"),
@@ -1147,7 +1147,7 @@ def build_remote_stage1_technical(run_root, config):
         "config_sha256": config["config_sha256"],
         "registry_sha256": config["registry_sha256"],
         "source_tree_sha256": config["source_tree_sha256"],
-        "bplsd_binary_sha256": config["bplsd_binary"]["sha256"],
+        "decoder_binary_sha256": config["decoder_binary"]["sha256"],
         "reportable_code_p": int(np.sum(aggregate["code_status"][:24] == "REPORTABLE")),
         "measurement_shards": replay["shards"],
         "replay_status": replay["status"],
@@ -1173,7 +1173,7 @@ def _require_scan_report(run_root, stage, config, preflight):
     report = json.loads(path.read_text(encoding="ascii"))
     required = {
         "schema_version", "status", "stage", "config_sha256",
-        "source_tree_sha256", "bplsd_binary_sha256", "hostname",
+        "source_tree_sha256", "decoder_binary_sha256", "hostname",
         "num_workers", "scheduled_code_p", "measurement_shards",
         "fresh_shards", "resumed_shards", "preflight_sha256",
         "deployment_manifest_sha256",
@@ -1186,7 +1186,7 @@ def _require_scan_report(run_root, stage, config, preflight):
         or report["stage"] != stage
         or report["config_sha256"] != config["config_sha256"]
         or report["source_tree_sha256"] != config["source_tree_sha256"]
-        or report["bplsd_binary_sha256"] != config["bplsd_binary"]["sha256"]
+        or report["decoder_binary_sha256"] != config["decoder_binary"]["sha256"]
         or report["hostname"] != config["environment"]["hostname"]
         or report["num_workers"] != 64
         or report["scheduled_code_p"] != len(_planned_code_p(config, stage))
@@ -1272,7 +1272,7 @@ def run_remote_verify_stage(
                 "crossing_bracket": bracket,
                 "num_code_p": 624,
                 "total_trials": 6_240_000,
-                "authority": "finite_grid_bplsd_decoder_crossing_only",
+                "authority": "finite_grid_bposd_decoder_crossing_only",
                 "exp102_blockers_cleared": [],
             },
             aggregate_path,
