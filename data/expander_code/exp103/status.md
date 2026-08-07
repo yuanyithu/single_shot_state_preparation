@@ -26,11 +26,24 @@ its blockers, as its contract always stated it could not.
 The primary equal-weight mean cannot resolve a threshold on this ensemble, and
 Validation 010 identifies why: eight frozen classical-distance-2 codes fail
 `0.4051` of the time already at `p=0.02`, a floor set by distance rather than
-size, spread unevenly over the six `m` panels. Secondary, uncertified views of
-the same trials do show the expected signature — distance-stratified means
-reverse their ordering between `p=0.07` and `p=0.08`, and the per-`m` median
-reverses between `p=0.05` and `p=0.06` — but under the contract these are
-diagnostics and cannot change the primary status.
+size, spread unevenly over the six `m` panels. Comparing `m` panels of unequal
+distance composition is not a size comparison, which is also why adjacent-size
+contrasts alternate in sign.
+
+Four uncertified views of the same trials locate a threshold-like reversal in a
+narrow region: the per-`m` median at `[0.05, 0.06]`, `Delta45` at `[0.06,
+0.07]`, the distance-stratified means at `[0.07, 0.08]`, and `Delta67` at
+`[0.07, 0.08]`. Under the contract these are diagnostics and cannot change the
+primary status, and every simultaneous band contains zero everywhere, so no
+location is certified.
+
+The frozen classifier keys the terminal status on `Delta38` alone and returns
+before examining the adjacent family. The contract's prose for this status
+instead says "complete valid data contain no negative-to-positive point-estimate
+reversal", which is literally false here because `Delta45` and `Delta67` do
+reverse. The gap is a defect of the contract text, disclosed in Validation 010
+and not resolved by relabelling a frozen decision after seeing data; a successor
+contract must state the primary-only scope explicitly.
 
 Shot noise never binds: the largest fixed-panel Monte Carlo standard error over
 all 624 cells is `0.0018` against a largest between-code standard deviation of

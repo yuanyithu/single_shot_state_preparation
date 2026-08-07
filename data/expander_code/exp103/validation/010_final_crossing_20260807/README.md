@@ -41,6 +41,38 @@ scale and is applied to every primary curve and every declared contrast. No
 bracket in this experiment could have been certified at that width, whatever
 the point estimates had done.
 
+## Two adjacent-size contrasts do reverse, and the decision does not use them
+
+The frozen classifier keys the terminal status entirely on `Delta38`. In
+`crossing.classify_final_crossing`, a `Delta38` with no correct-direction
+reversal returns `EXP103_NO_CORRECT_CROSSING_IN_WINDOW` immediately, before the
+adjacent contrasts are examined at all. That is the rule Validation 001 froze
+and tested, and it is the rule that ran here.
+
+The declared adjacent family nevertheless contains reversals:
+
+| p | Delta34 | Delta45 | Delta56 | Delta67 | Delta78 |
+|---|---:|---:|---:|---:|---:|
+| 0.02 | 0.0914 | -0.0248 | 0.0170 | -0.1021 | 0.1116 |
+| 0.04 | 0.1352 | -0.0426 | 0.0142 | -0.1594 | 0.1129 |
+| 0.06 | 0.1525 | -0.0172 | 0.0102 | -0.1017 | 0.0613 |
+| 0.07 | 0.1603 | 0.0123 | 0.0262 | -0.0427 | 0.0426 |
+| 0.08 | 0.1492 | 0.0336 | 0.0357 | 0.0013 | 0.0273 |
+| 0.10 | 0.0983 | 0.0251 | 0.0093 | 0.0034 | 0.0012 |
+
+`Delta45` is negative through `p=0.06` and positive from `p=0.07`, and
+`Delta67` is negative through `p=0.07` and positive from `p=0.08`. Both are
+correct-direction, threshold-like reversals, bracketed at `[0.06, 0.07]` and
+`[0.07, 0.08]`. `Delta34`, `Delta56` and `Delta78` stay positive throughout.
+
+This is disclosed, not relabelled. The contract's prose for this status reads
+"complete valid data contain no negative-to-positive point-estimate reversal",
+which taken literally is false here, while the frozen implementation means
+"no such reversal in the primary contrast `Delta38`", which is true. The gap
+between the prose and the code is a defect of the contract text, and a
+successor contract must state the primary-only scope explicitly. The terminal
+status is not changed after seeing the data.
+
 ## Why the primary cannot see a threshold, and what the secondaries show
 
 These are secondary, plug-in, uncertified observations. Under the contract they
@@ -73,6 +105,24 @@ The per-`m` median over the eight codes, which suppresses the distance-2 tail
 without deleting any code, reverses between `p=0.05` and `p=0.06`: the `m=8`
 median is below the `m=3` median at `p<=0.05` (`0.2095` against `0.2579`) and
 above it from `p=0.06` (`0.4200` against `0.3815`).
+
+Four independent views of the same trials therefore locate a threshold-like
+reversal in a narrow region: the per-`m` median at `[0.05, 0.06]`, `Delta45` at
+`[0.06, 0.07]`, the distance-stratified means at `[0.07, 0.08]`, and `Delta67`
+at `[0.07, 0.08]`. Taken together they are consistent with a decoder threshold
+near `p ~ 0.06-0.08` for this decoder on this ensemble. **None of this is
+certified.** Every simultaneous band in the frozen family contains zero at
+every grid point, so the experiment certifies no location, and these agreeing
+point estimates are exactly the kind of evidence that a successor experiment
+must be designed to test rather than to confirm.
+
+The pattern of which contrasts reverse is itself explained by ensemble
+composition rather than physics. The primary means at `p=0.02` alternate with
+`m`: `0.0307`, `0.1221`, `0.0972`, `0.1142`, `0.0121`, `0.1237` for `m=3..8`.
+Panels differ in how many distance-2 codes they carry, so adjacent-size
+contrasts alternate in sign, and the pairs that fail to reverse are the pairs
+whose composition difference outweighs the size difference. Comparing `m`
+panels of unequal distance composition is not a size comparison.
 
 ## Methodological finding for any successor experiment
 
