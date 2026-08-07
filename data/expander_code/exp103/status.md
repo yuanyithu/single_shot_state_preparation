@@ -2,61 +2,73 @@
 
 ## Current state
 
-**`STAGE1_MEASUREMENT_RUNNING` under `exp103.decoder_mc.v2`**
+**`EXP103_NO_CORRECT_CROSSING_IN_WINDOW`** — complete, published, closed.
 
-exp103 is a decoder Monte Carlo line for `q=0` code-capacity block logical
-failure. After Validation 005 proved the original BpLSD choice cannot satisfy
-the contract's bit-exact replay gate, the user authorized amendment
-`exp103.decoder_amendment.v3` on 2026-08-06: the frozen decoder becomes the
-deterministic `ldpc.BpOsdDecoder` with `osd_method=osd_0`, `osd_order=0`,
-every BP parameter unchanged, and the experiment identity moves to
-`exp103.decoder_mc.v2` so v1 evidence can never mix with v2 evidence.
+exp103 measured the `q=0` code-capacity block logical failure rate of one
+frozen decoder over the frozen 48-code expander ensemble. Under
+`exp103.decoder_mc.v2` with the deterministic `ldpc.BpOsdDecoder`
+(`osd_method=osd_0`, `osd_order=0`), both stages ran on `nd-3`, every one of
+the `2496` shards replayed bit for bit, and the complete panel of `624`
+code-p cells and `6,240,000` trials was aggregated fail-closed and published
+through the frozen loader.
 
-Validation 006 froze that identity locally and Validation 007 requalified
-`nd-3` at `206/206` and passed both outcome-blind resource gates. Validation
-008 (`m=3,4,5` scan, complete bit-exact replay, technical report) started at
-2026-08-06T08:43:56Z. No aggregate, curve, contrast, crossing or `p_c` exists
-yet. exp102 remains `BLOCKED_BEFORE_REMOTE`; exp103 has cleared none of its
-blockers.
+The preregistered primary contrast `Delta38` is positive at every grid point,
+so there is no negative-to-positive reversal and no certified bracket. The
+frozen simultaneous band has half-width `0.2601`, which would have prevented
+certifying any bracket in any case.
+
+No asymptotic threshold, exponent, FSS, `q_top`, MLD or preparation-channel
+claim is made. exp102 remains `BLOCKED_BEFORE_REMOTE`; exp103 cleared none of
+its blockers, as its contract always stated it could not.
+
+## What the result means, and what it does not
+
+The primary equal-weight mean cannot resolve a threshold on this ensemble, and
+Validation 010 identifies why: eight frozen classical-distance-2 codes fail
+`0.4051` of the time already at `p=0.02`, a floor set by distance rather than
+size, spread unevenly over the six `m` panels. Secondary, uncertified views of
+the same trials do show the expected signature — distance-stratified means
+reverse their ordering between `p=0.07` and `p=0.08`, and the per-`m` median
+reverses between `p=0.05` and `p=0.06` — but under the contract these are
+diagnostics and cannot change the primary status.
+
+Shot noise never binds: the largest fixed-panel Monte Carlo standard error over
+all 624 cells is `0.0018` against a largest between-code standard deviation of
+`0.3245`. A successor experiment should change the estimand over a
+heterogeneous ensemble and the simultaneous band, not the sample size. Any such
+experiment needs its own contract and explicit user authorization.
 
 ## Current gates
 
-1. Validations 001-005 keep their original terminal states; nothing is
-   reclassified. The `exp103.decoder_mc.v1` Stage 1 raw stays on the server as
-   immutable evidence of the defect and is never promoted or reused.
-2. v2 identity: experiment `exp103.decoder_mc.v2`, remote config
-   `decoder_mc.remote.v3.json` SHA
-   `f35bf575b1260c6dcfc83865a19c815fef36e8d5a6d03d9dff8dfbb601af3449`, source
-   commit `6baee24bf59f8486966842dd6699a58fafecf33d`, package tree
-   `5583e1e964ecc8036a805873d765fa645d29a394df03eca00da8d8646d69c722`, Linux
-   OSD extension `3a5a7dc2c1ed015eb137ef5823d7e2d13c2d851fe895788adc3bded4e4d0c079`.
-3. Validation 007: qualification `206/206`, preflight `PASS_ALL_STAGES` with
-   Stage 1 `1012.53 <= 10000` core-hours and `8.89 <= 96` wall-hours, Stage 2
-   `9499.00 <= 10000` and `75.20 <= 96`, RSS `19.78`/`25.68` of `128` GiB.
-4. The frozen suite now contains a determinism gate: two freshly constructed
-   decoders must return byte-identical corrections on an identical syndrome
-   sequence where BP does not converge. It has passed on the measurement host.
-5. Stage 2 launches only after Stage 1 is technically complete with a passing
-   bit-exact replay and a committed technical report, and that decision stays
-   unconditional on all Stage 1 curves.
-6. Run root `~/.single_shot/runs/exp103_remote_v3_001` on `nd-3`, 64 workers.
+1. Validations 001-010 keep their terminal states; nothing is reclassified.
+   The `exp103.decoder_mc.v1` BpLSD raw stays on the server as immutable
+   evidence of the randomized-decoder defect and is never promoted or reused.
+2. Publication is loader-verified: `624/624` `REPORTABLE`, `overall_status`
+   `COMPLETE`, `replay_status` `PASS` with scope `final_combined`, terminal
+   status `EXP103_NO_CORRECT_CROSSING_IN_WINDOW`.
+3. Known artifact defect: `report.md` and the primary plot title name the
+   superseded `BpLSD` decoder. The machine-readable authority field, config
+   SHA, decoder binary SHA and experiment identity are all correct. Recorded in
+   Validation 010 rather than patched, because regenerating would invalidate
+   the frozen identity the aggregate is bound to. To be fixed in the next
+   freeze, together with the stale `BpLSD` strings in pipeline error messages.
+4. No further exp103 compute is authorized. Restarting requires a new contract.
 
 ## Evidence map
 
-- `EXPERIMENT_CONTRACT.md`: frozen scientific and statistical contract.
-- `REMOTE_EXECUTION_AMENDMENT.md` / `_V2.md`: execution profile and caps.
-- `DECODER_AMENDMENT_V3.md`: authorized deterministic decoder and its gate.
+- `EXPERIMENT_CONTRACT.md`, `REMOTE_EXECUTION_AMENDMENT.md` / `_V2.md`,
+  `DECODER_AMENDMENT_V3.md`: contract and the three authorized amendments.
 - `config/decoder_mc.v2.json`, `config/decoder_mc.remote.v3.json`.
-- `validation/005_stage1_replay_nondeterminism_20260806/`: the defect, its root
-  cause, and the reproducible probes.
-- `validation/007_remote_gate_v3_20260806/`: v3 qualification and gate `PASS`.
+- `validation/005_stage1_replay_nondeterminism_20260806/`: the randomized
+  decoder defect, its root cause and reproducible probes.
+- `validation/008_...`, `009_...`: bit-exact stage evidence.
+- `validation/010_final_crossing_20260807/`: the published result, its
+  secondary diagnostics and its known defect.
 - `validation/INDEX.md`: numbered evidence ledger.
 
 ## Latest evidence
 
-- Validation 008: running; no shard retrieved or reported yet.
-- Validation 007: qualification `faa9042f...a08c56e`, preflight
-  `a034d2c1...fe824d`, both `PASS`; the deterministic decoder costs 1.3% and
-  0.2% less than the randomized one it replaces.
-- Validation 005: `BLOCKED_REPLAY_NONDETERMINISM`; unchanged immutable evidence
-  and the reason the decoder changed.
+- Validation 010: `EXP103_NO_CORRECT_CROSSING_IN_WINDOW`, aggregate SHA256
+  `460b3868...4ec7cf`, report SHA256 `fe354933...2f535`, no bracket.
+- Validation 009: Stage 2 scan and replay `PASS`, `1248/1248`, 33h33m.
+- Validation 008: Stage 1 scan and replay `PASS`, `1248/1248`, 4h26m.
