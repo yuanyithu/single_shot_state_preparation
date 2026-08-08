@@ -211,9 +211,10 @@ def test_run_root_must_sit_under_the_frozen_run_root(remote_config, tmp_path):
         )
 
 
-def test_remote_commands_refuse_the_local_config(frozen_config):
+def test_remote_commands_refuse_the_local_config(local_config):
+    assert local_config["schema_version"] == "exp104.config.v1"
     with pytest.raises(ValueError):
-        remote_cli._require_remote_config(frozen_config)
+        remote_cli._require_remote_config(local_config)
 
 
 def test_unplanned_raw_evidence_is_refused_before_a_run(tmp_path, remote_config):

@@ -60,6 +60,25 @@ def remote_config():
 
 
 @pytest.fixture(scope="session")
+def local_config():
+    """Always the local config, whichever one the environment points at.
+
+    During nd-3 qualification `frozen_config` resolves to the remote config, so
+    tests that need the two to differ must name the file rather than rely on the
+    fixtures being distinct.
+    """
+    return load_config(REPO_ROOT / "data/expander_code/exp104/config/ensemble_mc.v1.json")
+
+
+@pytest.fixture(scope="session")
+def foreign_config(frozen_config, local_config, remote_config):
+    """A valid config that is definitely not the one under test."""
+    if frozen_config["config_sha256"] != local_config["config_sha256"]:
+        return local_config
+    return remote_config
+
+
+@pytest.fixture(scope="session")
 def registry(frozen_config):
     return load_registry(REPO_ROOT / frozen_config["registry_path"])
 

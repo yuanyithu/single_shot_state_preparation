@@ -118,11 +118,12 @@ def test_loader_rejects_a_widened_or_narrowed_band(
 
 
 def test_loader_rejects_a_foreign_config(
-    complete_aggregate_factory, frozen_config, remote_config,
+    complete_aggregate_factory, frozen_config, foreign_config,
 ):
+    assert foreign_config["config_sha256"] != frozen_config["config_sha256"]
     payload = complete_aggregate_factory()
     with pytest.raises(ValueError, match="identity mismatch"):
-        load_exp104_crossing(payload, remote_config)
+        load_exp104_crossing(payload, foreign_config)
 
 
 def test_loader_refuses_an_incomplete_publication(
