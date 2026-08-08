@@ -42,13 +42,19 @@ successor experiment must be designed to test rather than to confirm.
 1. Validation 001 is `PASS`: contract frozen, 131 local tests green including the
    decoder-determinism regression gate, ensemble census measured twice, local
    resource preflight `PASS`.
-2. No remote compute is authorized until Validation 002 (cross-validation against
-   frozen exp103 raw) and Validation 003 (nd-3 qualification and remote resource
-   gate) both pass.
-3. Replay is a preregistered 10 percent subsample fixed before production by a
+2. Validation 002 is `PASS`: the exp104 and exp103 code paths produce
+   bit-identical per-trial arrays over 60,000 trials from the same frozen
+   registry, seeds and decoder identity. Recorded there and not gated: the
+   compiled decoder is not bit-portable between macmini and nd-3, differing by
+   under one percent of failures with belief-propagation convergence unchanged.
+   exp104 therefore generates, replays and aggregates entirely on nd-3 and never
+   mixes artifacts across platforms.
+3. No production compute is authorized until Validation 003 (nd-3 qualification
+   and remote resource gate) passes.
+4. Replay is a preregistered 10 percent subsample fixed before production by a
    frozen seed. Any single bit-exact mismatch invalidates the whole run; the
    subsample is never narrowed afterwards.
-4. exp102 remains `BLOCKED_BEFORE_REMOTE`. exp104 clears none of its blockers and
+5. exp102 remains `BLOCKED_BEFORE_REMOTE`. exp104 clears none of its blockers and
    authorizes none of its stages, as its contract states.
 
 ## Evidence map
