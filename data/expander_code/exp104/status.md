@@ -2,74 +2,71 @@
 
 ## Current state
 
-**Contract frozen, local gates passed. No production compute has run.**
+**`EXP104_CERTIFIED_CROSSING`** — complete, published, closed.
 
-exp104 measures the `q = 0` code-capacity block logical failure rate of the
-frozen `exp103.decoder_mc.v2` BP+OSD-0 decoder over a large, randomly generated
+exp104 measured the `q = 0` code-capacity block logical failure rate of the
+frozen `exp103.decoder_mc.v2` BP+OSD-0 decoder over a randomly generated
 expander-code ensemble: 2000 codes per `m` for `m = 3..8`, four trials per code
-and `p`, nine grid points from 0.02 to 0.10, 432,000 trials in total.
+and grid point, nine points from 0.02 to 0.10, 432,000 trials. Everything ran on
+nd-3 with 64 workers; the scan took 45.9 minutes.
 
-The estimand is the failure probability of a *random* code from the ensemble, so
-the budget goes into codes rather than into trials per code. exp103 established
-that shot noise never bound (largest cell standard error 0.0018 against a largest
-between-code standard deviation of 0.3245); exp104 uses 14 times fewer trials
-than exp103 and expects roughly an 18-fold improvement in the precision of the
-quantity being certified.
+- Certified bracket **`[0.05, 0.06]`**.
+- Crossing location **`p_cross = 0.05512`**, 95% bootstrap interval
+  **`[0.05327, 0.05699]`**.
+- Simultaneous band half-width **`0.0211`**, against exp103's `0.2601`.
+- `108,000` of `108,000` code-p cells `REPORTABLE`; committed replay `PASS` with
+  `60,120` trials bit-exact.
 
-## What is settled, and what is not
+`Delta38` is certified negative at `p = 0.03, 0.04, 0.05` and certified positive
+from `p = 0.06` onward. `p = 0.02` is **not** certified: the contrast is `-0.0096`
+against a half-width of `0.0211`, so the band contains zero there.
 
-Settled by measurement, recorded in Validation 001:
+No asymptotic threshold, exponent, FSS, `q_top`, MLD or preparation-channel claim
+is made. exp102 remains `BLOCKED_BEFORE_REMOTE`; exp104 cleared none of its
+blockers, as its contract always stated it could not.
 
-- The ensemble composition. The classical-distance-2 fraction falls monotonically
-  with size: `0.229, 0.195, 0.154, 0.133, 0.114, 0.104` for `m = 3..8`, measured
-  on 20,000 accepted codes per `m` and reproduced by an independent master seed
-  to within 0.0006. Acceptance rate rises from 0.721 to 0.990 over the same
-  range.
-- This is why exp103's primary contrast was positive everywhere. Its eight-code
-  panels drew `0, 3, 2, 2, 0, 1` distance-2 codes for `m = 3..8`; the `m = 3`
-  panel drew none where about 23 percent were due, so its curve sat too low and
-  pushed `Delta38` positive at every grid point.
-- Reweighting exp103's measured per-distance rates by the true composition puts a
-  negative-to-positive reversal of `Delta38` between `p = 0.05` and `p = 0.06`.
+## What this settles about exp103
 
-Not settled, and not claimed: nothing about exp104's own outcome. The reweighted
-reconstruction above is exp103 evidence viewed through a composition measurement,
-not an exp104 result, and it is exactly the kind of agreeing point estimate a
-successor experiment must be designed to test rather than to confirm.
+exp103 returned no certified crossing not because there is none but because its
+eight-code panels were not comparable across `m`. The measured composition
+confirms it: the distance-2 fraction of this family falls from `0.229` at `m = 3`
+to `0.104` at `m = 8`, and exp103's panels drew `0, 3, 2, 2, 0, 1` such codes. Its
+`m = 3` panel drew none where about 23 percent were due, which biased
+`P_fail(m=3)` low and pushed `Delta38` positive at every grid point.
+
+Nothing was wrong with exp103's decoder, seeds or scoring: Validation 002 shows
+the two code paths are bit-identical functions over 60,000 trials. Nothing was
+wrong with its trial count either. exp104 used 14.4 times fewer trials and
+certified what exp103 could not, by spending the budget on codes instead.
 
 ## Current gates
 
-1. Validation 001 is `PASS`: contract frozen, 131 local tests green including the
-   decoder-determinism regression gate, ensemble census measured twice, local
-   resource preflight `PASS`.
-2. Validation 002 is `PASS`: the exp104 and exp103 code paths produce
-   bit-identical per-trial arrays over 60,000 trials from the same frozen
-   registry, seeds and decoder identity. Recorded there and not gated: the
-   compiled decoder is not bit-portable between macmini and nd-3, differing by
-   under one percent of failures with belief-propagation convergence unchanged.
-   exp104 therefore generates, replays and aggregates entirely on nd-3 and never
-   mixes artifacts across platforms.
-3. Validation 003 is `PASS`: nd-3 qualified with 131/58/17 tests on the Linux
-   build and the exp103 decoder binary, and the resource gate reserved 270.9
-   core-hours against the 900 cap, 4.09 wall hours against 16 and 24.3 GiB
-   against 128. Formal measurement is open under those caps.
-4. Replay is a preregistered 10 percent subsample fixed before production by a
-   frozen seed. Any single bit-exact mismatch invalidates the whole run; the
-   subsample is never narrowed afterwards.
-5. exp102 remains `BLOCKED_BEFORE_REMOTE`. exp104 clears none of its blockers and
-   authorizes none of its stages, as its contract states.
+1. Validations 001-005 keep their terminal states; nothing is reclassified.
+2. Publication is loader-verified on macmini: `108,000/108,000` `REPORTABLE`,
+   `overall_status` `COMPLETE`, `replay_status` `PASS`, terminal status
+   `EXP104_CERTIFIED_CROSSING`, `p_cross` and the band re-derived from the stored
+   per-code counts.
+3. The compiled decoder is not bit-portable across platforms (Validation 002).
+   exp104 generated, replayed and aggregated entirely on nd-3 against the pinned
+   nd-3 binary SHA256, and never mixes artifacts across platforms.
+4. No further exp104 compute is authorized. Restarting requires a new contract.
 
 ## Evidence map
 
-- `EXPERIMENT_CONTRACT.md`: the preregistered contract, including the terminal
-  decision rule and its explicit primary-only scope.
+- `EXPERIMENT_CONTRACT.md`: the preregistered contract and its primary-only
+  terminal rule.
 - `config/ensemble_mc.v1.json`, `config/ensemble_mc.remote.v1.json`,
   `config/ensemble_registry.v1.json`.
+- `validation/001_...`: red team, ensemble census, local gates.
+- `validation/002_...`: implementation equality with exp103; platform finding.
+- `validation/003_...`: nd-3 qualification and resource gate.
+- `validation/004_...`, `005_...`: the measurement and the published result.
 - `validation/INDEX.md`: numbered evidence ledger.
-- `validation/001_contract_and_census_20260808/`: red team, census, local gates.
+- `final_results/`: published aggregate, report, curves and plots.
 
 ## Latest evidence
 
-- Validation 001: `PASS`. Registry SHA256 `7e40ff18...c709f315d4`, 12,000 codes.
-  Census `f_2(m)` monotone decreasing, two seeds agreeing to 0.0006. Local
-  preflight `PASS` at 16.33 generation core-hours upper bound on macmini.
+- Validation 005: `EXP104_CERTIFIED_CROSSING`, aggregate SHA256
+  `dcca50dd...8da130`, bracket `[0.05, 0.06]`, `p_cross 0.05512`.
+- Validation 004: scan `PASS` 778/778 in 45.9 min; replay `PASS` 83/83.
+- Validation 003: nd-3 qualification and resource gate `PASS`.
