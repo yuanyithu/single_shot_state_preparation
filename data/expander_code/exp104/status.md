@@ -49,8 +49,10 @@ successor experiment must be designed to test rather than to confirm.
    under one percent of failures with belief-propagation convergence unchanged.
    exp104 therefore generates, replays and aggregates entirely on nd-3 and never
    mixes artifacts across platforms.
-3. No production compute is authorized until Validation 003 (nd-3 qualification
-   and remote resource gate) passes.
+3. Validation 003 is `PASS`: nd-3 qualified with 131/58/17 tests on the Linux
+   build and the exp103 decoder binary, and the resource gate reserved 270.9
+   core-hours against the 900 cap, 4.09 wall hours against 16 and 24.3 GiB
+   against 128. Formal measurement is open under those caps.
 4. Replay is a preregistered 10 percent subsample fixed before production by a
    frozen seed. Any single bit-exact mismatch invalidates the whole run; the
    subsample is never narrowed afterwards.
