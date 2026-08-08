@@ -105,7 +105,11 @@ TOP_LEVEL_FIELDS = {
 REMOTE_CONFIG_SCHEMA = "exp104.config.remote.v1"
 REMOTE_CONFIG_PATH = "data/expander_code/exp104/config/ensemble_mc.remote.v1.json"
 REMOTE_EXECUTION_PROFILE = "exp104.remote_execution.v1"
-REMOTE_CONDA_PREFIX = "/home/DATA1/users/yuany/.single_shot/cache/exp104_remote_v1_env"
+# exp104 reuses the environment exp103 built and qualified rather than creating
+# its own. Rebuilding would recompile the decoder and could change its binary
+# hash, and a byte-identical decoder is precisely what makes the two experiments
+# comparable. Validation 003 re-verifies every version and the binary SHA256.
+REMOTE_CONDA_PREFIX = "/home/DATA1/users/yuany/.single_shot/cache/exp103_remote_v1_env"
 REMOTE_DECODER_BINARY_SHA256 = "3a5a7dc2c1ed015eb137ef5823d7e2d13c2d851fe895788adc3bded4e4d0c079"
 REMOTE_DECODER_BINARY_SUFFIX = ".cpython-312-x86_64-linux-gnu.so"
 REMOTE_TOP_LEVEL_FIELDS = TOP_LEVEL_FIELDS | {
