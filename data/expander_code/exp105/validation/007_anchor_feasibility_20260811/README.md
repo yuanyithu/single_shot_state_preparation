@@ -13,7 +13,7 @@ could not, by contract, change Track A's terminal status in either direction.
 
 ## The fast path
 
-`exp105_pipeline/sector_ti_fast.py`. It replaces the inner loop of
+`exp105/anchor/sector_ti_fast.py`. It replaces the inner loop of
 `exp101/src/sector_ti.py::_run_fixed_sector_chain` and nothing else. Integration,
 bootstrap, the coarse/fine grid gates, the sector weights and `q_top` all remain
 the certified exp101 code, reached through a scoped `fast_chain_installed()`
