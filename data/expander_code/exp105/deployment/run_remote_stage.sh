@@ -13,7 +13,7 @@ fi
 deployment_root=$1
 deployment_manifest_sha256=$2
 run_root=$3
-config=data/expander_code/exp105/config/ensemble_mc.remote.v1.json
+config=data/expander_code/exp105/config/noisy_mc.remote.v1.json
 module=data.expander_code.exp105.exp105_pipeline.remote_cli
 common=(
   --config "$config"

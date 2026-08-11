@@ -266,7 +266,7 @@ def run_environment_qualification(config, source_root):
         "PYTEST_ADDOPTS": "-p no:cacheprovider",
         "PYTHONPATH": str(source_root),
         "EXP105_TEST_CONFIG_PATH": str(
-            source_root / "data/expander_code/exp105/config/ensemble_mc.remote.v1.json"
+            source_root / "data/expander_code/exp105/config/noisy_mc.remote.v1.json"
         ),
     })
     environment.pop("PYTHONOPTIMIZE", None)
