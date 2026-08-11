@@ -118,7 +118,13 @@ def block_bounds(num_measurements, block_count):
 
 if NUMBA_AVAILABLE:
 
-    @njit(cache=True)
+    # Deliberately uncached. exp101's own suite imports the same prng source
+    # under the module name `src.prng`, while the bridge imports it as
+    # `exp101_certified_src.prng`; two module names for one source collide in a
+    # shared numba cache directory and make exp101's bit-exactness tests fail
+    # for a reason that has nothing to do with either package. Compilation costs
+    # a second or two, against an anchor cell that runs for minutes.
+    @njit(cache=False)
     def _kernel(state, v, syndrome_term, data_weight, syndrome_weight,
                 qubit_offsets, qubit_index, check_offsets, check_index,
                 count, kp_grid, K_q, burn_in, num_measurements,

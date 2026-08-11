@@ -70,6 +70,7 @@ data/**/.gitignore
 # tree and would trip the bytecode/tree gate at exit 67. load_registry still
 # verifies its SHA256 on every read.
 !data/expander_code/exp105/config/*.npz
+data/expander_code/exp105/anchor/.numba-cache/
 !data/expander_code/exp105/deployment/bootstrap_verified_archive.sh
 !data/expander_code/exp105/validation/**/*.json
 !data/expander_code/exp105/final_results/*.json

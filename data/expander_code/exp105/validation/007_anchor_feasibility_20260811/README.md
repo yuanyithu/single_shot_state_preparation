@@ -104,6 +104,22 @@ full-sector TI — a fresh contract with its own red team, not an anchor. Per
 permanent discipline 13, this family of attempt is not extended by adding
 budget to the same instrument.
 
+## An operational hazard worth writing down
+
+exp101's `prng.py` and `fast_mcmc.py` compile cached numba kernels under
+whichever module name imported them: `src.prng` when exp101's own suite runs,
+`exp101_certified_src.prng` when the bridge loads it. Numba's on-disk cache
+cannot serve both, so a shared cache directory makes whichever suite runs second
+fail with `ModuleNotFoundError: No module named 'src.prng'` — in either order,
+and looking exactly like a broken package rather than a cache collision. It cost
+a diagnosis here, and it would have looked like exp105 breaking exp101.
+
+`exp105/anchor/__init__.py` therefore points `NUMBA_CACHE_DIR` at its own
+directory via `setdefault`, which leaves the nd-3 runner's explicit
+per-deployment cache in place. Verified: both suites pass in either order.
+This is a property of the `exp101_bridge` pattern, not of Track B, so exp102
+and exp104 carry it too — they simply never exercised exp101's numba kernels.
+
 ## Evidence in this directory
 
 - `configuration_agreement_probe.json`
