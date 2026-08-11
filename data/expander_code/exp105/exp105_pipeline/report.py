@@ -42,7 +42,7 @@ def write_primary_curves(path, payload):
     for m_index, m in enumerate(payload["m_values"].tolist()):
         for p_index, p in enumerate(payload["p_values"]):
             rows.append([
-                m, f"{p:.2f}", payload["m_status"][m_index, p_index],
+                m, f"{p:.4f}", payload["m_status"][m_index, p_index],
                 f"{payload['primary_mean'][m_index, p_index]:.6f}",
                 f"{payload['primary_band_low'][m_index, p_index]:.6f}",
                 f"{payload['primary_band_high'][m_index, p_index]:.6f}",
@@ -59,10 +59,11 @@ def write_primary_curves(path, payload):
 
 
 def write_contrasts(path, payload):
+    ms = payload["m_values"].tolist()
     rows = []
     for p_index, p in enumerate(payload["p_values"]):
         row = [
-            f"{p:.2f}",
+            f"{p:.4f}",
             f"{payload['delta38'][p_index]:.6f}",
             f"{payload['delta38_band_low'][p_index]:.6f}",
             f"{payload['delta38_band_high'][p_index]:.6f}",
@@ -73,7 +74,7 @@ def write_contrasts(path, payload):
         elif payload["delta38_band_low"][p_index] > 0:
             certified = "certified_positive"
         row.append(certified)
-        for adjacent in range(len(payload["m_values"]) - 1):
+        for adjacent in range(len(ms) - 1):
             row.append(f"{payload['adjacent_delta'][adjacent, p_index]:.6f}")
         rows.append(row)
     header = [
@@ -94,7 +95,7 @@ def write_distance_strata(path, payload):
             for p_index, p in enumerate(payload["p_values"]):
                 rows.append([
                     m, distance, codes,
-                    f"{codes / panel_counts(payload)[m]:.6f}", f"{p:.2f}",
+                    f"{codes / panel_counts(payload)[m]:.6f}", f"{p:.4f}",
                     int(payload["strata_failures"][m_index, d_index, p_index]),
                     int(payload["strata_trials"][m_index, d_index, p_index]),
                     f"{payload['strata_rate'][m_index, d_index, p_index]:.6f}",
@@ -113,7 +114,7 @@ def write_code_diagnostics(path, payload):
                 int(payload["code_m"][code_slot]),
                 int(payload["code_index"][code_slot]),
                 int(payload["classical_distance"][code_slot]),
-                f"{p:.2f}",
+                f"{p:.4f}",
                 payload["code_status"][code_slot, p_index],
                 int(payload["failure_counts"][code_slot, p_index]),
                 int(payload["trial_counts"][code_slot, p_index]),
