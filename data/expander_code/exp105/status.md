@@ -2,9 +2,21 @@
 
 ## Current state
 
-**`PRODUCTION_SCAN_RUNNING`** — contract frozen, pipeline implemented, locally
-gated, pilot run, nd-3 qualified and resource-gated. The production scan is
-running on nd-3. No published result.
+**`EXP105_NO_CERTIFIED_CROSSING`** — Track A complete, published, closed.
+Track B (the `m = 2, 3` `q_top` anchor) is not yet run.
+
+At `q = 0.05`, over `p` from `0.001` to `0.07`, the ensemble-mean block logical
+failure rate of the frozen BP+OSD-0 decoder is higher for the larger code at
+**every** grid point. `Delta38` is certified **positive at all 10 points** and
+negative at none, with a simultaneous band half-width of `0.010486`. There is no
+crossing, and that absence is certified rather than unresolved.
+
+3,314/3,314 tasks fresh on nd-3 in 2.20 wall hours; 17,617 codes; 1,057,020
+trials; replay 337/337 with 110,160 trials bit-exact; 176,170/176,170 cells
+`REPORTABLE`; re-derived on macmini through the loader.
+
+Towards the originally requested observable, the certified one-sided bound
+`E[q_top] >= (1 - P_fail)^2` reaches `0.97190` at `m = 3, p = 0.001`.
 
 The pilot found `Delta38 > 0` at all 14 grid points from `p = 0.001` to `0.07`.
 At `q = 0.05` this family is already above threshold from readout noise alone:
@@ -45,10 +57,18 @@ is blocked, plus a **transport-free `q_top` anchor** at `m = 2, 3` (Track B).
 3. The compiled decoder is not bit-portable across platforms (exp104 Validation
    002). Generation, replay and aggregation all happen on nd-3 against the pinned
    nd-3 binary; artifacts are never mixed across platforms.
-4. The production plan is frozen in `config.py` and gated: 17,617 codes, 3,314
-   tasks, 1,057,020 trials, 64 workers, 644.7 reserved core-hours against a cap
-   of 800. Validation 003's allocation was re-evaluated on nd-3's own measured
-   costs after the resource gate blocked the macmini-derived panel.
+4. No further exp105 Track A compute is authorized. `report.py` was corrected
+   after the measurement, so the live source tree no longer matches the frozen
+   configs; the configs are deliberately left bound to the freeze that produced
+   the published aggregate, and any new compute needs a fresh freeze.
+5. Track B is outstanding. It needs a numba fast path for the fixed-label sector
+   chain first: `sector_ti.py` is a pure-Python reference and `m = 3` costs about
+   20 hours per disorder there. The fast path cannot be bit-exact with the
+   certified reference, because that reference draws from numpy's `default_rng`,
+   which numba cannot reproduce; the plan is the `fast_mcmc.py` pattern -- a
+   python/numba twin pair on `prng.py` that are bit-exact with each other -- with
+   agreement against the certified reference established statistically at
+   `m = 2`, inside TI's own gate tolerance.
 
 ## Authority and limits
 
@@ -69,10 +89,17 @@ absence of a crossing is a legitimate terminal state, not a failure.
 - `validation/003_...`: locating pilot, cost benchmark, the production plan, and
   the bracket it opens: `q_c` lies strictly inside `(0, 0.05)`.
 - `validation/004_...`: nd-3 qualification and resource gate.
+- `validation/005_...`: production scan, committed replay and aggregation.
+- `validation/006_...`: loader-verified publication and the terminal status.
+- `final_results/`: published aggregate, report, curves and plots.
 - `validation/INDEX.md`: numbered evidence ledger.
 
 ## Latest evidence
 
+- Validation 006: `EXP105_NO_CERTIFIED_CROSSING`, aggregate SHA256 `ff73fd9c...`,
+  simultaneous half-width `0.010486`, 10/10 points certified positive.
+- Validation 005: scan `PASS` 3,314/3,314 in 2.20 h; replay `PASS` 337/337 with
+  110,160 trials bit-exact.
 - Validation 004: `PASS`. 166/58/131/17 tests on nd-3, nothing skipped; reserved
   644.7/800 core-hours, wall 7.01/14 h. The first qualification and the first
   resource projection both failed, and between them found four real defects --
