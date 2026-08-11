@@ -64,13 +64,12 @@ data/**/.gitignore
 !data/expander_code/exp104/final_results/*.npz
 !data/expander_code/exp104/final_results/*.png
 !data/expander_code/exp105/config/*.json
-!data/expander_code/exp105/config/ensemble_registry.pilot.v1.npz
-# The production registry is 167,005 rows and is fully determined by the
-# master seed, the namespace and the per-m counts. Its SHA256 is committed
-# inside the config and load_registry verifies it on every read, so the file
-# itself is rebuilt rather than tracked -- on nd-3 that rebuild is also a
-# cross-platform reproducibility check on the algebraic construction.
-data/expander_code/exp105/config/ensemble_registry.v1.npz
+# The production registry is 10 MB. It is tracked anyway, because the deployed
+# source tree is verified byte for byte against its archive and the test suite
+# reads the registry: a file rebuilt on nd-3 would be an unlisted file in that
+# tree and would trip the bytecode/tree gate at exit 67. load_registry still
+# verifies its SHA256 on every read.
+!data/expander_code/exp105/config/*.npz
 !data/expander_code/exp105/deployment/bootstrap_verified_archive.sh
 !data/expander_code/exp105/validation/**/*.json
 !data/expander_code/exp105/final_results/*.json

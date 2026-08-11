@@ -89,25 +89,25 @@ def test_q_is_fixed_at_the_contract_value(frozen_config):
             normalize_q_token(bad)
 
 
-def test_pilot_grid_and_panel_are_the_frozen_ones(frozen_config):
-    assert frozen_config["phase"] == "pilot"
-    assert frozen_config["p_tokens"] == PILOT_P_TOKENS
-    assert frozen_config["m_values"] == PILOT_M_VALUES == [3, 8]
-    assert frozen_config["codes_per_m"] == {
+def test_pilot_grid_and_panel_are_the_frozen_ones(pilot_config):
+    assert pilot_config["phase"] == "pilot"
+    assert pilot_config["p_tokens"] == PILOT_P_TOKENS
+    assert pilot_config["m_values"] == PILOT_M_VALUES == [3, 8]
+    assert pilot_config["codes_per_m"] == {
         str(m): PILOT_CODES_PER_M for m in PILOT_M_VALUES
     }
-    assert frozen_config["trials_per_code_p"] == {
+    assert pilot_config["trials_per_code_p"] == {
         str(m): PILOT_TRIALS_PER_CODE_P for m in PILOT_M_VALUES
     }
-    assert frozen_config["objective"] == (
+    assert pilot_config["objective"] == (
         "bposd_ensemble_block_logical_failure_crossing_q005"
     )
 
 
-def test_pilot_draws_from_its_own_ensemble_namespace(frozen_config):
+def test_pilot_draws_from_its_own_ensemble_namespace(pilot_config):
     """No code that helps choose the frozen grid may also be measured on it."""
-    assert frozen_config["registry_path"].endswith("ensemble_registry.pilot.v1.npz")
-    assert frozen_config["registry_path"] != config_module.REGISTRY_PATH
+    assert pilot_config["registry_path"].endswith("ensemble_registry.pilot.v1.npz")
+    assert pilot_config["registry_path"] != config_module.REGISTRY_PATH
 
 
 def test_decoder_identity_is_exp104_plus_the_augmented_block(frozen_config):
@@ -184,7 +184,7 @@ def test_block_index_outside_the_plan_is_rejected(frozen_config):
         with pytest.raises(ValueError):
             block_code_indices(frozen_config, m, -1)
     with pytest.raises(ValueError):
-        block_code_indices(frozen_config, 5, 0)
+        block_code_indices(frozen_config, 2, 0)
 
 
 def test_code_id_round_trip_and_range():
@@ -201,8 +201,9 @@ def test_code_id_round_trip_and_range():
 
 def test_p_token_normalization_rejects_everything_off_grid(frozen_config):
     tokens = frozen_config["p_tokens"]
-    assert normalize_p_token("0.02", tokens) == "0.02"
-    assert normalize_p_token(0.02, tokens) == "0.02"
+    # Named by position: the two phases have different grids.
+    assert normalize_p_token(tokens[0], tokens) == tokens[0]
+    assert normalize_p_token(float(tokens[0]), tokens) == tokens[0]
     for bad in ("0.11", "0.065", 0.11, 0.0, 1.0, "abc"):
         with pytest.raises(ValueError):
             normalize_p_token(bad, tokens)
@@ -268,8 +269,8 @@ def test_config_must_be_the_canonical_artifact(tmp_path, frozen_config):
         config_module.load_config(copied)
 
 
-def test_phase_and_schema_must_agree(frozen_config):
-    broken = copy.deepcopy(frozen_config)
+def test_phase_and_schema_must_agree(pilot_config):
+    broken = copy.deepcopy(pilot_config)
     broken.pop("config_sha256", None)
     broken.pop("config_path", None)
     broken["schema_version"] = config_module.REMOTE_CONFIG_SCHEMA

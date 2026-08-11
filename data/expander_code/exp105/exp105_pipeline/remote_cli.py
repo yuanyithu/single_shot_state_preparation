@@ -265,6 +265,14 @@ def run_environment_qualification(config, source_root):
         "PYTHONDONTWRITEBYTECODE": "1",
         "PYTEST_ADDOPTS": "-p no:cacheprovider",
         "PYTHONPATH": str(source_root),
+        # exp104's suite is part of this qualification, so its frozen-config
+        # fixture has to be pointed at exp104's *remote* config as well.
+        # Left at its default it would check macmini identities on nd-3 and
+        # fail for a reason that has nothing to do with the environment.
+        "EXP104_TEST_CONFIG_PATH": str(
+            source_root
+            / "data/expander_code/exp104/config/ensemble_mc.remote.v1.json"
+        ),
         "EXP105_TEST_CONFIG_PATH": str(
             source_root / "data/expander_code/exp105/config/noisy_mc.remote.v1.json"
         ),

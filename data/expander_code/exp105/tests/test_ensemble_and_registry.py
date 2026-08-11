@@ -54,8 +54,11 @@ def test_parity_check_matrices_are_pairwise_distinct_within_each_m(registry):
 
 def test_codes_rebuild_from_their_seeds(registry):
     # Spot check across the panel: reconstruction is the reproducibility claim.
+    # The stride is chosen so the count is fixed rather than proportional to the
+    # panel, which is 167,005 rows in production.
     rows = registry["codes"]
-    for row in rows[::37]:
+    stride = max(1, len(rows) // 24)
+    for row in rows[::stride]:
         H = rebuild_code(row)
         assert matrix_sha256(H) == row["classical_H_sha256"]
         assert H.shape == (3 * row["m"], 4 * row["m"])
