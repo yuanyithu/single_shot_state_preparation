@@ -86,7 +86,7 @@ QUALIFICATION_GROUPS = (
 # what exp105 means. The exp101 and exp102 groups are the same certified
 # subsets exp103 and exp104 qualified against.
 QUALIFICATION_EXPECTED_PASSES = {
-    "exp105": 152, "exp104": 131, "exp101": 58, "exp102": 17,
+    "exp105": 165, "exp104": 131, "exp101": 58, "exp102": 17,
 }
 
 
