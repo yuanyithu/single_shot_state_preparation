@@ -76,7 +76,7 @@ def test_the_frozen_production_plan_is_the_rule_output():
     assert codes[3] > codes[8] > codes[7], (
         "panels must be unequal: an m=8 trial costs about 70 times an m=3 trial"
     )
-    assert sum(codes.values()) == 167005
+    assert sum(codes.values()) == 17617
 
 
 def test_q_is_fixed_at_the_contract_value(frozen_config):

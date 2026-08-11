@@ -54,14 +54,20 @@ PILOT_CODES_PER_TASK = {3: 50, 8: 5}
 # at fixed cost. Counts are the rule's output rounded down to a multiple of the
 # frozen block size, which is chosen to keep a task near eight minutes on nd-3.
 # ---------------------------------------------------------------------------
+# The panel was first evaluated with costs measured on the macmini, which was an
+# error: the rule spends a budget of core-hours on the machine that runs it, and
+# that machine is nd-3. The nd-3 resource gate caught it, projecting 5,368
+# reserved core-hours against a cap of 800. Re-evaluating the same rule on nd-3's
+# own measured costs -- a trial at m = 8 costs 4.88 s there against 0.61 s on the
+# macmini -- gives the panel below at the same frozen 290 core-hour budget.
 PRODUCTION_PLAN_FROZEN = True
 P_TOKENS = [
     "0.001", "0.0015", "0.0025", "0.004", "0.006", "0.01", "0.016",
     "0.025", "0.04", "0.07",
 ]
-CODES_PER_M = {3: 89000, 4: 35700, 5: 13900, 6: 6080, 7: 3050, 8: 19275}
+CODES_PER_M = {3: 9500, 4: 3300, 5: 1360, 6: 656, 7: 352, 8: 2449}
 TRIALS_PER_CODE_P = {3: 6, 4: 6, 5: 6, 6: 6, 7: 6, 8: 6}
-CODES_PER_TASK = {3: 250, 4: 100, 5: 50, 6: 20, 7: 10, 8: 5}
+CODES_PER_TASK = {3: 50, 4: 20, 5: 8, 6: 4, 7: 2, 8: 1}
 
 # Inputs to the frozen allocation rule, fixed here so that Validation 003
 # evaluates a rule rather than choosing an outcome.
