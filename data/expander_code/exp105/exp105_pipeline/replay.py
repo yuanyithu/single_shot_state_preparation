@@ -368,11 +368,11 @@ def validate_replay_report(report, config):
         if key in seen or key not in expected_keys:
             raise ValueError("replay result identity is duplicate or unplanned")
         seen.add(key)
-        indices = block_code_indices(key[0], key[1])
+        indices = block_code_indices(config, key[0], key[1])
         if item["codes"] != len(indices):
             raise ValueError("replay result code count mismatch")
         if item["trials"] != len(indices) * len(config["p_tokens"]) * int(
-            config["trials_per_code_p"]
+            config["trials_per_code_p"][str(key[0])]
         ):
             raise ValueError("replay result trial count mismatch")
         if item["replay_control_seed"] != derive_seed(

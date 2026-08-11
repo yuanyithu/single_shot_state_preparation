@@ -34,16 +34,49 @@ from data.expander_code.exp105.exp105_pipeline.config import (
 )
 
 
-def test_the_production_plan_is_not_frozen_yet():
-    """Until Validation 003 runs, every production entry point must refuse."""
-    if config_module.PRODUCTION_PLAN_FROZEN:
-        pytest.skip("production plan frozen; this guard no longer applies")
+def test_the_production_plan_freeze_is_all_or_nothing(monkeypatch):
+    """The freeze is a state the code enforces, not a note in a document.
+
+    Before Validation 003 every production entry point must refuse; after it,
+    every production constant must be present. Half-frozen is the dangerous
+    state and is what this asserts cannot exist.
+    """
+    assert config_module.PRODUCTION_PLAN_FROZEN is True
+    for name in ("P_TOKENS", "CODES_PER_M", "TRIALS_PER_CODE_P", "CODES_PER_TASK"):
+        assert getattr(config_module, name) is not None
+    require_production_plan_frozen()
+    assert plan_for_phase("production")[1] == config_module.P_TOKENS
+
+    monkeypatch.setattr(config_module, "PRODUCTION_PLAN_FROZEN", False)
     with pytest.raises(ProductionPlanNotFrozen):
         require_production_plan_frozen()
     with pytest.raises(ProductionPlanNotFrozen):
         plan_for_phase("production")
-    assert config_module.P_TOKENS is None
-    assert config_module.CODES_PER_M is None
+
+    monkeypatch.setattr(config_module, "PRODUCTION_PLAN_FROZEN", True)
+    monkeypatch.setattr(config_module, "CODES_PER_M", None)
+    with pytest.raises(ProductionPlanNotFrozen):
+        require_production_plan_frozen()
+
+
+def test_the_frozen_production_plan_is_the_rule_output():
+    """The panel is the Validation 003 arithmetic, not a round number."""
+    from data.expander_code.exp105.exp105_pipeline.config import (
+        CODES_PER_M as codes, CODES_PER_TASK as blocks,
+        TRIALS_PER_CODE_P as trials, P_TOKENS as grid, FALLBACK_P_TOKENS,
+    )
+
+    assert grid == FALLBACK_P_TOKENS, "the pilot found no sign change"
+    assert set(codes) == set(M_VALUES)
+    assert all(trials[m] == 6 for m in M_VALUES), (
+        "the pilot measured sigma_c below its resolution, so trials sit at the cap"
+    )
+    for m in M_VALUES:
+        assert codes[m] % blocks[m] == 0
+    assert codes[3] > codes[8] > codes[7], (
+        "panels must be unequal: an m=8 trial costs about 70 times an m=3 trial"
+    )
+    assert sum(codes.values()) == 167005
 
 
 def test_q_is_fixed_at_the_contract_value(frozen_config):

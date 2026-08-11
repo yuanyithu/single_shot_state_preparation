@@ -26,14 +26,19 @@ from data.expander_code.exp105.exp105_pipeline.replay import (
 )
 
 
-def _benchmark_tasks(per_trial=0.05, model_seconds=1.0, rss=0.4):
+# Shaped like the Validation 003 cost benchmark rather than invented: per-trial
+# cost rises roughly as the fourth power of m, because both the block length and
+# the iteration budget grow with m^2. Using a linear-in-m stand-in would push the
+# projection an order of magnitude over the caps and test nothing.
+def _benchmark_tasks(per_trial=0.61, model_seconds=2.2, rss=0.4):
     tasks = []
     for m in M_VALUES:
+        scale = (m / 8.0) ** 4
         tasks.append({
             "m": m,
-            "measurement_seconds_per_trial": per_trial * m,
-            "replay_seconds_per_trial": per_trial * m,
-            "model_seconds": model_seconds * m / 8.0,
+            "measurement_seconds_per_trial": per_trial * scale,
+            "replay_seconds_per_trial": per_trial * scale,
+            "model_seconds": model_seconds * scale,
             "identity_seconds": 0.001,
             "decoder_setup_seconds": 0.002,
             "replay_setup_seconds": 0.002,
@@ -110,6 +115,7 @@ def test_replay_report_validation_requires_full_coverage(remote_config):
             ),
             "raw_sha256": "a" * 64,
             "error_stream_sha256": "b" * 64,
+            "readout_stream_sha256": "e" * 64,
             "correction_stream_sha256": "c" * 64,
             "label_stream_sha256": "d" * 64,
         })
