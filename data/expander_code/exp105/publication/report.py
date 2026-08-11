@@ -1,16 +1,26 @@
-"""Publication artifacts for exp105: curves, contrasts, strata, plots, report."""
+"""Publication report generation, outside the identity-bound package.
+
+Corrected after the measurement, so it cannot live in `exp105_pipeline`
+without invalidating the frozen `source_tree_sha256` that the configs, the
+raw files and the published aggregate are all bound to. It reads the
+aggregate through the loader and never touches raw, the decoder or the
+seeds.
+
+Original module docstring follows.
+
+Publication artifacts for exp105: curves, contrasts, strata, plots, report."""
 
 import csv
 from pathlib import Path
 
 import numpy as np
 
-from .aggregate import DISTANCE_STRATA
+from data.expander_code.exp105.exp105_pipeline.aggregate import DISTANCE_STRATA
 import json
 
-from .config import ensure_config
-from .crossing import CERTIFIED
-from .io import atomic_json, sha256_file
+from data.expander_code.exp105.exp105_pipeline.config import ensure_config
+from data.expander_code.exp105.exp105_pipeline.crossing import CERTIFIED
+from data.expander_code.exp105.exp105_pipeline.io import atomic_json, sha256_file
 
 
 DECODER_LABEL = "BP+OSD-0"
@@ -42,7 +52,7 @@ def write_primary_curves(path, payload):
     for m_index, m in enumerate(payload["m_values"].tolist()):
         for p_index, p in enumerate(payload["p_values"]):
             rows.append([
-                m, f"{p:.2f}", payload["m_status"][m_index, p_index],
+                m, f"{p:.4f}", payload["m_status"][m_index, p_index],
                 f"{payload['primary_mean'][m_index, p_index]:.6f}",
                 f"{payload['primary_band_low'][m_index, p_index]:.6f}",
                 f"{payload['primary_band_high'][m_index, p_index]:.6f}",
@@ -59,10 +69,11 @@ def write_primary_curves(path, payload):
 
 
 def write_contrasts(path, payload):
+    ms = payload["m_values"].tolist()
     rows = []
     for p_index, p in enumerate(payload["p_values"]):
         row = [
-            f"{p:.2f}",
+            f"{p:.4f}",
             f"{payload['delta38'][p_index]:.6f}",
             f"{payload['delta38_band_low'][p_index]:.6f}",
             f"{payload['delta38_band_high'][p_index]:.6f}",
@@ -73,7 +84,7 @@ def write_contrasts(path, payload):
         elif payload["delta38_band_low"][p_index] > 0:
             certified = "certified_positive"
         row.append(certified)
-        for adjacent in range(len(payload["m_values"]) - 1):
+        for adjacent in range(len(ms) - 1):
             row.append(f"{payload['adjacent_delta'][adjacent, p_index]:.6f}")
         rows.append(row)
     header = [
@@ -94,7 +105,7 @@ def write_distance_strata(path, payload):
             for p_index, p in enumerate(payload["p_values"]):
                 rows.append([
                     m, distance, codes,
-                    f"{codes / panel_counts(payload)[m]:.6f}", f"{p:.2f}",
+                    f"{codes / panel_counts(payload)[m]:.6f}", f"{p:.4f}",
                     int(payload["strata_failures"][m_index, d_index, p_index]),
                     int(payload["strata_trials"][m_index, d_index, p_index]),
                     f"{payload['strata_rate'][m_index, d_index, p_index]:.6f}",
@@ -113,18 +124,18 @@ def write_code_diagnostics(path, payload):
                 int(payload["code_m"][code_slot]),
                 int(payload["code_index"][code_slot]),
                 int(payload["classical_distance"][code_slot]),
-                f"{p:.2f}",
+                f"{p:.4f}",
                 payload["code_status"][code_slot, p_index],
                 int(payload["failure_counts"][code_slot, p_index]),
                 int(payload["trial_counts"][code_slot, p_index]),
                 f"{payload['bp_convergence_rate'][code_slot, p_index]:.6f}",
                 f"{payload['mean_bp_iterations'][code_slot, p_index]:.3f}",
-                f"{payload['syndrome_mismatch_rate'][code_slot, p_index]:.6f}",
+                f"{payload['readout_mismatch_rate'][code_slot, p_index]:.6f}",
             ])
     return _write_csv(path, [
         "m", "code_index", "classical_distance", "p", "status", "failures",
         "trials", "bp_convergence_rate", "mean_bp_iterations",
-        "syndrome_mismatch_rate",
+        "readout_mismatch_rate",
     ], rows)
 
 
@@ -159,6 +170,7 @@ def write_plots(directory, payload):
             p_values, payload["primary_band_low"][m_index],
             payload["primary_band_high"][m_index], alpha=0.18,
         )
+    axes[0].set_xscale("log")
     axes[0].set_xlabel("physical error rate p")
     axes[0].set_ylabel("ensemble mean block logical failure rate")
     axes[0].set_title(
@@ -179,9 +191,10 @@ def write_plots(directory, payload):
         axes[1].axvspan(
             payload["p_cross_low"], payload["p_cross_high"], color="navy", alpha=0.15,
         )
+    axes[1].set_xscale("log")
     axes[1].set_xlabel("physical error rate p")
     axes[1].set_ylabel("P_fail(m=8) - P_fail(m=3)")
-    axes[1].set_title(f"{DECODER_LABEL} primary contrast and certified crossing")
+    axes[1].set_title(f"{DECODER_LABEL} primary contrast and its simultaneous band")
     axes[1].legend()
     axes[1].grid(alpha=0.3)
     figure.tight_layout()
@@ -201,6 +214,7 @@ def write_plots(directory, payload):
             axes[0].plot(
                 p_values, rates[m_index], marker="s", label=f"d={distance} (m=8)",
             )
+    axes[0].set_xscale("log")
     axes[0].set_xlabel("physical error rate p")
     axes[0].set_ylabel("block logical failure rate")
     axes[0].set_title("Distance strata at m=8 (preregistered secondary)")
@@ -280,16 +294,56 @@ def write_report(directory, payload, config):
             f"(defined in {payload['p_cross_defined_fraction']:.3f} of replicates).",
         ]
     else:
-        lines += ["No certified bracket and no crossing location."]
+        low = payload["delta38_band_low"]
+        high = payload["delta38_band_high"]
+        negative = int((high < 0).sum())
+        positive = int((low > 0).sum())
+        lines += ["No certified bracket and no crossing location.", ""]
+        if positive == len(low) and negative == 0:
+            # Worth separating from "nothing was found": every point is
+            # certified on the same side, which is a result about the physics
+            # rather than an absence of resolution.
+            lines += [
+                f"The primary contrast is **certified positive at all "
+                f"{positive} grid points**: the simultaneous band excludes zero "
+                "from below everywhere, so the larger code is worse than the "
+                "smaller one at every p in the window. This is a certified "
+                "absence of a crossing, not a failure to resolve one.",
+            ]
+        else:
+            lines += [
+                f"Certified negative at {negative} grid points and certified "
+                f"positive at {positive}, with no negative point preceding a "
+                "positive one.",
+            ]
+    bound = json.loads(str(payload["qtop_lower_bound_json"]))
+    ms = payload["m_values"].tolist()
+    best = max(
+        (value, ms[index], float(payload["p_values"][j]))
+        for index, m in enumerate(ms)
+        for j, value in enumerate(bound[str(m)])
+        if value is not None
+    )
     lines += [
+        "",
+        "## Bound on q_top",
+        "",
+        "Per disorder the exact posterior satisfies `map_success <= "
+        "sqrt(purity)`, and no decoder beats MAP success at its own "
+        "observation, so with `S = 1 - P_fail` and `M = 2^k` Jensen gives "
+        "`E[q_top] >= (M S^2 - 1)/(M - 1)`. This is a certified one-sided "
+        "bound, never an estimate, and it is informative only where `S` is "
+        f"large. Its strongest value here is `{best[0]:.5f}` at "
+        f"`m = {best[1]}, p = {best[2]:g}`. Full table in `report.json`.",
         "",
         "## Scope",
         "",
-        "Finite-grid, decoder-dependent, code-capacity result for one frozen "
-        f"{DECODER_LABEL} decoder on one randomly generated expander-code ensemble "
-        "at q=0. No asymptotic threshold, no critical exponent, no finite-size "
-        "scaling, no q_top, no MLD and no preparation-channel claim. Clears no "
-        "exp102 blocker.",
+        "Finite-grid, decoder-dependent result for one frozen "
+        f"{DECODER_LABEL} decoder on one randomly generated expander-code "
+        f"ensemble at q = {payload['q_token']}. No asymptotic threshold, no "
+        "critical exponent, no finite-size scaling, no q_top *estimate* at "
+        "m >= 4, no MLD and no preparation-channel claim. Clears no exp102 "
+        "blocker.",
         "",
     ]
     report_md = directory / "report.md"
@@ -319,9 +373,10 @@ def write_report(directory, payload, config):
         "p_cross_reason": payload["p_cross_reason"],
         "replay_status": payload["replay_status"],
         "replay_scope": payload["replay_scope"],
-        "codes_per_m": int(payload["codes_per_m"]),
+        "q_token": payload["q_token"],
         "trials_per_code_p": panel_trials(payload),
         "codes_per_m": panel_counts(payload),
+        "qtop_lower_bound_json": payload["qtop_lower_bound_json"],
         "payload_sha256": payload["payload_sha256"],
         "file_sha256": files,
     }
