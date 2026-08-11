@@ -2,9 +2,9 @@
 
 ## Current state
 
-**`PILOT_COMPLETE_NO_SIGN_CHANGE`** — contract frozen, pipeline implemented and
-locally gated, locating pilot run. No remote transfer, no production compute, no
-published result.
+**`PRODUCTION_SCAN_RUNNING`** — contract frozen, pipeline implemented, locally
+gated, pilot run, nd-3 qualified and resource-gated. The production scan is
+running on nd-3. No published result.
 
 The pilot found `Delta38 > 0` at all 14 grid points from `p = 0.001` to `0.07`.
 At `q = 0.05` this family is already above threshold from readout noise alone:
@@ -45,9 +45,10 @@ is blocked, plus a **transport-free `q_top` anchor** at `m = 2, 3` (Track B).
 3. The compiled decoder is not bit-portable across platforms (exp104 Validation
    002). Generation, replay and aggregation all happen on nd-3 against the pinned
    nd-3 binary; artifacts are never mixed across platforms.
-4. No nd-3 compute is authorized. The production plan is evaluated and recorded
-   in Validation 003 but deliberately **not applied**: writing the constants into
-   `config.py` is the freeze, and the freeze happens when the run is authorized.
+4. The production plan is frozen in `config.py` and gated: 17,617 codes, 3,314
+   tasks, 1,057,020 trials, 64 workers, 644.7 reserved core-hours against a cap
+   of 800. Validation 003's allocation was re-evaluated on nd-3's own measured
+   costs after the resource gate blocked the macmini-derived panel.
 
 ## Authority and limits
 
@@ -65,12 +66,18 @@ absence of a crossing is a legitimate terminal state, not a failure.
 - `validation/001_...`: contract freeze, scientific red team, ensemble census,
   measured PT-gate infeasibility.
 - `validation/002_...`: local implementation gate.
-- `validation/003_...`: locating pilot, cost benchmark, evaluated (not applied)
-  production plan, and the bracket it opens: `q_c` lies strictly inside `(0, 0.05)`.
+- `validation/003_...`: locating pilot, cost benchmark, the production plan, and
+  the bracket it opens: `q_c` lies strictly inside `(0, 0.05)`.
+- `validation/004_...`: nd-3 qualification and resource gate.
 - `validation/INDEX.md`: numbered evidence ledger.
 
 ## Latest evidence
 
+- Validation 004: `PASS`. 166/58/131/17 tests on nd-3, nothing skipped; reserved
+  644.7/800 core-hours, wall 7.01/14 h. The first qualification and the first
+  resource projection both failed, and between them found four real defects --
+  including that the allocation rule had been evaluated with macmini costs for a
+  run that happens on nd-3, where a trial at `m = 8` is eight times slower.
 - Validation 003: `PILOT_COMPLETE_NO_SIGN_CHANGE`. 44/44 pilot tasks VALID;
   `Delta38` from `+0.064` at `p = 0.001` to `+0.541` at `p = 0.03`, never
   negative. Cost benchmark: a trial at `m = 8` costs 70 times one at `m = 3`.
