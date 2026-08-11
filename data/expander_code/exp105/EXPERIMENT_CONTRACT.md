@@ -149,21 +149,37 @@ the grid.
 
 ## 6. Locating pilot and the freezing rules
 
-A pilot runs under the independent seed namespace `exp105.pilot.v1` at `m = 3, 8`
-only, over `p in {0.005, 0.01, 0.015, 0.02, 0.025, 0.03, 0.035, 0.04, 0.05, 0.06,
-0.07}`, 200 codes per `m`, four trials per (code, `p`). **Pilot raw is never
-merged into production and never enters any published statistic.** Its sole
-function is to evaluate the two rules below, which are frozen here, before the
-pilot runs.
+A pilot runs under the independent seed namespace `exp105.pilot.v1`, drawing its
+codes from the independent ensemble namespace `exp105.noisy_syndrome_mc.pilot.v1`
+and its own registry file, at `m = 3, 8` only, over
+
+```text
+p in {0.001, 0.002, 0.003, 0.005, 0.0075, 0.01, 0.015,
+      0.02, 0.025, 0.03, 0.04, 0.05, 0.06, 0.07}
+```
+
+with 200 codes per `m` and four trials per (code, `p`). **Pilot raw is never
+merged into production and never enters any published statistic, and no pilot
+code is ever a production code.** Its sole function is to evaluate the two rules
+below, which are frozen here, before the pilot runs.
+
+The grid reaches down to `0.001` on an argument fixed before anything ran. exp104
+put the `q = 0` crossing at `p = 0.05512`, and readout noise can only move it
+down. If the threshold curve is even roughly linear near the axes and the two
+axes have comparable scales, `q = 0.05` leaves a `p` budget of order `0.005`. A
+pilot that cannot bracket the crossing wastes the production run it exists to
+plan, so the low end is cheap insurance rather than a guess at the answer.
 
 **Grid rule.** Let `[p_lo, p_hi]` be the innermost pair of pilot grid points at
 which the pilot point estimate of `Delta38 = P_fail(8) - P_fail(3)` changes sign
 from negative to positive. The production grid is ten uniformly spaced points
 over `[p_lo - 2h, p_hi + 2h]`, where `h` is the pilot grid spacing at `p_lo`,
-rounded to three decimals, deduplicated, and clipped to `[0.002, 0.10]`. If the
+rounded to four decimals, deduplicated, and clipped to `[0.0005, 0.10]`. If the
 pilot estimate shows no negative-to-positive sign change anywhere, the production
-grid is the frozen fallback
-`{0.002, 0.005, 0.01, 0.015, 0.02, 0.03, 0.04, 0.05, 0.07, 0.10}`.
+grid is the frozen log-spaced fallback
+`{0.001, 0.0015, 0.0025, 0.004, 0.006, 0.01, 0.016, 0.025, 0.04, 0.07}`, chosen
+that way because if the crossing is not where the pilot looked then its order of
+magnitude is what is uncertain, not its third decimal.
 
 **Allocation rule.** Let `c_m` be the measured per-trial cost, `kappa_m` the
 measured per-code frame cost in seconds, `sigma_c(m)` the between-code standard

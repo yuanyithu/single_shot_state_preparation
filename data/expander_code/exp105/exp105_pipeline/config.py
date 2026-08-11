@@ -23,9 +23,15 @@ ANCHOR_M_VALUES = [2, 3]
 # evaluate the two freezing rules in EXPERIMENT_CONTRACT.md section 6.
 # ---------------------------------------------------------------------------
 PILOT_M_VALUES = [3, 8]
+# The grid reaches down to 0.001 on an a-priori argument, fixed before anything
+# ran. exp104 put the q = 0 crossing at p = 0.05512, and readout noise can only
+# move it down. If the threshold curve is even roughly linear near the axes and
+# the two axes have comparable scales, then q = 0.05 leaves a p budget of order
+# 0.005 -- the old lower edge. A pilot that cannot bracket the crossing wastes
+# the production run it exists to plan, so the low end is cheap insurance.
 PILOT_P_TOKENS = [
-    "0.005", "0.01", "0.015", "0.02", "0.025",
-    "0.03", "0.035", "0.04", "0.05", "0.06", "0.07",
+    "0.001", "0.002", "0.003", "0.005", "0.0075", "0.01", "0.015",
+    "0.02", "0.025", "0.03", "0.04", "0.05", "0.06", "0.07",
 ]
 PILOT_CODES_PER_M = 200
 PILOT_TRIALS_PER_CODE_P = 4
@@ -51,10 +57,14 @@ DIAGNOSTIC_M_VALUES = [4, 5, 6, 7]
 PRIMARY_M_VALUES = [3, 8]
 TRIALS_PER_CODE_P_RANGE = (3, 6)
 PRODUCTION_GRID_POINTS = 10
-PRODUCTION_GRID_CLIP = ("0.002", "0.10")
+PRODUCTION_GRID_CLIP = ("0.0005", "0.10")
+PRODUCTION_GRID_DECIMALS = 4
+# Used only if the pilot finds no sign change anywhere. Log-spaced, because if
+# the crossing is not where the pilot looked then its order of magnitude is what
+# is uncertain, not its third decimal.
 FALLBACK_P_TOKENS = [
-    "0.002", "0.005", "0.01", "0.015", "0.02", "0.03", "0.04", "0.05",
-    "0.07", "0.10",
+    "0.001", "0.0015", "0.0025", "0.004", "0.006", "0.01", "0.016",
+    "0.025", "0.04", "0.07",
 ]
 
 # A fresh master seed. exp105 draws its own ensemble so that no exp104 code
