@@ -63,6 +63,14 @@ data/**/.gitignore
 !data/expander_code/exp104/final_results/*.csv
 !data/expander_code/exp104/final_results/*.npz
 !data/expander_code/exp104/final_results/*.png
+!data/expander_code/exp105/config/*.json
+!data/expander_code/exp105/config/*.npz
+!data/expander_code/exp105/deployment/bootstrap_verified_archive.sh
+!data/expander_code/exp105/validation/**/*.json
+!data/expander_code/exp105/final_results/*.json
+!data/expander_code/exp105/final_results/*.csv
+!data/expander_code/exp105/final_results/*.npz
+!data/expander_code/exp105/final_results/*.png
 !data/expander_code/exp102/validation/011_q0_global_screen_diagnostic_20260721/failed_run_evidence/remote_evidence/**/*.log
 !data/expander_code/exp102/validation/011_q0_global_screen_diagnostic_20260721/failed_run_evidence/remote_evidence/**/SUCCESS
 !data/expander_code/exp102/validation/011_q0_global_screen_diagnostic_20260721/failed_run_evidence/remote_evidence/**/stage.lock
