@@ -385,3 +385,25 @@ def test_task_plan_covers_every_code_once(remote_config):
     assert len(set(tasks)) == len(tasks)
     total_codes = sum(CODES_PER_TASK[m] for m, _ in tasks)
     assert total_codes == TOTAL_CODES
+
+
+def test_both_preflight_entry_points_benchmark_the_same_grid_points(remote_config):
+    """The local and remote preflights must not drift apart.
+
+    exp105 replaced exp104's hard-coded PREFLIGHT["p_tokens"] with a positional
+    selection, because the production grid is not frozen until the pilot has
+    run. The local entry point was updated and the remote one was not, so the
+    remote resource gate died with a KeyError after the deployment had already
+    been built, shipped and bootstrapped. This asserts they agree.
+    """
+    from data.expander_code.exp105.exp105_pipeline.preflight import (
+        benchmark_p_tokens,
+    )
+
+    tokens = benchmark_p_tokens(remote_config)
+    grid = list(remote_config["p_tokens"])
+    assert tokens == [grid[0], grid[len(grid) // 2], grid[-1]]
+    assert "p_tokens" not in remote_config["preflight"], (
+        "the preflight spec must name grid points by position, not by value"
+    )
+    assert remote_config["preflight"]["p_token_selection"] == "first_middle_last"

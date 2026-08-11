@@ -39,7 +39,7 @@ from .identity import (
     verify_remote_deployment,
 )
 from .io import atomic_json, sha256_file, sha256_json
-from .preflight import benchmark_task, estimate_resources
+from .preflight import benchmark_p_tokens, benchmark_task, estimate_resources
 from .raw import load_raw, raw_filename, save_raw
 from .replay import (
     build_replay_report,
@@ -86,7 +86,7 @@ QUALIFICATION_GROUPS = (
 # what exp105 means. The exp101 and exp102 groups are the same certified
 # subsets exp103 and exp104 qualified against.
 QUALIFICATION_EXPECTED_PASSES = {
-    "exp105": 165, "exp104": 131, "exp101": 58, "exp102": 17,
+    "exp105": 166, "exp104": 131, "exp101": 58, "exp102": 17,
 }
 
 
@@ -395,9 +395,9 @@ def run_remote_resource_preflight(config, registry_rows, qualification_sha256):
     profile = config["execution_profile"]
     tasks = [
         benchmark_task(m, code_index, token, config, registry_rows)
-        for m in spec["m_values"]
+        for m in config["m_values"]
         for code_index in spec["code_indices"]
-        for token in spec["p_tokens"]
+        for token in benchmark_p_tokens(config)
     ]
     estimate = estimate_resources(tasks, config, profile["num_workers"], profile)
     blocks = committed_replay_blocks(config)
