@@ -58,11 +58,11 @@ REMOTE_SCAN_SCHEMA = "exp105.remote_scan.v1"
 REMOTE_QUALIFICATION_RELATIVE = Path("validation/environment_qualification.json")
 REMOTE_PREFLIGHT_RELATIVE = Path("validation/remote_resource_preflight.json")
 COMMITTED_QUALIFICATION_RELATIVE = Path(
-    "data/expander_code/exp105/validation/003_remote_gate_20260808/"
+    "data/expander_code/exp105/validation/004_remote_gate_20260811/"
     "environment_qualification.json"
 )
 COMMITTED_PREFLIGHT_RELATIVE = Path(
-    "data/expander_code/exp105/validation/003_remote_gate_20260808/"
+    "data/expander_code/exp105/validation/004_remote_gate_20260811/"
     "remote_resource_preflight.json"
 )
 QUALIFICATION_GROUPS = (
@@ -74,13 +74,20 @@ QUALIFICATION_GROUPS = (
         "data/expander_code/exp101/tests/test_hgp.py",
         "data/expander_code/exp101/tests/test_logicals.py",
     )),
+    ("exp104", ("data/expander_code/exp104/tests",)),
     ("exp102", (
         "data/expander_code/exp102/tests/test_core.py",
         "data/expander_code/exp102/tests/test_scan_results_strict.py",
         "data/expander_code/exp102/tests/test_source_identity.py",
     )),
 )
-QUALIFICATION_EXPECTED_PASSES = {"exp105": 131, "exp101": 58, "exp102": 17}
+# exp104 is included because exp105 reuses its ensemble rule, its decoder
+# identity and its comparison codes; a change there would silently change
+# what exp105 means. The exp101 and exp102 groups are the same certified
+# subsets exp103 and exp104 qualified against.
+QUALIFICATION_EXPECTED_PASSES = {
+    "exp105": 152, "exp104": 131, "exp101": 58, "exp102": 17,
+}
 
 
 def _require_remote_config(config):

@@ -1,4 +1,11 @@
-"""Build an immutable, selective exp104 remote source deployment."""
+"""Build an immutable, selective exp105 remote source deployment.
+
+exp104 is carried along because exp105 reuses its ensemble rule, its
+decoder identity and its comparison codes: the nd-3 qualification runs
+exp104's suite, and the cross-package equality gate reads exp104's frozen
+registry. A change on either side has to surface as a failure there rather
+than as a silent difference in what exp105 measures.
+"""
 
 import argparse
 import hashlib
@@ -8,16 +15,16 @@ import subprocess
 import tarfile
 from pathlib import Path
 
-from data.expander_code.exp104.exp104_pipeline.config import (
+from data.expander_code.exp105.exp105_pipeline.config import (
     REMOTE_CONFIG_SCHEMA,
     REMOTE_EXECUTION_PROFILE,
     load_config,
 )
-from data.expander_code.exp104.exp104_pipeline.identity import (
+from data.expander_code.exp105.exp105_pipeline.identity import (
     REMOTE_DEPLOYMENT_SCHEMA,
     source_tree_sha256,
 )
-from data.expander_code.exp104.exp104_pipeline.io import (
+from data.expander_code.exp105.exp105_pipeline.io import (
     atomic_json,
     canonical_json,
     sha256_file,
@@ -43,16 +50,22 @@ SOURCE_PATHS = (
     "data/expander_code/exp102/validation/002_numba_smoke_20260719/run_verified_source.sh",
     "data/expander_code/exp104/EXPERIMENT_CONTRACT.md",
     "data/expander_code/exp104/config",
-    "data/expander_code/exp104/deployment/build_remote_deployment.py",
-    "data/expander_code/exp104/deployment/bootstrap_verified_archive.sh",
-    "data/expander_code/exp104/deployment/run_remote_stage.sh",
-    "data/expander_code/exp104/deployment/run_verified_source.sh",
     "data/expander_code/exp104/exp104_pipeline",
-    "data/expander_code/exp104/final_results/README.md",
     "data/expander_code/exp104/raw/README.md",
     "data/expander_code/exp104/status.md",
     "data/expander_code/exp104/tests",
-    "data/expander_code/exp104/validation",
+    "data/expander_code/exp105/EXPERIMENT_CONTRACT.md",
+    "data/expander_code/exp105/config",
+    "data/expander_code/exp105/deployment/build_remote_deployment.py",
+    "data/expander_code/exp105/deployment/bootstrap_verified_archive.sh",
+    "data/expander_code/exp105/deployment/run_remote_stage.sh",
+    "data/expander_code/exp105/deployment/run_verified_source.sh",
+    "data/expander_code/exp105/exp105_pipeline",
+    "data/expander_code/exp105/final_results/README.md",
+    "data/expander_code/exp105/raw/README.md",
+    "data/expander_code/exp105/status.md",
+    "data/expander_code/exp105/tests",
+    "data/expander_code/exp105/validation",
 )
 
 FROZEN_EXECUTION_PATHS = (
@@ -73,9 +86,13 @@ FROZEN_EXECUTION_PATHS = (
     "data/expander_code/exp102/validation/002_numba_smoke_20260719/run_stage_wrapper.sh",
     "data/expander_code/exp102/validation/002_numba_smoke_20260719/run_verified_source.sh",
     "data/expander_code/exp104/EXPERIMENT_CONTRACT.md",
-    "data/expander_code/exp104/deployment",
+    "data/expander_code/exp104/config",
     "data/expander_code/exp104/exp104_pipeline",
     "data/expander_code/exp104/tests",
+    "data/expander_code/exp105/EXPERIMENT_CONTRACT.md",
+    "data/expander_code/exp105/deployment",
+    "data/expander_code/exp105/exp105_pipeline",
+    "data/expander_code/exp105/tests",
 )
 
 
@@ -134,9 +151,9 @@ def build_remote_deployment(repo_root, output_dir, commit, config_path):
     config = load_config(config_path)
     if config["schema_version"] != REMOTE_CONFIG_SCHEMA:
         raise ValueError("remote deployment requires the canonical remote config")
-    package_path = root / "data/expander_code/exp104/exp104_pipeline"
+    package_path = root / "data/expander_code/exp105/exp105_pipeline"
     if source_tree_sha256(package_path) != config["source_tree_sha256"]:
-        raise ValueError("checked-out exp104 package differs from the frozen source tree")
+        raise ValueError("checked-out exp105 package differs from the frozen source tree")
     source_diff = _git(
         root, "diff", "--quiet", config["source_commit"], commit, "--",
         *FROZEN_EXECUTION_PATHS, check=False,

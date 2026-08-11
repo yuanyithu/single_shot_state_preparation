@@ -38,16 +38,30 @@ PILOT_TRIALS_PER_CODE_P = 4
 PILOT_CODES_PER_TASK = {3: 50, 8: 5}
 
 # ---------------------------------------------------------------------------
-# Production plan. Deliberately unset until Validation 003 evaluates the frozen
-# rules on pilot measurements. Filling these in is a reviewable source change,
-# which is what makes the freeze auditable; until then every production entry
-# point refuses to run.
+# Production plan, frozen by Validation 003 from the section 6 rules. Filling
+# these in is the freeze; the values below are the rules evaluated on measured
+# pilot inputs, not a choice.
+#
+# The grid is the fallback branch: the pilot found Delta38 positive at all 14 of
+# its points, so there is no sign change to bracket. The trial count is at its
+# cap of six at every m because the pilot measured the between-code spread at or
+# below its own resolution -- at q = 0.05 failure is driven by the readout
+# channel, which is common to all codes, so shot noise binds rather than code
+# diversity. That is the reverse of exp104.
+#
+# Panels are unequal because a trial at m = 8 costs 70 times a trial at m = 3
+# (measured), so the primary pair is split to minimise the variance of Delta38
+# at fixed cost. Counts are the rule's output rounded down to a multiple of the
+# frozen block size, which is chosen to keep a task near eight minutes on nd-3.
 # ---------------------------------------------------------------------------
-PRODUCTION_PLAN_FROZEN = False
-P_TOKENS = None
-CODES_PER_M = None
-TRIALS_PER_CODE_P = None
-CODES_PER_TASK = None
+PRODUCTION_PLAN_FROZEN = True
+P_TOKENS = [
+    "0.001", "0.0015", "0.0025", "0.004", "0.006", "0.01", "0.016",
+    "0.025", "0.04", "0.07",
+]
+CODES_PER_M = {3: 89000, 4: 35700, 5: 13900, 6: 6080, 7: 3050, 8: 19275}
+TRIALS_PER_CODE_P = {3: 6, 4: 6, 5: 6, 6: 6, 7: 6, 8: 6}
+CODES_PER_TASK = {3: 250, 4: 100, 5: 50, 6: 20, 7: 10, 8: 5}
 
 # Inputs to the frozen allocation rule, fixed here so that Validation 003
 # evaluates a rule rather than choosing an outcome.

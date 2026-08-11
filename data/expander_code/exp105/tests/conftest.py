@@ -42,6 +42,12 @@ CONFIG_PATH = Path(os.environ.get(
 PILOT_CONFIG_PATH = (
     REPO_ROOT / "data/expander_code/exp105/config/noisy_mc.pilot.v1.json"
 )
+PRODUCTION_CONFIG_PATH = (
+    REPO_ROOT / "data/expander_code/exp105/config/noisy_mc.v1.json"
+)
+REMOTE_CONFIG_PATH = (
+    REPO_ROOT / "data/expander_code/exp105/config/noisy_mc.remote.v1.json"
+)
 EXP104_REGISTRY_PATH = (
     REPO_ROOT / "data/expander_code/exp104/config/ensemble_registry.v1.json"
 )
@@ -59,6 +65,16 @@ def frozen_config():
 def pilot_config():
     """Always the pilot config, whichever one the environment points at."""
     return load_config(PILOT_CONFIG_PATH)
+
+
+@pytest.fixture(scope="session")
+def production_config():
+    return load_config(PRODUCTION_CONFIG_PATH)
+
+
+@pytest.fixture(scope="session")
+def remote_config():
+    return load_config(REMOTE_CONFIG_PATH)
 
 
 @pytest.fixture(scope="session")

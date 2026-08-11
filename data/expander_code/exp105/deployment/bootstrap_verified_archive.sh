@@ -64,6 +64,6 @@ elif [[ ! -d $source_dir ]]; then
   exit 67
 fi
 
-wrapper=data/expander_code/exp104/deployment/run_verified_source.sh
+wrapper=data/expander_code/exp105/deployment/run_verified_source.sh
 tar -xOf "$archive" "$wrapper" \
   | bash -s -- "$deployment_root" "$expected_manifest_sha256" "$@"
