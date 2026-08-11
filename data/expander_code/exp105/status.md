@@ -3,7 +3,7 @@
 ## Current state
 
 **`EXP105_NO_CERTIFIED_CROSSING`** — Track A complete, published, closed.
-Track B (the `m = 2, 3` `q_top` anchor) is not yet run.
+Track B closed as `ANCHOR_NOT_CERTIFIABLE_TI_GATE_FAILS_ON_THE_INFORMATIVE_DISORDERS`.
 
 At `q = 0.05`, over `p` from `0.001` to `0.07`, the ensemble-mean block logical
 failure rate of the frozen BP+OSD-0 decoder is higher for the larger code at
@@ -61,14 +61,17 @@ is blocked, plus a **transport-free `q_top` anchor** at `m = 2, 3` (Track B).
    after the measurement, so the live source tree no longer matches the frozen
    configs; the configs are deliberately left bound to the freeze that produced
    the published aggregate, and any new compute needs a fresh freeze.
-5. Track B is outstanding. It needs a numba fast path for the fixed-label sector
-   chain first: `sector_ti.py` is a pure-Python reference and `m = 3` costs about
-   20 hours per disorder there. The fast path cannot be bit-exact with the
-   certified reference, because that reference draws from numpy's `default_rng`,
-   which numba cannot reproduce; the plan is the `fast_mcmc.py` pattern -- a
-   python/numba twin pair on `prng.py` that are bit-exact with each other -- with
-   agreement against the certified reference established statistically at
-   `m = 2`, inside TI's own gate tolerance.
+5. Track B is closed without an anchor. The numba fast path was built and is
+   bit-exact with the certified reference (about 1,200x at `m = 3`), so cost is
+   not the obstacle. The obstacle is that the TI grid gate fails preferentially
+   on the disorders whose posterior is not concentrated -- 16/20, 8/20 and 1/20
+   valid at `p = 0.001`, `0.01`, `0.04` -- and has a demonstrated false positive.
+   Fail-closed therefore voids every point and valid-only averaging would bias
+   `q_top` upward. The Track A bound stays **uncalibrated**: known to hold, not
+   known to be tight. Making TI certifiable here needs a fresh contract.
+6. `exp105_pipeline` is identity-frozen to the measurement. Track B and the
+   corrected report generator live in `anchor/` and `publication/` for that
+   reason; `exp105_pipeline/report.py` is exactly as it was when the scan ran.
 
 ## Authority and limits
 
@@ -91,11 +94,15 @@ absence of a crossing is a legitimate terminal state, not a failure.
 - `validation/004_...`: nd-3 qualification and resource gate.
 - `validation/005_...`: production scan, committed replay and aggregation.
 - `validation/006_...`: loader-verified publication and the terminal status.
+- `validation/007_...`: Track B, the fast path and the anchor's negative.
 - `final_results/`: published aggregate, report, curves and plots.
 - `validation/INDEX.md`: numbered evidence ledger.
 
 ## Latest evidence
 
+- Validation 007: Track B closed. Fast path bit-exact, ~1,200x at `m = 3`; anchor
+  not certifiable because the TI gate fails where the physics is and has a
+  demonstrated false positive.
 - Validation 006: `EXP105_NO_CERTIFIED_CROSSING`, aggregate SHA256 `ff73fd9c...`,
   simultaneous half-width `0.010486`, 10/10 points certified positive.
 - Validation 005: scan `PASS` 3,314/3,314 in 2.20 h; replay `PASS` 337/337 with
