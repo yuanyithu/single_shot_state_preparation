@@ -83,6 +83,11 @@ def registry(frozen_config):
 
 
 @pytest.fixture(scope="session")
+def pilot_registry(pilot_config):
+    return load_registry(REPO_ROOT / pilot_config["registry_path"])
+
+
+@pytest.fixture(scope="session")
 def registry_rows(registry):
     return registry_index(registry)
 
@@ -109,12 +114,18 @@ def short_block(monkeypatch):
 
 
 @pytest.fixture(scope="session")
-def complete_aggregate_factory(frozen_config, registry):
+def complete_aggregate_factory(pilot_config, pilot_registry):
     """A COMPLETE aggregate built directly, with a real certified crossing.
 
-    Built on the pilot plan, whose two sizes are exactly the primary pair, so
-    the crossing classifier is exercised on the panel it will actually decide.
+    Deliberately built on the *pilot* plan even during nd-3 qualification. The
+    aggregation and loader logic is panel-agnostic, while the production panel
+    is 167,005 codes: a 20,000-replicate cluster bootstrap over it would draw
+    about 3e9 indices, which is a production run, not a unit test. The pilot's
+    two sizes are exactly the primary pair, so the crossing classifier is still
+    exercised on the shape it will actually decide.
     """
+    frozen_config = pilot_config
+    registry = pilot_registry
     arrays = _blank_arrays(frozen_config)
     m_values, codes_per_m, trials_by_m, offsets, _ = panel_layout(frozen_config)
     n_p = len(frozen_config["p_tokens"])
@@ -267,7 +278,7 @@ def complete_aggregate_factory(frozen_config, registry):
 
 
 @pytest.fixture(scope="session")
-def foreign_config(frozen_config):
+def foreign_config(pilot_config):
     """A valid config that is definitely not the one under test.
 
     Only `source_commit` differs, which is enough to change the config hash and
@@ -277,7 +288,7 @@ def foreign_config(frozen_config):
     from data.expander_code.exp105.exp105_pipeline.config import ensure_config
 
     payload = {
-        key: copy.deepcopy(value) for key, value in frozen_config.items()
+        key: copy.deepcopy(value) for key, value in pilot_config.items()
         if key not in {"config_sha256", "config_path"}
     }
     payload["source_commit"] = "f" * 40
