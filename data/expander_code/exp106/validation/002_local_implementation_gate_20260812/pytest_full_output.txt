@@ -1,0 +1,68 @@
+### source_tree_sha256 at gate time
+e88e8f6784fa6e45754293df1275f7b00e3021ae3d19ddea83a720da596c18fb
+### exp106 2026-08-12T04:46:54Z
+[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[33ms[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m [ 32%]
+[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m [ 65%]
+[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[33ms[0m[33ms[0m[33ms[0m[33ms[0m[33ms[0m[33ms[0m[33ms[0m[33ms[0m[33ms[0m[33ms[0m[33ms[0m[33ms[0m[33ms[0m[33ms[0m[33ms[0m[33ms[0m[33ms[0m[33ms[0m[33ms[0m[33ms[0m[33ms[0m[33ms[0m[33ms[0m[33ms[0m[33ms[0m[33ms[0m[33ms[0m[33ms[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m [ 97%]
+[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m                                                                    [100%][0m
+[32m[32m[1m192 passed[0m, [33m29 skipped[0m[32m in 180.76s (0:03:00)[0m[0m
+
+### exp105 (exp106 qualification group)
+[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m [ 43%]
+[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m [ 86%]
+[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m                                                   [100%][0m
+[32m[32m[1m166 passed[0m[32m in 85.88s (0:01:25)[0m[0m
+
+### exp104
+[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m [ 54%]
+[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m              [100%][0m
+[32m[32m[1m131 passed[0m[32m in 29.22s[0m[0m
+
+### exp101
+[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m               [100%][0m
+[32m[32m[1m58 passed[0m[32m in 0.15s[0m[0m
+
+### exp102
+[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m                                                        [100%][0m
+[32m[32m[1m17 passed[0m[32m in 0.78s[0m[0m
+
+### bytecode check
+data/expander_code/exp106/exp106_pipeline/__pycache__
+data/expander_code/exp106/tests/__pycache__
+data/expander_code/exp106/exp106_pipeline/__pycache__/equality.cpython-312.pyc
+data/expander_code/exp106/exp106_pipeline/__pycache__/io.cpython-312.pyc
+data/expander_code/exp106/exp106_pipeline/__pycache__/seeds.cpython-312.pyc
+data/expander_code/exp106/exp106_pipeline/__pycache__/crossing.cpython-312.pyc
+data/expander_code/exp106/exp106_pipeline/__pycache__/pilot.cpython-312.pyc
+data/expander_code/exp106/exp106_pipeline/__pycache__/config.cpython-312.pyc
+data/expander_code/exp106/exp106_pipeline/__pycache__/replay.cpython-312.pyc
+data/expander_code/exp106/exp106_pipeline/__pycache__/preflight.cpython-312.pyc
+data/expander_code/exp106/exp106_pipeline/__pycache__/remote_cli.cpython-312.pyc
+data/expander_code/exp106/exp106_pipeline/__pycache__/raw.cpython-312.pyc
+data/expander_code/exp106/exp106_pipeline/__pycache__/worker.cpython-312.pyc
+data/expander_code/exp106/exp106_pipeline/__pycache__/loader.cpython-312.pyc
+data/expander_code/exp106/exp106_pipeline/__pycache__/ensemble.cpython-312.pyc
+data/expander_code/exp106/exp106_pipeline/__pycache__/report.cpython-312.pyc
+data/expander_code/exp106/exp106_pipeline/__pycache__/model.cpython-312.pyc
+data/expander_code/exp106/exp106_pipeline/__pycache__/exp101_bridge.cpython-312.pyc
+data/expander_code/exp106/exp106_pipeline/__pycache__/cli.cpython-312.pyc
+data/expander_code/exp106/exp106_pipeline/__pycache__/aggregate.cpython-312.pyc
+data/expander_code/exp106/exp106_pipeline/__pycache__/audit_scorer.cpython-312.pyc
+data/expander_code/exp106/exp106_pipeline/__pycache__/__init__.cpython-312.pyc
+data/expander_code/exp106/exp106_pipeline/__pycache__/identity.cpython-312.pyc
+data/expander_code/exp106/tests/__pycache__/test_cost_benchmark.cpython-312-pytest-9.0.3.pyc
+data/expander_code/exp106/tests/__pycache__/test_crossing_decisions.cpython-312-pytest-9.0.3.pyc
+data/expander_code/exp106/tests/__pycache__/test_label_map.cpython-312-pytest-9.0.3.pyc
+data/expander_code/exp106/tests/__pycache__/conftest.cpython-312-pytest-9.0.3.pyc
+data/expander_code/exp106/tests/__pycache__/test_decoder_determinism.cpython-312-pytest-9.0.3.pyc
+data/expander_code/exp106/tests/__pycache__/test_worker_and_replay.cpython-312-pytest-9.0.3.pyc
+data/expander_code/exp106/tests/__pycache__/test_exp104_equality.cpython-312-pytest-9.0.3.pyc
+data/expander_code/exp106/tests/__pycache__/test_exp105_equality.cpython-312-pytest-9.0.3.pyc
+data/expander_code/exp106/tests/__pycache__/test_remote_execution.cpython-312-pytest-9.0.3.pyc
+data/expander_code/exp106/tests/__pycache__/test_aggregate_fail_closed.cpython-312-pytest-9.0.3.pyc
+data/expander_code/exp106/tests/__pycache__/test_pilot_rules.cpython-312-pytest-9.0.3.pyc
+data/expander_code/exp106/tests/__pycache__/test_report_generation.cpython-312-pytest-9.0.3.pyc
+data/expander_code/exp106/tests/__pycache__/test_publication_loader.cpython-312-pytest-9.0.3.pyc
+data/expander_code/exp106/tests/__pycache__/test_contract_and_config.cpython-312-pytest-9.0.3.pyc
+data/expander_code/exp106/tests/__pycache__/test_ensemble_and_registry.cpython-312-pytest-9.0.3.pyc
+GATE_COMPLETE

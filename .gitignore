@@ -79,6 +79,28 @@ data/expander_code/exp105/anchor/.numba-cache/
 data/expander_code/exp105/final_results/code_diagnostics.csv
 !data/expander_code/exp105/final_results/*.npz
 !data/expander_code/exp105/final_results/*.png
+!data/expander_code/exp106/config/*.json
+# Tracked for the same reason exp105's is: the deployed source tree is verified
+# byte for byte against its archive, so a registry rebuilt on nd-3 would be an
+# unlisted file and would trip the tree gate at exit 67. exp105's first nd-3
+# qualification failed on exactly that. load_registry still verifies its SHA256
+# on every read.
+!data/expander_code/exp106/config/*.npz
+# All three, not just the bootstrap: `run_verified_source.sh` is extracted from
+# inside the verified tarball and piped to bash, so it has to be in the archive,
+# and `git archive` only carries tracked files. exp104 and exp105 have theirs by
+# a one-time force-add, which a fresh checkout would not reproduce.
+!data/expander_code/exp106/deployment/*.sh
+!data/expander_code/exp106/validation/**/*.json
+# Gate transcripts are the evidence, not a by-product: the exact pass counts and
+# the absence of skips are what nd-3 qualification is later checked against.
+!data/expander_code/exp106/validation/**/*.txt
+!data/expander_code/exp106/final_results/*.json
+!data/expander_code/exp106/final_results/*.csv
+# One row per code and p, and fully derivable from the published NPZ.
+data/expander_code/exp106/final_results/code_diagnostics.csv
+!data/expander_code/exp106/final_results/*.npz
+!data/expander_code/exp106/final_results/*.png
 !data/expander_code/exp102/validation/011_q0_global_screen_diagnostic_20260721/failed_run_evidence/remote_evidence/**/*.log
 !data/expander_code/exp102/validation/011_q0_global_screen_diagnostic_20260721/failed_run_evidence/remote_evidence/**/SUCCESS
 !data/expander_code/exp102/validation/011_q0_global_screen_diagnostic_20260721/failed_run_evidence/remote_evidence/**/stage.lock

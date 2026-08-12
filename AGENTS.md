@@ -4,8 +4,9 @@
 
 ## 接手与权限
 
-- 当前主线是 exp105 噪声 syndrome crossing（`exp105.noisy_syndrome_mc.v1`）：同一冻结 BP+OSD-0 解码器，在 `q=0.05` 下解码增广矩阵 `[H_Z | I]`，按 exp101 的 `phi_r` 打逻辑类标签，逐 m 码数按方差不等分配。先读 `data/expander_code/exp105/status.md`，再读 `data/expander_code/exp105/validation/INDEX.md`。exp103（`exp103.decoder_mc.v2`）与 exp104（`exp104.ensemble_mc.v1`）已完成并冻结，是可比证据，不再开新计算。
-- exp103/exp104/exp105 都只研究该冻结解码器的逻辑块失败率；不估计 `q_top`、MLD 或 preparation channel，且任何结果都不解除 exp102 blocker。exp105 只额外给出 `E[q_top] >= (1-P_fail)^2` 这一严格单边下界，以及 `k<=10`（`m<=3`）上 transport-free full-sector TI 的 `q_top` anchor；`m>=4` 的 `q_top` 在冻结仪器下不可测，理由与实测见 exp105 Validation 001。
+- 当前主线是 exp106 读出阈值定位（`exp106.noisy_syndrome_mc.q001.v1`）：同一冻结 BP+OSD-0 解码器，在 `q=0.01` 下解码增广矩阵 `[H_Z | I]`，按 exp101 的 `phi_r` 打逻辑类标签，逐 m 码数按方差不等分配。先读 `data/expander_code/exp106/status.md`，再读 `data/expander_code/exp106/validation/INDEX.md`。exp103（`exp103.decoder_mc.v2`）、exp104（`exp104.ensemble_mc.v1`）与 exp105（`exp105.noisy_syndrome_mc.v1`）已完成并冻结，是可比证据与 equality gate 的只读对照，不再开新计算。
+- exp103--exp106 都只研究该冻结解码器的逻辑块失败率；不估计 `q_top`、MLD 或 preparation channel，且任何结果都不解除 exp102 blocker。只额外给出 `E[q_top] >= (1-P_fail)^2` 这一严格单边下界；`m>=4` 的 `q_top` 在冻结仪器下不可测（exp105 Validation 001），而 full-sector TI 在 `q>0` 上无法认证 anchor（exp105 Validation 007），故 exp106 无 Track B，该下界未标定。
+- exp104 在 `q=0` 认证 crossing（`p_cross=0.05512`），exp105 在 `q=0.05` 认证全程无 crossing，故读出阈值 `q_c` 严格落在 `(0, 0.05)`；exp106 测其内部一点，两种终态都是合法结果，不得把带宽不足写成物理结论。
 - exp102 当前为 `BLOCKED_BEFORE_REMOTE`；在 `status.md` 明确解除 blocker 且用户授权前，不启动 remote、formal、held-out 或 production，也不把诊断值写成物理结果。
 - exp101 的物理与聚合权威分别是 `data/expander_code/exp101/PHYSICS_CONTRACT.md` 和该目录的 `AGENTS.md`、`status.md`、`validation/README.md`。
 - 旧 3D toric 工作与 expander code 不混用；仅在明确处理 legacy 3D 时，按任务读取 `data/3d_toric_code/with_measurement_noise/README.md` 或 `data/3d_toric_code/without_measurement_noise/README.md`。
