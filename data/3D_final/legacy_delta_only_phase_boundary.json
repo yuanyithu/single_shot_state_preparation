@@ -1,0 +1,224 @@
+{
+  "schema_version": 1,
+  "artifact": "legacy_delta_only finite-size phase-boundary summary",
+  "csv": "data/3D_final/legacy_delta_only_phase_boundary.csv",
+  "model_permissions": {
+    "model": "legacy_delta_only",
+    "allowed_claim": "Historical finite-size L3-L7 crossing summary for the legacy_delta_only model.",
+    "threshold_observable": "w0",
+    "companion_observable": "q_top=q_W",
+    "companion_role": "companion_only",
+    "forbidden_claims": [
+      "true_posterior or reduced-MLD threshold",
+      "asymptotic threshold or finite-size-scaling fit",
+      "q_top-derived decoding-threshold headline",
+      "measured sharp-knee shape in the unsampled interval"
+    ]
+  },
+  "analysis_provenance": {
+    "summary_derived": true,
+    "fit_performed": false,
+    "interpolation_performed": false,
+    "local_rebootstrap_performed": false,
+    "ci_note": "Historical 95% confidence intervals are inherited verbatim. They were not re-bootstrapped locally and are not described here as paired-disorder confidence intervals."
+  },
+  "internal_q0_anchor": {
+    "p": 0.22684326965111049,
+    "q": 0.0,
+    "role": "finite_size_internal_anchor",
+    "exact_or_asymptotic": false,
+    "source": "data/3d_toric_code/without_measurement_noise/exp10_q0_oneday_deep_relaunch/README.md"
+  },
+  "not_sampled": {
+    "p_open_interval": [
+      0.22,
+      0.22684326965111049
+    ],
+    "rendering": "shaded_only",
+    "connector_or_schematic_knee": false
+  },
+  "raw_status": {
+    "exp41_005_p022_per_disorder_npz": {
+      "frozen_history": {
+        "path": "data/3d_toric_code/with_measurement_noise/exp41/005_p022_L7_knee_384dis_20260627",
+        "required_pattern": "**/*.npz",
+        "available_in_worktree": false,
+        "status": "missing_from_frozen_history"
+      },
+      "recovered_activity_copy": {
+        "status": "restored_and_validated_for_pilot",
+        "preserved_in_git": false,
+        "validation": "data/3D_final/legacy_delta_only_nd3_pilot_20260811/validation.json",
+        "files": [
+          {
+            "path": "data/3D_final/legacy_delta_only_nd3_pilot_20260811/raw/recovered_p022/nd1/collected/p0p22/sector_ti_results.npz",
+            "sha256": "4b485473380b3142518c97639e5aa5adb2a367896e16c77daabef348a4db1173"
+          },
+          {
+            "path": "data/3D_final/legacy_delta_only_nd3_pilot_20260811/raw/recovered_p022/nd2/collected/p0p22/sector_ti_results.npz",
+            "sha256": "6e3f4587afb9dac384735271540da14aafa05180340879d3736e1c6aadffc09b"
+          }
+        ]
+      },
+      "impact": "The p=0.22 raw was restored and validated in the activity directory for the pilot, but is not part of the formal figure artifact. Other p values on the common exp41 grid remain unavailable here, so the complete fixed-q w0/q_top curves still cannot be regenerated."
+    }
+  },
+  "source_files": [
+    {
+      "path": "data/3d_toric_code/with_measurement_noise/exp41/003_p011_L7_prod_384dis_20260621/summary.md",
+      "sha256": "a4720cbfdd866fa02d19caacfafe86b0a826766d134338daa3d0773276a168b4"
+    },
+    {
+      "path": "data/3d_toric_code/with_measurement_noise/exp41/004_p021_L7_prod_384dis_20260624/summary.md",
+      "sha256": "16beb8a1d3c585c513fa5fdc839bfb6489c160bd48b41ece87010a614b42c367"
+    },
+    {
+      "path": "data/3d_toric_code/with_measurement_noise/exp41/005_p022_L7_knee_384dis_20260627/summary.md",
+      "sha256": "d84c56b613ff3feac9af351165d44744ebadc76273bbe11f457eb83b4c67645b"
+    },
+    {
+      "path": "data/3d_toric_code/with_measurement_noise/exp41/006_plateau_fill_p005_p017_L7_20260630/summary.md",
+      "sha256": "f791c132c38b3963fb2e9f1fdf0524af0b28d98bdc232974b8dd0d8e4fb04ba3"
+    },
+    {
+      "path": "data/3d_toric_code/with_measurement_noise/exp41/006_plateau_fill_p005_p017_L7_20260630/plot_phase_diagram_final.py",
+      "sha256": "aec116c66d1c878631c73ee728b38b4b702a3bbbf470d7b28dbaa8dbc9e78213"
+    },
+    {
+      "path": "data/3d_toric_code/without_measurement_noise/exp10_q0_oneday_deep_relaunch/README.md",
+      "sha256": "e517b9215fa73878dded2a813af1a47eaeeef532489c87ca6bed95b0efb32c67"
+    }
+  ],
+  "records": [
+    {
+      "model": "legacy_delta_only",
+      "observable": "w0",
+      "role": "threshold",
+      "p": 0.05,
+      "q_crossing": 0.032,
+      "ci95_low": 0.0304,
+      "ci95_high": 0.035,
+      "L_pair": "L3-L7",
+      "disorders": 384,
+      "nboot": 10000,
+      "source": "data/3d_toric_code/with_measurement_noise/exp41/006_plateau_fill_p005_p017_L7_20260630/summary.md"
+    },
+    {
+      "model": "legacy_delta_only",
+      "observable": "q_top=q_W",
+      "role": "companion_only",
+      "p": 0.05,
+      "q_crossing": 0.0343,
+      "ci95_low": 0.0309,
+      "ci95_high": 0.0409,
+      "L_pair": "L3-L7",
+      "disorders": 384,
+      "nboot": 10000,
+      "source": "data/3d_toric_code/with_measurement_noise/exp41/006_plateau_fill_p005_p017_L7_20260630/plot_phase_diagram_final.py"
+    },
+    {
+      "model": "legacy_delta_only",
+      "observable": "w0",
+      "role": "threshold",
+      "p": 0.11,
+      "q_crossing": 0.0338,
+      "ci95_low": 0.0314,
+      "ci95_high": 0.0358,
+      "L_pair": "L3-L7",
+      "disorders": 384,
+      "nboot": 10000,
+      "source": "data/3d_toric_code/with_measurement_noise/exp41/003_p011_L7_prod_384dis_20260621/summary.md"
+    },
+    {
+      "model": "legacy_delta_only",
+      "observable": "q_top=q_W",
+      "role": "companion_only",
+      "p": 0.11,
+      "q_crossing": 0.04,
+      "ci95_low": 0.0327,
+      "ci95_high": 0.042,
+      "L_pair": "L3-L7",
+      "disorders": 384,
+      "nboot": 10000,
+      "source": "data/3d_toric_code/with_measurement_noise/exp41/006_plateau_fill_p005_p017_L7_20260630/plot_phase_diagram_final.py"
+    },
+    {
+      "model": "legacy_delta_only",
+      "observable": "w0",
+      "role": "threshold",
+      "p": 0.17,
+      "q_crossing": 0.0351,
+      "ci95_low": 0.0284,
+      "ci95_high": 0.0367,
+      "L_pair": "L3-L7",
+      "disorders": 384,
+      "nboot": 10000,
+      "source": "data/3d_toric_code/with_measurement_noise/exp41/006_plateau_fill_p005_p017_L7_20260630/summary.md"
+    },
+    {
+      "model": "legacy_delta_only",
+      "observable": "q_top=q_W",
+      "role": "companion_only",
+      "p": 0.17,
+      "q_crossing": 0.0411,
+      "ci95_low": 0.0371,
+      "ci95_high": 0.0436,
+      "L_pair": "L3-L7",
+      "disorders": 384,
+      "nboot": 10000,
+      "source": "data/3d_toric_code/with_measurement_noise/exp41/006_plateau_fill_p005_p017_L7_20260630/plot_phase_diagram_final.py"
+    },
+    {
+      "model": "legacy_delta_only",
+      "observable": "w0",
+      "role": "threshold",
+      "p": 0.21,
+      "q_crossing": 0.0344,
+      "ci95_low": 0.0284,
+      "ci95_high": 0.037,
+      "L_pair": "L3-L7",
+      "disorders": 384,
+      "nboot": 10000,
+      "source": "data/3d_toric_code/with_measurement_noise/exp41/004_p021_L7_prod_384dis_20260624/summary.md"
+    },
+    {
+      "model": "legacy_delta_only",
+      "observable": "q_top=q_W",
+      "role": "companion_only",
+      "p": 0.21,
+      "q_crossing": 0.0405,
+      "ci95_low": 0.0365,
+      "ci95_high": 0.0429,
+      "L_pair": "L3-L7",
+      "disorders": 384,
+      "nboot": 10000,
+      "source": "data/3d_toric_code/with_measurement_noise/exp41/006_plateau_fill_p005_p017_L7_20260630/plot_phase_diagram_final.py"
+    },
+    {
+      "model": "legacy_delta_only",
+      "observable": "w0",
+      "role": "threshold",
+      "p": 0.22,
+      "q_crossing": 0.0349,
+      "ci95_low": 0.0327,
+      "ci95_high": 0.0363,
+      "L_pair": "L3-L7",
+      "disorders": 384,
+      "nboot": 10000,
+      "source": "data/3d_toric_code/with_measurement_noise/exp41/005_p022_L7_knee_384dis_20260627/summary.md"
+    },
+    {
+      "model": "legacy_delta_only",
+      "observable": "q_top=q_W",
+      "role": "companion_only",
+      "p": 0.22,
+      "q_crossing": 0.0404,
+      "ci95_low": 0.0371,
+      "ci95_high": 0.0431,
+      "L_pair": "L3-L7",
+      "disorders": 384,
+      "nboot": 10000,
+      "source": "data/3d_toric_code/with_measurement_noise/exp41/006_plateau_fill_p005_p017_L7_20260630/plot_phase_diagram_final.py"
+    }
+  ]
+}

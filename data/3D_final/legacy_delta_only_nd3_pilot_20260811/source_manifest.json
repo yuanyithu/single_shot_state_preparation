@@ -1,0 +1,79 @@
+{
+  "schema_version": 1,
+  "model": "legacy_delta_only",
+  "git_commit": "70ea84cd5fe800948a619e4a070c693e684e5b4b",
+  "shared_remote_base": "/home/DATA1/users/yuany/.single_shot",
+  "files": [
+    {
+      "path": "src/exp37_sector_ti.py",
+      "sha256": "428e8383fc5ff7a9f31529f5b604c4a2fadf7302d7779367482e39af773114eb"
+    },
+    {
+      "path": "data/3D_final/legacy_delta_only_nd3_pilot_20260811/run_legacy_pilot.py",
+      "sha256": "810365b86dfb353f118e8e07c89380cd2c3562784032dfacf56ea2b647926996"
+    },
+    {
+      "path": "data/3D_final/legacy_delta_only_nd3_pilot_20260811/analyze_legacy_pilot.py",
+      "sha256": "6a99e7dff989ef2f19e4a9a499b3370a732d7b2821dd6ec26c7559416ab48ea5"
+    },
+    {
+      "path": "data/3D_final/legacy_delta_only_nd3_pilot_20260811/experiment_spec.json",
+      "sha256": "a534d4fb4a17232878fd71c6b7c603a7f7c2f2db581c7f4d0306b6d845f44cdf"
+    }
+  ],
+  "remote_execution": {
+    "run_id": "3dfinal_legacy_pilot_20260811T131837Z_nd3",
+    "node": "nd-3",
+    "shared_run_root": "/home/DATA1/users/yuany/.single_shot/runs/3dfinal_legacy_pilot_20260811T131837Z_nd3",
+    "outcome": "pilot_complete_no_bracket",
+    "production_launched": false,
+    "aggregate_task_wall_hours": 328.54354669029436,
+    "aggregate_time_note": "Sum of single-thread task wall_time_seconds; not a hardware CPU counter.",
+    "waves": [
+      {
+        "wave_id": "p0230",
+        "created_at": "2026-08-11T13:20:31.624019+00:00",
+        "finished_at": "2026-08-11T16:21:58.007139+00:00",
+        "pairs": [[0.23, 0.012], [0.23, 0.022], [0.23, 0.03]],
+        "lattice_sizes": [3, 7],
+        "num_disorder_samples": 48,
+        "seed_base": 950000,
+        "workers": 69,
+        "total_tasks": 288,
+        "aggregate_task_wall_hours": 164.07873766236446,
+        "config_hash": "7b2ed2677641243d065f621c475e7cd755664e11da710402fffddfe509553481",
+        "log_sha256": "3953c31b5163865738ca44d51cc6119e4524840bf9d540c766ef2ec746dee70e",
+        "cells": {
+          "cells/p0230_q0012_L03.npz": "c2b8fc60c15726d3c0b187cf64ddc3b6f6180fd0ab3425979a8fa3d57fc4f9e8",
+          "cells/p0230_q0012_L07.npz": "1a1b49dd6a4e98302c376421e630bd5fe79f518ac700eeaeb60136f8c134f52f",
+          "cells/p0230_q0022_L03.npz": "dfed0ce1896e22b675837ab8d9e307b3e5a0cb3a6c8aeeda19c5c2a89f8b7019",
+          "cells/p0230_q0022_L07.npz": "b7bae82ba2debacc12481d32647fef1c8e3a84c71d8982329e4619221937263d",
+          "cells/p0230_q0030_L03.npz": "d143e5730c944fe0dbfbaa762e5e3d8ed3c4a55dd32b7ef8cadff93af6a1ff1d",
+          "cells/p0230_q0030_L07.npz": "c5039ca2029d72d2f08d29ed40d1ab72bbc7ba4a0bf9eb711637c7e81bec6919"
+        }
+      },
+      {
+        "wave_id": "p0240",
+        "created_at": "2026-08-11T16:31:10.925046+00:00",
+        "finished_at": "2026-08-11T19:29:53.072722+00:00",
+        "pairs": [[0.24, 0.012], [0.24, 0.022], [0.24, 0.03]],
+        "lattice_sizes": [3, 7],
+        "num_disorder_samples": 48,
+        "seed_base": 950048,
+        "workers": 69,
+        "total_tasks": 288,
+        "aggregate_task_wall_hours": 164.4648090279299,
+        "config_hash": "00c7fe3b054520bae7e303b692672f850eba4f6bbf3acba0b24f2ccf00b00118",
+        "log_sha256": "1b442c904053599d1ce473583c6a935757ad63b72041821238d477a8b3a1c90c",
+        "cells": {
+          "cells/p0240_q0012_L03.npz": "391e1d1d6337989b39db73dc958fb69858ef62f356ea70e8fa0cbdd572cc1ba6",
+          "cells/p0240_q0012_L07.npz": "b7fd8a0345a7dd90ebf4d6076fe2cd4a1897a82a8c41bca3cfe5b27e1d23727a",
+          "cells/p0240_q0022_L03.npz": "231c41fa3a4c6caa99262df309301f8172076d324b4a6ea613c3d732752d555c",
+          "cells/p0240_q0022_L07.npz": "bedfd33c27cf2535762141efe2727466b050fe0cbef7228384b483fb9480eda6",
+          "cells/p0240_q0030_L03.npz": "b950769f38f28882aedc54c45f2fa34c261a4a167a989d5a2a5bca413774faf1",
+          "cells/p0240_q0030_L07.npz": "35ac4610ef825e7e9b10b304e45f2bec87df86e926f614ffd2681c5ac4ba2186"
+        }
+      }
+    ]
+  }
+}

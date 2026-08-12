@@ -1,0 +1,11 @@
+model,observable,role,p,q_crossing,ci95_low,ci95_high,L_pair,disorders,nboot,source
+legacy_delta_only,w0,threshold,0.05,0.0320,0.0304,0.0350,L3-L7,384,10000,data/3d_toric_code/with_measurement_noise/exp41/006_plateau_fill_p005_p017_L7_20260630/summary.md
+legacy_delta_only,q_top=q_W,companion_only,0.05,0.0343,0.0309,0.0409,L3-L7,384,10000,data/3d_toric_code/with_measurement_noise/exp41/006_plateau_fill_p005_p017_L7_20260630/plot_phase_diagram_final.py
+legacy_delta_only,w0,threshold,0.11,0.0338,0.0314,0.0358,L3-L7,384,10000,data/3d_toric_code/with_measurement_noise/exp41/003_p011_L7_prod_384dis_20260621/summary.md
+legacy_delta_only,q_top=q_W,companion_only,0.11,0.0400,0.0327,0.0420,L3-L7,384,10000,data/3d_toric_code/with_measurement_noise/exp41/006_plateau_fill_p005_p017_L7_20260630/plot_phase_diagram_final.py
+legacy_delta_only,w0,threshold,0.17,0.0351,0.0284,0.0367,L3-L7,384,10000,data/3d_toric_code/with_measurement_noise/exp41/006_plateau_fill_p005_p017_L7_20260630/summary.md
+legacy_delta_only,q_top=q_W,companion_only,0.17,0.0411,0.0371,0.0436,L3-L7,384,10000,data/3d_toric_code/with_measurement_noise/exp41/006_plateau_fill_p005_p017_L7_20260630/plot_phase_diagram_final.py
+legacy_delta_only,w0,threshold,0.21,0.0344,0.0284,0.0370,L3-L7,384,10000,data/3d_toric_code/with_measurement_noise/exp41/004_p021_L7_prod_384dis_20260624/summary.md
+legacy_delta_only,q_top=q_W,companion_only,0.21,0.0405,0.0365,0.0429,L3-L7,384,10000,data/3d_toric_code/with_measurement_noise/exp41/006_plateau_fill_p005_p017_L7_20260630/plot_phase_diagram_final.py
+legacy_delta_only,w0,threshold,0.22,0.0349,0.0327,0.0363,L3-L7,384,10000,data/3d_toric_code/with_measurement_noise/exp41/005_p022_L7_knee_384dis_20260627/summary.md
+legacy_delta_only,q_top=q_W,companion_only,0.22,0.0404,0.0371,0.0431,L3-L7,384,10000,data/3d_toric_code/with_measurement_noise/exp41/006_plateau_fill_p005_p017_L7_20260630/plot_phase_diagram_final.py

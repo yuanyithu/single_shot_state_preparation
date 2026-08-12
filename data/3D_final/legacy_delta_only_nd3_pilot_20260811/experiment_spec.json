@@ -1,0 +1,55 @@
+{
+  "schema_version": 1,
+  "model": "legacy_delta_only",
+  "scope": "adaptive_pilot_only",
+  "node": "nd-3",
+  "source": {
+    "git_commit": "70ea84cd5fe800948a619e4a070c693e684e5b4b",
+    "entrypoint": "src/exp37_sector_ti.py",
+    "sha256": "428e8383fc5ff7a9f31529f5b604c4a2fadf7302d7779367482e39af773114eb"
+  },
+  "fixed_parameters": {
+    "code_family": "3d_toric",
+    "projection_mode": "linear",
+    "num_kp_grid_points": 129,
+    "num_burn_in_sweeps": 512,
+    "max_effective_num_burn_in_sweeps": 512,
+    "num_measurements": 8192,
+    "num_sweeps_between_measurements": 2,
+    "block_count": 128,
+    "num_bootstrap": 800,
+    "winding_heatbath_sweeps": 1,
+    "grid_tv_warning": 0.02,
+    "grid_q_top_warning": 0.02,
+    "disorder_seed_scope": "disorder_index",
+    "disorder_realization_mode": "rng_stream",
+    "use_numba": true
+  },
+  "pilot": {
+    "baseline_p": 0.22,
+    "initial_p": 0.23,
+    "q_values": [0.012, 0.022, 0.03],
+    "lattice_sizes": [3, 7],
+    "num_disorder_samples": 48,
+    "candidate_p": [0.225, 0.23, 0.235, 0.24],
+    "bootstrap_replicates": 10000,
+    "bootstrap_seed": 20260811,
+    "minimum_pass_count": 44,
+    "maximum_adaptive_cells": 18
+  },
+  "resources": {
+    "maximum_workers": 70,
+    "reserved_logical_cpus": 16,
+    "worker_policy": "min(70, logical_cpus - measured_busy_cores - 16)",
+    "nice": 10,
+    "ionice_class": 2,
+    "ionice_level": 7,
+    "thread_limit": 1,
+    "shared_filesystem": "/home/DATA1"
+  },
+  "remote_recovery": {
+    "run_id": "exp41_p022L7_20260627_122412",
+    "nd1_sha256": "4b485473380b3142518c97639e5aa5adb2a367896e16c77daabef348a4db1173",
+    "nd2_sha256": "6e3f4587afb9dac384735271540da14aafa05180340879d3736e1c6aadffc09b"
+  }
+}

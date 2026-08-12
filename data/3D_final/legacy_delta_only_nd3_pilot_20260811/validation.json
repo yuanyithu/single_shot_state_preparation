@@ -1,0 +1,92 @@
+{
+  "frozen_headline_reproduction": {
+    "L_pair": "L3-L7",
+    "bootstrap_crossing_fraction": 1.0,
+    "ci95": [
+      0.032693579734972326,
+      0.03629917766263567
+    ],
+    "nboot": 10000,
+    "observable": "w0",
+    "q_crossing": 0.03492122925364965,
+    "rng_seed": 20260620
+  },
+  "historical_grid": {
+    "num_cells": 40,
+    "num_disorders": 384,
+    "sources": [
+      {
+        "bytes": 2097285,
+        "node": "nd1",
+        "path": "/Users/jarvis/Desktop/project_D_3D/data/3D_final/legacy_delta_only_nd3_pilot_20260811/raw/recovered_p022/nd1/collected/p0p22/sector_ti_results.npz",
+        "sha256": "4b485473380b3142518c97639e5aa5adb2a367896e16c77daabef348a4db1173"
+      },
+      {
+        "bytes": 2098233,
+        "node": "nd2",
+        "path": "/Users/jarvis/Desktop/project_D_3D/data/3D_final/legacy_delta_only_nd3_pilot_20260811/raw/recovered_p022/nd2/collected/p0p22/sector_ti_results.npz",
+        "sha256": "6e3f4587afb9dac384735271540da14aafa05180340879d3736e1c6aadffc09b"
+      }
+    ]
+  },
+  "model": "legacy_delta_only",
+  "permissions": {
+    "allowed": "legacy_delta_only adaptive pilot baseline",
+    "not_allowed": [
+      "true_posterior",
+      "reduced_MLD",
+      "asymptotic_threshold",
+      "paired_coordinate_disorder_claim"
+    ]
+  },
+  "pilot_baseline": {
+    "0.012": {
+      "D": -0.0015961667222288503,
+      "bootstrap_method": "common-seed L3/L7 paired resampling; legacy rng_stream",
+      "bootstrap_seed": 20260811,
+      "ci95_high": -0.00011806764842652632,
+      "ci95_low": -0.004551326262663482,
+      "eligible": true,
+      "nboot": 10000,
+      "num_disorders": 384,
+      "p": 0.22,
+      "pass_fraction_L3": 1.0,
+      "pass_fraction_L7": 1.0,
+      "q": 0.012,
+      "state": "NEG"
+    },
+    "0.022": {
+      "D": -0.00801918296590766,
+      "bootstrap_method": "common-seed L3/L7 paired resampling; legacy rng_stream",
+      "bootstrap_seed": 20260811,
+      "ci95_high": -0.0019361696815339332,
+      "ci95_low": -0.016424496427529762,
+      "eligible": true,
+      "nboot": 10000,
+      "num_disorders": 384,
+      "p": 0.22,
+      "pass_fraction_L3": 0.9973958333333334,
+      "pass_fraction_L7": 1.0,
+      "q": 0.022,
+      "state": "NEG"
+    },
+    "0.030": {
+      "D": -0.014176815408754652,
+      "bootstrap_method": "common-seed L3/L7 paired resampling; legacy rng_stream",
+      "bootstrap_seed": 20260811,
+      "ci95_high": -0.004607195550566019,
+      "ci95_low": -0.024755156024590084,
+      "eligible": true,
+      "nboot": 10000,
+      "num_disorders": 384,
+      "p": 0.22,
+      "pass_fraction_L3": 0.9921875,
+      "pass_fraction_L7": 0.9973958333333334,
+      "q": 0.03,
+      "state": "NEG"
+    }
+  },
+  "schema_version": 1,
+  "status": "PASS",
+  "validated_at": "2026-08-11T13:06:35.217509+00:00"
+}

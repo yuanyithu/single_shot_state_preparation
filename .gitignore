@@ -43,6 +43,16 @@ data/**/*.pdf
 data/**/*.txt
 data/**/*.sh
 data/**/.gitignore
+!data/3D_final/legacy_delta_only_phase_boundary.csv
+!data/3D_final/legacy_delta_only_phase_boundary.json
+!data/3D_final/legacy_delta_only_phase_boundary.png
+!data/3D_final/legacy_delta_only_phase_boundary.pdf
+!data/3D_final/legacy_delta_only_nd3_pilot_20260811/experiment_spec.json
+!data/3D_final/legacy_delta_only_nd3_pilot_20260811/source_manifest.json
+!data/3D_final/legacy_delta_only_nd3_pilot_20260811/validation.json
+!data/3D_final/legacy_delta_only_nd3_pilot_20260811/pilot_decision.json
+!data/3D_final/legacy_delta_only_nd3_pilot_20260811/pilot_decision.csv
+!data/3D_final/legacy_delta_only_nd3_pilot_20260811/launch_yuany_nd3.sh
 !data/expander_code/exp102/config/*.json
 !data/expander_code/exp102/registry/*.json
 !data/expander_code/exp102/registry/*.csv
