@@ -324,13 +324,13 @@ is rerun; their evidence is read-only.
 
 ## 10. Execution
 
-Entry `ssh yuany`, compute host **nd-2 only**, conda environment as frozen in the
+Entry `ssh yuany`, compute host **nd-3 only**, conda environment as frozen in the
 remote config, **75 workers** passed explicitly, long runs under `screen`, run
 root `~/.single_shot/runs/`. The clean-source tree runs only through
 `run_verified_source.sh`, whose bytecode gate exits 67. A failed run is not rerun
 in place.
 
-### Amendment 1 (user-authorized): nd-3 -> nd-2, 72 -> 75 workers
+### Amendment 1 (user-authorized): 72 -> 75 workers; the nd-2 move is impossible
 
 The original text named nd-3 and 72 workers, on the reasoning that nd-3 has 96
 logical CPUs on 48 physical cores with another user holding ten of them
@@ -343,27 +343,57 @@ per-`m` costs, re-measured minutes apart on nd-3, moved by factors of `0.69` to
 `1.58` in both directions. The allocation rule spends the entire frozen budget by
 construction, so a projection built on noisy costs has nowhere to go.
 
-The user authorized moving to **nd-2** and using **75 workers** without regard
-for other users. nd-2 is idle -- 80 logical CPUs on 40 physical cores, load
-average `0.01` -- so its benchmark and its preflight measure the same machine in
-the same state, which is what the caps' two percent of margin actually requires.
+The user authorized moving to **nd-2** and using **75 workers** without regard for
+other users. The move was attempted and **is impossible**:
 
-**The caps are unchanged.** The budget is denominated in core-hours, so a slower
-core buys a smaller panel rather than a larger bill; nd-2's Xeon Gold 5218R at
-2.10 GHz is slower per core than nd-3's 6126 at 2.60 GHz, and the section 6 rule
-absorbs that by allocating fewer codes at the same 800 core-hours. Precision, not
-budget, is what moves.
+```text
+nd-1  CentOS Linux 7   glibc 2.17   80 logical CPUs
+nd-2  CentOS Linux 7   glibc 2.17   80 logical CPUs
+nd-3  Ubuntu 24.04     glibc 2.39   96 logical CPUs
+```
 
-**Because the compute host changed, section 6's own cost rule now requires
-re-measuring `c_m` and `kappa_m` on nd-2 and re-evaluating the allocation there.**
-That is following the rule, not evading a gate: the rule says the costs come from
-the machine that spends the budget, and the re-evaluation happens before any
-production task runs, so no outcome can influence it. The nd-3 freeze and the
-nd-2 re-freeze are both recorded in Validation 003.
+The frozen decoder extension requires `GLIBC_2.29`. On nd-2 it does not load:
+`ImportError: /lib64/libm.so.6: version 'GLIBC_2.29' not found (required by
+.../ldpc/bp_decoder/_bp_decoder.cpython-312-x86_64-linux-gnu.so)`. Rebuilding it
+on CentOS 7 would produce a different binary, and a byte-identical decoder is the
+only reason exp106's numbers are comparable to exp104's and exp105's -- exp104
+Validation 002 measured directly that this decoder is **not** bit-portable across
+builds, with failure counts differing between platforms. **nd-3 is the only host
+this experiment can run on**, and that is a fact about the cluster rather than a
+choice.
 
-Nothing else changes. The estimand, the ensemble, the grid, the physics, the
-estimators, the bands, the fail-closed rules, the replay gate, the two equality
-gates and the terminal decision are all untouched.
+What does carry over is the worker count: **75 instead of 72**, using nd-3's
+spare hyperthreads without regard for the other user holding ten of its 48
+physical cores. That shortens wall time. It does **not** change core-hours, so it
+does not by itself clear the resource gate that blocked; the projection is
+`2 x` the work, and work is unchanged.
+
+**The caps as first written leave the resource gate blocking**, and clearing it
+needs either an amended ceiling or a smaller generation budget -- neither of
+which this contract may decide for itself. See Amendment 2.
+
+### Amendment 2 (user-authorized): reserved core-hour cap 1800 -> 2200
+
+The original `1800` was `2 x (800 + 80 + 1 + 1) = 1764` rounded up. That is two
+percent of margin, and it was never going to hold: the section 6 allocation rule
+spends the **entire** frozen generation budget by construction, so the projection
+begins at the ceiling and any upward re-measurement fails. The first gate came in
+at `2001.95`.
+
+`2200` sits about nine percent above that -- sized to the drift actually observed
+rather than chosen as a round number. The wall cap (`20`, against a projection of
+`15.3` at 75 workers) and the RSS cap (`128 GiB`, against `55.5`) are unchanged
+and were never binding.
+
+This is a resource ceiling and nothing else. The estimand, the ensemble, the
+grid, the panel, the physics, the estimators, the bands, the fail-closed rules,
+the replay gate, both equality gates and the terminal decision are untouched, and
+the generation budget itself stays at 800 core-hours so the panel does not move.
+The failed projection is retained in Validation 004 rather than replaced.
+
+Nothing scientific changes. The estimand, the ensemble, the grid, the physics,
+the estimators, the bands, the fail-closed rules, the replay gate, the two
+equality gates and the terminal decision are all untouched.
 
 The compiled decoder is not bit-portable across platforms (exp104 Validation 002).
 exp106 generates, replays and aggregates entirely on nd-3 against the pinned nd-3
@@ -376,18 +406,14 @@ replay plus analysis plus fixed overhead, per permanent discipline 11:
 
 | quantity | cap |
 |---|---:|
-| reserved core hours | 1800 |
+| reserved core hours | 2200 (Amendment 2; originally 1800) |
 | predicted wall hours | 20 |
 | projected peak RSS | 128 GiB |
 
-These follow from the frozen `G = 800` core-hour generation budget:
-`2 x (800 + 80 + 1 + 1) = 1764` and `(800 + 80) / 75 + 2 = 13.7`.
-
-The reserved cap leaves about two percent of margin over the projection, which is
-tight on purpose but was **too** tight against a contended host: the rule spends
-the whole budget, so the projection starts at the ceiling. On an idle machine the
-benchmark and the preflight measure the same thing and the margin holds; if it
-does not, the run blocks and reports rather than trimming the panel.
+The wall cap follows from the frozen `G = 800` core-hour generation budget:
+`(800 + 80) / 75 + 2 = 13.7`. The reserved cap is Amendment 2's `2200`; the
+arithmetic ceiling `2 x (800 + 80 + 1 + 1) = 1764` proved unusable in practice
+for the reason recorded there.
 
 ## 11. Terminal decision
 

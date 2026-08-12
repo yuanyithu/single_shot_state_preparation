@@ -2,10 +2,9 @@
 
 ## Current state
 
-**`MOVED_TO_ND2_AWAITING_REFREEZE`** — the pilot is complete and the section 6
-rules have been evaluated, but the nd-3 resource gate blocked and the run has
-moved to nd-2 on user authorization. The plan must be re-derived from nd-2's
-costs before production. No production compute has run.
+**`AMENDED_AWAITING_ND3_RESOURCE_GATE`** — the pilot is complete, the plan is
+frozen, and the first resource gate blocked. Two user-authorized amendments have
+been applied and the gate is being re-run. No production compute has run.
 
 exp106 (`exp106.noisy_syndrome_mc.q001.v1`) measures the ensemble block logical
 failure rate of the frozen exp103/exp104 BP+OSD-0 decoder at readout error rate
@@ -38,7 +37,7 @@ under which no crossing survives.
 production run exists to settle the small-`p` end, where a dip that had *moved*
 rather than vanished would hide.
 
-## The plan frozen on nd-3 costs (to be re-derived on nd-2)
+## The frozen plan
 
 | m | codes | trials per (code,p) | codes per task |
 |---|---:|---:|---:|
@@ -79,17 +78,25 @@ the allocation rule had to be preregistered rather than chosen after the fact.
    factors of `0.69` to `1.58`, in both directions. Contract section 6 stopped the
    run rather than shrinking the panel, and a failed gate does not authorize its
    own relaxation.
-5. **Amendment 1, user-authorized: compute host nd-3 -> nd-2, 72 -> 75 workers.**
-   nd-2 is idle (80 logical CPUs on 40 physical cores, load `0.01`), so its
-   benchmark and its preflight measure the same machine in the same state. The
-   caps are unchanged: the budget is in core-hours, so nd-2's slower cores buy a
-   smaller panel rather than a larger bill. Nothing scientific changes.
-6. Because the compute host changed, section 6's own cost rule requires
-   re-measuring `c_m` and `kappa_m` on nd-2 and re-evaluating the allocation
-   there. That is following the rule, not evading the gate, and it happens before
-   any production task runs. Both freezes will be recorded in Validation 003.
+5. **Amendment 1, user-authorized: 72 -> 75 workers.** The move to nd-2 was also
+   authorized, attempted, and is **impossible**: nd-1 and nd-2 run CentOS 7 with
+   glibc 2.17, nd-3 runs Ubuntu 24.04 with glibc 2.39, and the frozen decoder
+   extension requires `GLIBC_2.29` — it raises `ImportError` on nd-2. Rebuilding
+   it there would change the binary hash, and a byte-identical decoder is the
+   only reason exp106 is comparable to exp104 and exp105; exp104 Validation 002
+   measured that this decoder is not bit-portable across builds. **nd-3 is the
+   only host this experiment can run on.** The 75 workers carry over and shorten
+   wall time, but core-hours are work rather than parallelism, so they do not
+   clear the gate.
+6. **Amendment 2, user-authorized: reserved core-hour cap 1800 -> 2200.** The
+   original 1800 was `2 x (800+80+1+1) = 1764` rounded up — two percent of margin
+   against a rule that spends the entire budget by construction, so the
+   projection began at the ceiling. 2200 sits about nine percent above the
+   observed `2001.95`. Wall (`20`) and RSS (`128 GiB`) are unchanged and were
+   never binding. The generation budget stays at 800, so **the panel does not
+   move** and neither does the precision.
 7. No production compute is authorized until a Validation 004 resource gate
-   passes on nd-2.
+   passes.
 
 ## What differs from exp105, and why
 
@@ -110,7 +117,7 @@ the allocation rule had to be preregistered rather than chosen after the fact.
   bit for bit on exp105's own registry.
 - **`report.py` ships corrected and tested.** exp105's copy had an undefined name
   that killed its remote aggregate stage after the NPZ had been written.
-- **nd-2 at 75 workers**, caps of 1800 reserved core-hours / 20 wall hours.
+- **nd-3 at 75 workers**, caps of 2200 reserved core-hours / 20 wall hours.
 - **No Track B.** exp105 established that full-sector TI cannot certify a `q_top`
   anchor at `q > 0`; permanent discipline 13 forbids extending that attempt. The
   certified bound `E[q_top] >= (1 - P_fail)²` is still reported, uncalibrated.

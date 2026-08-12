@@ -280,19 +280,32 @@ REMOTE_EXECUTION_FIELDS = {
 # KeyError in the middle of a resource gate. The compute host is a constant for
 # the same reason: it was spelled inline at six sites before the run moved.
 #
-# nd-2, 75 workers, by user authorization after the nd-3 resource gate blocked.
-# nd-3 has another user holding ten of its 48 physical cores continuously, and
-# the contention showed up directly in the measurements: the same six per-m costs
-# re-measured minutes apart scattered from 0.69x to 1.58x, inflating the
-# projection past its ceiling. nd-2 is idle -- 80 logical CPUs on 40 physical
-# cores, load average 0.01 -- so its benchmark and its preflight should agree,
-# which is what the two percent of margin below actually requires.
+# nd-3 at 75 workers. The move to nd-2 was authorized and attempted, and it is
+# impossible: nd-1 and nd-2 run CentOS 7 with glibc 2.17, nd-3 runs Ubuntu 24.04
+# with glibc 2.39, and the frozen decoder extension requires GLIBC_2.29. It does
+# not load there at all. Rebuilding it on CentOS would produce a different binary
+# and break the byte-identical decoder identity that is the only reason exp106's
+# numbers are comparable to exp104's and exp105's -- and exp104 Validation 002
+# measured that this decoder is not bit-portable across builds. So nd-3 is the
+# only host this experiment can run on.
 #
-# The caps follow permanent discipline 11 from the frozen 800 core-hour
-# generation budget: reserved = 2 x (800 + 80 replay + 1 analysis + 1 overhead),
-# and wall = (800 + 80) / 75 + 2. They are unchanged by the move: the budget is
-# in core-hours, so a slower core buys a smaller panel rather than a larger bill.
-COMPUTE_HOST = "nd-2"
+# What does carry over from that authorization is the worker count: 75 rather
+# than 72, using nd-3's spare hyperthreads without regard for the other user
+# holding ten of its 48 physical cores. That shortens wall time; it does not
+# change core-hours, so it does not by itself clear the resource gate.
+#
+# The wall and RSS caps follow permanent discipline 11 from the frozen 800
+# core-hour generation budget: wall = (800 + 80) / 75 + 2.
+#
+# The core-hour cap is 2200 by user authorization (Amendment 2), against the
+# 1800 the contract first named. 1800 was `2 x (800 + 80 + 1 + 1) = 1764`
+# rounded up, which left two percent of margin -- and the allocation rule spends
+# the entire budget by construction, so the projection starts at the ceiling with
+# nowhere to absorb a re-measurement. The first gate blocked at 2001.9. 2200
+# leaves about nine percent over that, which is the size of the drift actually
+# observed rather than a round number. Nothing scientific moves: the panel, the
+# grid, the estimators and the bands are all unchanged.
+COMPUTE_HOST = "nd-3"
 REMOTE_EXECUTION_DEFAULTS = {
     "profile_id": REMOTE_EXECUTION_PROFILE,
     "entry_host": "yuany",
@@ -302,7 +315,7 @@ REMOTE_EXECUTION_DEFAULTS = {
     "run_root": "~/.single_shot/runs",
     "log_root": "~/.single_shot/logs",
     "reserve_multiplier": 2.0,
-    "stage_core_hour_cap": 1800.0,
+    "stage_core_hour_cap": 2200.0,
     "stage_wall_hour_cap": 20.0,
     "peak_rss_gib_cap": 128.0,
 }
