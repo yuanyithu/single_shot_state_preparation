@@ -22,6 +22,7 @@ from .config import (
     Q_TOKEN,
     REGISTRY_PATH_BY_PHASE,
     SCHEMA_BY_PHASE,
+    canonical_config_filename,
     REMOTE_CONFIG_SCHEMA,
     REMOTE_CONDA_PREFIX,
     REMOTE_DECODER_BINARY_SHA256,
@@ -121,9 +122,7 @@ def command_write_config(args):
         registry["registry_sha256"], args.source_commit, tree, args.phase,
     )
     config_dir = Path(__file__).resolve().parents[1] / "config"
-    filename = (
-        "noisy_mc.pilot.v1.json" if args.phase == "pilot" else "noisy_mc.v1.json"
-    )
+    filename = canonical_config_filename(SCHEMA_BY_PHASE[args.phase])
     atomic_json(config_dir / filename, base)
     print("local ", sha256_json(base))
     if args.remote:
@@ -133,10 +132,7 @@ def command_write_config(args):
         # no aggregation, no published statistic.
         phase = "pilot_remote" if args.phase == "pilot" else "production_remote"
         remote = _remote_config(base, phase)
-        filename = (
-            "noisy_mc.pilot.remote.v1.json" if phase == "pilot_remote"
-            else "noisy_mc.remote.v1.json"
-        )
+        filename = canonical_config_filename(SCHEMA_BY_PHASE[phase])
         atomic_json(config_dir / filename, remote)
         print("remote", sha256_json(remote))
     return 0

@@ -412,3 +412,66 @@ def test_the_pilot_registry_is_the_shape_the_constant_declares(pilot_registry):
     assert set(counts) == set(M_VALUES), (
         "the cost benchmark times every production size"
     )
+
+
+def test_every_config_schema_has_exactly_one_canonical_filename():
+    """One lookup, not a hard-coded name at each call site.
+
+    exp106 has two *remote* schemas -- the production config and the pilot
+    remote config the nd-3 cost benchmark runs under -- so every place that
+    spelled `noisy_mc.remote.v1.json` inline silently meant "production only".
+    That assumption was wrong in three places, and the deployment verifier's
+    copy of it failed on nd-3 after a full bundle round trip.
+    """
+    from pathlib import Path
+
+    from data.expander_code.exp106.exp106_pipeline.config import (
+        SCHEMA_BY_PHASE, canonical_config_filename,
+    )
+
+    config_dir = Path(__file__).resolve().parents[1] / "config"
+    names = set()
+    for phase, schema in SCHEMA_BY_PHASE.items():
+        filename = canonical_config_filename(schema)
+        assert filename not in names, f"{filename} claimed by two schemas"
+        names.add(filename)
+        # the pilot phases exist now; the production ones appear at the freeze
+        if phase in ("pilot", "pilot_remote"):
+            assert (config_dir / filename).is_file(), f"{phase}: {filename} missing"
+
+    with pytest.raises(ValueError, match="unknown exp106 config schema"):
+        canonical_config_filename("exp106.config.not.a.schema")
+
+
+def test_the_deployment_ships_both_remote_configs_and_both_predecessors():
+    """The archive has to carry what the gates on nd-3 will reach for.
+
+    exp105's first nd-3 qualification failed because the production registry was
+    gitignored and therefore absent from the archive; a file the deployed tree
+    needs but does not have is the same class of failure.
+    """
+    import importlib.util
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parents[4]
+    spec = importlib.util.spec_from_file_location(
+        "_exp106_deploy",
+        root / "data/expander_code/exp106/deployment/build_remote_deployment.py",
+    )
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+
+    paths = set(module.SOURCE_PATHS)
+    assert "data/expander_code/exp106/config" in paths, "both remote configs"
+    # the two equality gates decode against these packages, and both suites are
+    # qualification groups
+    for needed in (
+        "data/expander_code/exp104/exp104_pipeline",
+        "data/expander_code/exp104/config",
+        "data/expander_code/exp105/exp105_pipeline",
+        "data/expander_code/exp105/config",
+        "data/expander_code/exp105/tests",
+    ):
+        assert needed in paths, needed
+    for entry in paths:
+        assert (root / entry).exists(), f"SOURCE_PATHS names a missing path: {entry}"

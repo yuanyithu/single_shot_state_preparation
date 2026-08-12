@@ -18,6 +18,7 @@ from data.expander_code.exp102.exp102_pipeline.io import verify_source_identity
 from .config import (
     REMOTE_EXECUTION_PROFILE,
     REMOTE_SCHEMAS,
+    canonical_config_filename,
     ensure_config,
 )
 from .io import sha256_file
@@ -271,7 +272,10 @@ def verify_remote_deployment(
     package_dir = source_root / "data" / "expander_code" / "exp106" / "exp106_pipeline"
     if source_tree_sha256(package_dir) != config["source_tree_sha256"]:
         raise ValueError("remote deployment package differs from the frozen source tree")
-    config_path = source_root / "data" / "expander_code" / "exp106" / "config" / "noisy_mc.remote.v1.json"
+    config_path = (
+        source_root / "data" / "expander_code" / "exp106" / "config"
+        / canonical_config_filename(config["schema_version"])
+    )
     if not config_path.is_file():
         raise ValueError("remote deployment does not contain its canonical config")
     deployed_config = json.loads(config_path.read_text(encoding="ascii"))

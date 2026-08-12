@@ -565,12 +565,24 @@ _CANONICAL_FILENAME = {
 }
 
 
+def canonical_config_filename(schema_version):
+    """The one filename a config of this schema is allowed to live under.
+
+    Exposed because there are now two remote schemas -- the production config
+    and the pilot remote config the cost benchmark runs under -- and every
+    caller that hard-codes `noisy_mc.remote.v1.json` silently means "production
+    only". That assumption was wrong in three places.
+    """
+    filename = _CANONICAL_FILENAME.get(schema_version)
+    if filename is None:
+        raise ValueError(f"unknown exp106 config schema {schema_version!r}")
+    return filename
+
+
 def load_config(path):
     path = Path(path)
     raw = json.loads(path.read_text(encoding="ascii"))
-    filename = _CANONICAL_FILENAME.get(raw.get("schema_version"))
-    if filename is None:
-        raise ValueError("unknown exp106 config schema")
+    filename = canonical_config_filename(raw.get("schema_version"))
     canonical_path = Path(__file__).resolve().parents[1] / "config" / filename
     if path.resolve() != canonical_path.resolve():
         raise ValueError("formal exp106 config must be the canonical config artifact")

@@ -13,13 +13,13 @@ against. Full transcript in `pytest_full_output.txt`.
 
 | group | result |
 |---|---|
-| exp106 | 192 passed, 29 skipped |
+| exp106 | 194 passed, 29 skipped |
 | exp105 (exp106's qualification subset) | 166 passed |
 | exp104 | 131 passed |
 | exp101 (certified subset) | 58 passed |
 | exp102 (certified subset) | 17 passed |
 
-`source_tree_sha256` at gate time is `e88e8f67...596c18fb`, recorded at the top of
+`source_tree_sha256` at gate time is `593945de...7688a2cc5b`, recorded at the top of
 the transcript, and it is byte-identical to the value bound into both pilot
 configs. The bytecode check is empty.
 
@@ -27,7 +27,7 @@ configs. The bytecode check is empty.
 `test_remote_execution.py` module plus the frozen-plan assertion, and they skip
 because `PRODUCTION_PLAN_FROZEN` is `False`. nd-3 qualification requires *zero*
 skipped tests, so an unfrozen plan cannot reach the machine. After Validation 003
-freezes the plan they become 221 passed and 0 skipped, and that is the number
+freezes the plan they become 223 passed and 0 skipped, and that is the number
 `QUALIFICATION_EXPECTED_PASSES["exp106"]` will be set to.
 
 The groups run as separate processes because exp104's and exp105's suites both
@@ -80,6 +80,14 @@ not.
   `None` and reporting a count mismatch.
 - **`test_every_qualification_group_path_exists`** -- a mistyped group path would
   shrink the gate silently instead of failing it.
+- **`test_every_config_schema_has_exactly_one_canonical_filename`** and
+  **`test_the_deployment_ships_both_remote_configs_and_both_predecessors`** --
+  added after nd-3 rejected the first cost-benchmark bundle with "remote
+  deployment does not contain its canonical config". `verify_remote_deployment`
+  hard-coded `noisy_mc.remote.v1.json`, which silently meant "production only";
+  exp106 has two remote schemas because the cost benchmark runs before the
+  production plan exists. The assumption was wrong in three places and is now a
+  single lookup with a test behind it.
 
 ## Determinism (permanent discipline 15)
 
