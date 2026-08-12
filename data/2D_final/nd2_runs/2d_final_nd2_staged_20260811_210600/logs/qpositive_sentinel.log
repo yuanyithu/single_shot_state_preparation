@@ -1,0 +1,36 @@
+bash: warning: setlocale: LC_ALL: cannot change locale (C.UTF-8)
+/usr/bin/bash: warning: setlocale: LC_ALL: cannot change locale (C.UTF-8)
+[2026-08-11T09:11:20-04:00] q-positive sentinel pending_tasks=32 workers=32 effective_burn_in=29578
+[2026-08-11T09:25:15-04:00] completed arm=A disorder=11
+[2026-08-11T09:25:18-04:00] completed arm=A disorder=9
+[2026-08-11T09:25:18-04:00] completed arm=A disorder=7
+[2026-08-11T09:25:18-04:00] completed arm=A disorder=15
+[2026-08-11T09:25:21-04:00] completed arm=A disorder=1
+[2026-08-11T09:25:21-04:00] completed arm=A disorder=2
+[2026-08-11T09:25:26-04:00] completed arm=A disorder=12
+[2026-08-11T09:25:31-04:00] completed arm=A disorder=5
+[2026-08-11T09:25:31-04:00] completed arm=A disorder=13
+[2026-08-11T09:25:31-04:00] completed arm=A disorder=4
+[2026-08-11T09:25:32-04:00] completed arm=A disorder=8
+[2026-08-11T09:25:35-04:00] completed arm=A disorder=0
+[2026-08-11T09:25:36-04:00] completed arm=A disorder=14
+[2026-08-11T09:25:38-04:00] completed arm=A disorder=6
+[2026-08-11T09:25:47-04:00] completed arm=A disorder=10
+[2026-08-11T09:26:04-04:00] completed arm=A disorder=3
+[2026-08-11T09:27:18-04:00] completed arm=B disorder=12
+[2026-08-11T09:27:25-04:00] completed arm=B disorder=15
+[2026-08-11T09:27:27-04:00] completed arm=B disorder=10
+[2026-08-11T09:27:27-04:00] completed arm=B disorder=13
+[2026-08-11T09:27:28-04:00] completed arm=B disorder=3
+[2026-08-11T09:27:35-04:00] completed arm=B disorder=4
+[2026-08-11T09:27:37-04:00] completed arm=B disorder=9
+[2026-08-11T09:27:37-04:00] completed arm=B disorder=8
+[2026-08-11T09:27:37-04:00] completed arm=B disorder=5
+[2026-08-11T09:27:39-04:00] completed arm=B disorder=2
+[2026-08-11T09:27:42-04:00] completed arm=B disorder=1
+[2026-08-11T09:27:47-04:00] completed arm=B disorder=0
+[2026-08-11T09:27:47-04:00] completed arm=B disorder=14
+[2026-08-11T09:27:48-04:00] completed arm=B disorder=6
+[2026-08-11T09:27:49-04:00] completed arm=B disorder=11
+[2026-08-11T09:28:06-04:00] completed arm=B disorder=7
+[2026-08-11T09:28:07-04:00] sentinel outputs: {'A': '/home/DATA1/users/yuany/.single_shot/runs/2d_final_nd2_staged_20260811_210600/runs/qpositive_sentinel/qpositive_sentinel_A.npz', 'B': '/home/DATA1/users/yuany/.single_shot/runs/2d_final_nd2_staged_20260811_210600/runs/qpositive_sentinel/qpositive_sentinel_B.npz'}

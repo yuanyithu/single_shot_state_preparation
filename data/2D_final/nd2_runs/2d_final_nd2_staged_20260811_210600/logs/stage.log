@@ -1,0 +1,11 @@
+bash: warning: setlocale: LC_ALL: cannot change locale (C.UTF-8)
+[2026-08-11T09:11:17-0400] launched name=q0_A pid=273913 log=/home/DATA1/users/yuany/.single_shot/runs/2d_final_nd2_staged_20260811_210600/logs/q0_pilot_A.log
+[2026-08-11T09:11:17-0400] launched name=q0_B pid=273915 log=/home/DATA1/users/yuany/.single_shot/runs/2d_final_nd2_staged_20260811_210600/logs/q0_pilot_B.log
+[2026-08-11T09:11:17-0400] launched name=qpositive pid=273917 log=/home/DATA1/users/yuany/.single_shot/runs/2d_final_nd2_staged_20260811_210600/logs/qpositive_sentinel.log
+[2026-08-11T09:45:48-0400] completed name=q0_A rc=0
+[2026-08-11T10:05:55-0400] completed name=q0_B rc=0
+[2026-08-11T10:05:55-0400] completed name=qpositive rc=0
+/usr/bin/bash: warning: setlocale: LC_ALL: cannot change locale (C.UTF-8)
+
+[2026-08-11T10:05:57-0400] q0 pilot selected_schedule=STOP
+[2026-08-11T10:05:58-0400] stage finished rc=21

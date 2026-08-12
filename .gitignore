@@ -43,6 +43,22 @@ data/**/*.pdf
 data/**/*.txt
 data/**/*.sh
 data/**/.gitignore
+
+# Publication-ready 2D bundle. Historical data remain ignored; only assets
+# intentionally placed under this delivery directory are eligible for tracking.
+!data/2D_final/
+!data/2D_final/**/
+!data/2D_final/**/*.md
+!data/2D_final/**/*.py
+!data/2D_final/**/*.sh
+!data/2D_final/**/*.npz
+!data/2D_final/**/*.json
+!data/2D_final/**/*.csv
+!data/2D_final/**/*.log
+!data/2D_final/**/*.txt
+!data/2D_final/**/*.png
+!data/2D_final/**/*.pdf
+!data/2D_final/**/*.svg
 !data/expander_code/exp102/config/*.json
 !data/expander_code/exp102/registry/*.json
 !data/expander_code/exp102/registry/*.csv
@@ -98,3 +114,9 @@ runs/
 logs/
 data/expander_code/exp102/deployment/
 data/expander_code/exp102/raw/
+
+# Audited nd-2 run assets and logs are part of the immutable 2D collection bundle.
+!data/2D_final/**/runs/
+!data/2D_final/**/runs/**/
+!data/2D_final/**/logs/
+!data/2D_final/**/logs/**/*.log

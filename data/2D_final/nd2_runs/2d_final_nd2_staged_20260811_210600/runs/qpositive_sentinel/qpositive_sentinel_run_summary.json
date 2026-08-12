@@ -1,0 +1,16 @@
+{
+  "created_at": "2026-08-11T09:28:07-04:00",
+  "effective_num_burn_in_sweeps": 29578,
+  "legacy_disorder_hashes": {
+    "data_bits_first16_sha256": "e835a16465d8c1b677549ef8337a9bacf87fda377ad83e67318014e696359129",
+    "data_uniforms_first16_sha256": "edecc85207e41453cece13c8a1870e98d3fa9b0d83bdcfcb986ad73104967cf0",
+    "syndrome_bits_first16_sha256": "20260b571209455ee110056f7588cd2c7dbd0787e469b422abda54f4497c5fa1",
+    "syndrome_uniforms_first16_sha256": "8bae8784097ae75415bfed6d1b913cbafcc68297698718a4eec173c59e72d2ed"
+  },
+  "outputs": {
+    "A": "/home/DATA1/users/yuany/.single_shot/runs/2d_final_nd2_staged_20260811_210600/runs/qpositive_sentinel/qpositive_sentinel_A.npz",
+    "B": "/home/DATA1/users/yuany/.single_shot/runs/2d_final_nd2_staged_20260811_210600/runs/qpositive_sentinel/qpositive_sentinel_B.npz"
+  },
+  "schema_version": 1,
+  "source_commit": "70ea84cd5fe800948a619e4a070c693e684e5b4b"
+}

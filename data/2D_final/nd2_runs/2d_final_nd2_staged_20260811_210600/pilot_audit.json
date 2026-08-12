@@ -1,0 +1,388 @@
+{
+  "config_path": "/home/DATA1/users/yuany/.single_shot/runs/2d_final_nd2_staged_20260811_210600/control/nd2_staged_experiment_config.json",
+  "config_sha256": "62d5239d0b5072a0e6f81c7ca6fde0f2879e40f4ebd52628e82e2d9b67ca77b4",
+  "created_at": "2026-08-11T10:05:57-04:00",
+  "manifests": {
+    "q0_A": {
+      "completed_chunks": 16,
+      "failed_chunks": 0,
+      "passed": true,
+      "path": "/home/DATA1/users/yuany/.single_shot/runs/2d_final_nd2_staged_20260811_210600/runs/q0_pilot_A/manifest.json",
+      "pending_chunks": 0,
+      "sha256": "494af9b285fc77744fdf77a25809863c6795ef5d3c1579167aaad6f4ad900c4f",
+      "source_commit": "70ea84cd5fe800948a619e4a070c693e684e5b4b",
+      "total_chunks": 16
+    },
+    "q0_B": {
+      "completed_chunks": 16,
+      "failed_chunks": 0,
+      "passed": true,
+      "path": "/home/DATA1/users/yuany/.single_shot/runs/2d_final_nd2_staged_20260811_210600/runs/q0_pilot_B/manifest.json",
+      "pending_chunks": 0,
+      "sha256": "e87df36ce512e6e8105d00076ec5bc033cae4e8240f9394f7483887788eb81f6",
+      "source_commit": "70ea84cd5fe800948a619e4a070c693e684e5b4b",
+      "total_chunks": 16
+    }
+  },
+  "q0": {
+    "arms": {
+      "A": {
+        "arm": "A",
+        "checks": {
+          "aggregate_rebuild": true,
+          "chunk_size": true,
+          "common_random": true,
+          "lattice_size": true,
+          "num_burn_in_sweeps": true,
+          "num_disorder": true,
+          "num_measurements_per_disorder": true,
+          "num_start_chains": true,
+          "num_sweeps_between_measurements": true,
+          "p_grid": true,
+          "q": true,
+          "seed_base": true,
+          "shapes": true,
+          "source_commit": true,
+          "spread_rebuild": true
+        },
+        "mean_q_top": [
+          0.6669832646122684,
+          0.4919426432291667
+        ],
+        "mean_q_top_start_spread": [
+          0.16483275462962965,
+          0.15777847222222224
+        ],
+        "passed_integrity": true,
+        "path": "/home/DATA1/users/yuany/.single_shot/runs/2d_final_nd2_staged_20260811_210600/runs/q0_pilot_A/q0_pilot_A.npz",
+        "sha256": "f29859b3997d5b68c6bd1a1f7cf16759960e63aa1381ef52e607e7873e0f179d"
+      },
+      "B": {
+        "arm": "B",
+        "checks": {
+          "aggregate_rebuild": true,
+          "chunk_size": true,
+          "common_random": true,
+          "lattice_size": true,
+          "num_burn_in_sweeps": true,
+          "num_disorder": true,
+          "num_measurements_per_disorder": true,
+          "num_start_chains": true,
+          "num_sweeps_between_measurements": true,
+          "p_grid": true,
+          "q": true,
+          "seed_base": true,
+          "shapes": true,
+          "source_commit": true,
+          "spread_rebuild": true
+        },
+        "mean_q_top": [
+          0.6631540644892939,
+          0.4947029703776042
+        ],
+        "mean_q_top_start_spread": [
+          0.11074508101851852,
+          0.11766890914351853
+        ],
+        "passed_integrity": true,
+        "path": "/home/DATA1/users/yuany/.single_shot/runs/2d_final_nd2_staged_20260811_210600/runs/q0_pilot_B/q0_pilot_B.npz",
+        "sha256": "b88202bd2fd4dc00a64dc3ab5ae8f05ce791afec418d9ed84b6205df6cf54423"
+      }
+    },
+    "gate": {
+      "arm_mean_q_top_difference_b_minus_a": [
+        -0.0038292001229744965,
+        0.0027603271484374914
+      ],
+      "checks": {
+        "a_b_mean_q_top_difference_pass": true,
+        "a_spread_pass": false,
+        "b_spread_pass": false,
+        "input_integrity": true,
+        "manifests_complete": true
+      },
+      "passed": false,
+      "selected_schedule": "STOP"
+    }
+  },
+  "q_positive": {
+    "a_b_q_top_difference_b_minus_a": [
+      0.019778414351851847,
+      -0.04783631365740726,
+      -0.018168373842592622,
+      -0.04426420717592583,
+      0.03753712384259261,
+      -0.04348813657407402,
+      -0.029715133101851823,
+      0.0016730613425926522,
+      -0.0027539062499997158,
+      -0.008098003472222115,
+      6.076388887610307e-07,
+      0.0030366608796296157,
+      0.0007798900462961944,
+      0.0005487268518521438,
+      -0.013389728009259194,
+      -0.05906374421296312
+    ],
+    "arms": {
+      "A": {
+        "arm": "A",
+        "block_drift": {
+          "mean": -0.008481018518518527,
+          "mean_absolute": 0.07172268518518517,
+          "per_disorder": [
+            0.04855555555555563,
+            -0.24225185185185166,
+            0.09106666666666674,
+            0.026177777777777855,
+            0.14968888888888893,
+            0.016933333333333245,
+            -0.18445925925925927,
+            -0.011333333333333306,
+            0.017659259259259152,
+            0.013266666666666538,
+            0.004422222222222105,
+            -0.01328148148148145,
+            -0.19030370370370386,
+            0.0,
+            0.13378518518518523,
+            0.004377777777777703
+          ]
+        },
+        "invariant_checks": {
+          "arm": true,
+          "chain_shape": true,
+          "cluster_disabled": true,
+          "lattice_size": true,
+          "legacy_disorder_seed": true,
+          "legacy_uniform_hashes": true,
+          "num_disorder": true,
+          "num_replicas": true,
+          "num_start_chains": true,
+          "p": true,
+          "pt_disabled": true,
+          "q": true,
+          "source_commit": true,
+          "zero_syndrome_sweep_enabled": true
+        },
+        "occupation": {
+          "first_half": [
+            0.8434114583333333,
+            0.0,
+            0.0,
+            0.0050260416666666665,
+            0.0,
+            0.0815625,
+            0.07,
+            0.0
+          ],
+          "mean_per_chain_first_second_tv": 0.09718750000000001,
+          "second_half": [
+            0.8460677083333333,
+            0.0,
+            0.0,
+            0.005,
+            0.0,
+            0.08908854166666667,
+            0.05984375,
+            0.0
+          ]
+        },
+        "paired_difference_from_legacy": {
+          "max_absolute": 0.8506163194444445,
+          "mean": -0.2139794777199074,
+          "mean_absolute": 0.28884913917824073,
+          "per_disorder": [
+            -0.5853137731481481,
+            -0.33802210648148157,
+            -0.06832083333333328,
+            -0.030169791666666557,
+            -0.49732951388888874,
+            -0.1329311342592593,
+            -0.8506163194444445,
+            -0.6785358796296296,
+            0.025578124999999785,
+            -0.07164780092592604,
+            -0.0077578703703703455,
+            0.5171193287037037,
+            0.056259837962962966,
+            -0.016562500000000036,
+            -0.722259375,
+            -0.02316203703703701
+          ]
+        },
+        "passed": false,
+        "passed_integrity": true,
+        "path": "/home/DATA1/users/yuany/.single_shot/runs/2d_final_nd2_staged_20260811_210600/runs/qpositive_sentinel/qpositive_sentinel_A.npz",
+        "q_top_per_disorder": [
+          0.41468622685185186,
+          0.6619778935185184,
+          0.9316791666666667,
+          0.9653931712962963,
+          0.49823344907407413,
+          0.8670688657407407,
+          0.14938368055555554,
+          0.3214641203703704,
+          0.9861781249999998,
+          0.928352199074074,
+          0.9922421296296297,
+          0.9894822916666666,
+          0.8162598379629631,
+          0.9834375,
+          0.26888136574074073,
+          0.976837962962963
+        ],
+        "sha256": "f2c8872c60650f5b782b535b666b818dcf8940fb67346900526af9b876cddf24",
+        "transport_gate": {
+          "checks": {
+            "all_ess_above_limit": false,
+            "all_r_hat_below_limit": false,
+            "every_chain_changed_logical_sector": false,
+            "mean_q_top_spread_below_limit": false,
+            "mean_winding_acceptance_above_limit": true
+          },
+          "metrics": {
+            "max_num_never_flipped_chains_per_disorder": 3,
+            "max_r_hat": 1.2159638638242636,
+            "mean_q_top_spread": 0.18971296296296297,
+            "mean_winding_acceptance": 0.0003286280776515152,
+            "min_effective_sample_size": 3.8020857945402033,
+            "min_occupied_sector_count_per_chain": 1
+          },
+          "passed": false
+        }
+      },
+      "B": {
+        "arm": "B",
+        "block_drift": {
+          "mean": -0.014872337962962976,
+          "mean_absolute": 0.058521875,
+          "per_disorder": [
+            0.03216666666666662,
+            0.06925925925925924,
+            -0.008322222222222342,
+            -0.021674074074073957,
+            0.22688888888888886,
+            -0.2358907407407409,
+            -0.1605833333333333,
+            0.003229629629629638,
+            0.008859259259259233,
+            -0.002094444444444288,
+            0.004422222222222105,
+            -0.006649999999999934,
+            -0.12872407407407416,
+            0.004370370370370469,
+            -0.006194444444444502,
+            -0.017020370370370408
+          ]
+        },
+        "invariant_checks": {
+          "arm": true,
+          "chain_shape": true,
+          "cluster_disabled": true,
+          "lattice_size": true,
+          "legacy_disorder_seed": true,
+          "legacy_uniform_hashes": true,
+          "num_disorder": true,
+          "num_replicas": true,
+          "num_start_chains": true,
+          "p": true,
+          "pt_disabled": true,
+          "q": true,
+          "source_commit": true,
+          "zero_syndrome_sweep_enabled": true
+        },
+        "occupation": {
+          "first_half": [
+            0.8447395833333333,
+            0.0,
+            0.0,
+            0.005013020833333334,
+            0.0,
+            0.08532552083333333,
+            0.064921875,
+            0.0
+          ],
+          "mean_per_chain_first_second_tv": 0.07203124999999999,
+          "second_half": [
+            0.8237890625,
+            0.0,
+            0.0,
+            0.010651041666666666,
+            0.0,
+            0.0927734375,
+            0.07278645833333333,
+            0.0
+          ]
+        },
+        "paired_difference_from_legacy": {
+          "max_absolute": 0.8803314525462963,
+          "mean": -0.2266934190538194,
+          "mean_absolute": 0.30169591109664345,
+          "per_disorder": [
+            -0.5655353587962964,
+            -0.3858584201388888,
+            -0.0864892071759259,
+            -0.07443399884259239,
+            -0.45979239004629613,
+            -0.1764192708333333,
+            -0.8803314525462963,
+            -0.6768628182870369,
+            0.02282421875000007,
+            -0.07974580439814816,
+            -0.0077572627314815845,
+            0.5201559895833332,
+            0.05703972800925916,
+            -0.016013773148147892,
+            -0.7356491030092592,
+            -0.08222578125000013
+          ]
+        },
+        "passed": false,
+        "passed_integrity": true,
+        "path": "/home/DATA1/users/yuany/.single_shot/runs/2d_final_nd2_staged_20260811_210600/runs/qpositive_sentinel/qpositive_sentinel_B.npz",
+        "q_top_per_disorder": [
+          0.4344646412037037,
+          0.6141415798611112,
+          0.9135107928240741,
+          0.9211289641203705,
+          0.5357705729166667,
+          0.8235807291666667,
+          0.11966854745370371,
+          0.3231371817129631,
+          0.9834242187500001,
+          0.9202541956018518,
+          0.9922427372685184,
+          0.9925189525462962,
+          0.8170397280092593,
+          0.9839862268518521,
+          0.25549163773148154,
+          0.9177742187499999
+        ],
+        "sha256": "d160adb5c31f1bd30144719e600cc317f3c2ed13e84906b108865e60fd2f3dd5",
+        "transport_gate": {
+          "checks": {
+            "all_ess_above_limit": false,
+            "all_r_hat_below_limit": false,
+            "every_chain_changed_logical_sector": false,
+            "mean_q_top_spread_below_limit": false,
+            "mean_winding_acceptance_above_limit": true
+          },
+          "metrics": {
+            "max_num_never_flipped_chains_per_disorder": 2,
+            "max_r_hat": 1.1092326760727997,
+            "mean_q_top_spread": 0.16336736111111116,
+            "mean_winding_acceptance": 0.0003343740135732324,
+            "min_effective_sample_size": 5.805548091596211,
+            "min_occupied_sector_count_per_chain": 1
+          },
+          "passed": false
+        }
+      }
+    },
+    "decision": "STOP_Q_POSITIVE",
+    "passed": false
+  },
+  "schema_version": 1,
+  "source_commit": "70ea84cd5fe800948a619e4a070c693e684e5b4b"
+}

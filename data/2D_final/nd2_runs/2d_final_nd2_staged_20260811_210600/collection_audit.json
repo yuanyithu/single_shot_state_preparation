@@ -1,0 +1,127 @@
+{
+  "collected_at": "2026-08-11T22:10:17+08:00",
+  "collection_mode": "diagnostic_gate_stop",
+  "excluded": [
+    "remote chunks",
+    "q-positive task parts",
+    "preflight scratch assets",
+    "cache and __pycache__",
+    "automatic preview PNG"
+  ],
+  "files": [
+    {
+      "path": "control/audit_nd2_staged_experiment.py",
+      "sha256": "f640d1c277d054d821e7b2447f7889b57a62e02696f3754b65d857a6e2345e5e",
+      "size_bytes": 30503
+    },
+    {
+      "path": "control/control_sha256s.txt",
+      "sha256": "1ae02b2f81da4ad52b6c4a0bd2b1ccff6c257d2adc60efade390e5467235d3b0",
+      "size_bytes": 728
+    },
+    {
+      "path": "control/nd2_qpositive_sentinel.py",
+      "sha256": "aa425a485cda41d7fa5d5a31d472b0d09893b110ec297145bcfc47ea5b3fb79a",
+      "size_bytes": 20131
+    },
+    {
+      "path": "control/nd2_staged_experiment_config.json",
+      "sha256": "62d5239d0b5072a0e6f81c7ca6fde0f2879e40f4ebd52628e82e2d9b67ca77b4",
+      "size_bytes": 4810
+    },
+    {
+      "path": "control/phase",
+      "sha256": "134e7bc74c163da6f9cb533b03b1dd21f6b4bff0d4d02f0c4117d3f873b36857",
+      "size_bytes": 11
+    },
+    {
+      "path": "control/run_nd2_staged_experiment.sh",
+      "sha256": "9a8ddd10cffb7c233872352244e27cd88d6a5ba19d21b99a47f156c28d830aa0",
+      "size_bytes": 10729
+    },
+    {
+      "path": "control/stage_done",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "size_bytes": 0
+    },
+    {
+      "path": "logs/monitor.log",
+      "sha256": "f3de07d75e9c968fa82881b35315fa90620ab581de0e2172a298fed80973fca2",
+      "size_bytes": 179073
+    },
+    {
+      "path": "logs/pilot_audit.log",
+      "sha256": "136f5c9d492862e8a7e2916edd8649595b56b064f8ca8d970aa28af8cb36e251",
+      "size_bytes": 79
+    },
+    {
+      "path": "logs/q0_pilot_A.log",
+      "sha256": "fc585de86aff97ec8cfc42d2eccc73c28c46826fea65f36f3ea254c07d6e2355",
+      "size_bytes": 2856
+    },
+    {
+      "path": "logs/q0_pilot_B.log",
+      "sha256": "0c43a46673f2060ad5f3f74a027bda7f03404eac204d38f61beca9f62402cd83",
+      "size_bytes": 2856
+    },
+    {
+      "path": "logs/qpositive_sentinel.log",
+      "sha256": "aeeabd0ab2a1d83625726dfb8010e126581d6080903b56b1cc9da0c29b67aa06",
+      "size_bytes": 2328
+    },
+    {
+      "path": "logs/stage.log",
+      "sha256": "9aaa11c62ca5ec6632efbb778b00feca6f65f74e5a94fe75c0037cad6deef905",
+      "size_bytes": 898
+    },
+    {
+      "path": "pilot_audit.json",
+      "sha256": "632794308aa6f5c68ab3209013cd3be35517d46c6b81ad63e114ec900124a0f7",
+      "size_bytes": 12464
+    },
+    {
+      "path": "pilot_summary.csv",
+      "sha256": "d26045dae22e634292d6a34610e5df1e98346ef884ca1073c8ba85eeb6cce32c",
+      "size_bytes": 512
+    },
+    {
+      "path": "runs/q0_pilot_A/manifest.json",
+      "sha256": "494af9b285fc77744fdf77a25809863c6795ef5d3c1579167aaad6f4ad900c4f",
+      "size_bytes": 17562
+    },
+    {
+      "path": "runs/q0_pilot_A/q0_pilot_A.npz",
+      "sha256": "f29859b3997d5b68c6bd1a1f7cf16759960e63aa1381ef52e607e7873e0f179d",
+      "size_bytes": 72235
+    },
+    {
+      "path": "runs/q0_pilot_B/manifest.json",
+      "sha256": "e87df36ce512e6e8105d00076ec5bc033cae4e8240f9394f7483887788eb81f6",
+      "size_bytes": 17563
+    },
+    {
+      "path": "runs/q0_pilot_B/q0_pilot_B.npz",
+      "sha256": "b88202bd2fd4dc00a64dc3ab5ae8f05ce791afec418d9ed84b6205df6cf54423",
+      "size_bytes": 72235
+    },
+    {
+      "path": "runs/qpositive_sentinel/qpositive_sentinel_A.npz",
+      "sha256": "f2c8872c60650f5b782b535b666b818dcf8940fb67346900526af9b876cddf24",
+      "size_bytes": 40008
+    },
+    {
+      "path": "runs/qpositive_sentinel/qpositive_sentinel_B.npz",
+      "sha256": "d160adb5c31f1bd30144719e600cc317f3c2ed13e84906b108865e60fd2f3dd5",
+      "size_bytes": 45391
+    },
+    {
+      "path": "runs/qpositive_sentinel/qpositive_sentinel_run_summary.json",
+      "sha256": "c9a73ea7c1a9f601701279044a7d53c4a24b23ddd9bb8fc4527bace4ef795ddf",
+      "size_bytes": 921
+    }
+  ],
+  "remote_phase": "done_rc_21",
+  "remote_stage_root": "/home/DATA1/users/yuany/.single_shot/runs/2d_final_nd2_staged_20260811_210600",
+  "run_id": "2d_final_nd2_staged_20260811_210600",
+  "schema_version": 1
+}

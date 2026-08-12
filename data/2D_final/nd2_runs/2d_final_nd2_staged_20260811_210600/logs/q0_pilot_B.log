@@ -1,0 +1,45 @@
+bash: warning: setlocale: LC_ALL: cannot change locale (C.UTF-8)
+/usr/bin/bash: warning: setlocale: LC_ALL: cannot change locale (C.UTF-8)
+[2026-08-11T09:11:20-04:00] Running exact_enumeration.py quick validation
+Quick exact          0    +0.9693    +0.9767     0.0073     0.1732   PASS
+Quick exact          1    +0.9693    +0.9667     0.0027     0.1732   PASS
+Quick exact          2    +0.9405    +0.9433     0.0029     0.1732   PASS
+
+q>0 single-bit brute-force ratio test
+single-bit-ratio: p=0.05, q=0.001, cases=512, delta_syndrome_weight=0 covered
+single-bit-ratio: p=0.25, q=0.001, cases=512, delta_syndrome_weight=0 covered
+single-bit-ratio: p=0.15, q=0.01, cases=512, delta_syndrome_weight=0 covered
+single-bit-ratio: p=0.25, q=0.04, cases=512, delta_syndrome_weight=0 covered
+
+Data-weight cache consistency regression
+Data-weight cache consistency regression passed
+
+PT swap full-weight regression
+PT swap full-weight regression passed
+
+cluster one-step exact-invariance regression: TV=0.0084
+Cluster update regressions passed
+Quick exact-enumeration validations passed.
+[2026-08-11T09:11:28-04:00] Running preflight chunk
+[2026-08-11T09:11:31-04:00] Running preflight merge
+[2026-08-11T09:11:31-04:00] Launching chunk workers: 16 workers for 16 chunks
+[2026-08-11T10:03:45-04:00] Completed L11_p00_chunk007 (1/16) in 3133.6s
+[2026-08-11T10:03:46-04:00] Completed L11_p00_chunk001 (2/16) in 3134.5s
+[2026-08-11T10:03:49-04:00] Completed L11_p01_chunk007 (3/16) in 3137.9s
+[2026-08-11T10:03:53-04:00] Completed L11_p00_chunk003 (4/16) in 3141.6s
+[2026-08-11T10:03:54-04:00] Completed L11_p01_chunk002 (5/16) in 3142.4s
+[2026-08-11T10:03:56-04:00] Completed L11_p01_chunk003 (6/16) in 3144.0s
+[2026-08-11T10:03:58-04:00] Completed L11_p00_chunk005 (7/16) in 3146.4s
+[2026-08-11T10:04:04-04:00] Completed L11_p00_chunk002 (8/16) in 3152.7s
+[2026-08-11T10:04:11-04:00] Completed L11_p01_chunk001 (9/16) in 3159.5s
+[2026-08-11T10:04:25-04:00] Completed L11_p01_chunk005 (10/16) in 3173.4s
+[2026-08-11T10:04:29-04:00] Completed L11_p01_chunk000 (11/16) in 3177.1s
+[2026-08-11T10:04:42-04:00] Completed L11_p00_chunk004 (12/16) in 3190.9s
+[2026-08-11T10:04:53-04:00] Completed L11_p01_chunk006 (13/16) in 3201.5s
+[2026-08-11T10:04:56-04:00] Completed L11_p01_chunk004 (14/16) in 3204.2s
+[2026-08-11T10:05:10-04:00] Completed L11_p00_chunk000 (15/16) in 3218.9s
+[2026-08-11T10:05:55-04:00] Completed L11_p00_chunk006 (16/16) in 3263.3s
+[2026-08-11T10:05:55-04:00] Merging chunk outputs
+[2026-08-11T10:05:55-04:00] Final NPZ: /home/DATA1/users/yuany/.single_shot/runs/2d_final_nd2_staged_20260811_210600/runs/q0_pilot_B/q0_pilot_B.npz
+[2026-08-11T10:05:55-04:00] Final PNG: /home/DATA1/users/yuany/.single_shot/runs/2d_final_nd2_staged_20260811_210600/runs/q0_pilot_B/q0_pilot_B.png
+[2026-08-11T10:05:55-04:00] Chunk counts: completed=16 failed=0 pending=0

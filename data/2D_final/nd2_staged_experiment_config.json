@@ -1,0 +1,158 @@
+{
+  "schema_version": 1,
+  "experiment_id": "2d_final_nd2_staged_20260811",
+  "source_commit": "70ea84cd5fe800948a619e4a070c693e684e5b4b",
+  "code_family": "2d_toric",
+  "remote": {
+    "host": "nd-2",
+    "base": "/home/DATA1/users/yuany/.single_shot",
+    "conda_environment": "11"
+  },
+  "resources": {
+    "total_workers": 64,
+    "cpu_list": "0-31,40-71",
+    "reserved_physical_cores": [
+      32,
+      33,
+      34,
+      35,
+      36,
+      37,
+      38,
+      39
+    ],
+    "nice": 10,
+    "blas_threads": 1,
+    "monitor_interval_seconds": 300,
+    "memory_emergency_gib": 64,
+    "resource_competition_authorized_at": "2026-08-11T21:00:00+08:00",
+    "resource_competition_note": "User explicitly authorized competition for nd-2 CPU resources; never signal or modify another user's processes."
+  },
+  "q0_pilot": {
+    "lattice_size": 11,
+    "data_error_probabilities": [
+      0.1,
+      0.11
+    ],
+    "syndrome_error_probability": 0.0,
+    "num_disorder_samples": 128,
+    "chunk_size": 16,
+    "num_start_chains": 4,
+    "seed_base": 620260811,
+    "burn_in_scaling_reference_num_qubits": 18,
+    "workers_per_arm": 16,
+    "common_random_disorder_across_p": true,
+    "arms": {
+      "A": {
+        "num_burn_in_sweeps": 2000,
+        "num_sweeps_between_measurements": 10,
+        "num_measurements_per_disorder": 600
+      },
+      "B": {
+        "num_burn_in_sweeps": 4000,
+        "num_sweeps_between_measurements": 10,
+        "num_measurements_per_disorder": 1200
+      }
+    }
+  },
+  "q_positive_sentinel": {
+    "lattice_size": 11,
+    "data_error_probability": 0.0875,
+    "syndrome_error_probability": 0.001,
+    "num_disorder_samples": 16,
+    "num_start_chains": 4,
+    "num_replicas_per_start": 2,
+    "mcmc_seed_base": 620261001,
+    "burn_in_scaling_reference_num_qubits": 18,
+    "base_num_burn_in_sweeps": 2200,
+    "num_sweeps_between_measurements": 12,
+    "q_top_block_count": 8,
+    "num_zero_syndrome_sweeps_per_cycle": 1,
+    "winding_repeat_factor": 1,
+    "winding_plane_heatbath_sweeps": 0,
+    "cluster_update_enabled": false,
+    "parallel_tempering_enabled": false,
+    "workers": 32,
+    "arms": {
+      "A": {
+        "num_measurements_per_disorder": 600
+      },
+      "B": {
+        "num_measurements_per_disorder": 1200
+      }
+    },
+    "legacy_reference": {
+      "source_repo_relative_path": "data/2d_toric_code/with_measurement_noise/no_threshold_final_nd3_20260421_225039/q_0p0010/scan_result_multi_L_q0p0010_no_threshold_final_common_random.npz",
+      "manifest_repo_relative_path": "data/2d_toric_code/with_measurement_noise/no_threshold_final_nd3_20260421_225039/q_0p0010/manifest.json",
+      "source_commit_recorded": "fa3750ded9109d64d275fc103cb19e1963a62bf0",
+      "source_npz_sha256": "0495570a24c2db33a4270d00b3851ab02c39f515aa82909ea82009e88cbbac4e",
+      "lattice_index": 4,
+      "point_index": 5,
+      "chunk_index": 0,
+      "legacy_chunk_size": 32,
+      "disorder_seed": 916260831,
+      "num_checks": 121,
+      "num_qubits": 242,
+      "syndrome_uniforms_first16_sha256": "8bae8784097ae75415bfed6d1b913cbafcc68297698718a4eec173c59e72d2ed",
+      "data_uniforms_first16_sha256": "edecc85207e41453cece13c8a1870e98d3fa9b0d83bdcfcb986ad73104967cf0",
+      "syndrome_bits_first16_sha256": "20260b571209455ee110056f7588cd2c7dbd0787e469b422abda54f4497c5fa1",
+      "data_bits_first16_sha256": "e835a16465d8c1b677549ef8337a9bacf87fda377ad83e67318014e696359129",
+      "q_top_first16": [
+        1.0,
+        1.0,
+        1.0,
+        0.9955629629629629,
+        0.9955629629629629,
+        1.0,
+        1.0,
+        1.0,
+        0.9606,
+        1.0,
+        1.0,
+        0.47236296296296293,
+        0.7600000000000001,
+        1.0,
+        0.9911407407407408,
+        1.0
+      ]
+    }
+  },
+  "gates": {
+    "q0_max_mean_start_spread": 0.1,
+    "q0_max_abs_arm_mean_q_top_difference": 0.01,
+    "q_positive_max_r_hat": 1.05,
+    "q_positive_min_effective_sample_size": 200.0,
+    "q_positive_max_mean_q_top_spread": 0.03,
+    "q_positive_min_mean_winding_acceptance": 0.0001,
+    "q_positive_require_every_chain_sector_change": true
+  },
+  "q0_formal": {
+    "data_error_probabilities": [
+      0.1125,
+      0.115,
+      0.1175,
+      0.12,
+      0.1225,
+      0.125
+    ],
+    "syndrome_error_probability": 0.0,
+    "num_disorder_samples": 1024,
+    "chunk_size": 16,
+    "num_start_chains": 4,
+    "burn_in_scaling_reference_num_qubits": 18,
+    "workers_per_lattice_size": 32,
+    "common_random_disorder_across_p": true,
+    "lattice_sizes": {
+      "9": {
+        "seed_base": 620260909,
+        "num_burn_in_sweeps": 2000,
+        "num_sweeps_between_measurements": 10,
+        "num_measurements_per_disorder": 600
+      },
+      "11": {
+        "seed_base": 620260911,
+        "schedule_from_q0_pilot": true
+      }
+    }
+  }
+}

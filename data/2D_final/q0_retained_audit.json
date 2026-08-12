@@ -1,0 +1,189 @@
+{
+  "adjacent_size_differences": {
+    "L11_minus_L9": {
+      "ci95_high": [
+        0.04466827667611884,
+        0.03312363029436974,
+        0.04856211758712542,
+        0.02364009700987989,
+        0.007094014810422818,
+        0.02152215592613529,
+        0.026269431301030818
+      ],
+      "ci95_low": [
+        -0.007126766440296979,
+        -0.02129482712596689,
+        -0.00603117050234531,
+        -0.03191849237301679,
+        -0.0483053329889529,
+        -0.03295821278377434,
+        -0.028053348763414972
+      ],
+      "difference": [
+        0.01877075511791093,
+        0.005914401584201423,
+        0.021265473542390056,
+        -0.004139197681568452,
+        -0.020605659089265038,
+        -0.0057180284288195216,
+        -0.0008919587311920774
+      ],
+      "p": [
+        0.095,
+        0.0975,
+        0.1,
+        0.1025,
+        0.105,
+        0.1075,
+        0.11
+      ],
+      "point_estimate_bracketed": true
+    },
+    "L9_minus_L7": {
+      "ci95_high": [
+        0.05265154171044279,
+        0.06083303242632527,
+        0.06403194050747615,
+        0.058027500979190315,
+        0.06306346870264426,
+        0.050538483817197215,
+        0.035172923585623274
+      ],
+      "ci95_low": [
+        -0.01126501239548345,
+        -0.003820104728119396,
+        -0.003392050189912378,
+        -0.009075074040532892,
+        -0.003917183257042517,
+        -0.015852627697405412,
+        -0.030737198126277156
+      ],
+      "difference": [
+        0.02069326465747967,
+        0.028506463849102937,
+        0.03031994515878189,
+        0.02447621346932871,
+        0.02957314272280087,
+        0.0173429280598959,
+        0.002217862729673059
+      ],
+      "p": [
+        0.095,
+        0.0975,
+        0.1,
+        0.1025,
+        0.105,
+        0.1075,
+        0.11
+      ],
+      "point_estimate_bracketed": false
+    }
+  },
+  "ci_method": "pointwise normal 95% CI across disorder; z=1.959963984540054",
+  "coverage_gap": {
+    "lattice_sizes": [
+      9,
+      11
+    ],
+    "missing_p": [
+      0.1125,
+      0.115,
+      0.1175,
+      0.12,
+      0.1225,
+      0.125
+    ],
+    "purpose": "close or explicitly exclude the L7-L9 crossing window"
+  },
+  "diagnostics": {
+    "maximum_mean_four_start_spread_by_lattice_size": {
+      "11": 0.15023702980324072,
+      "3": 0.05893030598958335,
+      "5": 0.06135462239583334,
+      "7": 0.09776523437500001,
+      "9": 0.09636746961805556
+    }
+  },
+  "inputs": [
+    {
+      "canonical_source": "data/2d_toric_code/without_measurement_noise/q0_threshold_deep_nd3_20260420_221142/scan_result_multi_L_q0_geometric_multistart_threshold_deep.npz",
+      "input_sha256": "f3821be7f779119603f1464b9f201ece184106d515f9f19baf5fc2db9a5f4f61",
+      "lattice_sizes": [
+        3,
+        5,
+        7
+      ],
+      "manifest": "data/2d_toric_code/without_measurement_noise/q0_threshold_deep_nd3_20260420_221142/manifest.json",
+      "manifest_completed_chunks": 720,
+      "manifest_failed_chunks": 0,
+      "manifest_pending_chunks": 0,
+      "num_disorder": 512,
+      "p": [
+        0.09,
+        0.0925,
+        0.095,
+        0.0975,
+        0.1,
+        0.1025,
+        0.105,
+        0.1075,
+        0.11,
+        0.1125,
+        0.115,
+        0.1175,
+        0.12,
+        0.1225,
+        0.125
+      ],
+      "run": "q0_threshold_deep_nd3_20260420_221142",
+      "source_git_sha": "a15c3326fcc07844e06cc02ff176cf39ab7c0bbb",
+      "start_labels": [
+        "00",
+        "10",
+        "01",
+        "11"
+      ]
+    },
+    {
+      "canonical_source": "data/2d_toric_code/without_measurement_noise/q0_control_extension_nd3_20260421_225303/scan_result_multi_L_q0_control_extension.npz",
+      "input_sha256": "06254aa73b3e5c4596bdaf94d076e2c26c7427e43e8ba3b70789b49d199094ee",
+      "lattice_sizes": [
+        9,
+        11
+      ],
+      "manifest": "data/2d_toric_code/without_measurement_noise/q0_control_extension_nd3_20260421_225303/manifest.json",
+      "manifest_completed_chunks": 448,
+      "manifest_failed_chunks": 0,
+      "manifest_pending_chunks": 0,
+      "num_disorder": 1024,
+      "p": [
+        0.095,
+        0.0975,
+        0.1,
+        0.1025,
+        0.105,
+        0.1075,
+        0.11
+      ],
+      "run": "q0_control_extension_nd3_20260421_225303",
+      "source_git_sha": "a197215bd18e9ffc160b4864b7f54239ff4e39da",
+      "start_labels": [
+        "00",
+        "10",
+        "01",
+        "11"
+      ]
+    }
+  ],
+  "outputs": [
+    "data/2D_final/q0_retained_summary.csv",
+    "data/2D_final/q0_retained_audit_preview.png",
+    "data/2D_final/q0_retained_audit_preview.pdf",
+    "data/2D_final/q0_retained_large_L_gap_preview.png",
+    "data/2D_final/q0_retained_large_L_gap_preview.pdf"
+  ],
+  "paper_figure": false,
+  "q_positive_data_included": false,
+  "schema_version": 1,
+  "scope": "retained q=0 audit preview only"
+}
