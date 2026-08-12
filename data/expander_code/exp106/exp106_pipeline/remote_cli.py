@@ -120,15 +120,15 @@ QUALIFICATION_GROUPS = (
 # against.
 #
 # exp101, exp102, exp104 and exp105 are closed and frozen, so their counts are
-# measured and fixed. exp106's is `None` until the production plan is frozen,
-# because 29 of its tests are skipped while it is not -- and `qualify` requires
-# zero skips, so the count and the freeze have to be set together at
-# Validation 004. `require_expected_pass_counts` refuses until then.
+# measured and fixed. exp106's could only be measured once Validation 003 froze
+# the production plan: 29 of its tests skip while the plan is absent, and
+# `qualify` requires zero skips, so the count and the freeze are set together.
+# `require_expected_pass_counts` refuses to run the gate against an unset count.
 #
-# exp105's group is 166 rather than its own suite's 175: the ten tests of Track B
-# are excluded above, and they happen to number nine plus the module.
+# exp105's group is 166 rather than its own suite's 175, because the ten Track B
+# tests are excluded above.
 QUALIFICATION_EXPECTED_PASSES = {
-    "exp106": None, "exp105": 166, "exp104": 131, "exp101": 58, "exp102": 17,
+    "exp106": 223, "exp105": 166, "exp104": 131, "exp101": 58, "exp102": 17,
 }
 
 

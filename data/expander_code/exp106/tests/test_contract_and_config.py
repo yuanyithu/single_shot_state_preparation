@@ -348,21 +348,29 @@ def test_every_qualification_group_path_exists():
 
 
 def test_qualification_refuses_unmeasured_pass_counts(monkeypatch):
-    """An unset count must block the gate, not sail through it."""
+    """An unset count must block the gate, not sail through it.
+
+    exp106's own count can only be measured once the production plan is frozen,
+    because 29 tests skip until then and qualification allows no skips. This
+    test is written to hold on both sides of that freeze, so it is not something
+    that has to be edited at exactly the moment it matters.
+    """
     from data.expander_code.exp106.exp106_pipeline import remote_cli
 
     counts = dict(remote_cli.QUALIFICATION_EXPECTED_PASSES)
-    assert counts["exp106"] is None, (
-        "exp106's count is measured once the production plan is frozen, because "
-        "29 tests skip until then and qualification allows no skips"
+    if config_module.PRODUCTION_PLAN_FROZEN:
+        assert all(isinstance(value, int) and value > 0 for value in counts.values())
+        remote_cli.require_expected_pass_counts()
+    else:
+        assert counts["exp106"] is None
+        with pytest.raises(ValueError, match="pass counts are unset"):
+            remote_cli.require_expected_pass_counts()
+
+    monkeypatch.setattr(
+        remote_cli, "QUALIFICATION_EXPECTED_PASSES", dict(counts, exp106=None),
     )
     with pytest.raises(ValueError, match="pass counts are unset"):
         remote_cli.require_expected_pass_counts()
-
-    monkeypatch.setattr(
-        remote_cli, "QUALIFICATION_EXPECTED_PASSES", dict(counts, exp106=1),
-    )
-    remote_cli.require_expected_pass_counts()
 
 
 def test_the_frozen_execution_profile_has_one_definition():

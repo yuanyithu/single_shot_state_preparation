@@ -377,11 +377,15 @@ def test_preflight_validation_refuses_a_substituted_replay_subsample(remote_conf
         "source_tree_sha256": remote_config["source_tree_sha256"],
         "decoder_binary_sha256": remote_config["decoder_binary"]["sha256"],
         "hostname": remote_config["environment"]["hostname"],
-        "num_workers": 64,
+        # from the frozen profile, not a literal: the worker count is a
+        # contract value and this test exists to check identity binding, not to
+        # re-assert a number that has already moved once (64 -> 72)
+        "num_workers": remote_config["execution_profile"]["num_workers"],
         "outcome_blind": True,
         "committed_replay_blocks": {str(m): blocks[m] for m in M_VALUES},
         "estimate": estimate_resources(
-            _benchmark_tasks(), remote_config, 64,
+            _benchmark_tasks(), remote_config,
+            remote_config["execution_profile"]["num_workers"],
             remote_config["execution_profile"],
         ),
     }

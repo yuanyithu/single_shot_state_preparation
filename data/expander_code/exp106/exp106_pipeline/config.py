@@ -75,11 +75,34 @@ COST_BENCHMARK_TRIALS = 6
 # measures c_m and kappa_m with `remote_cli cost-benchmark` on nd-3 before the
 # allocation rule is evaluated at all.
 # ---------------------------------------------------------------------------
-PRODUCTION_PLAN_FROZEN = False
-P_TOKENS = None
-CODES_PER_M = None
-TRIALS_PER_CODE_P = None
-CODES_PER_TASK = None
+# Frozen by Validation 003. These five values are the section 6 rules evaluated
+# on measured pilot statistics and measured nd-3 costs; filling them in is the
+# freeze, and none of them was chosen.
+#
+# The grid is the fallback branch: the pilot found Delta38 positive at all 14 of
+# its points, from +0.035 at p = 0.005 to +0.263 at p = 0.06, so there is no
+# negative-to-positive sign change to bracket. The fallback covers the window
+# exp104 measured negative at q = 0, which is the window a no-crossing terminal
+# has to be able to speak about.
+#
+# Trials sit at the *floor* of three, the opposite of exp105's cap of six. At
+# q = 0.05 failure was driven by a readout channel common to every code, so the
+# between-code spread collapsed below pilot resolution and the rule bought
+# trials. At q = 0.01 it is recoverable -- sigma_c is about 0.12 at both primary
+# sizes -- so the rule buys codes instead. That is exp104's regime returning, and
+# it is why the s-form had to be preregistered rather than chosen here.
+#
+# Panels are unequal because a code at m = 8 costs about seventy times a code at
+# m = 3 on nd-3, so equal panels would spend the budget on the smaller of the two
+# variance terms.
+PRODUCTION_PLAN_FROZEN = True
+P_TOKENS = [
+    "0.005", "0.01", "0.015", "0.02", "0.025", "0.03", "0.035",
+    "0.045", "0.055", "0.07",
+]
+CODES_PER_M = {3: 76162, 4: 13068, 5: 5176, 6: 2464, 7: 1186, 8: 10344}
+TRIALS_PER_CODE_P = {3: 3, 4: 3, 5: 3, 6: 3, 7: 3, 8: 3}
+CODES_PER_TASK = {3: 113, 4: 22, 5: 8, 6: 4, 7: 2, 8: 1}
 
 # Inputs to the frozen allocation rule, fixed here so that Validation 003
 # evaluates a rule rather than choosing an outcome.
