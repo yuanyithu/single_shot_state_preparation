@@ -257,7 +257,7 @@ REMOTE_CONFIG_PATH = "data/expander_code/exp106/config/noisy_mc.remote.v1.json"
 PILOT_REMOTE_CONFIG_PATH = (
     "data/expander_code/exp106/config/noisy_mc.pilot.remote.v1.json"
 )
-REMOTE_EXECUTION_PROFILE = "exp106.remote_execution.v1"
+REMOTE_EXECUTION_PROFILE = "exp106.remote_execution.v2"
 # exp106 reuses the environment exp103 built and exp104 qualified rather than
 # creating its own. Rebuilding would recompile the decoder and could change its
 # binary hash, and a byte-identical decoder is what keeps exp104's q = 0 cells
@@ -277,20 +277,27 @@ REMOTE_EXECUTION_FIELDS = {
 # One definition, read both by the config author and by the validator. exp105
 # kept two copies of these numbers and the same class of duplication -- the
 # benchmark grid, defined once in preflight and once in remote_cli -- produced a
-# KeyError in the middle of a resource gate.
+# KeyError in the middle of a resource gate. The compute host is a constant for
+# the same reason: it was spelled inline at six sites before the run moved.
 #
-# 72 workers, against exp105's 64. nd-3 has 96 logical CPUs on 48 physical cores,
-# and another user has held ten cores at 100 percent continuously; 72 takes the
-# available parallelism without contending for their hyperthreads.
+# nd-2, 75 workers, by user authorization after the nd-3 resource gate blocked.
+# nd-3 has another user holding ten of its 48 physical cores continuously, and
+# the contention showed up directly in the measurements: the same six per-m costs
+# re-measured minutes apart scattered from 0.69x to 1.58x, inflating the
+# projection past its ceiling. nd-2 is idle -- 80 logical CPUs on 40 physical
+# cores, load average 0.01 -- so its benchmark and its preflight should agree,
+# which is what the two percent of margin below actually requires.
 #
 # The caps follow permanent discipline 11 from the frozen 800 core-hour
 # generation budget: reserved = 2 x (800 + 80 replay + 1 analysis + 1 overhead),
-# and wall = (800 + 80) / 72 + 2.
+# and wall = (800 + 80) / 75 + 2. They are unchanged by the move: the budget is
+# in core-hours, so a slower core buys a smaller panel rather than a larger bill.
+COMPUTE_HOST = "nd-2"
 REMOTE_EXECUTION_DEFAULTS = {
     "profile_id": REMOTE_EXECUTION_PROFILE,
     "entry_host": "yuany",
-    "compute_host": "nd-3",
-    "num_workers": 72,
+    "compute_host": COMPUTE_HOST,
+    "num_workers": 75,
     "omp_thread_count": 1,
     "run_root": "~/.single_shot/runs",
     "log_root": "~/.single_shot/logs",
@@ -534,8 +541,8 @@ def _validate(config):
     env = config["environment"]
     if remote:
         expected_remote_environment = {
-            "device_name": "nd-3",
-            "hostname": "nd-3",
+            "device_name": COMPUTE_HOST,
+            "hostname": COMPUTE_HOST,
             "conda_environment": config["execution_profile"]["conda_environment"],
             "conda_prefix_matches_python": True,
             "python": "3.12.12", "numpy": "2.4.1", "scipy": "1.17.0", "ldpc": "2.4.1",

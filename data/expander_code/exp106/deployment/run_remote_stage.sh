@@ -23,10 +23,10 @@ common=(
 )
 
 if [[ ! -f $run_root/validation/scan.json ]]; then
-  python -B -m "$module" scan "${common[@]}" --num-workers 72
+  python -B -m "$module" scan "${common[@]}" --num-workers 75
 fi
 if [[ ! -f $run_root/validation/replay.json ]]; then
-  python -B -m "$module" replay "${common[@]}" --num-workers 72
+  python -B -m "$module" replay "${common[@]}" --num-workers 75
 fi
 if [[ ! -f $run_root/aggregate/ensemble_crossing.npz ]]; then
   python -B -m "$module" aggregate "${common[@]}"

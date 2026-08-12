@@ -336,7 +336,11 @@ def test_qualification_validation_accepts_a_clean_pass(remote_config):
     {"status": "FAIL"},
     {"bytecode_clean_before": False},
     {"bytecode_clean_after": False},
-    {"hostname": "nd-2"},
+    # a host that is not the frozen compute host. Deliberately not another node
+    # of this cluster: the run has already moved from nd-3 to nd-2 once, and a
+    # negative control that names a real neighbour becomes a false pass the day
+    # it is adopted -- which is exactly what happened to `nd-2` here.
+    {"hostname": "not-the-compute-host"},
     {"conda_prefix_matches_python": False},
     {"source_tree_sha256": "0" * 64},
 ])

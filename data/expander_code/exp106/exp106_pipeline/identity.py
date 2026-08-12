@@ -24,7 +24,7 @@ from .config import (
 from .io import sha256_file
 
 
-DEVICE_BY_HOSTNAME = {"ymini.local": "macmini", "nd-3": "nd-3"}
+DEVICE_BY_HOSTNAME = {"ymini.local": "macmini", "nd-2": "nd-2", "nd-3": "nd-3"}
 REMOTE_DEPLOYMENT_SCHEMA = "exp106.remote_deployment.v1"
 REMOTE_DEPLOYMENT_FIELDS = {
     "schema_version", "experiment_id", "execution_profile_id",

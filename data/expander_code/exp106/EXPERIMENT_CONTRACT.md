@@ -191,8 +191,8 @@ therefore mean "certified positive across the whole window where `q = 0` was
 negative", which the fallback above can support and a low-`p` log grid cannot.
 
 **Cost measurement.** `c_m`, the per-trial cost, and `kappa_m`, the per-code frame
-cost, are measured **on nd-3** by `remote_cli cost-benchmark`, which is
-outcome-blind and independent of the production plan. This is not a detail. exp105
+cost, are measured **on the section 10 compute host** by `remote_cli
+cost-benchmark`, which is outcome-blind and independent of the production plan. This is not a detail. exp105
 evaluated the same allocation rule on costs measured on the macmini, and its nd-3
 resource gate blocked at 5,367.8 reserved core-hours against a cap of 800, because
 a trial at `m = 8` costs about eight times as much on nd-3. The rule spends a
@@ -324,15 +324,46 @@ is rerun; their evidence is read-only.
 
 ## 10. Execution
 
-Entry `ssh yuany`, compute host **nd-3 only**, conda environment as frozen in the
-remote config, **72 workers** passed explicitly, long runs under `screen`, run
+Entry `ssh yuany`, compute host **nd-2 only**, conda environment as frozen in the
+remote config, **75 workers** passed explicitly, long runs under `screen`, run
 root `~/.single_shot/runs/`. The clean-source tree runs only through
 `run_verified_source.sh`, whose bytecode gate exits 67. A failed run is not rerun
 in place.
 
-72 rather than the 64 exp103/104/105 inherited: nd-3 has 96 logical CPUs on 48
-physical cores, and another user has held ten cores continuously, leaving 76 free
-hyperthreads.
+### Amendment 1 (user-authorized): nd-3 -> nd-2, 72 -> 75 workers
+
+The original text named nd-3 and 72 workers, on the reasoning that nd-3 has 96
+logical CPUs on 48 physical cores with another user holding ten of them
+continuously, so 72 took the available parallelism without contending.
+
+That contention turned out to be the problem rather than a thing to work around.
+The Validation 004 resource projection blocked at `2001.95` reserved core-hours
+against a cap of `1800`, and the cause was measurement scatter: the same six
+per-`m` costs, re-measured minutes apart on nd-3, moved by factors of `0.69` to
+`1.58` in both directions. The allocation rule spends the entire frozen budget by
+construction, so a projection built on noisy costs has nowhere to go.
+
+The user authorized moving to **nd-2** and using **75 workers** without regard
+for other users. nd-2 is idle -- 80 logical CPUs on 40 physical cores, load
+average `0.01` -- so its benchmark and its preflight measure the same machine in
+the same state, which is what the caps' two percent of margin actually requires.
+
+**The caps are unchanged.** The budget is denominated in core-hours, so a slower
+core buys a smaller panel rather than a larger bill; nd-2's Xeon Gold 5218R at
+2.10 GHz is slower per core than nd-3's 6126 at 2.60 GHz, and the section 6 rule
+absorbs that by allocating fewer codes at the same 800 core-hours. Precision, not
+budget, is what moves.
+
+**Because the compute host changed, section 6's own cost rule now requires
+re-measuring `c_m` and `kappa_m` on nd-2 and re-evaluating the allocation there.**
+That is following the rule, not evading a gate: the rule says the costs come from
+the machine that spends the budget, and the re-evaluation happens before any
+production task runs, so no outcome can influence it. The nd-3 freeze and the
+nd-2 re-freeze are both recorded in Validation 003.
+
+Nothing else changes. The estimand, the ensemble, the grid, the physics, the
+estimators, the bands, the fail-closed rules, the replay gate, the two equality
+gates and the terminal decision are all untouched.
 
 The compiled decoder is not bit-portable across platforms (exp104 Validation 002).
 exp106 generates, replays and aggregates entirely on nd-3 against the pinned nd-3
@@ -350,8 +381,13 @@ replay plus analysis plus fixed overhead, per permanent discipline 11:
 | projected peak RSS | 128 GiB |
 
 These follow from the frozen `G = 800` core-hour generation budget:
-`2 x (800 + 80 + 1 + 1) = 1764` and `(800 + 80) / 72 + 2 = 14.2`. The expected
-production scan is about 9 wall hours.
+`2 x (800 + 80 + 1 + 1) = 1764` and `(800 + 80) / 75 + 2 = 13.7`.
+
+The reserved cap leaves about two percent of margin over the projection, which is
+tight on purpose but was **too** tight against a contended host: the rule spends
+the whole budget, so the projection starts at the ceiling. On an idle machine the
+benchmark and the preflight measure the same thing and the margin holds; if it
+does not, the run blocks and reports rather than trimming the panel.
 
 ## 11. Terminal decision
 

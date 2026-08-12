@@ -10,6 +10,7 @@ from . import CONFIG_SCHEMA, EXPERIMENT_ID, PILOT_CONFIG_SCHEMA
 from .aggregate import ARRAY_FIELDS, SCALAR_FIELDS, aggregate_scan
 from .config import (
     BOOTSTRAP,
+    COMPUTE_HOST,
     CROSSING,
     DECODER,
     DECODER_BINARY_SHA256,
@@ -95,8 +96,8 @@ def _remote_config(base, phase="production_remote"):
         "schema_version": SCHEMA_BY_PHASE[phase],
         "phase": phase,
         "environment": {
-            "device_name": "nd-3",
-            "hostname": "nd-3",
+            "device_name": COMPUTE_HOST,
+            "hostname": COMPUTE_HOST,
             "conda_environment": REMOTE_CONDA_PREFIX,
             "conda_prefix_matches_python": True,
             "python": "3.12.12", "numpy": "2.4.1", "scipy": "1.17.0", "ldpc": "2.4.1",

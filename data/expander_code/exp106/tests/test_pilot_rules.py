@@ -16,6 +16,7 @@ import math
 import pytest
 
 from data.expander_code.exp106.exp106_pipeline.config import (
+    COMPUTE_HOST,
     DIAGNOSTIC_M_VALUES,
     FALLBACK_P_TOKENS,
     GENERATION_BUDGET_CORE_HOURS,
@@ -272,7 +273,7 @@ def _pilot_plan(**overrides):
 def _cost_benchmark(**overrides):
     report = {
         "schema_version": "exp106.cost_benchmark.v1",
-        "device": "nd-3",
+        "device": COMPUTE_HOST,
         "q_token": "0.01",
         "kappa_seconds_upper": {str(m): ND3_KAPPA[m] for m in M_VALUES},
         "c_seconds_upper": {str(m): ND3_C[m] for m in M_VALUES},
@@ -296,7 +297,7 @@ def test_allocate_writes_a_plan_that_the_config_could_adopt(tmp_path):
     assert plan["status"] == "EVALUATED_NOT_APPLIED", (
         "evaluating the rule is not applying it; the freeze is a separate act"
     )
-    assert plan["cost_device"] == "nd-3"
+    assert plan["cost_device"] == COMPUTE_HOST
     codes = {int(m): v for m, v in plan["codes_per_m"].items()}
     blocks = {int(m): v for m, v in plan["codes_per_task"].items()}
     for m in M_VALUES:
@@ -310,7 +311,7 @@ def test_allocate_refuses_costs_from_the_wrong_machine(tmp_path):
     """The single most expensive process failure in exp105, made unrepeatable."""
     _write_report(tmp_path / "pilot_plan.json", _pilot_plan())
     _write_report(tmp_path / "cost_benchmark.json", _cost_benchmark(device="macmini"))
-    with pytest.raises(ValueError, match="must be evaluated on nd-3 costs"):
+    with pytest.raises(ValueError, match="must be evaluated on .* costs"):
         main([
             "allocate",
             "--pilot-plan", str(tmp_path / "pilot_plan.json"),

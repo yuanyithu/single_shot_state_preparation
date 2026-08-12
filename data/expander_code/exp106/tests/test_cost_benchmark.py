@@ -1,7 +1,7 @@
-"""The nd-3 cost benchmark, exercised before it ever reaches nd-3.
+"""The compute-host cost benchmark, exercised before it ever reaches that host.
 
 This command exists to break a circularity exp105 could not: its only path to
-nd-3 costs was `preflight`, which already needs the frozen production plan, and
+remote costs was `preflight`, which already needs the frozen production plan, and
 the allocation rule that produces that plan needs the costs. exp105 guessed with
 macmini numbers and its resource gate blocked at 5,368 core-hours against a cap
 of 800.
@@ -9,7 +9,7 @@ of 800.
 Being new code that runs exactly once, on a machine reachable only through a
 deployment round trip, it is worth testing here rather than discovering a typo
 after `git archive`. The decoder work is real; only the host identity is
-substituted, because a macmini cannot claim to be nd-3.
+substituted, because a macmini cannot claim to be the compute host.
 """
 
 import json
@@ -19,6 +19,7 @@ import pytest
 from data.expander_code.exp106.exp106_pipeline import preflight as preflight_module
 from data.expander_code.exp106.exp106_pipeline import remote_cli
 from data.expander_code.exp106.exp106_pipeline.config import (
+    COMPUTE_HOST,
     COST_BENCHMARK_TRIALS,
     M_VALUES,
     load_config,
@@ -100,7 +101,7 @@ def test_the_report_is_self_verifying(report):
     core = {key: value for key, value in report.items() if key != "report_sha256"}
     assert report["report_sha256"] == sha256_json(core)
     # and it is the shape `pilot allocate` will read
-    assert json.loads(json.dumps(report, sort_keys=True))["device"] == "nd-3"
+    assert json.loads(json.dumps(report, sort_keys=True))["device"] == COMPUTE_HOST
 
 
 def test_the_benchmark_refuses_a_production_config(pilot_rows):

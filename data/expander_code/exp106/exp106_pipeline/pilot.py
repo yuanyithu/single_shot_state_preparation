@@ -22,6 +22,7 @@ import numpy as np
 
 from .aggregate import panel_layout
 from .config import (
+    COMPUTE_HOST,
     DIAGNOSTIC_BUDGET_SHARE,
     DIAGNOSTIC_M_VALUES,
     FALLBACK_P_TOKENS,
@@ -303,12 +304,14 @@ def _command_allocate(args):
     """Evaluate the frozen allocation rule. No free parameters, no choices."""
     plan = _checked_report(args.pilot_plan, PILOT_SCHEMA)
     costs = _checked_report(args.cost_benchmark)
-    if costs.get("device") != "nd-3":
+    if costs.get("device") != COMPUTE_HOST:
         # exp105 evaluated this rule on macmini costs and its nd-3 resource gate
         # blocked at 5,368 core-hours against a cap of 800. The rule spends a
-        # budget of core-hours on the machine that runs it.
+        # budget of core-hours on the machine that runs it, so the check names
+        # the frozen compute host rather than a literal -- the run has already
+        # moved once.
         raise ValueError(
-            "the allocation rule must be evaluated on nd-3 costs, not "
+            f"the allocation rule must be evaluated on {COMPUTE_HOST} costs, not "
             f"{costs.get('device')!r}"
         )
     if costs.get("q_token") != plan["q_token"]:
@@ -392,12 +395,12 @@ def main(argv=None):
     measure.add_argument("--output", required=True)
 
     allocate = sub.add_parser(
-        "allocate", help="evaluate the frozen allocation rule on nd-3 costs",
+        "allocate", help="evaluate the frozen allocation rule on compute-host costs",
     )
     allocate.add_argument("--pilot-plan", required=True)
     allocate.add_argument(
         "--cost-benchmark", required=True,
-        help="cost_benchmark.json produced by `remote_cli cost-benchmark` on nd-3",
+        help="cost_benchmark.json from `remote_cli cost-benchmark` on the compute host",
     )
     allocate.add_argument("--output", required=True)
 

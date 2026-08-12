@@ -76,7 +76,7 @@ def test_the_pilot_phase_is_usable_before_the_freeze():
     assert codes == {m: PILOT_CODES_PER_M for m in PILOT_M_VALUES}
     assert trials == {m: PILOT_TRIALS_PER_CODE_P for m in PILOT_M_VALUES}
     assert blocks == PILOT_CODES_PER_TASK
-    # ... and so is its remote form, which is how nd-3 costs get measured
+    # ... and so is its remote form, which is how compute-host costs get measured
     # before the allocation rule that spends them is evaluated.
     assert plan_for_phase("pilot_remote") == plan_for_phase("pilot")
 
@@ -381,17 +381,39 @@ def test_the_frozen_execution_profile_has_one_definition():
     the middle of a resource gate.
     """
     from data.expander_code.exp106.exp106_pipeline.config import (
+        COMPUTE_HOST, GENERATION_BUDGET_CORE_HOURS,
         REMOTE_EXECUTION_DEFAULTS, REMOTE_EXECUTION_FIELDS,
     )
 
     assert set(REMOTE_EXECUTION_DEFAULTS) | {"conda_environment"} == REMOTE_EXECUTION_FIELDS
-    assert REMOTE_EXECUTION_DEFAULTS["num_workers"] == 72
-    assert REMOTE_EXECUTION_DEFAULTS["compute_host"] == "nd-3"
+    # The host is named once and read everywhere; it was spelled inline at six
+    # sites before the run moved from nd-3 to nd-2.
+    assert REMOTE_EXECUTION_DEFAULTS["compute_host"] == COMPUTE_HOST
+    workers = REMOTE_EXECUTION_DEFAULTS["num_workers"]
+    assert isinstance(workers, int) and workers > 0
     # The caps are discipline 11 applied to the frozen generation budget:
-    # 2 x (800 + 80 replay + 1 analysis + 1 overhead), and (800 + 80)/72 + 2.
+    # 2 x (G + 0.1 G replay + 1 analysis + 1 overhead), and (G + 0.1 G)/workers + 2.
+    budget = GENERATION_BUDGET_CORE_HOURS
     assert REMOTE_EXECUTION_DEFAULTS["reserve_multiplier"] == 2.0
-    assert REMOTE_EXECUTION_DEFAULTS["stage_core_hour_cap"] >= 2 * (800 + 80 + 2)
-    assert REMOTE_EXECUTION_DEFAULTS["stage_wall_hour_cap"] >= (800 + 80) / 72 + 2
+    assert REMOTE_EXECUTION_DEFAULTS["stage_core_hour_cap"] >= 2 * (budget * 1.1 + 2)
+    assert REMOTE_EXECUTION_DEFAULTS["stage_wall_hour_cap"] >= (budget * 1.1) / workers + 2
+
+
+def test_the_compute_host_is_named_once(monkeypatch):
+    """Changing the host must not require finding six string literals.
+
+    The nd-3 resource gate blocked and the run moved to nd-2 on the same day.
+    Every consumer of the host -- the execution profile, the expected remote
+    environment, and the allocation rule's refusal to accept costs from the wrong
+    machine -- now reads one constant.
+    """
+    from data.expander_code.exp106.exp106_pipeline import pilot as pilot_module
+    from data.expander_code.exp106.exp106_pipeline.config import COMPUTE_HOST
+    from data.expander_code.exp106.exp106_pipeline.identity import DEVICE_BY_HOSTNAME
+
+    assert COMPUTE_HOST in DEVICE_BY_HOSTNAME
+    assert DEVICE_BY_HOSTNAME[COMPUTE_HOST] == COMPUTE_HOST
+    assert pilot_module.COMPUTE_HOST == COMPUTE_HOST
 
 
 def test_the_pilot_registry_is_the_shape_the_constant_declares(pilot_registry):

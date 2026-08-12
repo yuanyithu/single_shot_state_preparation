@@ -2,9 +2,10 @@
 
 ## Current state
 
-**`PLAN_FROZEN_AWAITING_ND3_GATES`** — the locating pilot is complete, the nd-3
-costs are measured, and the section 6 rules have been evaluated and applied. No
-production compute has run.
+**`MOVED_TO_ND2_AWAITING_REFREEZE`** — the pilot is complete and the section 6
+rules have been evaluated, but the nd-3 resource gate blocked and the run has
+moved to nd-2 on user authorization. The plan must be re-derived from nd-2's
+costs before production. No production compute has run.
 
 exp106 (`exp106.noisy_syndrome_mc.q001.v1`) measures the ensemble block logical
 failure rate of the frozen exp103/exp104 BP+OSD-0 decoder at readout error rate
@@ -37,7 +38,7 @@ under which no crossing survives.
 production run exists to settle the small-`p` end, where a dip that had *moved*
 rather than vanished would hide.
 
-## The frozen plan
+## The plan frozen on nd-3 costs (to be re-derived on nd-2)
 
 | m | codes | trials per (code,p) | codes per task |
 |---|---:|---:|---:|
@@ -67,13 +68,28 @@ the allocation rule had to be preregistered rather than chosen after the fact.
    `require_expected_pass_counts()` refuses to qualify until every group's count
    is measured.
 3. The compiled decoder is not bit-portable across platforms (exp104 Validation
-   002). Generation, replay and aggregation all happen on nd-3 against the pinned
-   nd-3 binary; artifacts are never mixed across platforms.
-4. No production compute is authorized until the Validation 004 resource gate
-   passes. Reserved core-hours are projected near `1767` against a cap of `1800`,
-   which is tight by design: the rule spends the whole frozen budget, so an
-   upward drift in measured cost at preflight time will block rather than
-   silently overrun. If it blocks, that is reported, not worked around.
+   002). Generation, replay and aggregation all happen on **one** host against the
+   pinned binary; artifacts are never mixed across platforms. The nd-3 cost
+   benchmark is the one nd-3 artifact in the chain, and it is a *cost*
+   measurement, not an outcome -- it is superseded by the nd-2 re-measurement
+   rather than mixed with it.
+4. **The nd-3 resource gate blocked** at `2001.95` reserved core-hours against a
+   cap of `1800` (wall and RSS both passed). The cause was measurement scatter on
+   a contended host: the same six per-`m` costs re-measured minutes apart moved by
+   factors of `0.69` to `1.58`, in both directions. Contract section 6 stopped the
+   run rather than shrinking the panel, and a failed gate does not authorize its
+   own relaxation.
+5. **Amendment 1, user-authorized: compute host nd-3 -> nd-2, 72 -> 75 workers.**
+   nd-2 is idle (80 logical CPUs on 40 physical cores, load `0.01`), so its
+   benchmark and its preflight measure the same machine in the same state. The
+   caps are unchanged: the budget is in core-hours, so nd-2's slower cores buy a
+   smaller panel rather than a larger bill. Nothing scientific changes.
+6. Because the compute host changed, section 6's own cost rule requires
+   re-measuring `c_m` and `kappa_m` on nd-2 and re-evaluating the allocation
+   there. That is following the rule, not evading the gate, and it happens before
+   any production task runs. Both freezes will be recorded in Validation 003.
+7. No production compute is authorized until a Validation 004 resource gate
+   passes on nd-2.
 
 ## What differs from exp105, and why
 
@@ -81,17 +97,20 @@ the allocation rule had to be preregistered rather than chosen after the fact.
   exp105 code enters an exp106 panel by construction.
 - **A different pilot grid and fallback grid**, dense across `p in [0.02, 0.06]`,
   the window exp104 measured negative at `q = 0`.
-- **Costs measured on nd-3 before the allocation rule is evaluated**, through a
-  new plan-independent `remote_cli cost-benchmark` and a `pilot_remote` config
-  phase. This breaks the circularity that made exp105 evaluate its rule on
-  macmini numbers and blocked its first resource gate at 5,367.8 core-hours.
+- **Costs measured on the compute host before the allocation rule is evaluated**,
+  through a new plan-independent `remote_cli cost-benchmark` and a `pilot_remote`
+  config phase. This breaks the circularity that made exp105 evaluate its rule on
+  macmini numbers and blocked its first resource gate at 5,367.8 core-hours. The
+  compute host is now a single constant, `config.COMPUTE_HOST`, read by the
+  execution profile, the expected remote environment and the allocation rule's
+  refusal — it was spelled inline at six sites before the run moved.
 - **The allocation rule preregistered in its `s`-form**, which exp105 had to
   substitute mid-flight.
 - **A second equality gate at `q = 0.05`**, requiring exp106 to reproduce exp105
   bit for bit on exp105's own registry.
 - **`report.py` ships corrected and tested.** exp105's copy had an undefined name
   that killed its remote aggregate stage after the NPZ had been written.
-- **72 workers**, caps of 1800 reserved core-hours / 20 wall hours.
+- **nd-2 at 75 workers**, caps of 1800 reserved core-hours / 20 wall hours.
 - **No Track B.** exp105 established that full-sector TI cannot certify a `q_top`
   anchor at `q > 0`; permanent discipline 13 forbids extending that attempt. The
   certified bound `E[q_top] >= (1 - P_fail)²` is still reported, uncalibrated.
