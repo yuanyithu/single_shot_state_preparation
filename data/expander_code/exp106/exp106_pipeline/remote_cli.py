@@ -128,7 +128,7 @@ QUALIFICATION_GROUPS = (
 # exp105's group is 166 rather than its own suite's 175, because the ten Track B
 # tests are excluded above.
 QUALIFICATION_EXPECTED_PASSES = {
-    "exp106": 223, "exp105": 166, "exp104": 131, "exp101": 58, "exp102": 17,
+    "exp106": 224, "exp105": 166, "exp104": 131, "exp101": 58, "exp102": 17,
 }
 
 
