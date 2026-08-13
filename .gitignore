@@ -95,6 +95,7 @@ data/expander_code/exp105/final_results/code_diagnostics.csv
 # Gate transcripts are the evidence, not a by-product: the exact pass counts and
 # the absence of skips are what nd-3 qualification is later checked against.
 !data/expander_code/exp106/validation/**/*.txt
+!data/expander_code/exp106/validation/**/*.png
 !data/expander_code/exp106/final_results/*.json
 !data/expander_code/exp106/final_results/*.csv
 # One row per code and p, and fully derivable from the published NPZ.

@@ -78,6 +78,26 @@ times what erasing that advantage requires. The reason is structural: a code at
 as many independent opportunities to misread, and one round of readout is not
 protected by any meta-check in `H_aug = [H_Z | I]`.
 
+## The figure
+
+`readout_threshold_bracket.png` draws the primary contrast at all three readout
+rates on one axis, each from its own **published, certified** aggregate with its
+own simultaneous 95 percent band. Nothing in it is a new measurement; it is a
+rendering of three terminal results, and it is filed here because it is what the
+section above describes.
+
+The `q = 0` curve is the only one that ever goes below zero. It dips over
+`p in [0.02, 0.055]`, deepest at `-0.053`. Both `q = 0.01` and `q = 0.05` stay
+above zero across their whole windows, with bands that never reach it. Whatever
+`q_c` is, it is small enough that `q = 0.01` has already crossed it.
+
+The two published figures are in `final_results/`: `primary_crossing.png` (the
+six per-`m` curves, ordered by size at every point, and `Delta38` with its band)
+and `distance_strata.png` (the preregistered distance-stratified secondary and
+the measured ensemble composition -- the distance-2 fraction falling from 0.229
+at `m = 3` to 0.101 at `m = 8` is the mechanism exp104 identified behind exp103's
+anomaly, and it is why exp106 samples thousands of codes per size).
+
 ## The certified bound on the requested observable
 
 The original request was `q_top`. Section 7 gives a certified one-sided bound from
@@ -135,6 +155,8 @@ from the start that it would.
 ## Evidence in this directory
 
 - `loader_verification.json` — the independent macmini re-derivation
+- `readout_threshold_bracket.png` — the cross-experiment diagnostic figure,
+  drawn from exp104's, exp105's and exp106's published aggregates
 
 ## Reproduction
 
